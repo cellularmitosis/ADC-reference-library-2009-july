@@ -1,0 +1,178 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/1999/REC-html401-19991224/loose.dtd">
+<html><head>
+<!-- BEGIN META TAG INFO -->
+<link rel="home" href="http://developer.apple.com/">
+<link rel="find" href="http://developer.apple.com/search/">
+<link rel="stylesheet" type="text/css" href="../../documentation/css/adcstyle.css" title="fonts">
+<script language="JavaScript" type="text/javascript" src="../../documentation/js/busnav.js"></script>
+<script language="JavaScript" src="../../documentation/js/adc.js" type="text/javascript"></script>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<!-- END META TAG INFO -->
+<!-- BEGIN TITLE -->
+<title>Technical Note TN2104: Handling Audio Unit Events</title>
+<!-- END TITLE -->
+</head>
+<!-- BEGIN BODY OPEN -->
+<body bgcolor="#ffffff"><a name="//apple_ref/doc/uid/DTS10003198" title="Handling Audio Unit Events"></a>
+<!--END BODY OPEN -->
+<!-- START CENTER OPEN -->
+<center>
+<!-- END CENTER OPEN -->
+<a name="top"></a>
+<!-- BEGIN LOGO AND SEARCH -->
+<!--#include virtual="/includes/adcnavbar"-->
+<!-- END LOGO AND SEARCH -->
+<!-- START BREADCRUMB -->
+<div id="breadcrumb"><table width="680" border="0" cellpadding="0" cellspacing="0"><tr>
+<td scope="row"><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+<td><img width="340" height="10" src="images/1dot.gif" alt=""></td></tr><tr valign="middle"><td align="left" colspan="2">
+<a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../technicalnotes/index.html">Technical Notes</a> &gt; <a href="../../technicalnotes/MusicAudio/index.html">Audio</a> &gt; <a href="../../technicalnotes/MusicAudio/idxCarbon-date.html">Carbon</a> &gt; 
+</td></tr><tr><td colspan="2" scope="row"><img width="680" height="35" src="images/1dot.gif" alt=""></td></tr></table></div>
+<!-- END BREADCRUMB -->
+
+<!-- START MAIN CONTENT -->
+<!-- START TITLE GRAPHIC AND INTRO-->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top">
+<td><h1>
+<div id="pagehead">Technical Note TN2104</div>
+<div id="pageheadsub">Handling Audio Unit Events</div>
+</h1></td></tr></table>
+<!-- END TITLE GRAPHIC AND INTRO -->
+<!-- BEGIN WIDE COLUMN -->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td align="left" width="680">
+<!-- BEGIN CONTENTS -->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td><p>This technote describes how to use AudioUnitEvents to send and receive notifications about an Audio Unit's changing state, whether those changes are due to &quot;gestures&quot;, or changes in the values of parameters or properties.</p><p>Using the <code>AudioUnitEvent</code> API, Audio Units, Audio Unit Hosts, and their UIs now have a unified method of sending and receiving notifications of events.  Notifications of events can be sent and received without the need of different implementations for both Carbon and Cocoa UIs.  This greatly simplifies the interaction between Audio Units, their hosts, and their UIs.</p></td></tr><tr><td scope="row"><img width="680" height="10" src="images/1dot.gif" alt=""><br><img height="1" width="680" src="images/1dot_919699.gif" alt=""><br><img width="680" height="20" src="images/1dot.gif" alt=""></td></tr></table><table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td width="680"><ul><li><a href="#AUDIOEVENT">AudioUnitEvents and AUEventListeners</a></li><li><a href="#PARAMETERS">Handling Parameter Changes</a></li><li><a href="#PROPERTIES">Handling Property Changes</a></li><li><a href="#GESTURES">Notifications of begin/end gestures</a></li><li><a href="#SUMMARY">Summary</a></li><li><a href="#REFERENCES">References</a></li><li><a href="#TNT_HISTORY_TAG">Document Revision History</a></li></ul></td></tr><tr><td colspan="3" scope="row"><img width="680" height="10" src="images/1dot.gif" alt=""><br><img height="1" width="680" src="images/1dot_919699.gif" alt=""><br><img width="680" height="20" src="images/1dot.gif" alt=""></td></tr></table><p>There are three different types of events that can fall into the <code>AudioUnitEvent</code> category:</p><ul><li><p>Changes to an Audio Unit Property value.</p></li><li><p>Signaling begin or end of Audio Unit Parameter change gestures</p></li></ul><p>The <code>AudioUnitEvent</code> API is simply a mechanism for sending notification of these types of changes.  This new implementation builds on top of the existing Core Audio API for Audio Unit property and parameter listening.  This new implementation allows better cooperation among clients by using AudioUnitEvents to be aware of what the other client is doing.  Now, when an Audio Unit host changes an Audio Unit's parameter (or property value), that change can be reflected in the host's GUI, and vice versa.</p><p>This new API also provides a universal notification of signaling begin or end parameter change gestures. An example of a gesture would be a user clicking and dragging a slider on an UI.  The begin gesture in this case would be the users first click, whereas the end gesture would be when the user releases the mouse button. This is much like Carbon mouse click events, but now a developer can expand the definition of gestures to events other than just mouse clicks (such as pressing a key on the keyboard).</p><A NAME="AUDIOEVENT"></A><H2>AudioUnitEvents and AUEventListeners</H2><p>Audio Unit Events are comprised of an AudioUnitEventType and possibly an argument, which can refer to either an AudioUnitParameter or an AudioUnitProperty.</p><p class="smalltext"><strong>Listing 1:</strong> The AudioUnitEvent struct as defined in AudioUnitUtilities.h</p><pre class="sourcecodebox">
+typedef struct AudioUnitEvent {
+   AudioUnitEventType        mEventType;
+    union {
+          AudioUnitParameter      mParameter;
+          AudioUnitProperty       mProperty;
+    }  mArgument;
+} AudioUnitEvent;</pre><p>An <code>AudioUnitEventType</code> will describe an <code>AudioUnitEvent</code>. Event types are restricted to the following four types of events: begin and end gestures, parameter changes, and property changes. If the intended use of an <code>AudioUnitEvent</code> is to send a notification of <code>AudioUnitParameter</code> activity, then the only event types that may be used are <code>kAudioUnitEvent_ParameterValueChange</code>, <code>kAudioUnitEvent_BeginParameterChangeGesture</code>, or <code>kAudioUnitEvent_EndParameterChangeGesture</code>. Similarly, an AudioUnitProperty can only use <code>kAudioUnitEvent_PropertyChange</code> as the event type.</p><p class="smalltext"><strong>Listing 2:</strong> AudioUnitEventType as defined in AudioUnitUtilities.h</p><pre class="sourcecodebox">
+typedef UInt32 AudioUnitEventType;
+
+enum {
+    kAudioUnitEvent_ParameterValueChange           = 0,
+    kAudioUnitEvent_BeginParameterChangeGesture    = 1,
+    kAudioUnitEvent_EndParameterChangeGesture      = 2,
+    kAudioUnitEvent_PropertyChange                 = 3
+};
+</pre><p>Listeners can be created to monitor changes in the parameters or properties of an Audio Unit. The <code>AUEventListenerCreate</code> method (defined in &lt;AudioToolbox/AudioUnitUtilities.h&gt;) will create an <code>AUEventListener</code> for your Audio Unit. To correctly  create an event listener with the <code>AUEventListenerCreate</code> method, you must include the CFRunLoop and the CFRunLoop mode on which you intend to receive <code>AudioUnitEvent</code> notifications.   While these notifications may be issued from real-time priority threads, they may be received on another run loop that can be specified when the event listener is created.  When using <code>AUEventListenerCreate</code>, you must also specify the interval between calls to the event listener proc, as well as the granularity with which the  parameter value changes will queued by the event listener proc. This will improve performance because it defines the correct frequency for notifications to occur, which enables Audio Units and hosts to react more appropriately to an event. For example, when an event follows a previous one by a smaller time interval than the granularity, then the listener will only be notified for the second parameter change. This can be very helpful depending on the type of Audio Unit or host being created. Please refer to AudioUnitUtilities.h for more information and examples of notification intervals and value change granularity.</p><p>After the event listener is created, you may add events it will listen for by using <code>AUEventListenerAddEventType</code>.  The <code>AUEventListenerAddEventType</code> method requires an <code>AUEventListenerRef</code> and an <code>AudioUnitEvent</code>.</p><p class="smalltext"><strong>Listing 3:</strong> The AUEventListenerProc callback as defined in AudioUnitUtilities.h</p><pre class="sourcecodebox">
+typedef void (*AUEventListenerProc) (void *        inCallbackRefCon,
+                                     void *        inObject,
+                                     const AudioUnitEvent *        inEvent,
+                                     UInt64            inEventHostTime,
+                                     Float32           inParameterValue);
+</pre><p class="smalltext"><strong>Listing 4:</strong> AUListenerCreate declaration as defined in AudioUnitUtilities.h</p><pre class="sourcecodebox">
+extern OSStatus
+     AUListenerCreate(AUParameterListenerProc    inProc,
+                         void *inRefCon,
+                         CFRunLoopRef inRunLoop,
+                         CFStringRef inRunLoopMode,
+                         Float32 inNotificationInterval,
+                         AUParameterListenerRef *outListener);
+</pre><p class="smalltext"><strong>Listing 5:</strong> Creating an Audio Unit Event Listener</p><pre class="sourcecodebox">
+OSStatus createListener(){
+
+    OSStatus result = noErr;
+    AudioUnitProperty  myProperty;
+    AudioUnitEvent  myPropertyEvent;
+    AUEventListenerRef MyListener;
+
+    //this may be a run loop of your choosing
+    CFRunLoopRef runLoop =
+           (CFRunLoopRef)GetCFRunLoopFromEventLoop(GetCurrentEventLoop());
+    CFStringRef loopMode = kCFRunLoopDefaultMode;
+
+    myPropertyEvent.mEventType = kAudioUnitEvent_PropertyChange;
+    myPropertyEvent.mArgument.mProperty = myProperty;
+
+    AUEventListenerCreate(MyPropertyListener,
+                                NULL,
+                                runLoop,
+                                loopMode,
+                                100,
+                                100,
+                                &amp;MyListener);
+    AUEventListenerAddEventType(MyListener, NULL, &amp;myPropertyEvent );
+
+    return result;
+}
+
+</pre><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="PARAMETERS"></A><H2>Handling Parameter Changes</H2><p>Audio Unit parameters are used to modify the behavior of the rendering process of an Audio Unit. Parameters can be used to modify volume, gain, delay and many other behaviors that would have an effect on an Audio Unit. These changes are often applied in real time and notifications of these changes can be sent and received through an <code>AudioUnitEvent</code>.</p><p>Parameter change notifications can be sent by an Audio Unit or host using <code>AUEventListenerNotify</code>.  The <code>AudioUnitEvent</code> must have <code>kAudioUnitEvent_ParameterValueChange</code> as the type and an <code>AudioUnitParameter</code> for the argument.  The events are delivered serially to the listener interspersed with parameter changes, preserving the time order of the events and parameter changes.  This is much like what <code>AUParameterListener</code> already does, but in a more general case.  An <code>AUParameterListener</code> can generate theses notifications by using <code>AUParameterSet</code> and <code>AUParameterListenerNotify</code>.</p><p>The <code>AUEventListener</code> API's extend the above <code>AUParameterListener</code> API's by adding a semantic of events other than parameter changes.</p><p class="smalltext"><strong>Listing 6:</strong> Short example of creating an AudioUnitEvent (Parameter Change) and notifying AUEventListener</p><pre class="sourcecodebox">
+    AudioUnitEvent myEvent;
+    myEvent.mEventType = kAudioUnitEvent_ParameterValueChange;
+    myEvent.mArgument.mParameter.mAudioUnit = myAudioUnit;
+    myEvent.mArgument.mParameter.mParameterID = parameterID;
+    myEvent.mArgument.mParameter.mScope = kAudioUnitScope_Global;
+    myEvent.mArgument.mParameter.mElement = 0;
+    AUEventListenerNotify(NULL, NULL, &amp;myEvent);
+</pre><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="PROPERTIES"></A><H2>Handling Property Changes</H2><p>Properties represent a general and extensible mechanism for passing information to and from Audio Units.  The type of information passed by properties can be managed by listening for AudioUnitEvents.  Actions both internal and external to an Audio Unit can change a property's value.</p><p>For instance, an output audio unit that tracks the device that a user chooses in the Sound Preferences pane is the Default Output Unit.  The device can be changed at any time through user interaction.  If a program has an instance of the <code>DefaultOutputUnit</code> open, a property listener for the <code>kAudioOutputUnitProperty_CurrentDevice</code> property can be established to allow the program to detect that change.  Alternatively, the program may not care about the particular device that the <code>DefaultOutputUnit</code> is connected to, but may care about the format of that device, e.g. the sample rate of the device.  To detect that property has changed, a listener can also be established beforehand to notify that a property value has changed.  Then the host or Audio Unit can take any appropriate actions that it needs to.</p><p>Property change notifications can be implemented by using an <code>AudioUnitEvent</code>.  The <code>AudioUnitEvent</code> must have an <code>AudioUnitProperty</code> and <code>kAudioUnitEvent_PropertyChange</code> as the type.  After a listener is created using <code>AUEventListenerCreate</code>, the Audio Unit or host can receive these notifications safely on the thread where it will be most applicable instead of the thread where the change actually occurred. This is particularly useful for notifications which are generated on an audio rendering thread (such threads typically run with realtime priority).</p><p class="smalltext"><strong>Listing 7:</strong> Short example of creating an AudioUnitEvent (Property Change) and notifying AUEventListener</p><pre class="sourcecodebox">
+    AudioUnitEvent myEvent;
+    myEvent.mEventType = kAudioUnitEvent_PropertyChange;
+    myEvent.mArgument.mProperty.mAudioUnit = myAudioUnit;
+    myEvent.mArgument.mProperty.mPropertyID = PropertyID;
+    myEvent.mArgument.mProperty.mScope = kAudioUnitScope_Global;
+    myEvent.mArgument.mProperty.mElement = 0;
+    AUEventListenerNotify(NULL, NULL, &amp;myEvent);
+</pre><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="GESTURES"></A><H2>Notifications of begin/end gestures</H2><p>Audio Units have a general method of sending begin and end gesture notifications.  Begin and end gesture notifications send a signal to say that a parameter is about to be changed or has finished changing.  This enables both Carbon and Cocoa UIs to send and receive these types of event notifications from user interactions, then decide what to do with that information.  This new mechanism generalizes the definition of gestures so that any interaction with the GUI can be interpreted as a gesture, therefore removing the limitation of mouse clicks (mouse up, mouse down) as the only valid gesture that can be interpreted.  This will eventually deprecate the Carbon view events <code>kAudioUnitCarbonViewEvent_MouseDownInControl</code> and <code>kAudioUnitCarbonViewEvent_MouseUpInControl</code>.</p><p>For example, a user may want to click and drag a parameter button on an Audio Unit's GUI to change its value.  The UI can be made to react to the user's selection by changing the button color to provide feedback to the user that a parameter value is about to be changed.  After the parameter button is released, an end parameter change gesture notification can be sent out to revert the button color.</p><p>Begin and end gesture notifications have no data associated with them.  Using <code>AUEventListenerNotify</code> with the event types <code>kAudioUnitEvent_BeginParameterChangeGesture</code>, or <code>kAudioUnitEvent_EndParameterChangeGesture</code> will ignore parameter argument value if one exists.  AudioUnitParameter data will only be passed through an <code>AudioUnitEvent</code> if the event is of the <code>kAudioUnitEvent_ParameterValueChange</code> type.</p><p class="smalltext"><strong>Listing 8:</strong> Short example of managing parameter value changes using begin &amp; end gestures</p><pre class="sourcecodebox">
+void CreateAudioUnitEventForParameterID(AudioUnitEvent *myEvent,
+                                        AudioUnitParameterID parameterID){
+
+    myEvent-&gt;mArgument.mParameter.mAudioUnit = myAudioUnit;
+    myEvent-&gt;mArgument.mParameter.mParameterID = parameterID;
+    myEvent-&gt;mArgument.mParameter.mScope = kAudioUnitScope_Global;
+    myEvent-&gt;mArgument.mParameter.mElement = 0;
+
+}
+
+void HandleMouseDown(AudioUnitEvent *myEvent){
+    myEvent-&gt;mEventType = kAudioUnitEvent_BeginParameterChangeGesture;
+    AUEventListenerNotify(NULL, NULL, myEvent);
+}
+
+void HandleParameterChange(AudioUnitEvent *myEvent){
+    myEvent-&gt;mEventType =kAudioUnitEvent_ParameterValueChange;
+    AUEventListenerNotify(NULL, NULL, myEvent);
+}
+
+void HandleMouseUp(AudioUnitEvent *myEvent){
+    myEvent-&gt;mEventType = kAudioUnitEvent_EndParameterChangeGesture;
+    AUEventListenerNotify(NULL, NULL, myEvent);
+}
+
+</pre><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="SUMMARY"></A><H2>Summary</H2><p>The <code>AudioUnitEvent</code> API enables Audio Units, Audio Unit hosts, and their GUIs to communicate more effectively.  As a result, this will greatly simplify the interaction between these objects.</p><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="REFERENCES"></A><H2>References</H2><p><A HREF="../../audio/pdf/coreaudio.pdf">Audio and MIDI on Mac OS X (May 2001) </A></p><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNT_HISTORY_TAG"></A><H2>Document Revision History</H2><table cellspacing="0" class="graybox" width="680"><tr><th width="100">Date</th><th width="580">Notes</th></tr><tr><td scope="row">2005-04-29</td><td>AUEvent notifications clarification.</td></tr><tr><td scope="row">2004-02-16</td><td>This technote explains how to handle AudioUnit Events</td></tr></table><p><b>Posted:</b> 2005-04-29</p>
+<!-- END CONTENTS -->
+</td></tr></table>
+<!-- END WIDE COLUMN -->
+<!-- END MAIN CONTENT -->
+	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/technotes/tn2002/tn2104.html%3Fid%3DDTS10003198-1.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/technotes/tn2002/tn2104.html%3Fid%3DDTS10003198-1.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/technotes/tn2002/tn2104.html%3Fid%3DDTS10003198-1.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+
+<!-- START BOTTOM APPLE NAVIGATION -->
+<!--#include virtual="/includes/footer"-->
+<!-- END BOTTOM APPLE NAVIGATION -->
+<!-- START CENTER CLOSE -->
+</center>
+<!-- END CENTER CLOSE -->
+</body></html>

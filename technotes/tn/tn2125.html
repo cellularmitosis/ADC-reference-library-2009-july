@@ -1,0 +1,1054 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/1999/REC-html401-19991224/loose.dtd">
+<html><head>
+<!-- BEGIN META TAG INFO -->
+<link rel="home" href="http://developer.apple.com/">
+<link rel="find" href="http://developer.apple.com/search/">
+<link rel="stylesheet" type="text/css" href="../../documentation/css/adcstyle.css" title="fonts">
+<script language="JavaScript" type="text/javascript" src="../../documentation/js/busnav.js"></script>
+<script language="JavaScript" src="../../documentation/js/adc.js" type="text/javascript"></script>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<!-- END META TAG INFO -->
+<!-- BEGIN TITLE -->
+<title>Technical Note TN2125: Thread-safe programming in QuickTime</title>
+<!-- END TITLE -->
+</head>
+<!-- BEGIN BODY OPEN -->
+<body bgcolor="#ffffff"><a name="//apple_ref/doc/uid/DTS10003392" title="Thread-safe programming in QuickTime"></a>
+<!--END BODY OPEN -->
+<!-- START CENTER OPEN -->
+<center>
+<!-- END CENTER OPEN -->
+<a name="top"></a>
+<!-- BEGIN LOGO AND SEARCH -->
+<!--#include virtual="/includes/adcnavbar"-->
+<!-- END LOGO AND SEARCH -->
+<!-- START BREADCRUMB -->
+<div id="breadcrumb"><table width="680" border="0" cellpadding="0" cellspacing="0"><tr>
+<td scope="row"><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+<td><img width="340" height="10" src="images/1dot.gif" alt=""></td></tr><tr valign="middle"><td align="left" colspan="2">
+<a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../technicalnotes/index.html">Technical Notes</a> &gt; <a href="../../technicalnotes/QuickTime/index.html">QuickTime</a> &gt; <a href="../../technicalnotes/QuickTime/idxCocoa-date.html">Cocoa</a> &gt; 
+</td></tr><tr><td colspan="2" scope="row"><img width="680" height="35" src="images/1dot.gif" alt=""></td></tr></table></div>
+<!-- END BREADCRUMB -->
+
+<!-- START MAIN CONTENT -->
+<!-- START TITLE GRAPHIC AND INTRO-->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top">
+<td><h1>
+<div id="pagehead">Technical Note TN2125</div>
+<div id="pageheadsub">Thread-safe programming in QuickTime</div>
+</h1></td></tr></table>
+<!-- END TITLE GRAPHIC AND INTRO -->
+<!-- BEGIN WIDE COLUMN -->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td align="left" width="680">
+<!-- BEGIN CONTENTS -->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td><p>The technical note introducing QuickTime 1.0 in 1992 began with the phrase &quot;The world isn't standing still -- it's moving, fast&quot;. Since its introduction QuickTime has kept pace, evolving over the years from a mere 500 APIs to over 2500, adding support for new video, still image and audio formats, streaming, interactivity and so on. Since the release of Mac OS X 10.3, QuickTime has allowed developers to move common processor-intensive QuickTime operations to background threads enabling more powerful and responsive applications.</p><p>This technical note is aimed at QuickTime developers who are targeting Mac OS X 10.3 or later and want to add multithreading support to their applications or components.</p><p>If you're interested in adding multithreading support to your QuickTime application or component but are not familiar with the vocabulary or concepts of multithreaded application development, refer to the following list of reference materials:</p><p><A HREF="#TNTAG34">Technical Books List</A></p><p>To take advantage of QuickTime's multithreading support, you must be working with Mac OS X 10.3 or later and QuickTime 6.4 or later. Earlier versions of Mac OS X do not provide the system level support required for QuickTime to be called from background threads, even with the latest version of QuickTime installed.</p><p>QuickTime 7 provides even greater flexibility, the adoption of Core Audio under the hood for example removed many of the earlier limitations when working with certain sound media formats.</p><p>QTKit developers who would like to take advantage of the thread-safety support discussed in this document must target Mac OS X 10.5 or QuickTime 7.3 or later. Previous versions do not provide the QTKit framework APIs required to support thread-safe operations.</p></td></tr><tr><td scope="row"><img width="680" height="10" src="images/1dot.gif" alt=""><br><img height="1" width="680" src="images/1dot_919699.gif" alt=""><br><img width="680" height="20" src="images/1dot.gif" alt=""></td></tr></table><table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td width="680"><ul><li><a href="#TNTAG1">Introduction</a></li><li><a href="#TNTAG2">Thread-safe Operations</a><ul><li><a href="#TNTAG4">What can be made thread-safe</a></li><li><a href="#TNTAG3">What is not thread-safe</a></li></ul></li><li><a href="#TNTAG8">Advice for Application Developers</a><ul><li><a href="#TNTAG5">Calling EnterMoviesOnThread</a></li><li><a href="#TNTAG9">Moving QuickTime objects between threads</a></li><li><a href="#TNTAG12">Dealing with Callbacks</a></li><li><a href="#TNTAG21">Dealing with the Resource Manager</a></li><li><a href="#TNTAG23">Scenarios and Sample Code</a></li></ul></li><li><a href="#TNTAG51">Working with the QTKit Framework</a><ul><li><a href="#TNTAG52">Overview</a></li><li><a href="#TNTAG53">QTMovie Class Methods</a></li><li><a href="#TNTAG56">QTMovie Instance Methods</a></li><li><a href="#TNTAG61">Beware the underlying QuickTime Movie Controller</a><ul><li><a href="#TNTAG67">Correctly creating a QTMovie for background processing</a></li></ul></li><li><a href="#TNTAG62">Sample Code</a></li><li><a href="#TNTAG65">QTKit Capture</a></li></ul></li><li><a href="#TNTAG49">QuickTime for Windows</a></li><li><a href="#TNTAG13">Advice for Component Developers</a><ul><li><a href="#TNTAG14">Use the one-shot Component Manager resource APIs</a></li><li><a href="#TNTAG17">Don't use the Component RefCon to store global state</a></li><li><a href="#TNTAG18">Consider putting constant tables into your executable</a></li><li><a href="#TNTAG19">Set the Component thread-safe flag</a></li></ul></li><li><a href="#TNTAG29">QuickTime Thread-safe components</a></li><li><a href="#TNTAG28">References</a><ul><li><a href="#TNTAG34">Technical Books List</a></li><li><a href="#TNTAG33">Mac OS X</a></li><li><a href="#TNTAG35">PThreads and Multithreading</a></li><li><a href="#TNTAG50">Tools</a></li></ul></li><li><a href="#TNT_HISTORY_TAG">Document Revision History</a></li></ul></td></tr><tr><td colspan="3" scope="row"><img width="680" height="10" src="images/1dot.gif" alt=""><br><img height="1" width="680" src="images/1dot_919699.gif" alt=""><br><img width="680" height="20" src="images/1dot.gif" alt=""></td></tr></table><A NAME="TNTAG1"></A><H2>Introduction</H2><p>QuickTime's heritage on traditional Mac OS (System 6.0.8 through Mac OS 9) meant that many of the original APIs were designed to be called from a single thread. Mac OS X, however, introduced Macintosh developers to the power of true multiprocessing -- the ability to perform multiple simultaneous operations in <strong>multiple applications</strong> at once. Mac OS X also removed some traditional Mac OS limitations regarding the types of tasks that could be performed with multiple threads from within any <strong>single application</strong>.</p><p>Why is this important when developing a QuickTime application?</p><p>To answer this question, let's suppose that all processing operations were instantaneous. If this were true, all operations could be run in theory, from the same thread. In reality however, many common operations can in fact take time. When these processor intensive operations delay application responsiveness by blocking the user interface, or by limiting the number of tasks that can be performed at once, the user experience suffers. Your application can benefit whenever you can perform a QuickTime operation that doesn't require any direct user interaction and can run regardless of whatever is happening on the main thread.</p><p>As an example, think about movie compression -- a somewhat time consuming processes. Maybe your application would like to compress two movies at the same time, or play one movie while compressing another. These types of QuickTime operations prior to Mac OS X 10.3 may have introduced unacceptable processing delays or lack of application responsiveness.</p><p>Now consider moving this operation from the main thread (the user interface blocking thread) to a background thread, or even a number of background threads. Your application could then compress and export multiple movies in different formats all at the same time while playing another movie or performing some other task all without blocking the user interface.</p><p>The design goal of QuickTime's multithreading support for Mac OS X 10.3 and later specifically addresses this problem. QuickTime will now allow developers to move processor-intensive tasks to background threads, freeing up the main thread thereby improving an application's speed, responsiveness and overall performance.</p><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG2"></A><H2>Thread-safe Operations</H2><p>Mac OS X 10.3 and later now allows you to perform the following QuickTime operations from background threads:</p><ul><li><p>Opening movie files</p></li><li><p>Rendering Movies</p></li><li><p>Compressing and exporting Movies</p></li><li><p>Still image Import and Export</p></li></ul><p>These types of operations can take up a great deal of processing time thus causing CPU bottlenecks and user interface responsiveness problems. They are ideal to move to background threads.</p><div class="notebox"><p><strong>IMPORTANT:</strong> Movie <strong>playback</strong> has always avoided blocking the user interface. It has been this way since QuickTime 1.0 and continues to be true.</p></div><p>Before discussing what can be made thread-safe, we need to define a few terms; QuickTime Movie, Movie file, QuickTime object and Disjoint.</p><ul><li><p>QuickTime Movie - an opaque QuickTime data structure in memory referencing time-based media.</p></li><li><p>Movie File - a file containing some media sample data that sits on disk. A movie file may, or may not be a QuickTime movie file (.mov). For example, a movie file could be an MPEG4 file (.mp4) imported and being viewed as a QuickTime Movie.</p></li><li><p>QuickTime object - in the context of this technical note this term is used as a generic reference to any of the QuickTime data types. A QuickTime object could be some opaque data structure like a QuickTime Movie, a Component Instance, Decompression sequence and so on.</p></li><li><p>Disjoint - Having no elements in common.</p></li></ul><div class="notebox"><p><strong>Note:</strong> It is important to understand the above distinction between a QuickTime Movie (the data structure in memory) and a movie file (the file on disk).</p></div><A NAME="TNTAG4"></A><H3>What can be made thread-safe</H3><p>QuickTime applications working with the following toolbox managers can be made thread-safe:</p><ul><li><p>Movie Toolbox (Import, Rendering, Creation, Export)</p></li><li><p>Image Compression Manager</p></li><li><p>QuickDraw (Offscreen GWorlds)</p></li><li><p>Component Manager</p></li><li><p>Alias Manager</p></li><li><p>Memory Manager</p></li></ul><p>Independent threads in your application can safely use logically disjoint sets of QuickTime objects from multiple threads. If one thread has its own unique set of QuickTime objects and another thread has its own unique set, then any operation performed on these objects can be considered thread-safe. The two threads must have no QuickTime objects in common. See Figure 1.</p><p>For example, two background threads could import a .DV stream then step through each Movie using APIs such as <code>GetNextInterestingTime</code>, <code>SetMovieTime</code> and render frames by calling <code>MoviesTask</code>.</p><p class="caption"><strong>Figure 1:</strong> Disjoint access is thread-safe.</p><p><img  src="images/tn2125_disjointednessOK.jpg" width="424" height="181" alt="Figure 1, Disjoint access is thread-safe."></p><p>Conversely, if two threads access the same QuickTime object or objects simultaneously, then any operation performed on these objects is not considered thread-safe. The threads manipulating these objects are required to perform their own synchronization (or locking) around any object access. This is no different from any unprotected (or global) data structure that needs to be accessed from multiple threads. Some kind of thread protection must be implemented before allowing simultaneous access. See Figure 2.</p><p class="caption"><strong>Figure 2:</strong> Simultaneous access is not thread-safe.</p><p><img  src="images/tn2125_disjointednessNotOK.jpg" width="218" height="142" alt="Figure 2, Simultaneous access is not thread-safe."></p><div class="notebox"><p><strong>Note:</strong> POSIX pthread APIs provide two thread synchronization primitives; mutexs and condition variables.</p><p>Mutexes are simple locks and can be used to control access to some QuickTime object like a Graphics Importer Instance or Decompression Sequence shared between two background threads.</p><p>Mutexes have only two states, locked and unlocked. POSIX condition variable can be used with mutexes to allow threads to block and wait for a signal from another thread. When the signal arrives, the thread that's blocked can then attempt to grab the lock on the related mutex.</p><p>Multiprocessing Services also provides thread synchronization and signaling mechanisms.</p><p>See the References section at the end of this Technical Note for more information regarding pthreads and Multiprocessing Services.</p></div><p>An exception occurs when working with the file system. The operating system routines that implement access to files are all thread-safe. Because the file system is designed for multithreaded access, independent threads can have two QuickTime objects referring to the same file. It is perfectly fine to have two threads share the same movie file for <strong>reading</strong>. Two threads can have their own separate QuickTime Movies referencing the same movie file while performing read operations. For example, these threads could render or display different parts of the Movie at the same time, without any problems. However, it may not be safe for one of these threads to be writing to the movie file while the other thread is reading from it without some locking. See Figure 3.</p><p class="caption"><strong>Figure 3:</strong> Sharing the same movie file for reading is thread-safe.</p><p><img  src="images/tn2125_disjointednessFile.jpg" width="334" height="238" alt="Figure 3, Sharing the same movie file for reading is thread-safe."></p><p>The key point in this discussion is that your application should not allow more than one thread to work on the same QuickTime object at same time if you want to ensure thread-safety. It is your responsibility as the caller to ensure that this is the case.</p><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG3"></A><H3>What is not thread-safe</H3><p>The following Toolbox managers are not thread safe; QuickTime applications cannot use their services from background threads:</p><ul><li><p>HIToolbox (User Interface)</p></li><li><p>Resource Manager</p></li></ul><p>Additionally, the following Movie Toolbox functionality is not available from background threads:</p><ul><li><p>Movie Playback</p></li><li><p>Movie Controller</p></li></ul><p>The Human Interface Toolbox provides user interface elements for applications. Working with the HIToolbox however is not thread-safe. Additionally, it is the main threads run loop which normally receives all the events generated by the user.</p><p>It doesn't matter if you are working with QuickTime in the Carbon or Cocoa environment, user interface elements must stay on the main thread and it is your responsibility as the caller to avoid creating or presenting a Dialog or Window on a background thread. QuickTime user interface elements include the Standard Compression Dialog, Dialogs presented by APIs such as <code>MovieExportDoUserDialog</code>, the default Movie Export Progress Procedure and so on. See Figure 4.</p><p class="caption"><strong>Figure 4:</strong> Keep all user interface on the main thread.</p><p><img  src="images/tn2125_howsafe.jpg" width="356" height="185" alt="Figure 4, Keep all user interface on the main thread."></p><p>Working with the Resource Manager is also not thread-safe, because its APIs involve the use of a global state called the &quot;resource chain&quot;. The resource chain is a list of open resource file. It is effectively an implicit parameter passed to most of the Resource Manager APIs. This means you should not call APIs such as <code>OpenComponentResFile</code>, <code>OpenAComponentResFile</code>, <code>CloseComponentResFile</code> and so on, from background threads.</p><p>The Movie Toolbox provides the functionality that allows you to import, play, render, create, edit, and store time-based data. Movies cannot be played on background threads, therefore calling Movie Toolbox <strong>playback</strong> APIs such as <code>StartMovie</code> or <code>SetMovieRate</code> should only be done from the main thread.</p><p>The Movie Controller (and Carbon Movie Control which you can think of in terms of the more familiar HIToolbox Control) provides a whole suite of functionality when working with QuickTime Movies; playback, editing, user interface, interactive event dispatching to name a few. The Movie Controller however is not thread-safe and must only be created and used from the main thread.</p><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG8"></A><H2>Advice for Application Developers</H2><p>Performing some high-level operation such as opening a movie file or converting an image from one format to another may involve a number of lower-level components such as Movie Importers, Data Handlers, Image Decompressors and so on. These components may, or may not be thread-safe and often the application doesn't have any way of knowing which lower-level components will be invoked until the operation has started.</p><p>This means that some media files cannot be opened and certain media conversions cannot be performed safely from background threads. Your application will need to adopt a strategy to deal with this possibility.</p><p>Mac OS X 10.3 includes a number of thread-safe and non-thread-safe components. For example, while the most widely used still image formats such as JPEG, PNG and TIFF have been made thread-safe MacPaint has not. You can use this to your advantage by having a very well defined case to test how well your code handles dealing with media requiring  components that are not thread-safe. In most cases you will need to move the QuickTime object to the main thread and continue the operation. The threads import and export samples in  the <A HREF="#TNTAG23">Scenarios and Sample Code</A> section of this document demonstrate this technique.</p><A NAME="TNTAG5"></A><H3>Calling EnterMoviesOnThread</H3><p>Applications using QuickTime on background threads should now call <code>EnterMoviesOnThread</code> on each background thread before calling any other QuickTime APIs on those threads. When QuickTime will no longer be used on a background thread, the thread should call <code>ExitMoviesOnThread</code>. This indicates to QuickTime that the application will no longer be using QuickTime from that thread.</p><p>The <code>EnterMoviesOnThread</code> / <code>ExitMoviesOnThread</code> pair is not the same as <code>EnterMovies</code> / <code>ExitMovies</code> pair. Applications should continue to call <code>EnterMovies</code> if QuickTime APIs are being used on the main thread.</p><p><code>EnterMoviesOnThread</code> initializes a thread-private QuickTime environment, so calls to <code>GetMoviesError</code> or <code>MoviesTask(NULL, 0)</code>, for example, will not obtain errors or task movies in other threads.</p><p>Calling <code>EnterMoviesOnThread</code> also informs the Component Manager that it should not allow the use of any non-thread-safe components on that thread. If the Component Manager is about to open a non-thread-safe component to perform a certain function, it will return a <code>componentNotThreadSafeErr</code> (-2098) error without opening the component. This error code will then propagate up to the caller.</p><p>Your application can receive a <code>componentNotThreadSafeErr</code> from any QuickTime API called from a background thread, and should use this as a notification that the work being performed on the background thread needs to be shifted over to the main thread.</p><p class="smalltext"><strong>Listing 1:</strong> EnterMoviesOnThread.</p><pre class="sourcecodebox">
+OSErr EnterMoviesOnThread(UInt32 inFlags)
+
+EnterMoviesOnThread is used to indicate to QuickTime that an application will be using
+QuickTime APIs on the current thread.
+
+inFlags - flags indicating how the executing thread will be using QuickTime. Pass 0 for
+the default options.
+
+Flags:
+
+kQTEnterMoviesFlagDontSetComponentsThreadMode = 1L &lt;&lt; 0
+
+Discussion:
+
+Applications should call EnterMoviesOnThread on threads they create. If
+EnterMoviesOnThread is not called on a spawned preemptive thread when calling QuickTime
+APIs, the global QuickTime state will be shared with the main thread.
+
+By default, EnterMoviesOnThread will set the current Component Manager thread mode
+according to state of QuickTime's thread sharing policy. If the QuickTime state is
+private to the thread, the mode will be set to kCSAcceptThreadSafeComponentsOnlyMode. If
+the QuickTime state is shared between the thread calling EnterMoviesOnThread and the
+main thread, then the mode will be set to kCSAcceptAllComponentsMode.
+
+By including the kQTEnterMoviesFlagDontSetComponentThreadMode flag in the call to
+EnterMoviesOnThread, no change to the thread mode will be made leaving it as it was
+before the call. Setting the thread mode is a convenience provided by
+EnterMoviesOnThread and can be done directly using CSSetComponentsThreadMode. You can
+also get the current thread mode by calling CSGetComponentsThreadMode.
+
+The thread mode set by calling EnterMoviesOnThread or CSSetComponentsThreadMode is
+thread-local, not process-global.
+
+The first call to EnterMoviesOnThread will change the Component Manager thread mode
+unless the kQTEnterMoviesFlagDontSetComponentsThreadMode flag is passed. All subsequent
+calls will leave the Component Manger thread mode unaffected.
+
+Multiple calls to EnterMoviesOnThread can be made on a single thread. An example may be
+an application that spawns a thread and calls EnterMoviesOnThread. The application then
+calls library code that also uses QuickTime. The library code, which is unable to
+predict if the caller initialized QuickTime, will call also call EnterMoviesOnThread.
+This matches the typical usage of EnterMovies today by libraries.
+</pre><p class="smalltext"><strong>Listing 2:</strong> ExitMoviesOnThread.</p><pre class="sourcecodebox">
+OSErr ExitMoviesOnThread(void)
+
+ExitMoviesOnThread is used to indicate to QuickTime that the application will no longer
+be using QuickTime APIs on the current thread.
+
+Discussion:
+
+ExitMoviesOnThread returns an appropriate operating system or QuickTime error if the
+operation couldn't be completed. This might occur because a previous call to
+EnterMoviesOnThread was not made.
+
+ExitMoviesOnThread should be called before exiting from a background thread that uses
+QuickTime and undoes the setup performed by EnterMoviesOnThread.
+
+Each EnterMoviesOnThread call should be matched with an ExitMoviesOnThread.
+ExitMoviesOnThread should not be called on a thread without a previous call to
+EnterMoviesOnThread.
+
+Note that after the last ExitMoviesOnThread is called on a background thread, subsequent
+calls to QuickTime APIs without calling EnterMoviesOnThread first will result in threads
+sharing the main thread's state just as though the application didn't use the
+EnterMoviesOnThread / ExitMoviesOnThread pair. This is for compatibility.
+
+Not calling ExitMoviesOnThread while not fatal can potentially result in resource leaks.
+Callers should therefore bracket all QuickTime calls on secondary threads between an
+initial EnterMoviesOnThread and final ExitMoviesOnThread.
+</pre><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG9"></A><H3>Moving QuickTime objects between threads</H3><p>In some cases, you may need to move a QuickTime object from one thread to another.</p><p>When working with instances of Graphics Importers and Graphics Exporters, you will need to manage this by implementing your own locking mechanism and ensuring that the QuickTime object (the Component Instance in this case) is only being called from one thread at a time.</p><p>QuickTime Movies on the other hand must know which thread they belong to at any given time. There are two APIs that must be called whenever moving a QuickTime Movie from one thread to another. You must first detach a Movie from the old thread then attach it to the new thread.</p><p>When passing a QuickTime Movie from one thread to another, call <code>DetachMovieFromCurrentThread</code> in the old thread and <code>AttachMovieToCurrentThread</code> in the new thread. This lets QuickTime know which thread owns the Movie and ensures that the Movie is not incorrectly tasked on the wrong thread. See Figure 5.</p><p class="caption"><strong>Figure 5:</strong> Migrating a QuickTime Movie between threads.</p><p><img  src="images/tn2125_migration.jpg" width="444" height="435" alt="Figure 5, Migrating a QuickTime Movie between threads."></p><p>Obtaining a Movie reference using any of the <code>NewMovie...</code> APIs such as <code>NewMovie</code>, <code>NewMovieFromDataRef</code>, <code>NewMovieFromFile</code> and so on will create a Movie that is already attached to the current thread. Calls to <code>AttachMovieToCurrentThread</code> will fail if the movie is already attached to a thread. If you're opening or creating a movie with the intention of passing it to a background thread, call <code>DetachMovieFromCurrentThread</code> on the creation thread before calling <code>AttachMovieToCurrentThread</code> on the background thread.</p><p>Calling <code>DetachMovieFromCurrentThread</code> to detach QuickTime Movie containing un-safe media (media requiring non-thread-safe components to render) from the main thread will fail and return a  <code>componentNotThreadSafeErr</code>. As previously mentioned, your application should be ready to deal with this specific situation and either perform the operation on the main thread, move the operation over to the main thread if the error was received on a background thread, or cancel the operation as required.</p><p class="smalltext"><strong>Listing 3:</strong> AttachMovieToCurrentThread.</p><pre class="sourcecodebox">
+OSErr AttachMovieToCurrentThread(Movie m)
+
+m - the Movie for this operation. Your application obtains this
+Movie identifier from such functions as NewMovie, NewMovieFromFile, and
+NewMovieFromHandle.
+
+Returns noErr if there is no error or componentNotThreadSafeErr if the Movie cannot
+be attached to the current thread.
+
+Discussion:
+
+Attaches a movie to the current thread.
+</pre><p class="smalltext"><strong>Listing 4:</strong> DetachMovieFromCurrentThread.</p><pre class="sourcecodebox">
+OSErr DetachMovieFromCurrentThread(Movie m)
+
+m - the movie for this operation. Your application obtains this
+movie identifier from such functions as NewMovie, NewMovieFromFile, and
+NewMovieFromHandle.
+
+Returns noErr if there is no error.
+
+Discussion:
+
+Detaches a Movie from the current thread.
+</pre><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG12"></A><H3>Dealing with Callbacks</H3><p>A number of QuickTime APIs allow for the installation of callback routines, the most common being asynchronous completion callbacks and progress callbacks.</p><p>Asynchronous completion callbacks have always been called from special threads and must be thread-safe. These threads are not the same thread that is performing the operation; this behavior has not changed in Mac OS X 10.3.</p><p>Other QuickTime callbacks however are called from the <strong>same thread performing the operation</strong>.</p><p>This is particularly important when implementing your own progress callbacks containing some user interface elements. A progress callback called from a background thread is <strong>executing on that thread</strong>. It doesn't matter where this code resides in your application or what other functions may be using it, if a callback could be called from a background thread it must be thread-safe.</p><p>In cases such as this, you may need to re-think your progress callbacks to make them thread-safe. One very useful technique is to use <A HREF="../../documentation/Carbon/Conceptual/Carbon_Event_Manager/Tasks/chapter_3_section_13.html#//apple_ref/doc/uid/TP30000989-CH203-TPXREF110">custom carbon events</A> sent from the progress callback on a background thread to a carbon event handler on the main thread. This can be accomplished by using the thread-safe API <code>PostEventToQueue</code> from a background thread. See Figure 6.</p><p>The API <code>GetMainEventQueue</code> can be used to retrieve the main event queue <code>EventQueueRef</code> -- this is the queue the Carbon event will be posted to.</p><div class="notebox"><p><strong>Note:</strong> On Mac OS X 10.3.x <code>GetMainEventQueue</code> is not thread-safe and must be called from the main thread. Your application can call this API early, storing the returned <code>EventQueueRef</code>, which at a later time can be part of the thread data passed to your background threads.</p><p>On Mac OS X 10.4 and greater, <code>GetMainEventQueue</code> is thread-safe and can be called from the background thread which may be posting the event.</p></div><p class="caption"><strong>Figure 6:</strong> Use PostEventToQueue to send custom Carbon Events to the main thread.</p><p><img  src="images/tn2125_postevent.jpg" width="356" height="256" alt="Figure 6, Use PostEventToQueue to send custom Carbon Events to the main thread."></p><div class="notebox"><p><strong>IMPORTANT:</strong> Don't call <code>SetMovieProgressProc</code> on a background thread with the MovieProgressUPP set to -1 for the Movie Toolbox's default progress function. This is not thread-safe.</p><p>When you don't want any Movie progress function use NULL:</p><p><code>SetMovieProgressProc(theMovie, NULL, NULL)</code>.</p></div><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG21"></A><H3>Dealing with the Resource Manager</H3><p>The Resource Manager is not thread-safe. It is critical to remember that this includes any APIs manipulating resources, the resource chain, or resource maps.</p><p>However, the one-shot Component Manager calls that return component resources are thread-safe and should be used if your application needs to obtain a public resource from a Component.</p><p>These include the following APIs:</p><ul><li><p><code>GetComponentResource</code></p></li><li><p><code>GetComponentIndString</code></p></li><li><p><code>GetComponentPublicResource</code></p></li><li><p><code>GetComponentPublicIndString</code></p></li><li><p><code>GetComponentPublicResourceList</code></p></li></ul><p class="smalltext"><strong>Listing 5:</strong> Using GetComponentPublicResource.</p><pre class="sourcecodebox">
+ComponentDescription cd;
+ResourceHandle resource = NULL;
+Component c = 0;
+
+cd.componentType = MovieExportType;
+cd.componentSubType = kAComponentSubType;
+cd.componentManufacturer = kAManufacturer;
+cd.componentFlags = 0;
+cd.componentFlagsMask = 0;
+
+c = FindNextComponent(c, &amp;cd)
+if (c) {
+    err = GetComponentPublicResource(c, 'PICT', 1, &amp;resource);
+    if (noErr == err) {
+        // do something with the resource
+
+        ...
+        DisposeHandle(resource);
+    }
+}
+</pre><p>For more information on these APIs see <A HREF="../../quicktime/icefloe/dispatch021.html">Ice Floe Dispatch 21</A></p><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG23"></A><H3>Scenarios and Sample Code</H3><p>(a) Still image import - ThreadsImporter Sample Code</p><p><A HREF="../../samplecode/ThreadsImporter/index.html">ThreadImporter</A> demonstrates importing and displaying still images on separate threads.</p><p>(b) Still image export - ThreadsExporter Sample Code</p><p><A HREF="../../samplecode/ThreadsExporter/index.html">ThreadsExporter</A> demonstrates importing and exporting still images in different formats on separate threads.</p><p>(c) QuickTime Movie import - ThreadsImportMovie Sample Code</p><p><A HREF="../../samplecode/ThreadsImportMovie/index.html">ThreadsImportMovie</A> demonstrates importing and displaying QuickTime Movies on separate threads.</p><p>(d) QuickTime Movie export - ThreadsExportMovie Sample Code</p><p><A HREF="../../samplecode/ThreadsExportMovie/index.html">ThreadsExportMovie</A> demonstrates exporting Movies using the QuickTime Movie Export Component on separate threads.</p><p>(e) Opening a Movie on main thread then migrating a copy of the Movie to a background thread.</p><p>Listing 8 contains a common code snippet demonstrating how a Movie can be migrated from the main thread to a background thread for some further processing. It's used with the worker functions shown in listings 6 and 7. The function <code>Do_SomeWorkOnSeparateThread</code> is called with a WindowRef containing a QuickTime movie and creates a background thread which then executes the function <code>DoSomeWorkFunction</code> shown in those listings.</p><p>(f) Export a migrated movie from a background thread.</p><p>Listing 6 opens the QuickTime Movie Export Component, configures it to compress the video using the DV Codec then calls <code>ConvertMovieToDataRef</code> to perform the export operation from the background thread.</p><p class="smalltext"><strong>Listing 6:</strong> Exporting a Movie on a background thread.</p><pre class="sourcecodebox">
+// This worker function performs the Movie Export operation on a background thread
+void *DoSomeWorkFunction(void *inWorkerThreadRef)
+{
+    QTAtomContainer exportSettings;
+    Handle theDataRef;
+    OSType theDataRefType;
+    EventRef theEventRef = NULL;
+    OSStatus status;
+
+    WorkerThreadRef worker = (WorkerThreadRef)inWorkerThreadRef;
+
+    EnterMoviesOnThread(0);
+
+    status = AttachMovieToCurrentThread(worker-&gt;theMovie);
+    require_noerr(status, CantAttachToCurrentThread);
+
+    CFStringRef path = CFSTR(&quot;/Users/fasteddie/Desktop/testoutput.mov&quot;);
+
+    status = QTNewDataReferenceFromFullPathCFString(path, kQTNativeDefaultPathStyle,
+                                                    0, &amp;theDataRef, &amp;theDataRefType);
+    require_noerr(status, Done);
+
+    // open the QuickTime Movie Export component and configure it
+    ComponentInstance ci = OpenDefaultComponent(MovieExportType, kQTFileTypeMovie);
+    if (ci) {
+
+        SCSpatialSettings ss;
+        SCTemporalSettings ts;
+        UInt8 falseSetting = false;
+        QTAtom videAtom = 0;
+        QTAtom sptlAtom = 0;
+        QTAtom tprlAtom = 0;
+        QTAtom ensoAtom = 0;
+        QTAtom saveAtom = 0;
+        QTAtom fastAtom = 0;
+
+        ss.codecType = kDVCNTSCCodecType;
+        ss.codec = NULL;
+        ss.depth = 0;
+        ss.spatialQuality = codecHighQuality;
+
+        ts.temporalQuality = 0;
+        ts.frameRate = FixRatio(30, 1); //30L&lt;&lt;16;
+        ts.keyFrameRate = 0;
+
+        // get the defaults and change them - you could keep these around if you want
+        status = MovieExportGetSettingsAsAtomContainer(ci, &amp;exportSettings);
+        require_noerr(status, Done);
+
+        // video options
+        videAtom = QTFindChildByID(exportSettings, kParentAtomIsContainer,
+                                   kQTSettingsVideo, 1, NULL);
+        if (videAtom) {
+            // spatial
+            sptlAtom = QTFindChildByID(exportSettings, videAtom, scSpatialSettingsType,
+                                       1, NULL);
+            if (sptlAtom) {
+                status = QTSetAtomData(exportSettings, sptlAtom,
+                                       sizeof(SCSpatialSettings), &amp;ss);
+            }
+            // temporal
+            tprlAtom = QTFindChildByID(exportSettings, videAtom, scTemporalSettingsType,
+                                       1, NULL);
+            if (tprlAtom) {
+                status = QTSetAtomData(exportSettings, tprlAtom,
+                                       sizeof(SCTemporalSettings), &amp;ts);
+            }
+        }
+
+        // we only care about video
+        // disable export sound
+        ensoAtom = QTFindChildByID(exportSettings, kParentAtomIsContainer,
+                                   kQTSettingsMovieExportEnableSound, 1, NULL);
+        if (ensoAtom) {
+            status = QTSetAtomData(exportSettings, ensoAtom, sizeof(falseSetting),
+                                   &amp;falseSetting);
+        }
+
+        // turn off save for internet options aka fastStart
+        saveAtom = QTFindChildByID(exportSettings, kParentAtomIsContainer,
+                                   kQTSettingsMovieExportSaveOptions, 1, NULL);
+        if (saveAtom) {
+            fastAtom = QTFindChildByID(exportSettings, saveAtom,
+                                       kQTSettingsMovieExportSaveForInternet, 1, NULL);
+            if (fastAtom) {
+                status = QTSetAtomData(exportSettings, fastAtom, sizeof(falseSetting),
+                                       &amp;falseSetting);
+            }
+        }
+
+        // set 'em
+        status = MovieExportSetSettingsFromAtomContainer(ci, exportSettings);
+        require_noerr(status, Done);
+
+        // no progress proc - if you do use a custom progress proc remember that it will
+        // be called on this thread and that you cannot use any user interface
+        // one approach you could use if you required user interface would be to create
+        // custom carbon events and post them to a handler installed on the main thread
+        SetMovieProgressProc(worker-&gt;theMovie, NULL, NULL);
+
+        // export the movie
+        ConvertMovieToDataRef(worker-&gt;theMovie, 0, theDataRef, theDataRefType,
+                              kQTFileTypeMovie, FOUR_CHAR_CODE('TVOD'),
+                              createMovieFileDeleteCurFile |
+                              createMovieFileDontCreateResFile,
+                              ci);
+    }
+
+Done:
+
+    DetachMovieFromCurrentThread(worker-&gt;theMovie);
+
+    if (ci) CloseComponent(ci);
+    if (exportSettings) QTDisposeAtomContainer(exportSettings);
+    if (theDataRef) DisposeHandle(theDataRef);
+
+CantAttachToCurrentThread:
+
+    ExitMoviesOnThread();
+
+    worker-&gt;threadStatus = status;
+
+    CreateEvent(NULL, kEventClassQTThreading, kEventAppCleanUpThreadDroppings, 0,
+                kEventAttributeNone, &amp;theEventRef);
+    SetEventParameter(theEventRef, kEventParamThreadData, typeWorkerThreadRef,
+                      sizeof(worker), &amp;worker);
+
+    if (theEventRef) {
+        PostEventToQueue(worker-&gt;mainEventQueue, theEventRef,
+                         kEventPriorityStandard);
+        ReleaseEvent(theEventRef);
+    }
+
+    pthread_exit(NULL);
+}
+</pre><p>(g) Rendering video to a GWorld and creating a Movie from scratch on a background thread.</p><p>Listing 7 creates a new Movie and movie file, renders the migrated movie to a <code>'2vuy'</code> GWorld, manipulates the luma and saves the sample data into the newly created movie file all on the background thread.</p><p class="smalltext"><strong>Listing 7:</strong> Rendering and Creating a Movie on a background thread.</p><pre class="sourcecodebox">
+// This worker function renders and creates a new Movie on a background thread
+void *DoSomeWorkFunction(void *inWorkerThreadRef)
+{
+    Handle theDataRef;
+    OSType theDataRefType;
+    DataHandler theDataHandler = 0;
+    Movie theNewMovie = NULL;
+    ImageDescriptionHandle id;
+    GWorldPtr theGWorld;
+    PixMapHandle theGWorldPixMap;
+    unsigned long theGWorldRowBytes;
+    Ptr baseAddr;
+    long theDataSize;
+    Track theTrack;
+    Media theMedia;
+    Rect srcRect;
+    short flags;
+    OSType whichMediaType = VideoMediaType;
+    TimeValue movieTime = 0;
+    TimeValue duration;
+    EventRef theEventRef = NULL;
+    OSStatus status;
+
+    WorkerThreadRef worker = (WorkerThreadRef)inWorkerThreadRef;
+
+    EnterMoviesOnThread(0);
+
+    status = AttachMovieToCurrentThread(worker-&gt;theMovie);
+    require_noerr(status, CantAttachToCurrentThread);
+
+    CFStringRef path = CFSTR(&quot;/Users/fasteddie/Desktop/testoutput.mov&quot;);
+
+    status = QTNewDataReferenceFromFullPathCFString(path,
+                                                    kQTNativeDefaultPathStyle,
+                                                    0,
+                                                    &amp;theDataRef,
+                                                    &amp;theDataRefType);
+    require_noerr(status, Done);
+
+    status = CreateMovieStorage(theDataRef, theDataRefType,
+                                FOUR_CHAR_CODE('TVOD'), smSystemScript,
+                                createMovieFileDeleteCurFile |
+                                createMovieFileDontCreateResFile,
+                                &amp;theDataHandler, &amp;theNewMovie);
+    require_noerr(status, Done);
+
+    // get the size of the movie
+    GetMovieBox(worker-&gt;theMovie, &amp;srcRect);
+    MacOffsetRect(&amp;srcRect, -srcRect.left, -srcRect.top);
+
+    // create a GWorld to render the frame into
+    status = QTNewGWorld(&amp;theGWorld,
+                         k2vuyPixelFormat,
+                         &amp;srcRect,
+                         NULL,
+                         NULL,
+                         0);
+    require_noerr(status, Done);
+
+    // set the GWorld
+    SetGWorld(theGWorld, NULL);
+    SetMovieGWorld(worker-&gt;theMovie, theGWorld, NULL);
+
+    theGWorldPixMap = GetGWorldPixMap(theGWorld);
+    LockPixels(theGWorldPixMap);
+    baseAddr = GetPixBaseAddr(theGWorldPixMap);
+    theGWorldRowBytes = QTGetPixMapHandleRowBytes(theGWorldPixMap);
+
+    // get the image description and data size
+    // NOTE: according to Ice Floe Dispatch 19 Image Descriptions
+    // for QuickTime Movie files containing uncompressed Y'CbCr video data
+    // should be version 2 and include a number of required Image Description
+    // extensions. We don't add any of these for the sake of simplicity
+    // http://developer.apple.com/quicktime/icefloe/dispatch019.html
+    status = MakeImageDescriptionForPixMap(theGWorldPixMap, &amp;id);
+    theDataSize = (**id).dataSize;
+
+    // create a new movie track and media
+    theTrack = NewMovieTrack(theNewMovie,
+                             FixRatio((srcRect.right - srcRect.left), 1),
+                             FixRatio((srcRect.bottom - srcRect.top), 1),
+                             kNoVolume);
+    status = GetMoviesError();
+    require_noerr(status, Done);
+
+    theMedia = NewTrackMedia(theTrack, VideoMediaType,
+                             kQTSDefaultMediaTimeScale, NULL, 0);
+    status = GetMoviesError();
+    require_noerr(status, Done);
+
+    // begin the editing session so sample data will be written out to the file
+    status = BeginMediaEdits(theMedia);
+    require_noerr(status, Done);
+
+    // for the first frame, include the frame we are currently on
+    flags = nextTimeMediaSample | nextTimeEdgeOK;
+    whichMediaType = VideoMediaType;
+
+    Handle theSampleData = NewHandle(theDataSize);
+    if (MemError() || NULL == theSampleData) goto Done;
+
+    while (1) {
+        // get the next frame of the source movie
+        // skip to the next interesting time
+        GetMovieNextInterestingTime(worker-&gt;theMovie,
+                                    flags,
+                                    1,
+                                    &amp;whichMediaType,
+                                    movieTime,
+                                    0,
+                                    &amp;movieTime,
+                                    &amp;duration);
+        status = GetMoviesError();
+        require_noerr(status, Done);
+
+        if (-1 == movieTime) break;
+
+        // set the time for the frame
+        SetMovieTimeValue(worker-&gt;theMovie, movieTime);
+
+        // draw the frame into the GWorld
+        MoviesTask(worker-&gt;theMovie, 0);
+        status = GetMoviesError();
+        require_noerr(status, Done);
+
+        // mess with the luma subtracting 25 from each Y
+        // value clamping at 16 the min value (25+16 = 41)
+        // CbYCrY 8-bits each component pixels 0-1
+        // see Ice Floe Dispatch 19
+        // http://developer.apple.com/quicktime/icefloe/dispatch019.html
+        UInt32 height = srcRect.bottom;
+        Ptr nextScanLine = baseAddr;
+        while (height--) {
+            UInt32 width = theGWorldRowBytes &gt;&gt; 1;
+            UInt8 *thePixPtr = (UInt8 *)nextScanLine;
+            while (width--) {
+                UInt8 Y = thePixPtr[1];
+                Y = ((Y &lt;= 41) * 16) | ((Y - 25) * !(Y &lt;= 41));
+                thePixPtr[1] = Y;
+                thePixPtr += 2;
+            }
+            nextScanLine += theGWorldRowBytes;
+        }
+
+        // add the media sample to the movie
+        PtrToXHand(baseAddr, theSampleData, theDataSize);
+        status = AddMediaSample(theMedia,
+                                theSampleData, // the video sample
+                                0,             // no offset into data
+                                theDataSize,
+                                60,            // frame duration
+                                (SampleDescriptionHandle)id,
+                                1,             // one sample
+                                0,             // self-contained samples
+                                NULL);
+        require_noerr(status, Done);
+
+        flags = nextTimeMediaSample;
+    }
+
+    // end the media editing session
+    status = EndMediaEdits(theMedia);
+    require_noerr(status, Done);
+
+    // add the media to the track
+    status = InsertMediaIntoTrack(theTrack, 0, 0, GetMediaDuration(theMedia),
+                                  fixed1);
+    require_noerr(status, Done);
+
+    status = AddMovieToStorage(theNewMovie, theDataHandler);
+
+Done:
+
+    SetMovieGWorld(worker-&gt;theMovie, NULL, NULL);
+
+    // something messed up so delete the file
+    if (status &amp;&amp; theDataHandler) {
+        DataHDeleteFile(theDataHandler);
+    }
+
+    if (theDataRef) DisposeHandle(theDataRef);
+    if (theDataHandler) CloseMovieStorage(theDataHandler);
+    if (id) DisposeHandle((Handle)id);
+    if (theSampleData) DisposeHandle(theSampleData);
+    if (theNewMovie) DisposeMovie(theNewMovie);
+    if (theGWorld) DisposeGWorld(theGWorld);
+
+    DetachMovieFromCurrentThread(worker-&gt;theMovie);
+
+CantAttachToCurrentThread:
+
+    worker-&gt;threadStatus = status;
+
+    ExitMoviesOnThread();
+
+    CreateEvent(NULL, kEventClassQTThreading, kEventAppCleanUpThreadDroppings,
+                0, kEventAttributeNone, &amp;theEventRef);
+    SetEventParameter(theEventRef, kEventParamThreadData, typeWorkerThreadRef,
+                      sizeof(worker), &amp;worker);
+
+    if (theEventRef) {
+        PostEventToQueue(worker-&gt;mainEventQueue, theEventRef,
+                         kEventPriorityStandard);
+        ReleaseEvent(theEventRef);
+    }
+
+    pthread_exit(NULL);
+}
+</pre><p class="smalltext"><strong>Listing 8:</strong> Do_SomeWorkOnSeparateThread.</p><pre class="sourcecodebox">
+// Worker thread struct we pass around
+typedef struct {
+    SInt32        refCount;
+    pthread_t     workerThread;
+    Movie         theMovie;
+    EventQueueRef mainEventQueue;
+    OSStatus      threadStatus;
+} WorkerThread, *WorkerThreadRef;
+
+// Our custom Carbon event type
+enum {
+  kEventClassQTThreading = 'QTTH',
+  kEventAppCleanUpThreadDroppings = 'clup',
+  kEventParamThreadData = 'thrd',
+  typeWorkerThreadRef = 'thrd'      // WorkerThreadRef
+};
+
+
+// code required to install our Carbon event handler
+// this snippet could reside in a larger initialize function that installs
+// a minimum set of Carbon event handlers, possibly before calling
+// RunApplicationEventLoop()
+
+...
+
+EventTypeSpec eventType[] = {{kEventClassQTThreading,
+                              kEventAppCleanUpThreadDroppings}};
+status = InstallApplicationEventHandler(Handle_CleanUpThreadData,
+                                        GetEventTypeCount(eventType),
+                                        eventType, NULL, NULL);
+
+...
+
+// The Carbon event handler for our custom clean up event
+static pascal OSStatus Handle_CleanUpThreadData(EventHandlerCallRef inHandlerCallRef,
+                                                EventRef inEvent, void *inUserData)
+{
+    WorkerThreadRef worker = NULL;
+
+    GetEventParameter(inEvent, kEventParamThreadData, typeWorkerThreadRef,
+                      NULL, sizeof(worker), NULL, &amp;worker);
+    if (NULL == worker) return eventNotHandledErr;
+
+    if (1 == DecrementAtomic(&amp;worker-&gt;refCount)) {
+        DisposeMovie(worker-&gt;theMovie);
+        free(worker);
+    }
+
+    return noErr;
+}
+
+// check the component for the magic cmpThreadSafe flag
+Boolean IsComponentThreadSafe(OSType inComponentType, OSType inComponentSubType)
+{
+    Component comp = 0;
+    ComponentDescription cd = { inComponentType, inComponentSubType,
+                                kAnyComponentManufacturer, 0, cmpIsMissing };
+    ComponentDescription compDesc;
+
+    comp = FindNextComponent(0, &amp;cd);
+    while (comp != NULL) {
+        GetComponentInfo(comp, &amp;compDesc, NULL, NULL, NULL);
+        if (compDesc.componentFlags &amp; cmpThreadSafe) return true;
+
+        comp = FindNextComponent(comp, &amp;cd);
+    }
+
+    return false;
+}
+
+/*****************************************************
+*
+* Do_SomeWorkOnSeparateThread(WindowRef aWindow)
+*
+* Purpose:  Takes the Movie being played in the passed in Window
+* and clones it, moves it to a background thread and then calls
+* one of the DoSomeWorkFunctions above to perform the work
+*
+* Inputs:   A Window Reference
+*
+* Returns:  none
+*/
+static OSStatus Do_SomeWorkOnSeparateThread(WindowRef aWindow)
+{
+    WorkerThreadRef worker;
+    pthread_attr_t attr;
+    OSStatus status = paramErr;
+
+    if (NULL == aWindow) return status;
+
+    WindowDataPtr wdr = (WindowDataPtr)GetWRefCon(aWindowRef);
+    if (NULL == wdr) return status;
+
+    Handle cloneHandle = NewHandle(0);
+    if (NULL == cloneHandle || status = MemError()) return status;
+
+    // allocate memory for the worker thread data
+    worker = calloc(1, sizeof(WorkerThread));
+    if (NULL == worker) { status = memFullErr; goto Failure; }
+
+    // we need the main event queue so we can call
+    // PostEventToQueue from the background thread
+    // but GetMainEventQueue isn't thread safe on
+    // 10.3.x -- that's why we set this up here
+    // However, GetMainEventQueue IS thread safe on
+    // 10.4 and greater, so we have the flexibility
+    // to do this later if we wished on newer systems
+    worker-&gt;mainEventQueue = GetMainEventQueue();
+
+    // clone the original movie this new movie will be attached
+    // to the main thread so make sure to detach it
+    status = PutMovieIntoHandle(wdr-&gt;fMovie, cloneHandle);
+    require_noerr(status, Failure);
+
+    status = NewMovieFromHandle(&amp;worker-&gt;theMovie, cloneHandle, newMovieActive, NULL);
+    require_noerr(status, Failure);
+
+    status = DetachMovieFromCurrentThread(worker-&gt;theMovie);
+    if (componentNotThreadSafeErr == status) {
+
+        // darn! - we can't export this movie as is on a separate thread
+        // we first need to remove tracks containing unsafe media
+
+        long trackCount = GetMovieTrackCount(worker-&gt;theMovie);
+        long count;
+
+        // delete all tracks of unsafe types
+        for (count = 1; count &lt;= trackCount; count++) {
+            Track track = GetMovieIndTrack(worker-&gt;theMovie, count);
+            Media media = GetTrackMedia(track);
+            SampleDescriptionHandle desc;
+            OSType theMediaType;
+            OSType theCodecType;
+
+            if (track) {
+                GetMediaHandlerDescription(media, &amp;theMediaType, NULL, NULL);
+                desc = (SampleDescriptionHandle)NewHandle(0);
+                GetMediaSampleDescription(media, 1, desc);
+                theCodecType = (**desc).dataFormat;
+                DisposeHandle((Handle)desc);
+                if (!IsComponentThreadSafe(MediaHandlerType, theMediaType) ||
+                    !IsComponentThreadSafe(decompressorComponentType, theCodecType)) {
+                    DisposeMovieTrack(track);
+                    count--;
+                }
+            }
+        }
+
+        // get the track count again - if there's no tracks left
+        // there's not much point in attempting an export is there
+        trackCount = GetMovieTrackCount(worker-&gt;theMovie);
+        if (trackCount == 0) goto Failure;
+
+        // try again
+        status = DetachMovieFromCurrentThread(worker-&gt;theMovie);
+        require_noerr(status, Failure);
+    }
+
+    // create thread detached
+    pthread_attr_init(&amp;attr);
+    pthread_attr_setdetachstate(&amp;attr, PTHREAD_CREATE_DETACHED);
+
+    IncrementAtomic(&amp;worker-&gt;refCount);
+
+    // create the worker thread and do some work
+    status = pthread_create(&amp;worker-&gt;workerThread, &amp;attr, DoSomeWorkFunction, worker);
+    pthread_attr_destroy(&amp;attr);
+    require_noerr(status, Failure);
+
+    DisposeHandle(cloneHandle);
+
+    return noErr;
+
+Failure:
+    if (cloneHandle) DisposeHandle(cloneHandle);
+    if (worker-&gt;theMovie) DisposeMovie(worker-&gt;theMovie);
+    if (worker) free(worker);
+    return status;
+}
+</pre><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG51"></A><H2>Working with the QTKit Framework</H2><A NAME="TNTAG52"></A><H3>Overview</H3><p>With Mac OS X 10.5 and QuickTime 7.3 or later installed, QTKit provides the framework level support that is required to use QTKit objects on background threads. This includes the ability to tell QTKit when you want to use a <code>QTMovie</code> instance on a background thread, when you're attaching or detaching a <code>QTMovie</code> instance from the current thread and also allows control of the <code>QTMovie</code> idle state.</p><p>Three <code>QTMovie</code> class methods and four <code>QTMovie</code> instance methods provide this enhanced functionality.</p><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG53"></A><H3>QTMovie Class Methods</H3><p>The <code>QTMovie</code> Class has three class methods to support thread-safety. These methods allow the client to notify the framework when it will be using, or is done using QTKit objects on background threads. Note that these methods are functionally equivalent to the <code>EnterMoviesOnThread</code> and <code>ExitMoviesOnThread</code> C API pair.</p><p class="smalltext"><strong>Listing 9:</strong> enterQTKitOnThread.</p><pre class="sourcecodebox">
++ (void)enterQTKitOnThread
+
+Discussion:
+
+Indicates that the client will be using QTKit on the current (non-main) thread and performs the required
+QuickTime-specific initialization. Must be paired with a call to +(void)exitQTKitOnThread.
+</pre><p class="smalltext"><strong>Listing 10:</strong> exitQTKitOnThread.</p><pre class="sourcecodebox">
++ (void)exitQTKitOnThread
+
+Discussion:
+
+Indicates that the client will no longer be using QTKit on the current
+(non-main) thread and performs any required QuickTime-specific cleanup. Must be paired with a call to
++(void)enterQTKitOnThread or +(void)enterQTKitOnThreadDisablingThreadSafetyProtection.
+</pre><p class="smalltext"><strong>Listing 11:</strong> enterQTKitOnThreadDisablingThreadSafetyProtection.</p><pre class="sourcecodebox">
++ (void)enterQTKitOnThreadDisablingThreadSafetyProtection
+
+Discussion:
+
+Indicates that the client will be using the QTKit on the current (non-main) thread allowing the use of
+non-threadsafe components. This is equivalent to using the kCSAcceptAllComponentsMode flag with the
+EnterMoviesOnThread C API. Must be paired with a call to +(void)exitQTKitOnThread.
+
+Developers should not under normal circumstances need to disable thread-safe component protection.
+</pre><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG56"></A><H3>QTMovie Instance Methods</H3><p>The <code>QTMovie</code> Class has four instance methods to support thread-safety. These methods allow you to attach and detach <code>QTMovie</code> instances from the currently running thread, as well as get and set the idle state of a <code>QTMovie</code> instance.</p><p class="smalltext"><strong>Listing 12:</strong> attachToCurrentThread.</p><pre class="sourcecodebox">
+- (void)attachToCurrentThread
+
+Discussion:
+
+Attaches a QTMovie instance to the current thread and if it is the main thread, adds the QTMovie instance to
+the global idle list. Call -setIdling:NO to override this default.
+</pre><p class="smalltext"><strong>Listing 13:</strong> detachFromCurrentThread.</p><pre class="sourcecodebox">
+- (void)detachFromCurrentThread
+
+Discussion:
+
+Detaches a QTMovie instance from the current thread and removes it from the global idle list. QTMovie
+instances must never be idled when they are attached to background threads.
+</pre><p class="smalltext"><strong>Listing 14:</strong> idling.</p><pre class="sourcecodebox">
+- (BOOL)idling
+
+Returns YES if the QTMovie is being idled, NO if it is not being idled.
+
+Discussion:
+
+Returns the current idling state of a QTMovie instance.
+</pre><p class="smalltext"><strong>Listing 15:</strong> setIdling.</p><pre class="sourcecodebox">
+- (void)setIdling:(BOOL)state
+
+state - idle state, YES or NO.
+
+Discussion:
+
+This method allows you to manage the idle state of a QTMovie instance, that is, whether it's being tasked or
+not.
+
+A QTMovie instance migrated to background threads using the detachFromCurrentThread /
+attachToCurrentThread methods will automatically be removed from the global idle list by the QTKit framework.
+
+QTMovie instances attached back to the main thread will be added to the global idle list automatically
+by the QTKit framework. Call -setIdling:NO to override this default behavior.
+
+Note that QTMovies attached to background threads must never be idled.
+</pre><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG61"></A><H3>Beware the underlying QuickTime Movie Controller</H3><p>A <code>QTMovie</code> instance always has-a QuickTime Movie Controller instance associated with it; this is a fundamental part of the <code>QTMovie</code> objects design. The QTKit framework relies on this QuickTime Movie Controller instance for a number of important operations, such as handling mcActions, intermovie communication, and so on.</p><p>However, QuickTime Movie Controller Components are <strong>NOT</strong> thread-safe and cannot be created on background threads. Therefore, there is a lurking thread safety problem here that will affect <code>QTMovie</code> object creation even when all the recommended thread-safety guidelines for working with QuickTime and QTKit are followed.</p><A NAME="TNTAG67"></A><H4>Correctly creating a QTMovie for background processing</H4><p>A <code>QTMovie</code> object instance <strong>must always be created and initialized on the main thread</strong> then migrated to a background thread for further processing if desired.</p><p>In other words, a <code>QTMovie</code> object <strong>must never be created on a background thread</strong>; the underlying QuickTime Movie Controller will fail to initialize and many subsequent operations on the <code>QTMovie</code> instance will simply fail. While it is possible to get around this limitation by using <code>enterQTKitOnThreadDisablingThreadSafetyProtection</code>, this is not a recommended or supported approach.</p><div class="notebox"><p><strong>WARNING:</strong> <code>QTMovie</code> objects must be allocated and initialized on the main thread then migrated to a background thread for further processing if so desired. Do not allocate a <code>QTMovie</code> object on a background thread!</p></div><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG62"></A><H3>Sample Code</H3><p class="smalltext"><strong>Listing 16:</strong> Setting up a QTMovie object on the main thread.</p><pre class="sourcecodebox">
+- (void)doExportWithFile:(NSString *)inFile
+{
+    QTMovie *movie = nil;
+
+    NSDictionary *attrs = [NSDictionary dictionaryWithObjectsAndKeys:(id)inFile, QTMovieFileNameAttribute,
+                                            [NSNumber numberWithBool:NO], QTMovieOpenAsyncOKAttribute, nil];
+
+    movie = [QTMovie movieWithAttributes:attrs error:nil];
+
+    [movie detachFromCurrentThread];
+
+    [NSThread detachNewThreadSelector:@selector(doExportOnThread:)
+                             toTarget:self
+                           withObject:movie];
+}
+</pre><p class="smalltext"><strong>Listing 17:</strong> Working on a background thread.</p><pre class="sourcecodebox">
+- (void)doExportOnThread:(QTMovie *)movie
+{
+    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+
+    NSDictionary *attrs = [NSDictionary dictionaryWithObjectsAndKeys:
+                                            [NSNumber numberWithBool:YES], QTMovieExport,
+                                            [NSNumber numberWithLong:'M4V '], QTMovieExportType, nil];
+
+    [QTMovie enterQTKitOnThread];
+    [movie attachToCurrentThread];
+
+    // do export
+    [movie writeToFile:@&quot;/Users/Shared/iPodMovie.m4v&quot; withAttributes:attrs];
+
+    [movie detachFromCurrentThread];
+    [QTMovie exitQTKitOnThread];
+
+    [pool release];
+}
+</pre><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG65"></A><H3>QTKit Capture</H3><p>The QTKit capture classes introduced in Mac OS X 10.5 and QuickTime 7.3 generally have good thread-safety characteristics. To be more specific, these classes may be used from background threads, except for <code>QTCaptureView</code> which inherits from <code>NSView</code> and therefore has a few notable limitations as discussed in the <A HREF="../../documentation/Cocoa/Conceptual/Multithreading/articles/CocoaSafety.html#//apple_ref/doc/uid/20000736-BCICDHAF">Cocoa Thread Safety</A> documentation.</p><p>Although Capture Sessions represented by the <code>QTCaptureSession</code> object and their Inputs (for example, <code>QTCaptureDeviceInput</code>) and Outputs (for example, <code>QTCaptureMovieFileOutput</code>) can be created, run, and monitored from background threads, any method calls that mutate these objects or access mutable information must be serialized. Therefore, these methods are required to perform their own synchronization (or locking) around any object access. This behavior is no different from any unprotected data structure that needs to be accessed from multiple threads.</p><p>See <A HREF="../../documentation/Cocoa/Conceptual/Multithreading/articles/CocoaSafety.html">Cocoa Thread Safety</A> and <A HREF="../../documentation/Cocoa/Conceptual/Multithreading/articles/CocoaLocks.html#//apple_ref/doc/uid/20000737-BCIGACJD">Using Locks in Cocoa</A> for more details regarding what is and what is not considered thread-safe when using Cocoa.</p><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG49"></A><H2>QuickTime for Windows</H2><p>While you may call QuickTime from a <strong>single</strong> background thread on Windows with relative safety, the system level support required to call the QuickTime Media Layer (QTML) from <strong>multiple</strong> background threads does not exist on the platform. For example, critical frameworks such as QuickDraw are not thread-safe on Windows.</p><p>Additionally, QuickTime is completely serialized on Windows only allowing a single thread to call into the QuickTime Library at any one time. If one thread is performing a QuickTime operation, any other thread making a QuickTime API call will block waiting for the previous operation to return.</p><p>Therefore, calling QuickTime from <strong>multiple</strong> background threads on Windows is not recommended.</p><div class="notebox"><p><strong>Note:</strong> This has been the case since the release of QuickTime for Windows 3.0 and remains unchanged with the current release of QuickTime for Windows.</p></div><div class="notebox"><p><strong>IMPORTANT:</strong> The QuickTime threading APIs discussed in this technical note are not available when using the QuickTime for Windows SDK.</p></div><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG13"></A><H2>Advice for Component Developers</H2><p>QuickTime's highly modular design allows it to be extended through the addition of new components that provide new and or specific services.</p><p>Component developers updating their components should make their next version thread-safe. The amount of effort this may require will differ for each component type. There are however a number of common guidelines which apply to all component types.</p><A NAME="TNTAG14"></A><H3>Use the one-shot Component Manager resource APIs</H3><p>As discussed, the Resource Manager is not thread-safe, but the one-shot Component Manager calls that return component resources are. When implementing component calls returning information stored in component resources such as <code>ImageCodecGetCodecInfo</code>, <code>GraphicsImportGetMIMETypeList</code> and so on, make sure to use the one-shot Component Manager resource APIs as required. See listings 9 through 11.</p><p class="smalltext"><strong>Listing 18:</strong> WRONG - Don't use the Resource Manager.</p><pre class="sourcecodebox">
+// The example below shows some typical old code a component could use to
+// obtain one of its resources. This is a relatively large amount of code and is
+// not thread-safe. If your component contains older code such as this
+// it's time to update the code.
+
+OSErr  err;
+Handle resource = NULL;
+short  saveResFile;
+short  resRef;
+
+saveResFile = CurResFile();
+err = OpenAComponentResFile((Component)store-&gt;self, &amp;resRef);
+if (err == noErr) {
+  resource = Get1Resource('PICT', 128);
+  if (resource) {
+    LoadResource(resource);
+    DetachResource(resource);
+  } else {
+    err = ResError();
+    if (err == noErr)
+      err = resNotFound;
+  }
+
+  CloseComponentResFile(resRef);
+  UseResFile(saveResFile);
+}
+</pre><p class="smalltext"><strong>Listing 19:</strong> CORRECT - Use GetComponentResource.</p><pre class="sourcecodebox">
+// Use the Component Manager one-shot thread-safe functions.
+// This one line performs the exact same function as the above listing.
+
+OSErr  err;
+Handle resource = NULL;
+
+err = GetComponentResource((Component)store-&gt;self, 'PICT', 128, &amp;resource);
+</pre><p class="smalltext"><strong>Listing 20:</strong> CORRECT - Implementing ImageCodecGetInfo.</p><pre class="sourcecodebox">
+// Example 'cdci' resource
+#define kMyCodecFormatName  &quot;My Cool Codec&quot;
+
+// These flags specify information about the capabilities of the component
+#define kMyDecoFlags (codecInfoDoes32 | codecInfoDoes8)
+
+// These flags specify the possible format of compressed data produced by the component
+// and the format of compressed files that the component can handle during decompression
+#define kMyFormatFlags (codecInfoDepth32 | codecInfoDepth40)
+
+// Component Description
+resource 'cdci' (129) {
+    kMyCodecFormatName, // Type
+    1,                  // Version
+    0,                  // Revision level
+    'MINE',             // Manufacturer
+    kMyDecoFlags,       // Decompression Flags
+    0,                  // Compression Flags
+    kMyFormatFlags,     // Format Flags
+    0,                  // Compression Accuracy
+    128,                // Decomression Accuracy
+    0,                  // Compression Speed
+    200,                // Decompression Speed
+    0,                  // Compression Level
+    0,                  // Reserved
+    8,                  // Minimum Height
+    8,                  // Minimum Width
+    0,                  // Decompression Pipeline Latency
+    0,                  // Compression Pipeline Latency
+    0                   // Private Data
+};
+
+// ImageCodecGetCodecInfo
+// Your codec receives the ImageCodecGetCodecInfo request whenever an application
+// calls the Image Compression Manager's GetCodecInfo function.
+// Your component should return a formatted CodecInfo structure defining its
+// capabilities.
+// Both compressors and decompressors may receive this call.
+pascal ComponentResult MyDeco_GetCodecInfo(MyCodecGlobals glob, CodecInfo *info)
+{
+    CodecInfo **tempCodecInfo;
+    OSErr err = noErr;
+
+    if (NULL == info) return paramErr;
+
+    err = GetComponentResource((Component)glob-&gt;self, codecInfoResourceType,
+                               129, (Handle *)&amp;tempCodecInfo);
+    if (noErr == err) {
+        *info = **tempCodecInfo;
+        DisposeHandle((Handle)tempCodecInfo);
+    }
+
+    return err;
+}
+</pre><p>For more information on these APIs see <A HREF="../../quicktime/icefloe/dispatch021.html">Ice Floe Dispatch 21</A></p><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG17"></A><H3>Don't use the Component RefCon to store global state</H3><p>Some components maintain a global state which is shared between Component Instances and use the Component RefCon for this purpose. This is no longer going to work when your component is called from multiple threads and therefore you should not use this RefCon to store global state.</p><p>If your component uses <code>SetComponentRefCon</code> and <code>GetComponentRefCon</code>, you'll need to review this usage. Shared globals used for communication between components should be protected, and shared globals for constant tables should be replaced with global const data as described in the next section of this document.</p><p>If however, you do need to share dynamic state between components, you'll need to use standard locking techniques to protect access to this global state as you normally would. Use functions such as <code>pthread_once</code> to protect the initialization of the global state.</p><p class="smalltext"><strong>Listing 21:</strong> The pthread_once function.</p><pre class="sourcecodebox">
+int pthread_once(pthread_once_t *once_control, void (*init_routine)(void))
+
+pthread_once performs one time initialization by ensuring that any initialization code
+is only ever executed once.
+
+once_control - a pointer to a static variable initialized to PTHREAD_ONCE_INIT.
+
+init_routine - a C initialization function corresponding to the following prototype,
+void initRoutine(void);
+
+Discussion:
+
+When pthread_once is first called with a given once_control argument, the function calls
+the init_routine then sets the value of once_control to record that initialization has
+been successful. Calls to pthread_once with the same once_control argument after
+successful initialization do nothing.
+</pre><p class="smalltext"><strong>Listing 22:</strong> Using pthread_once for initialization.</p><pre class="sourcecodebox">
+#include &lt;pthread.h&gt;
+
+typedef struct  {
+    Handle  someGlobalHandle;
+    long    someDynamicValues[ARRAY_SIZE];
+    ...
+} SharedGlobals;
+
+typedef struct {
+    ComponentInstance   self;
+    ComponentInstance   delegateComponent;
+    ComponentInstance   target;
+    OSType              codecType;
+    SharedGlobals       *sharedGlob;
+    ...
+} ComponentGlobals, *ComponentGlobalsPtr;
+
+static SharedGlobals componentSharedGlobals;
+
+static void InitSharedGlobals(void)
+{
+    componentSharedGlobals.someGlobalHandle = NewHandle(HANDLE_SIZE * sizeof(long));
+
+    InitSomeGlobalHandle(&amp;componentSharedGlobals);
+    InitSomeDynamicValues(&amp;componentSharedGlobals);
+}
+
+static SharedGlobals* GetSharedGlobals(void)
+{
+    static pthread_once_t control = PTHREAD_ONCE_INIT;
+
+    /* pthread_once executes a routine exactly once in a process.
+       The first call to this subroutine by any thread in the process
+       executes the given routine, without parameters. Any subsequent
+       call will have no effect.
+
+       This is useful when a unique initialization has to be done by
+       one thread and reduces synchronization requirements. */
+
+    pthread_once(&amp;control, InitSharedGlobals);
+
+    return &amp;componentSharedGlobals;
+}
+
+pascal ComponentResult MyCodec_ImageCodecOpen(ComponentGlobalsPtr glob,
+                                              ComponentInstance self)
+{
+    ComponentResult result = noErr;
+    ComponentDescription cd;
+
+    result = GetComponentInfo((Component)self, &amp;cd, NULL, NULL, NULL);
+    if (result) return result;
+
+    if ((glob = (ComponentGlobalsPtr)calloc(1, sizeof(ComponentGlobals))) == NULL)
+        return memFullErr;
+
+    SetComponentInstanceStorage(self,(Handle)glob);
+
+    glob-&gt;self = self;
+    glob-&gt;codecType = cd.componentSubType;
+    ...
+    glob-&gt;sharedGlob = GetSharedGlobals();
+
+    ...
+
+    return result;
+}
+</pre><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG18"></A><H3>Consider putting constant tables into your executable</H3><p>If your component requires shared globals for some constant tables allocating them once and keeping them around for use later consider building these tables separately and placing the prebuilt data in your component executable labeled as <code>static const</code>.</p><p>This is a valuable technique and has a number of advantages:</p><ul><li><p>If your table data is constant and the compiler knows that it is, the data will be placed in the read-only section of the component executable. This is also known as the TEXT segment.</p><p>The text segment is the same place as your components executable code. Not only can these constant tables be shared between multiple instances of a component within a <strong>single application</strong>, but they can also be shared between multiple instances of components across <strong>multiple applications</strong>. Your constant data will only ever reside in physical memory once.</p></li><li><p>The table data will be marked read-only. If memory needs to be paged out, the system knows it can bring the table data back at any time by mapping it back from the read-only file. This is a plus because the table data will never wastefully be written back to disk.</p></li></ul><p class="smalltext"><strong>Listing 23:</strong> Pre-built tables marked as const.</p><pre class="sourcecodebox">
+static const gReverseBitsTable[256] = {
+    0x00, 0x80, 0x40, 0xc0, 0x20, 0xa0, 0x60, 0xe0,
+    0x10, 0x90, 0x50, 0xd0, 0x30, 0xb0, 0x70, 0xf0,
+    0x08, 0x88, 0x48, 0xc8, 0x28, 0xa8, 0x68, 0xe8,
+    0x18, 0x98, 0x58, 0xd8, 0x38, 0xb8, 0x78, 0xf8,
+    [..]
+};
+
+Running nm -m from the teminal displays how these tables have indeed
+been placed in the TEXT segment.
+
+% nm -m whatever.o
+00000000 (__TEXT,__const) non-external _gReverseBitsTable
+
+If you didn't have the &quot;const&quot; keyword in the table definition, the
+table would be placed in the the DATA segment and each process will get
+its own writable copy.
+
+00000000 (__DATA,__data) non-external _gNonConstReverseBitsTable
+</pre><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG19"></A><H3>Set the Component thread-safe flag</H3><p>Once you've successfully made your component thread-safe, make sure to set the component thread-safe flag in your global component flags. This indicates to QuickTime (or any application that asks for your component info) that your component can safely be used from background threads.</p><p class="smalltext"><strong>Listing 24:</strong> Component thread-safe flag.</p><pre class="sourcecodebox">
+cmpThreadSafe  = 1L &lt;&lt; 28 // Component is thread-safe
+</pre><p class="smalltext"><strong>Listing 25:</strong> Adding the cmpThreadSafe flag.</p><pre class="sourcecodebox">
+// extended 'thng' template
+#define thng_RezTemplateVersion 1
+
+#include &lt;Carbon/Carbon.r&gt;
+#include &lt;QuickTime/QuickTime.r&gt;
+
+resource 'thng' (256) {
+    kSomeQTComponentType, // Type
+    'DEMO',               // SubType
+    'DEMO',               // Manufacturer
+    0,
+    0,
+    0,           // - use componentHasMultiplePlatforms
+    0,
+    'STR ',      // Name Type
+    128,         // Name ID
+    'STR ',      // Info Type
+    129,         // Info ID
+    0,           // Icon Type
+    0,           // Icon ID
+    kMyComponentVersion,  // Version
+    // Registration Flags
+    componentHasMultiplePlatforms |
+    kOtherComponentRegistrationFlags,
+    0,           // Resource ID of Icon Family
+    {
+      // Add Thread Safe Flag
+      kMyComponentFlags | cmpThreadSafe,
+      'dlle',    // Code Resource type - Entry point found by
+                 // symbol name 'dlle' resource
+      512,       // ID of 'dlle' resource
+      platformPowerPCNativeEntryPoint,
+                 // Platform Type (response from
+                 // gestaltComponentPlatform or failing
+                 // that, gestaltSysArchitecture)
+    };
+};
+</pre><p>For more information regarding the <code>'thng'</code> resource and building Mach-O Components see <A HREF="tn2012.html">Technical Note TN2012, 'Building Universal QuickTime Components for Mac OS X'</A>.</p><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG29"></A><H2>QuickTime Thread-safe components</H2><p>The following QuickTime components are thread-safe on Mac OS X 10.3 and later with QuickTime 6.5.2 installed. Newer versions of QuickTime may offer more thread-safe components. Fiendishthngs (see the <A HREF="#TNTAG50">Tools</A> section of this document) may be used to determine specific component capabilities with newer versions of QuickTime.</p><div class="notebox"><p><strong>IMPORTANT:</strong> All Sound Manager audio encoders/decoders (except for the DV Audio decoder) are not thread-safe with QuickTime versions 6.4 - 6.5.2. This requires removing Sound Tracks from Movies before migrating them to background threads and will prevent importing movie files containing audio on background threads.</p><p>Newer versions of QuickTime use the Core Audio framework lifting many of these restrictions.</p></div><p class="smalltext"><strong>Table 1:</strong> </p><table cellspacing="0" class="graybox"><tr><th>Image Codecs<p></p>'imco' compressorComponentType<p></p>'imdc' decompressorComponentType</th><th>Image Decompressors<p></p>'imdc' decompressorComponentType</th></tr><tr><td scope="row">Apple DV/DVCPRO Codec - NTSC</td><td>Apple Base (aka Base Codec)</td></tr><tr><td scope="row">Apple DV - PAL Codec</td><td>Apple CMYK</td></tr><tr><td scope="row">Apple DVCPRO - PAL Codec</td><td>Apple GIF</td></tr><tr><td scope="row">Apple DVCPRO50 - NTSC Codec</td><td>Apple AVR JPEG</td></tr><tr><td scope="row">Apple DVCPRO50 - PAL Codec</td><td>Apple OpenDML JPEG</td></tr><tr><td scope="row">Apple Planar RGB Codec</td><td>Apple r408</td></tr><tr><td scope="row">Apple PNG Codec</td><td>Apple Scaling</td></tr><tr><td scope="row">Apple None Codec (aka Raw Codec)</td><td>Apple Sorenson YUV9</td></tr><tr><td scope="row">Apple Animation Codec</td><td>Apple YUV420</td></tr><tr><td scope="row">Apple Video Codec</td><td>Apple YUV422</td></tr><tr><td scope="row">Apple TIFF Codec</td><td>Apple 16-bit Grey</td></tr><tr><td scope="row">Apple Cinepak Codec</td><td>Apple 32-bit Grey with Alpha</td></tr><tr><td scope="row">Apple Photo - JPEG Codec</td><td>Apple 48-bit RGB</td></tr><tr><td scope="row">Apple Motion JPEG A Codec</td><td>Apple 64-bit ARGB</td></tr><tr><td scope="row">Apple Motion JPEG B Codec</td><td>&nbsp;</td></tr><tr><td scope="row">JPEG 2000 Codec</td><td>&nbsp;</td></tr><tr><td scope="row">Apple MPEG4 Codec</td><td>&nbsp;</td></tr></table><p class="smalltext"><strong>Table 2:</strong> </p><table cellspacing="0" class="graybox"><tr><th>Still Image Importers &amp; Exporters<p></p>'grip' GraphicsImporterComponentType<p></p>'grex' GraphicsExporterComponentType</th><th>Still Image Importers<p></p>'grip' GraphicsImporterComponentType</th></tr><tr><td scope="row">JPEG</td><td>GIF</td></tr><tr><td scope="row">Photoshop</td><td>JPEG 2000</td></tr><tr><td scope="row">PNG</td><td>&nbsp;</td></tr><tr><td scope="row">QuickTime Image</td><td>&nbsp;</td></tr><tr><td scope="row">TIFF</td><td>&nbsp;</td></tr><tr><td scope="row">Base Import / Export</td><td>&nbsp;</td></tr></table><p class="smalltext"><strong>Table 3:</strong> </p><table cellspacing="0" class="graybox"><tr><th>Movie Importers &amp; Exporters<p></p>'eat ' MovieImportType<p></p>'spit' MovieExportType</th><th>Movie Importers<p></p>'eat ' MovieImportType</th><th>Movie Exporters<p></p>'spit' MovieExportType</th></tr><tr><td scope="row">DV</td><td>Animated GIF</td><td>3G</td></tr><tr><td scope="row">QuickTime Movie</td><td>Slow Movie</td><td>BMP</td></tr><tr><td scope="row">MPEG-4</td><td>Compact Disk Audio (AIFF)</td><td>Image Sequence</td></tr><tr><td scope="row">AVI</td><td>&nbsp;</td><td>Hinted Movie</td></tr><tr><td scope="row">AIFF</td><td>&nbsp;</td><td>&nbsp;</td></tr><tr><td scope="row">WAVE</td><td>&nbsp;</td><td>&nbsp;</td></tr><tr><td scope="row">muLaw</td><td>&nbsp;</td><td>&nbsp;</td></tr></table><p class="smalltext"><strong>Table 4:</strong> </p><table cellspacing="0" class="graybox"><tr><th>Data Handlers<p></p>'dhlr' DataHandlerType</th><th>Media Handlers<p></p>'mhlr' MediaHandlerType</th></tr><tr><td scope="row">Apple Handle Data Handler</td><td>Apple Generic Media Handler</td></tr><tr><td scope="row">Apple NULL Data Handler</td><td>Apple MPEG4 ODSM Media Handler</td></tr><tr><td scope="row">Apple Pointer Data Handler</td><td>Apple MPEG 4 Scene Media Handler</td></tr><tr><td scope="row">Apple Resource Data Handler</td><td>Apple Standard Media Handler</td></tr><tr><td scope="row">Apple Alias Data Handler</td><td>Time Code Media Handler</td></tr><tr><td scope="row">&nbsp;</td><td>Apple Video Media Handler</td></tr></table><p class="smalltext"><strong>Table 5:</strong> </p><table cellspacing="0" class="graybox"><tr><th>Standard Compression<p></p>'scdi' StandardCompressionType</th><th>Data Codecs<p></p>'dcom' DataCompressorComponentType<p></p>'ddec' DataDecompressorComponentType</th></tr><tr><td scope="row">Standard Image</td><td>Apple Data</td></tr><tr><td scope="row">Standard Sound</td><td>Deflate / Inflate (zlib)</td></tr></table><p class="smalltext"><strong>Table 6:</strong> </p><table cellspacing="0" class="graybox"><tr><th>Sound Decompressors<p></p>'sdec' kSoundDecompressor</th><th>Clock Components<p></p>'clok' clockComponentType</th></tr><tr><td scope="row">DV Sound Decompressor</td><td>Apple Microsecond Clock</td></tr></table><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG28"></A><H2>References</H2><A NAME="TNTAG34"></A><H3>Technical Books List</H3><ul><li><p><A HREF="http://www.amazon.com/exec/obidos/tg/listmania/list-browse/-/1XKE0LFSRIZY7/ref=cm_aya_av.lm_more/104-2703352-0145515">Threads, Operating Systems and QuickTime</A></p></li></ul><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG33"></A><H3>Mac OS X</H3><ul><li><p><A HREF="../../documentation/Cocoa/Conceptual/Multithreading/index.html">Introduction to Multithreading Programming Topics</A></p></li><li><p><A HREF="../../documentation/Cocoa/Conceptual/Multithreading/articles/CocoaSafety.html">Cocoa Thread Safety</A></p></li><li><p><A HREF="../../documentation/Cocoa/Conceptual/Multithreading/articles/CocoaLocks.html#//apple_ref/doc/uid/20000737-BCIGACJD">Using Locks in Cocoa</A></p></li><li><p><A HREF="tn2028.html">Threading Architectures</A></p></li><li><p><A HREF="../../documentation/Carbon/Conceptual/Multitasking_MultiproServ/01introduction/chapter_1_section_1.html">Introduction to Multiprocessing Services Programming Guide</A></p></li><li><p><A HREF="tn1071.html">Working with Multiprocessing Services</A></p></li><li><p><A HREF="tn2006.html">MP-Safe Routines</A></p></li><li><p><A HREF="../../quicktime/icefloe/dispatch021.html">Ice Floe Dispatch 21 - Component Resources</A></p></li><li><p><A HREF="tn2012.html">Technical Note 2012: Building QuickTime Components for Mac OS X</A></p></li></ul><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG35"></A><H3>PThreads and Multithreading</H3><ul><li><p><A HREF="http://www.llnl.gov/computing/tutorials/pthreads/">POSIX threads programming</A></p></li><li><p><A HREF="http://www.slcentral.com/articles/01/6/multithreading/index.php">Fundementals of Multithreading</A></p></li><li><p><A HREF="http://en.wikipedia.org/wiki/Multithreading">Wikipedia: Thread (computer science)</A></p></li><li><p><A HREF="http://en.wikipedia.org/wiki/Thread-safety">Wikipedia: Thread-safety</A></p></li><li><p><A HREF="http://www.cs.vu.nl/~ast/books/mos2/sample-2.pdf">Andrew S. Tanenbaum's link to Section 2.2. THREADS of his book Modern Operating Systems 2nd ed.</A></p></li><li><p><A HREF="http://www.amazon.com/exec/obidos/ASIN/0201633922/ref%3Dnosim/ricksphotograpag/104-2703352-0145515">Programming with POSIX Threads</A></p></li><li><p><A HREF="http://www.amazon.com/exec/obidos/tg/detail/-/0130424110/qid=1095717278/sr=8-4/ref=sr_8_xs_ap_i4_xgl14/102-9026273-2939321?v=glance&s=books&n=507846">Unix Systems Programming: Communication, Concurrency and Threads, Second Edition</A></p></li><li><p><A HREF="http://www.amazon.com/exec/obidos/tg/detail/-/1565921151/104-2703352-0145515?v=glance">Pthreads Programming: A POSIX Standard for Better Multiprocessing</A></p></li></ul><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG50"></A><H3>Tools</H3><p><A HREF="../../samplecode/Fiendishthngs/Fiendishthngs.html">Fiendishthngs (Mac OS X Universal Binary)</A> - This utility will list all the components it finds on the system and allow you query most QuickTime component types for detailed information.</p><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNT_HISTORY_TAG"></A><H2>Document Revision History</H2><table cellspacing="0" class="graybox" width="680"><tr><th width="100">Date</th><th width="580">Notes</th></tr><tr><td scope="row">2007-09-14</td><td>Updated for QuickTime 7.3 and Mac OS X 10.5. Added QTKit information. Editorial corrections. </td></tr><tr><td scope="row">2007-05-08</td><td>Editorial</td></tr><tr><td scope="row">2006-02-14</td><td>added QuickTime for Windows section</td></tr><tr><td scope="row">2005-05-05</td><td>editorial</td></tr><tr><td scope="row">2004-10-08</td><td>Discusses how to use QuickTime from background threads for applications and component developers.</td></tr></table><p><b>Posted:</b> 2007-09-14</p>
+<!-- END CONTENTS -->
+</td></tr></table>
+<!-- END WIDE COLUMN -->
+<!-- END MAIN CONTENT -->
+	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/technotes/tn/tn2125.html%3Fid%3DDTS10003392-2.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/technotes/tn/tn2125.html%3Fid%3DDTS10003392-2.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/technotes/tn/tn2125.html%3Fid%3DDTS10003392-2.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+
+<!-- START BOTTOM APPLE NAVIGATION -->
+<!--#include virtual="/includes/footer"-->
+<!-- END BOTTOM APPLE NAVIGATION -->
+<!-- START CENTER CLOSE -->
+</center>
+<!-- END CENTER CLOSE -->
+</body></html>

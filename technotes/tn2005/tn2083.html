@@ -1,0 +1,1649 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<!-- BEGIN META TAG INFO --><link rel="home" href="http://developer.apple.com/">
+<link rel="find" href="http://developer.apple.com/search/">
+<link rel="stylesheet" type="text/css" href="../../documentation/css/adcstyle.css" title="fonts">
+<script language="JavaScript" type="text/javascript" src="../../documentation/js/busnav.js"></script><script language="JavaScript" src="../../documentation/js/adc.js" type="text/javascript"></script><!-- END META TAG INFO --><!-- BEGIN TITLE --><title>Technical Note TN2083: Daemons and Agents</title>
+<!-- END TITLE --><style>
+			.sourcecodebox {
+				white-space: pre-wrap;
+				white-space: -moz-pre-wrap !important;
+				white-space: -pre-wrap;
+				white-space: -o-pre-wrap;
+				word-wrap: break-word;
+			}
+			</style>
+</head>
+<!-- BEGIN BODY OPEN --><body bgcolor="#ffffff"><a name="//apple_ref/doc/uid/DTS10003794" title="Daemons and Agents"></a>
+<!-- END BODY OPEN --><!-- START CENTER OPEN --><center>
+<!-- END CENTER OPEN --><a name="top"></a><!-- BEGIN LOGO AND SEARCH --><!--#include virtual="/includes/adcnavbar" --><!-- END LOGO AND SEARCH --><!-- START BREADCRUMB --><div id="breadcrumb"><table width="680" border="0" cellpadding="0" cellspacing="0">
+<tr>
+<td scope="row"><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+<td><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+</tr>
+<tr valign="middle"><td align="left" colspan="2">
+<a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../technicalnotes/index.html">Technical Notes</a> &gt; <a href="../../technicalnotes/Darwin/index.html">Darwin</a> &gt; <a href="../../technicalnotes/Darwin/idxProcessManagement-date.html">Process Management</a> &gt; </td></tr>
+<tr><td colspan="2" scope="row"><img width="680" height="35" src="images/1dot.gif" alt=""></td></tr>
+</table></div>
+<!-- END BREADCRUMB --><!-- START MAIN CONTENT --><!-- START TITLE GRAPHIC AND INTRO --><table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td><h1>
+<div id="pagehead">Technical Note TN2083</div>
+<div id="pageheadsub">Daemons and Agents</div>
+</h1></td></tr></table>
+<!-- END TITLE GRAPHIC AND INTRO --><!-- BEGIN WIDE COLUMN --><table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td align="left" width="680">
+<!-- BEGIN CONTENTS --><table width="680" border="0" cellpadding="0" cellspacing="0">
+<tr align="left" valign="top"><td>
+<p>Daemons and agents, collectively known as background programs, are programs that operate without any graphical user interface. As a developer, you can use background programs to perform actions without user interaction, and also to manage a shared state between multiple other programs.</p>
+<p>This technote describes the most common problems encountered when developing daemons and agents on Mac OS X, and offers detailed advice on solving those problems.</p>
+<p>You should read this technote if you're developing a background program for Mac OS X. You should also read this technote if you're developing a plug-in that's hosted by a background program (for example, a <a href="x-man-page://1/filter">CUPS filter</a>), because your plug-in must abide by the rules of the host's environment.</p>
+</td></tr>
+<tr><td scope="row">
+<img width="680" height="10" src="images/1dot.gif" alt=""><br><img width="680" height="1" src="images/1dot_919699.gif" alt=""><br><img width="680" height="20" src="images/1dot.gif" alt="">
+</td></tr>
+</table>
+<table width="680" border="0" cellpadding="0" cellspacing="0">
+<tr align="left" valign="top"><td width="680"><ul>
+<li><a href="#SECINTRODUCTION">Introduction</a></li>
+<li><a href="#SECDAEMONOMICON">Daemonomicon</a></li>
+<ul>
+<li><a href="#SECDAEMONS">Daemons</a></li>
+<li><a href="#SECAGENTS">Agents</a></li>
+<ul>
+<li><a href="#SECLOGINITEM">Login Item</a></li>
+<li><a href="#SECGLOBALLOGINITEM">Global Login Item</a></li>
+<li><a href="#SECLAUNCHDAGENT">launchd Agent</a></li>
+</ul>
+<li><a href="#SECANCIENTDAEMONS">Ancient Daemons (and Agents)</a></li>
+</ul>
+<li><a href="#SECEXECUTIONCONTEXTS">Execution Contexts</a></li>
+<ul>
+<li><a href="#SECUIDS">UIDs and GIDs</a></li>
+<li><a href="#SECMACHBOOTSTRAPBASICS">Mach Bootstrap Basics</a></li>
+<ul>
+<li><a href="#SECBOOTSTRAPNAMESPACES">Bootstrap Namespaces</a></li>
+<li><a href="#SECNAMESPACEHIERARCHY">Namespace Hierarchy</a></li>
+<li><a href="#SECNAMESPACEEXPLORATION">Namespace Exploration</a></li>
+</ul>
+<li><a href="#SECWINDOWSERVER">Window Server</a></li>
+<ul>
+<li><a href="#SECMORETHANWINDOWSERVER">More Than Window Server</a></li>
+<li><a href="#SECPERMISSIONTOCONNECT">Permission To Connect</a></li>
+<li><a href="#SECWINDOWSERVERLIFECYCLE">Window Server Lifecycle</a></li>
+<li><a href="#SECPRELOGINANDTRUST">Pre-Login Trust Issues</a></li>
+</ul>
+<li><a href="#SECSECURITYCONTEXT">Security Context</a></li>
+<li><a href="#SECCONTEXTCROSSREF">Execution Context Summary</a></li>
+<li><a href="#SECCONTEXTEXAMPLE">Execution Context Example</a></li>
+</ul>
+<li><a href="#SECLAYEREDFRAMEWORKS">Layered Frameworks</a></li>
+<ul>
+<li><a href="#SECLIVINGDANGEROUSLY">Living Dangerously</a></li>
+<li><a href="#SECFRAMEWORKCROSSREFERENCE">Framework Cross Reference</a></li>
+</ul>
+<li><a href="#SECDESIGNRECOMMENDATIONS">Design Considerations</a></li>
+<ul>
+<li><a href="#SEC">Is It Necessary?</a></li>
+<li><a href="#SECMONOLITHPERILS">The Perils of the Monolith</a></li>
+<li><a href="#SECCLIENTSERVER">The Client/Server Model</a></li>
+</ul>
+<li><a href="#SECGETTINGLAUNCHED">Getting Launched</a></li>
+<li><a href="#SECDAEMONIPCRECOMMENDATIONS">Daemon IPC Recommendations</a></li>
+<ul>
+<li><a href="#SECMACHCONSIDEREDHARMFUL">Mach Considered Harmful</a></li>
+<li><a href="#SECUNIXDOMAINSOCKETS">UNIX Domain Sockets Are Your Friend</a></li>
+<ul>
+<li><a href="#SECUNIXDOMAINADVANTAGES">Advantages of UNIX Domain Sockets</a></li>
+<li><a href="#SECUNIXDOMAINBESTPRACTICE">Best Practice</a></li>
+</ul>
+<li><a href="#SECCROSSARCHITECTURE">Cross Architecture IPC</a></li>
+</ul>
+<li><a href="#SECCODINGRECOMMENDATIONS">Coding Recommendations</a></li>
+<ul>
+<li><a href="#SECLAUNCHINGONDEMAND">Launching On Demand</a></li>
+<li><a href="#SECACCESSINGUSERSTATE">Daemons Accessing User State</a></li>
+<li><a href="#SECLOGGING">Logging</a></li>
+<ul>
+<li><a href="#SECAPPLESYSTEMLOG">Apple System Log</a></li>
+<li><a href="#SECSYSLOG">Syslog</a></li>
+<li><a href="#SECLOGGINGWITHPRINTF">Logging With printf</a></li>
+</ul>
+<li><a href="#SECSECURITY">Daemon Security Considerations</a></li>
+<li><a href="#SECAGENTSANDFASTUSERSWITCHING">Agents and Fast User Switching</a></li>
+<li><a href="#SECPROCESSMANAGER">Process Manager and Launch Services</a></li>
+</ul>
+<li><a href="#SECHINTSANDTIPS">Hints and Tips</a></li>
+<ul>
+<li><a href="#SECSTARTINGADAEMONFIRSTTIME">Starting a Daemon</a></li>
+<li><a href="#SECDEBUGGINGSTARTUP">Debugging Startup</a></li>
+<li><a href="#SECDEBUGGINGROGUEWINDOWSERVERUSE">Debugging Rogue Window Server Use</a></li>
+<li><a href="#SECWATCHLOGS">Watch Your Logs!</a></li>
+<li><a href="#SECBOOTSTRAPONEMORE">Bootstrap Namespaces: One More Thing</a></li>
+<li><a href="#SECCAREFULWITHTHATFORKEUGENE">Careful With That Fork, Eugene</a></li>
+</ul>
+<li><a href="#SECFURTHERREADING">Further Reading</a></li>
+<li><a href="#SECOLDSYSTEMSANDTECHNOLOGY">Old Systems and Technology</a></li>
+<ul>
+<li><a href="#SECOLDDAEMONOMICON">Deprecated Daemonomicon</a></li>
+<ul>
+<li><a href="#SECSTARTUPITEM">Startup Item</a></li>
+<li><a href="#SECMACHINITDAEMON">mach_init Daemon</a></li>
+<li><a href="#SECINETDXINETDDAEMON">inetd and xinetd Daemon</a></li>
+<li><a href="#SECSYSTEMLOGINITEM">System Login Item</a></li>
+<li><a href="#SECMACHINITAGENT">mach_init Agent</a></li>
+</ul>
+<li><a href="#SECOLDCONTEXTCROSSREF">Execution Context Summary for Deprecated Technologies</a></li>
+<li><a href="#SECCONTEXTEXAMPLE104">Execution Context Example on Mac OS 10.4</a></li>
+<li><a href="#SECGETTINGLAUNCHED104">Getting Launched Prior To Mac OS X 10.5</a></li>
+<li><a href="#SECOBSOLETEPROGRAMMINGTECHNIQUES">Obsolete Programming Techniques</a></li>
+<ul>
+<li><a href="#SECDAEMONIZATION">Daemonization</a></li>
+<li><a href="#SECDAEMONIZATIONANDBOOTSTRAPNAMESPACES">Daemonization and Bootstrap Namespaces</a></li>
+<li><a href="#SECDAEMONVSFRAMEWORKS">Daemonizing Frameworks</a></li>
+</ul>
+</ul>
+<li><a href="#document_revision_summary">Document Revision History</a></li>
+</ul></td></tr>
+<tr><td colspan="3" scope="row">
+<img width="680" height="10" src="images/1dot.gif" alt=""><br><img width="680" height="1" src="images/1dot_919699.gif" alt=""><br><img width="680" height="20" src="images/1dot.gif" alt="">
+</td></tr>
+</table>
+<a name="SECINTRODUCTION"></a><h2>Introduction</h2>
+<p>Many problems can be solved by programs running in the background. These programs have no graphical user interface (GUI), and only interact with the user indirectly. For example:</p>
+<ul>
+<li><p>A web server runs in the background and responds to HTTP requests from clients.</p></li>
+<li><p>A calendar application installs a background program that manages the calendar database, and relaunches the GUI application when calendar events occur.</p></li>
+</ul>
+<p>This technote discusses the issues associated with writing programs that run in the background. It starts with a formal definition of the types of background programs that you can write (<a href="#SECDAEMONOMICON">Daemonomicon</a>). It then goes on to discuss the unusual execution contexts encountered by background programs (<a href="#SECEXECUTIONCONTEXTS">Execution Contexts</a>) and how Mac OS X uses layered frameworks to manage the issues raised by these contexts (<a href="#SECLAYEREDFRAMEWORKS">Layered Frameworks</a>). It also offers advice about how to create a background program, starting with some general design recommendations (<a href="#SECDESIGNRECOMMENDATIONS">Design Considerations</a>), followed by advice on launching a background program (<a href="#SECGETTINGLAUNCHED">Getting Launched</a>) and how to communicate between the various components of the program (<a href="#SECDAEMONIPCRECOMMENDATIONS">Daemon IPC Recommendations</a>). Finally, there are some specific coding recommendations (<a href="#SECCODINGRECOMMENDATIONS">Coding Recommendations</a>) and some miscellaneous hints and tips (<a href="#SECHINTSANDTIPS">Hints and Tips</a>).</p>
+<p>Before reading this technote, you should look at the formal documentation for <a href="http://developer.apple.com/documentation/MacOSX/Conceptual/BPSystemStartup/index.html">System Startup Programming</a> and <a href="http://developer.apple.com/documentation/MacOSX/Conceptual/BPMultipleUsers/index.html">Multiple User Environments</a>.</p>
+<div class="notebox">
+<p><strong>IMPORTANT: </strong>This technote strives to clearly explain complicated topics. In many cases, the best way to make a particular point is to offer a concrete example. These examples show detailed information about how the system is implemented. It's important that you concentrate on the point of the example, rather than the specific implementation details which may change in the future.</p>
+<p>In cases where the implementation is different on older systems, or is likely to change in the future, the text warns you about these changes.</p>
+<p>The examples in this technote are from Mac OS X 10.5.</p>
+</div>
+<div class="notebox"><p><strong>Note: </strong>A previous version of this technote described Mac OS X 10.4. The specific details related to Mac OS X 10.4 have been moved to a separate section, <a href="#SECOLDSYSTEMSANDTECHNOLOGY">Old Systems and Technology</a>, at the end of the technote. Where appropriate, these changes are also called out in the text.</p></div>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="SECDAEMONOMICON"></a><h2>Daemonomicon</h2>
+<p>There are a variety of terms used to describe programs that run in the background. In many cases the same term is used by different people to mean different things. This section defines the terms used throughout the rest of the technote.</p>
+<p>A <strong>background program</strong> is a program that runs in the background, without presenting any significant GUI. This category is subdivided into daemons (system wide background programs) and agents (which work on behalf of a specific user). The next two sections describe these subdivisions in detail.</p>
+<a name="SECDAEMONS"></a><h3>Daemons</h3>
+<p>A <strong>daemon</strong> is a program that runs in the background as part of the overall system (that is, it is not tied to a particular user). A daemon cannot display any GUI; more specifically, it is not allowed to connect to the <a href="#SECWINDOWSERVER">window server</a>. A web server is the perfect example of a daemon.</p>
+<div class="notebox"><p><strong>Note: </strong>If you're coming from a traditional UNIX background, be aware that modifying <code>/etc/rc*</code> is not a supported way of launching a daemon on Mac OS X. Rather, you should launch your daemon via <code>launchd</code>.</p></div>
+<p>Historically, Mac OS X had a number of different ways to start daemons (for details, see <a href="#SECOLDDAEMONOMICON">Deprecated Daemonomicon</a>). On current systems there is only one recommend way: <a href="x-man-page://8/launchd">launchd</a>.</p>
+<p>A <strong>launchd daemon</strong> is configured by a sophisticated property list file. This file allows the daemon to be launched based on a variety of criteria (connections to listening sockets, items being modified in the file system, periodically, and so on). For details, see the <a href="x-man-page://5/launchd.plist">launchd.plist</a> man page.</p>
+<p>A third party launchd daemon should be installed by adding a property list file to the <code>/Library/LaunchDaemons</code> directory.</p>
+<p>It is important to realize that not all launchd daemons interact with <code>launchd</code> in the same way. The single unifying feature of all launchd daemons is the property list file. This tells <code>launchd</code> how to interact with the daemon. For example:</p>
+<ul>
+<li><p>A <strong>launchd-aware launchd daemon</strong> is typically <a href="#SECLAUNCHINGONDEMAND">launched on demand</a> and must explicitly check in with <code>launchd</code>. For an example of this, see <a href="/samplecode/SampleD/index.html">Sample Code 'SampleD'</a>.</p></li>
+<li><p>If you have a daemon that was previously launched via <code>inetd</code> (or <code>xinetd</code>), you can run it from <code>launchd</code> by creating a property list file with the <code>inetdCompatibility</code> property set appropriately. This results in an <strong>inetd-compatible launchd daemon</strong>. For an example of this, check out <code>/System/Library/LaunchDaemons/finger.plist</code>.</p></li>
+<li>
+<p>Virtually any program can be run as a launchd daemon by creating a minimal property list file with the <code>OnDemand</code> property set to false.</p>
+<div class="notebox"><p><strong>Note: </strong>In Mac OS X 10.5 and later the <code>OnDemand</code> property is deprecated in favor of the <code>KeepAlive</code> property. You should use the new property unless you need to support Mac OS X 10.4.x. Also, the <code>KeepAlive</code> property lets you express more complex criteria under which <code>launchd</code> will keep your daemon running. See <a href="#SECLAUNCHINGONDEMAND">Launching On Demand</a> for details.</p></div>
+</li>
+</ul>
+<p>Keep in mind that, regardless of how it interacts with <code>launchd</code>, a launchd daemon must not <a href="#SECDAEMONIZATION">daemonize</a> itself; doing so would undermine <code>launchd</code>'s ability to monitor the daemon.</p>
+<p>For more information about launchd daemons, read the <a href="#SECFURTHERREADING">launchd documentation</a>.</p>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="SECAGENTS"></a><h3>Agents</h3>
+<p>An <strong>agent</strong> is a process that runs in the background on behalf of a particular user. Agents are useful because they can do things that daemons can't, like reliably <a href="#SECACCESSINGUSERSTATE">access the user's home directory</a> or connect to the <a href="#SECWINDOWSERVER">window server</a>. A calendar monitoring program is a good example of an agent because:</p>
+<ul>
+<li><p>there should be an instance of the program per GUI login session</p></li>
+<li><p>each agent has access to that user's calendar</p></li>
+<li><p>the agent can launch the calendar application when certain events occur</p></li>
+</ul>
+<p>The difference between an agent and a daemon is that an agent can display GUI if it wants to, while a daemon can't. The difference between an agent and a regular application is that an agent typically displays no GUI (or a very limited GUI).</p>
+<p>Agents have acquired a variety of different names over the years. These include background-only applications (BOAs), faceless background-only applications (FBAs), and UI elements (implying that the agent displays some GUI, but is not a full blown application with a menu bar). These names are more-or-less irrelevant to this discussion. What is relevant, and what distinguishes different types of agents, is how the agent is launched.</p>
+<div class="notebox"><p><strong>Note: </strong>Users familiar with traditional Mac OS might describe an FBA or a BOA as a daemon; this is not correct on Mac OS X, where FBAs and BOAs are agents, and agents are quite different from daemons.</p></div>
+<div class="notebox"><p><strong>Note: </strong>Sharp-eyed readers will note that one process on the system, <code>KernelEventAgent</code>, is called an agent but is actually a daemon 
+			(r. <a href="rdar://problem/4324871">4324871</a>)
+		. This is exactly the sort of confusion that I hope to eliminate with this technote.</p></div>
+<a name="SECLOGINITEM"></a><h4>Login Item</h4>
+<p>A <strong>login item</strong> is launched when the user logs in using the GUI. A login item can be any openable item, but it is typically an application or an agent.</p>
+<p>You can install a login item using the shared file lists interface to Launch Services (see the <code>LSSharedFileList.h</code> header file in the LaunchServices subframework of the CoreServices framework). This API is available on Mac OS X 10.5 and later. On earlier systems, you can install a login item is by sending Apple events to the <code>System Events</code> process. <a href="/samplecode/LoginItemsAE/index.html">Sample Code 'LoginItemsAE'</a> shows one way to do this.</p>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="SECGLOBALLOGINITEM"></a><h4>Global Login Item</h4>
+<p>A <strong>global login item</strong> is a login item that is launched when any user logs in. Installing a global login item is roughly equivalent to installing that login item for all users on the system: every time a user logs in, <code>loginwindow</code> launches that user's login items and all global login items.</p>
+<p>In Mac OS X 10.5 and later you can install a global login item using the shared file lists interface to Launch Services.</p>
+<div class="notebox"><p><strong>IMPORTANT: </strong>Prior to Mac OS X 10.5 there is no supported way to install a global login item. If you need this functionality, please contact <a href="mailto:dts@apple.com">Developer Technical Support (DTS)</a>.</p></div>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="SECLAUNCHDAGENT"></a><h4>launchd Agent</h4>
+<p>A <strong>launchd agent</strong> is like a launchd daemon, except that it runs on behalf of a particular user. It is launched by <code>launchd</code>, typically as part of the process of logging in the user.</p>
+<p>A third party launchd agent should be installed by adding a property list file to the <code>~/Library/LaunchAgents</code> directory (to be invoked just for this user) or <code>/Library/LaunchAgents</code> directory (to be invoked for all users).</p>
+<div class="notebox"><p><strong>WARNING: </strong>Prior to Mac OS X 10.5, launchd agents were not particularly useful because there was no way for the agent to specify the type of login session that the agent required 
+			(r. <a href="rdar://problem/4255854">4255854</a>)
+		. Thus, you couldn't use a launchd agent as the equivalent of a global login item because it might be launched in the context of non-GUI login session. Mac OS X 10.5 has addressed this limitation, as described below. However, if you have to support older systems, you should investigate some of the alternative technologies described in <a href="#SECOLDDAEMONOMICON">Deprecated Daemonomicon</a>.</p></div>
+<p>launchd agents are further classified by their target session type, as shown in <a href="#TABLAUNCHAGENTSUBTYPES">Table 1</a>.</p>
+<a name="TABLAUNCHAGENTSUBTYPES"></a><p class="smalltext"><strong>Table 1 : </strong>Types of launchd agent</p>
+<table cellspacing="0" class="graybox">
+<tr>
+<th><strong>Name</strong></th>
+<th><strong>Session Type</strong></th>
+<th><strong>Notes</strong></th>
+</tr>
+<tr>
+<td scope="row"><strong>GUI launchd agent</strong></td>
+<td><code>Aqua</code></td>
+<td>Has access to all GUI services; much like a login item.</td>
+</tr>
+<tr>
+<td scope="row"><strong>non-GUI launchd agent</strong></td>
+<td><code>StandardIO</code></td>
+<td>Runs only in non-GUI login sessions (most notably, SSH login sessions)</td>
+</tr>
+<tr>
+<td scope="row"><strong>per-user launchd agent</strong></td>
+<td><code>Background</code></td>
+<td>Runs in a context that's the parent of all contexts for a given user</td>
+</tr>
+<tr>
+<td scope="row"><strong>pre-login launchd agent</strong></td>
+<td><code>LoginWindow</code></td>
+<td>Runs in the loginwindow context</td>
+</tr>
+</table>
+<p>To run your agent in a particular session type, use the session type strings from <a href="#TABLAUNCHAGENTSUBTYPES">Table 1</a> as the value of the <code>LimitLoadToSessionType</code> property in your agent's property list file. If you want to run in more than one session type, you can set <code>LimitLoadToSessionType</code> to an array, where each element is a session type string. If you don't specify the <code>LimitLoadToSessionType</code> property, <code>launchd</code> assumes a value of <code>Aqua</code>.</p>
+<p>If you set <code>LimitLoadToSessionType</code> to an array, be aware that each instance of your agent runs independently. For example, if you set up your agent to run in <code>LoginWindow</code> and <code>Aqua</code>, the system will first run an instance of your agent in the loginwindow context. When a user logs in, that instance will be terminated and a second instance will launch in the standard GUI context.</p>
+<p>Finally, there are some significant gotchas associated with developing a pre-login launchd agent; see <a href="/samplecode/PreLoginAgents/index.html">Sample Code 'PreLoginAgents'</a> for more information.</p>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="SECANCIENTDAEMONS"></a><h3>Ancient Daemons (and Agents)</h3>
+<p>For information about older ways to launch daemons and agents, see <a href="#SECOLDDAEMONOMICON">Deprecated Daemonomicon</a>.</p>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="SECEXECUTIONCONTEXTS"></a><h2>Execution Contexts</h2>
+<p>Most Mac OS X programmers are familiar with the user ID (UID) associated with a process (commonly referred to as the process's owner). On a traditional BSD system, this UID control the capabilities of that process. You can, more or less, assume that two processes with matching UIDs have the same capabilities.</p>
+<p>This is not true on Mac OS X. There are other elements of the process's context that significantly alter its capabilities. So, for example, a daemon whose UID is set to that of the logged in console user is not equivalent to an application that has been launched by that user.</p>
+<p>The following sections describe the elements of process's context, and how they affect background programs.</p>
+<a name="SECUIDS"></a><h3>UIDs and GIDs</h3>
+<p>A process's UIDs (its effective (EUID), real (RUID), and saved (SUID) UIDs) are the most well known elements of the process's context. These UIDs control various capabilities of the process, mostly centered on the BSD portions of the system (file system, networking, BSD process control). For example, a process's ability to open a file is controlled by its EUID, and its ability to signal another process is controlled by its EUID and the EUID and RUID of the target.</p>
+<p>Processes also have a set of group IDs (GIDs) that are analogous to the UIDs, plus a list of supplemental group IDs.</p>
+<p>For more information about these UIDs and GIDs, and how they affect the capabilities of your process, see <a href="http://developer.apple.com/documentation/Security/Conceptual/Security_Overview/index.html">Security Overview</a>.</p>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="SECMACHBOOTSTRAPBASICS"></a><h3>Mach Bootstrap Basics</h3>
+<p>Many Mac OS X subsystems work by exchanging Mach messages with a central service. For such a subsystem to work, it must be able to find the service. This is typically done using the Mach <strong>bootstrap service</strong>, which allows a process to look up a service by name. All processes inherit a reference to the bootstrap service from their parent.</p>
+<p>To get an idea of how this works, you can run <a href="x-man-page://1/launchctl">launchctl</a> with the <code>bslist</code> argument. This lists all of the services registered with the bootstrap service. <a href="#LISTBOOTSTRAPDUMP">Listing 1</a> shows an example of its output.</p>
+<a name="LISTBOOTSTRAPDUMP"></a><p class="caption"><strong>Listing 1: </strong>BootstrapDump from Terminal</p>
+<pre class="sourcecodebox">$ launchctl bslist
+D  com.apple.rcd
+A  com.apple.finder.ServiceProvider
+A  com.apple.systemuiserver.ServiceProvider
+A  com.apple.systemuiserver-ServicesPortName
+A  com.apple.dockling.server
+A  com.apple.SUISMessaging
+A  com.apple.ipodserver
+A  com.apple.dock.server
+D  BezelUI
+D  edu.mit.Kerberos.KerberosAgent.ipcService
+[...]</pre>
+<p>As you can see, there are numerous services published via the bootstrap service. Virtually all of them are private. For example, you are not expected to send messages directly to the "com.apple.dock.server" service; rather, you would call a routine exported by a framework (perhaps <code>SetApplicationDockTileImage</code>) and, behind the scenes, it exchanges messages with the service to do the job you requested.</p>
+<a name="SECBOOTSTRAPNAMESPACES"></a><h4>Bootstrap Namespaces</h4>
+<p>The previous example raises an interesting point: which Dock does <code>SetApplicationDockTileImage</code> interact with?  If there are multiple users logged in (via fast user switching), then there are multiple instances of the Dock running, so how does <code>SetApplicationDockTileImage</code> know which is the right one?  Moreover, how can all of these Docks register the same service name ("com.apple.dock.server") without suffering a name conflict?</p>
+<p>The solution to these problems is that the bootstrap service can create multiple <strong>bootstrap namespaces</strong>. Each login session has its own bootstrap namespace, to which all processes running in that session inherit a reference. So, when the Dock registers its service, the registration goes into that login session's namespace. Any other process within that session inherits a reference to the same namespace, and can, therefore, see the Dock's service. Processes in other login sessions reference a different namespace, which prevents them from seeing that service. However, they might be able to see a different instance of the Dock that's registered in their namespace.</p>
+<p>It's worth noting the distinction between <strong>GUI and non-GUI per-session bootstrap namespaces</strong>. A GUI per-session bootstrap namespace is instantiated by the GUI infrastructure (<code>loginwindow</code> and <code>WindowServer</code>) when a user logs in via the GUI. A non-GUI per-session bootstrap namespace is created when a user logs in via SSH. While there is no fundamental difference between these namespaces, GUI-based services, like the Dock, only register themselves in GUI per-session bootstrap namespaces.</p>
+<div class="notebox"><p><strong>Note: </strong>Prior to Mac OS X 10.3, non-GUI login sessions ran in the global bootstrap namespace.</p></div>
+<div class="notebox">
+<p><strong>Note: </strong>Non-GUI per-session bootstrap namespaces are created by <code>launchd</code> on behalf of <code>sshd</code> because <code>sshd</code>'s property list file (<code>/System/Library/LaunchDaemons/ssh.plist</code>) includes the <code>SessionCreate</code> property. Prior to the introduction of <code>launchd</code>, <code>xinetd</code> performed a similar function.</p>
+<p>In Mac OS X 10.5 and later these non-GUI namespaces are, after the user has logged in, moved below the per-user bootstrap namespace by the launchd PAM module (<code>/usr/lib/pam/pam_launchd.so</code>) under the direction of the SSH PAM configuration file (<code>/etc/pam.d/sshd</code>).</p>
+</div>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="SECNAMESPACEHIERARCHY"></a><h4>Namespace Hierarchy</h4>
+<p>Bootstrap namespaces are arranged hierarchically. There is a single <strong>global bootstrap namespace</strong>. Below that is a <strong>per-user bootstrap namespace</strong> for each user on the system, and below each of those is a <strong>per-session bootstrap namespace</strong> for each login session. You can print a map of the namespaces on the system using the <code>BootstrapDump</code> program (downloadable as <a href="/samplecode/BootstrapDump/index.html">Sample Code 'BootstrapDump'</a>) with the <code>MAP</code> argument, as illustrated by <a href="#LISTMAPBOOTSTRAP">Listing 2</a>.</p>
+<a name="LISTMAPBOOTSTRAP"></a><p class="caption"><strong>Listing 2: </strong>Bootstrap Namespace Hierarchy</p>
+<pre class="sourcecodebox">$ sudo BootstrapDump MAP
+Password:********
+0x0
+  launchd (root, 1/0)
+  launchd (quinn, 82/1)
+0x30b
+  kextd (root, 7/1)
+  DirectoryService (root, 8/1)
+  notifyd (root, 9/1)
+  configd (root, 10/1)
+  [...]
+  0x10f
+    0x100b
+      sshd (root, 443/1)
+      sshd (quinn, 447/443)
+      bash (quinn, 449/447)
+      BootstrapDump (root, 477/449)
+    0x20b
+      loginwindow (root, 24/1)
+      ARDAgent (root, 92/82)
+      Spotlight (quinn, 94/82)
+      UserEventAgent (quinn, 95/82)
+      Dock (quinn, 97/82)
+      AppleVNCServer (root, 98/92)
+      pboard (quinn, 99/82)
+      SystemUIServer (quinn, 100/82)
+      Finder (quinn, 101/82)
+      ATSServer (quinn, 102/82)</pre>
+<div class="notebox"><p><strong>Note: </strong>Per-user bootstrap namespaces did not exist prior to Mac OS X 10.5.</p></div>
+<p>If a process running within a namespace registers a service, it is visible in that namespace and any of its descendent namespaces. However, it is not visible in any other namespaces. In practice, this means that:</p>
+<ul>
+<li><p>processes using the global namespace can only see services in the global namespace</p></li>
+<li><p>processes using a per-user namespace can see services in that per-user namespace and the global namespace</p></li>
+<li><p>processes using a per-session namespace can see services in that per-session namespace, the parent per-user namespace, and the global namespace</p></li>
+<li><p>services registered in a per-session namespace can only be seen by processes using that per-session namespace</p></li>
+<li><p>services registered in a per-user namespace can be seen by any process in any of that user's sessions</p></li>
+<li><p>services registered in the global namespace can be seen by all processes</p></li>
+</ul>
+<p>You can use <code>launchctl</code>'s <code>bslist</code> command to view a bootstrap namespace by pointing it at a process using that namespace. For example, <a href="#LISTBOOTSTRAPDUMPGLOBAL">Listing 3</a> shows how to list the services in the global namespace by targeting <code>kextd</code>.</p>
+<a name="LISTBOOTSTRAPDUMPGLOBAL"></a><p class="caption"><strong>Listing 3: </strong>Dumping the global bootstrap namespace</p>
+<pre class="sourcecodebox">$ # The killall goop in the following command is a sneaky way 
+$ # to get the process ID for a process name.
+$ #
+$ pid=`sudo killall -s kextd | cut -f 3 -d ' '`
+$ sudo launchctl bslist $pid
+[...]
+A  com.apple.KernelExtensionServer
+D  com.apple.KerberosAutoConfig
+D  com.apple.java.updateSharingD
+D  com.apple.installdb.system
+D  com.apple.IIDCAssistant
+D  com.apple.system.hdiejectd
+D  com.apple.gssd
+A  com.apple.FSEvents
+[...]
+$ sudo launchctl bslist $pid | grep dock
+$ # No results because Dock is not registered in the global namespace.</pre>
+<div class="notebox"><p><strong>IMPORTANT: </strong>You should not rely on the ability to dump the global bootstrap namespace programmatically. The techniques used in this section are not something that Apple intends to support in the long term; they're appropriate for debugging and illustrative purposes, but you should not ship programs that rely on them.</p></div>
+<p>So the "com.apple.KernelExtensionServer" service is registered in the global bootstrap namespace, and can be seen by all processes on the system. On the other hand, "com.apple.dock.server" service (from <a href="#LISTBOOTSTRAPDUMP">Listing 1</a>) is registered in the per-session namespace and can only be seen by processes using that namespace.</p>
+<p>So, the rules to remember are:</p>
+<ul>
+<li><p>If you're developing an agent, make sure it inherits a reference to the correct per-user or per-session bootstrap namespace. <a href="#TABCONTEXTCROSSREFERENCE">Table 2</a> shows the execution context for each type of background program.</p></li>
+<li><p>If you're developing a daemon, make sure it inherits a reference to the global bootstrap namespace.</p></li>
+<li><p>If you're developing a daemon, make sure it only uses services that are registered in the global bootstrap namespace. See <a href="#SECLAYEREDFRAMEWORKS">Layered Frameworks</a> for more information about this.</p></li>
+</ul>
+<p>If you don't follow these rules, things might look like they're working, but you'll run into obscure problems down the line. The next section gives an example of one such problem. This is but one example; there are many more potential problems. The only guaranteed way to avoid such problems is to follow these rules, which are discussed further in <a href="#SECLAYEREDFRAMEWORKS">Layered Frameworks</a>.</p>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="SECNAMESPACEEXPLORATION"></a><h4>Namespace Exploration</h4>
+<p>All of this might seem a little theoretical, and you're probably wondering how it affects you. Let's make things crystal clear by looking at a concrete example of how bootstrap namespaces affect application functionality.</p>
+<ol>
+<li><p>Launch Activity Monitor (in <code>/Applications/Utilities</code>) from the Finder.</p></li>
+<li><p>If it's not currently showing its main window, choose Activity Monitor from the Window menu to reveal that window.</p></li>
+<li><p>Configuring it to show a CPU usage meter in its dock icon by choosing Show CPU Usage from the Dock Icon submenu of the View menu. You'll note that the Dock icon now displays a up-to-date representation of the CPU usage, and that the Dock menu works correctly. <a href="#FIGACTIVITYMONITOR">Figure 1</a> shows what I'm talking about.</p></li>
+<li><p>Now quit Activity Monitor.</p></li>
+<li>
+<p>Next, open a Terminal window and SSH to yourself, as shown in <a href="#LISTSSHLOCALHOST">Listing 4</a>.</p>
+<a name="LISTSSHLOCALHOST"></a><p class="caption"><strong>Listing 4: </strong>Connecting to yourself via ssh</p>
+<pre class="sourcecodebox">$ ssh localhost
+Password:********
+Last login: Fri Sep 30 10:07:59 2005
+Welcome to Darwin!
+$</pre>
+<div class="notebox"><p><strong>Note: </strong>For this to work, you'll have to enable Remote Login in the Sharing preferences panel.</p></div>
+<p>When you log in via ssh, the system creates a new per-session bootstrap namespace for your session. So, anything you execute in this Terminal window is running in a different per-session bootstrap namespace from the GUI applications that you're running.</p>
+</li>
+<li>
+<p>Now run Activity Monitor from this Terminal window, as shown in <a href="#LISTACTIVITYMONITORSSH">Listing 5</a>.</p>
+<a name="LISTACTIVITYMONITORSSH"></a><p class="caption"><strong>Listing 5: </strong>Running Activity Monitor from within SSH login session</p>
+<pre class="sourcecodebox">$ /Applications/Utilities/Activity\ Monitor.app/Contents/MacOS/Activity\ Monitor</pre>
+<p><a href="#FIGBADACTIVITYMONITOR">Figure 2</a> shows what you get. You'll notice two anomalous things:</p>
+<ul>
+<li><p>The Dock tile CPU meter is not displayed.</p></li>
+<li><p>If you control click on the Dock tile, the contextual menu contains an "Application Not Responding" item.</p></li>
+</ul>
+<p>These problems occur because the application is running in a different per-session bootstrap namespace, and is unable to look up the services that it needs to operate correctly (for example, "com.apple.dock.server").</p>
+</li>
+</ol>
+<div class="notebox"><p><strong>IMPORTANT: </strong>The fact that a copy of Activity Monitor running from an SSH session can display any GUI is quite surprising. This works because Activity Monitor has connected to the global window server service, a subject discussed in detail in the <a href="#SECWINDOWSERVER">next section</a>.</p></div>
+<a name="FIGACTIVITYMONITOR"></a><p class="caption"><strong>Figure 1: </strong>Activity Monitor's presence in the Dock</p>
+<p><img src="images/tn2083_ActivityMonitorGood.png" width="492" height="261" alt="Figure 1, Activity Monitor's presence in the Dock"></p>
+<a name="FIGBADACTIVITYMONITOR"></a><p class="caption"><strong>Figure 2: </strong>Activity Monitor launched from an SSH session</p>
+<p><img src="images/tn2083_ActivityMonitorBad.png" width="492" height="258" alt="Figure 2, Activity Monitor launched from an SSH session"></p>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="SECWINDOWSERVER"></a><h3>Window Server</h3>
+<p>The <strong>window server</strong> (on Mac OS X 10.5 this is <code>/System/Library/Frameworks/ApplicationServices.framework/Frameworks/CoreGraphics.framework/Resources/WindowServer</code>) is a single point of contact for all applications. It is central to the implementation of the GUI frameworks (AppKit and HIToolbox) and many other services (for example, Process Manager).</p>
+<div class="notebox"><p><strong>IMPORTANT: </strong>The window server does more than just manage windows. Even an application with no user interface (like a background-only application) depends on the window server.</p></div>
+<p>Most of the services provided by the window server are implemented using Mach messages. Thus, to use the window server reliably, you must inherit a reference to a valid GUI per-session bootstrap namespace. This is an expected consequence of the <a href="#SECNAMESPACEHIERARCHY">rules given earlier</a>.</p>
+<p>What's unexpected, however, is that applications do work (somewhat) if you run them from outside of a GUI login session (that is, if they inherit a reference to the global bootstrap namespace, or some other non-GUI bootstrap namespace). This is because the window server advertises its services in the global bootstrap namespace!  This is known as the <strong>global window server service</strong>.</p>
+<p>The reasons for this non-obvious behavior are lost in the depths of history. However, the fact that this works at all is pretty much irrelevant because there are important caveats that prevent it from being truly useful. The following sections describe these caveats in detail.</p>
+<div class="notebox"><p><strong>WARNING: </strong>Apple plans to disable the global window server service in a future release of Mac OS X. Do not write any new code that uses the global window server service. If you have existing code that uses this service, you must eliminate that dependency in order to be compatible in the long term. See <a href="#SECMONOLITHPERILS">The Perils of the Monolith</a> for specific advice on structuring your code to avoid this problem.</p></div>
+<a name="SECMORETHANWINDOWSERVER"></a><h4>More Than Window Server</h4>
+<p>The window server is not the only service that's required for an application to function correctly. As described earlier, the Dock service is also required, and it is only registered in GUI per-session bootstrap namespaces. There are many other services like this.</p>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="SECPERMISSIONTOCONNECT"></a><h4>Permission To Connect</h4>
+<p>The <strong>console user</strong> is the user whose GUI login session is using the console. The console device, <code>/dev/console</code>, is owned by the console user.</p>
+<p>A process can only use the global window server service if its EUID is 0 (it's running as root) or matches the UID of the console user. All other users are barred from using it.</p>
+<p>For a demonstration of this, you can SSH to your own machine and try to run Activity Monitor from your shell. <a href="#LISTNONCONSOLE">Listing 6</a> shows an example of doing this from Terminal. The first attempt to run Activity Monitor command works because it's running as the same user as Terminal. The second attempt fails because the test user (<code>mrgumby</code>) does not match the console user, and thus cannot access the global window server service.</p>
+<a name="LISTNONCONSOLE"></a><p class="caption"><strong>Listing 6: </strong>Accessing the window server from console and non-console users</p>
+<pre class="sourcecodebox">$ ssh ${USER}@localhost
+Password:********
+Last login: Wed Jun 20 11:49:23 2007
+$ id
+uid=502(quinn) gid=20(staff) groups=20(staff),81(_appserveradm),
+104(com.apple.sharepoint.group.1),79(_appserverusr),80(admin),
+101(com.apple.access_remote_ae),103(com.apple.access_ssh-disabled)
+$ ls -l /dev/console
+crw------- 1 quinn  staff    0,   0 Jun 20 11:50 /dev/console
+$ # Launch Activity Monitor and then quit it.
+$ /Applications/Utilities/Activity\ Monitor.app/Contents/MacOS/\
+Activity\ Monitor 
+$ logout
+Connection to localhost closed.
+$ ssh mrgumby@localhost
+Password:********
+Last login: Wed Jun 20 11:49:23 2007
+$ id
+uid=503(mrgumby) gid=20(staff) groups=20(staff),105(com.apple.sharepoint.group.2),
+104(com.apple.sharepoint.group.1)
+$ ls -l /dev/console 
+crw------- 1 quinn  quinn    0,   0 Oct  3 21:31 /dev/console
+$ # Activity Monitor fails to launch at all.
+$ /Applications/Utilities/ctivity\ Monitor.app/Contents/MacOS/Act
+_RegisterApplication(), FAILED TO establish the default connection to \
+the WindowServer, _CGSDefaultConnection() is NULL.
+2007-06-20 11:54:31.798 Activity Monitor[863:10b] An uncaught exception 
+was raised
+[...]
+Trace/BPT trap
+$ logout
+Connection to localhost closed.</pre>
+<p>This limitation makes it very hard to reliably use the global window service because:</p>
+<ul>
+<li>
+<p>Standard security practice is that daemons should not run as root; rather, they should be run by a dedicated user (that is, the <code>wombatd</code> daemon is run by a dedicated <code>_wombat</code> user).</p>
+<p>Also, standard security practice dictates that programs running as root should try to reduce their attack surface by limiting the list of frameworks that they use. Thus, in general, programs running as root should not use high-level frameworks that rely on the window server, like AppKit and HIToolbox.</p>
+<p>So, solving the problem by running as root is a security no-no.</p>
+</li>
+<li><p>There is no easy way to solve the problem by running your daemon as the console user because, with fast user switching, the console user can change at any time.</p></li>
+</ul>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="SECWINDOWSERVERLIFECYCLE"></a><h4>Window Server Lifecycle</h4>
+<p>The final nail in the coffin of the global window server service relates to the <strong>window server lifecycle</strong>. Contrary to what you might expect, the window server is not always running. Rather, at certain times (see the <a href="#NOTEWINDOWSERVERQUIT">note below</a>), the window server quits and is relaunched by <code>launchd</code>. As with the global window server service, the reasons for this are also lost in the depths of history. However, the consequences are crucial: when the window server quits, any process that's connected to it will terminate. </p>
+<a name="NOTEWINDOWSERVERQUIT"></a><div class="notebox"><p><strong>Note: </strong>The exact condition under which the window server quits is implementation-specific, and you should not depend on it. Currently (Mac OS X 10.5) the window server quits when the last GUI login session ends, which is not necessarily when the last GUI users logs out.</p></div>
+<p>You can see this in action using the program from <a href="#LISTWSTEST">Listing 7</a>. This program monitors the foreground application using Carbon Events, which requires it to connect to the window server.</p>
+<a name="LISTWSTEST"></a><p class="caption"><strong>Listing 7: </strong>A simple program that connects to the window server</p>
+<pre class="sourcecodebox">#include &lt;assert.h&gt;
+#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+
+#include &lt;Carbon/Carbon.h&gt;
+
+static OSStatus EventHandlerProc(
+    EventHandlerCallRef inHandlerCallRef, 
+    EventRef            inEvent, 
+    void *              inUserData)
+{
+    fprintf(stderr, "  Switch\n");
+    return noErr;
+}
+
+int main(int argc, char **argv)
+{
+    static const EventTypeSpec kEvents[] = { 
+        { kEventClassApplication, kEventAppFrontSwitched} 
+    };
+    OSStatus err;
+
+    err = InstallEventHandler(
+        GetApplicationEventTarget(), 
+        NewEventHandlerUPP( EventHandlerProc ), 
+        sizeof(kEvents) / sizeof(kEvents[0]), 
+        kEvents, 
+        NULL, 
+        NULL
+    );
+    assert(err == noErr);
+
+    while (true) {
+        fprintf(stderr, "Running runloop\n");
+        RunApplicationEventLoop();
+    }
+
+    return EXIT_SUCCESS;
+}</pre>
+<p>To test this, you have to log in using SSH from a different machine (because Terminal will hold up the GUI logout if there is a process running in one of its windows). <a href="#LISTWSTESTSSH">Listing 8</a> shows what this session might look like.</p>
+<a name="LISTWSTESTSSH"></a><p class="caption"><strong>Listing 8: </strong>Death by GUI logout</p>
+<pre class="sourcecodebox">$ ssh victim.local.
+Password:********
+Last login: Thu Jun 21 09:05:00 2007
+victim$ ./AppSwitchMonitor 
+Running runloop
+  Switch
+  Switch
+  Switch
+Running runloop
+Killed
+victim$ echo $?
+137</pre>
+<p>To replicate this yourself, do the following.</p>
+<ol>
+<li><p>Log into the console of the victim machine (<code>victim.local.</code> in this example).</p></li>
+<li><p>From another machine, SSH to the victim machine and run the <code>AppSwitchMonitor</code> program. This will run forever, printing a message when the foreground application changes.</p></li>
+<li><p>Using the GUI, log out.</p></li>
+<li><p>You should notice a delay in the log out. This is <code>loginwindow</code> waiting for <code>AppSwitchMonitor</code> to respond to the <code>'quit'</code> Apple event. <code>AppSwitchMonitor</code> does get this event, which causes a return from <code>RunApplicationEventLoop</code>. However, the while loop around <code>RunApplicationEventLoop</code> keeps it running.</p></li>
+<li><p>The <code>AppSwitchMonitor</code> program eventually dies. Printing the exit status reveals that it died because of a <code>SIGKILL</code> signal (you can decode this exit status using the macros in <code>&lt;sys/wait.h&gt;</code>; see the <a href="x-man-page://2/wait">wait</a> man page for details).</p></li>
+</ol>
+<p>This program is killed because the window server keeps track of the processes that are using its services. When you log out, the system (actually <code>loginwindow</code>) tries to quit these. For each GUI process, it sends a <code>'quit'</code> Apple event to the process. If any GUI process refuses to quit, <code>loginwindow</code> halts the logout and displays a message to the user.</p>
+<p>The situation for non-GUI processes is slightly different: <code>loginwindow</code> first tries to quit the process using a <code>'quit'</code> Apple event; if that fails it terminates the program by sending it a <code>SIGKILL</code> signal. There is no way to catch or ignore this signal.</p>
+<p>The upshot of this is that, if your process connects to the window server, it will not survive a normal logout.</p>
+<p>There are other issues related to the window server lifecycle that cause problems for daemons. Even if you don't actually connect to the window server, you can still get into trouble if your daemon registers services in the per-session bootstrap namespace. When the window server quits, any per-session bootstrap namespaces created by that window server are deactivated. For more information about this, see <a href="#SECBOOTSTRAPONEMORE">Bootstrap Namespaces: One More Thing</a>.</p>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="SECPRELOGINANDTRUST"></a><h4>Pre-Login Trust Issues</h4>
+<p>If, in Mac OS X 10.5 and later, you see a message like that shown in <a href="#LISTTRUST">Listing 9</a> you might mistakenly think that the solution is to get the system to 'trust' your application, perhaps via code signing.</p>
+<a name="LISTTRUST"></a><p class="caption"><strong>Listing 9: </strong>Pre-Login Trust Message</p>
+<pre class="sourcecodebox">Untrusted apps are not allowed to connect to or launch Window Server before login.</pre>
+<p>However, this isn't the case 
+			(r. <a href="rdar://problem/5544764">5544764</a>)
+		. This message is really telling you is that you're trying to connect to the window server from the wrong context. You see this message if you try to connect to the global window server service from outside of the pre-login context before the user has logged in; typically this means that you're trying to use the window server from a daemon.</p>
+<p>You should not attempt to fix this by convincing the window server to trust your program; doing so will just cause other problems further down the road. For example, if you do successfully connect to the window server from your daemon, you still have to deal with <a href="#SECWINDOWSERVERLIFECYCLE">window server lifecycle issues</a> described previously.</p>
+<p>Instead, you should fix this problem by changing your code to run in the correct context. If you need to connect to the window server in a pre-login context, create a <a href="#SECLAUNCHDAGENT">pre-login launchd agent</a>. For an example of this, see <a href="/samplecode/PreLoginAgents/index.html">Sample Code 'PreLoginAgents'</a>.</p>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="SECSECURITYCONTEXT"></a><h3>Security Context</h3>
+<p>The <strong>security context</strong> is another piece of execution context associated with a process. The security context is explicitly managed by the Mac OS X security server (<code>securityd</code>). The security context almost always follows the bootstrap namespace: that is, there is a single <strong>global security context</strong> (also known as the <strong>root security context</strong>), <strong>per-user security contexts</strong> (for per-user launchd agents), and a <strong>per-session security context</strong> for each login session.</p>
+<div class="notebox"><p><strong>Note: </strong>The only case where the security context and bootstrap namespace are not tied together is if you create your own bootstrap namespace.</p></div>
+<p>In most cases the security context is not directly relevant to your program; more often than not, the bootstrap namespace is the thing that trips you up.</p>
+<p>On the other hand, the security context has one nice attribute: you can get useful information about the context using the <code>SessionGetInfo</code> routine (from <code>&lt;Security/AuthSession.h&gt;</code>). This routine return two useful pieces of information.</p>
+<p>The first is the session identifier, a 32-bit number that uniquely identifies this session. This can be helpful in a number of places. For example, if you want to create a shared memory object (perhaps using <a href="x-man-page://2/shm_open">shm_open</a>) whose scope is limited to processes running within a particular login session, you can fold the session identifier into the object's name. Thus, two shared memory objects from different session won't collide in the shared memory object namespace, and client processes within the login session can easily find the correct shared memory object.</p>
+<p>Additionally, <code>SessionGetInfo</code> returns a set of flags that describe the current security context. These are:</p>
+<ul>
+<li><p><code>sessionIsRoot</code> — set if this is the global security context</p></li>
+<li><p><code>sessionHasGraphicAccess</code> — set if programs running in this context can access the window server</p></li>
+<li><p><code>sessionHasTTY</code> — set if programs running in this context can access the terminal (<code>/dev/tty</code>)</p></li>
+<li><p><code>sessionIsRemote</code> — set if this context is the being run over the network</p></li>
+</ul>
+<div class="notebox"><p><strong>IMPORTANT: </strong>The <code>sessionHasTTY</code> and <code>sessionIsRemote</code> flags are not correct for non-GUI login sessions starting with Mac OS X 10.4 
+			(r. <a href="rdar://problem/4280953">4280953</a>)
+		; they aren't set, but they should be.</p></div>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="SECCONTEXTCROSSREF"></a><h3>Execution Context Summary</h3>
+<p><a href="#TABCONTEXTCROSSREFERENCE">Table 2</a> shows how the execution context of your daemon or agent is affected by the mechanism used to launch it.</p>
+<a name="TABCONTEXTCROSSREFERENCE"></a><p class="smalltext"><strong>Table 2 : </strong>Context Cross Reference</p>
+<table cellspacing="0" class="graybox">
+<tr>
+<th>Program Type</th>
+<th>UID</th>
+<th>Bootstrap Namespace</th>
+<th>Security Context</th>
+</tr>
+<tr>
+<td scope="row">launchd daemon</td>
+<td>as configured [1]</td>
+<td>as configured [2]</td>
+<td>as configured [3]</td>
+</tr>
+<tr>
+<td scope="row">login item</td>
+<td>user</td>
+<td>GUI per-session</td>
+<td>per-session</td>
+</tr>
+<tr>
+<td scope="row">global login item</td>
+<td>user</td>
+<td>GUI per-session</td>
+<td>per-session</td>
+</tr>
+<tr>
+<td scope="row">GUI launchd agent [4]</td>
+<td>user</td>
+<td>GUI per-session</td>
+<td>per-session</td>
+</tr>
+<tr>
+<td scope="row">non-GUI launchd agent [4]</td>
+<td>user</td>
+<td>non-GUI per-session</td>
+<td>per-session</td>
+</tr>
+<tr>
+<td scope="row">per-user launchd agent [4]</td>
+<td>user</td>
+<td>per-user</td>
+<td>per-user</td>
+</tr>
+<tr>
+<td scope="row">pre-login launchd agent [4]</td>
+<td>root</td>
+<td>pre-login [5]</td>
+<td>pre-login [5]</td>
+</tr>
+</table>
+<div class="notebox"><p><strong>Note: </strong>This table only covers recommended technologies. For information about deprecated technologies, see <a href="#SECOLDCONTEXTCROSSREF">Execution Context Summary for Deprecated Technologies</a>.</p></div>
+<p><strong>Notes:</strong></p>
+<ol>
+<li><p>Configured using the <code>UserName</code> property in the property list file; defaults to <code>root</code> if the attribute is not specified.</p></li>
+<li><p>Uses the global bootstrap namespace unless the <code>SessionCreate</code> property is specified in the property list file, in which case the daemon runs in its own per-session bootstrap namespace.</p></li>
+<li><p>Uses the global security context unless the <code>SessionCreate</code> property is specified in the property list file, in which case the daemon runs in its own per-session security context.</p></li>
+<li><p>Prior to Mac OS X 10.5 there was no way to control the target session type of a launchd agent; launchd agents were executed per-user in an unpredictable context. See <a href="#SECAGENTS">Agents</a> for details.</p></li>
+<li><p>Once the user has logged in, this pre-login bootstrap namespace and security context become the bootstrap namespace and security context of the logged in user's login session.</p></li>
+</ol>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="SECCONTEXTEXAMPLE"></a><h3>Execution Context Example</h3>
+<p><a href="#FIGLAUNCHTREE">Figure 3</a> is graphical example of this information. Each box is a process. The text after the process name is either the UID of that process (text in round brackets) or a note that you can look up below (text in square brackets) or both. A directed line represents the parent/child relationship between two processes. Each blue box represents a per-user bootstrap namespace. Each red box represents a per-session bootstrap namespace. Items that aren't in any shaded box are in the global bootstrap namespace. There are two GUI login sessions (user A logged in first and then fast user switched to user B) and two non-GUI login session (user A and user C).</p>
+<a name="FIGLAUNCHTREE"></a><p class="caption"><strong>Figure 3: </strong>Process relationships</p>
+<p><img src="images/tn2083_LaunchTree.png" width="552" height="809" alt="Figure 3, Process relationships"></p>
+<p><strong>Notes:</strong></p>
+<ol>
+<li><p><code>WindowServer</code> runs with an EUID of <code>_windowserver</code> (88) and an RUID of <code>root</code> (0).</p></li>
+<li><p><code>loginwindow</code> runs with an EUID of the logged in user and an RUID of <code>root</code> (0).</p></li>
+<li><p><code>ftpd</code> runs with an EUID of the logged in user and an RUID of <code>root</code> (0). Currently <code>ftpd</code> runs in the global security context, but this may change in future systems; it will then will act more like <code>sshd</code>, and create a per-user security context for each FTP session.</p></li>
+</ol>
+<p>As you look at <a href="#FIGLAUNCHTREE">Figure 3</a>, consider the various different types of process that it shows.</p>
+<ul>
+<li><p>There is a global instance of <code>launchd</code> (PID 1). There is also an instance of <code>launchd</code> for each user.</p></li>
+<li><p>There is a single instance of the <code>WindowServer</code> process that resides in the global security context. However, it knows about all GUI login sessions and can register its services in each of them.</p></li>
+<li><p>The first instance of <code>loginwindow</code>, the one associated with user A's login session, is a child of the global <code>launchd</code>. The second instance, created when user A fast user switched to user B, is a child of the window server.</p></li>
+<li><p>Each per-user instance of <code>launchd</code> manages the context for all of that user's login sessions.</p></li>
+<li><p>The pasteboard server (<code>pboard</code>) is a typical GUI launchd agent.</p></li>
+<li><p><code>StdIOAgent</code> is a hypothetical non-GUI launchd agent. It's included to illustrate where this type of agent would appear in the diagram. Mac OS X does not currently install any non-GUI launchd agents by default.</p></li>
+<li><p><code>CCacheServer</code> is a per-user launchd agent that maintains the Kerberos credentials cache for a specific user.</p></li>
+<li><p>The <code>ReportCrash</code> program is a GUI launchd agent with special values in its property list that tell <code>launchd</code> to run it in response to crashes.</p></li>
+<li><p><code>sshd</code> is a launchd daemon with the <code>SessionCreate</code> property set, which means that it runs in its own bootstrap namespace. Once a user logs in, the launchd PAM session module (<code>/usr/lib/pam/pam_launchd.so</code>, as configured by <code>/etc/pam.d/sshd</code>) moves the bootstrap namespace to within the appropriate per-user bootstrap namespace.</p></li>
+<li><p><code>configd</code> is a run-of-the-mill launchd daemon.</p></li>
+<li><p><code>ftpd</code> is a launchd daemon that is launched when someone connects to the TCP port specified in its property list file.</p></li>
+</ul>
+<div class="notebox"><p><strong>WARNING: </strong>This example was taken from Mac OS X 10.5. It is included for illustrative purposes only. The exact relationship between the various processes running on the system has changed in the past and is likely to change in the future.</p></div>
+<div class="notebox"><p><strong>Note: </strong>For an equivalent example taken from Mac OS X 10.4, see <a href="#SECCONTEXTEXAMPLE104">Execution Context Example on Mac OS 10.4</a>.</p></div>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="SECLAYEREDFRAMEWORKS"></a><h2>Layered Frameworks</h2>
+<p>Most Mac OS X functionality is implemented by large system frameworks. Many of these frameworks use Mach-based services that they look up using the bootstrap service. This can cause all sorts of problems if you call them from a program which references the wrong bootstrap namespace.</p>
+<p>Apple's solution to this problem is layering: we divide our frameworks into layers, and decide, for each layer, whether that layer supports operations in the global bootstrap namespace. The basic rule is that everything in CoreServices and below (including System, IOKit, System Configuration, Foundation) should work in any bootstrap namespace (these are <strong>daemon-safe frameworks</strong>), whereas everything above CoreServices (including ApplicationServices, Carbon, and AppKit) requires a GUI per-session bootstrap namespace.</p>
+<p>The only fly in this ointment is that some frameworks aren't properly layered. QuickTime is a perfect example of this. Because of its traditional Mac OS heritage, QuickTime isn't clearly layered into 'core' and 'application' frameworks. Rather, there is one big framework, and its not documented which bits work from a daemon. The only way to be one hundred percent safe is to not use frameworks like these, but that isn't an option for many developers. You can, however, minimize the risk by restricting the set of routines that you call. <a href="#SECLIVINGDANGEROUSLY">Living Dangerously</a> describes this idea in more detail.</p>
+<p>In summary, the concrete recommendations are:</p>
+<ul>
+<li><p>When writing a daemon, only link to daemon-safe frameworks (see <a href="#SECFRAMEWORKCROSSREFERENCE">Framework Cross Reference</a>).</p></li>
+<li><p>When writing a GUI agent, you can link with any framework.</p></li>
+<li><p>If you're writing a daemon and you must link with a framework that's not daemon-safe, consider splitting your code into a daemon component and an agent component. If that's not possible, be aware of the potential issues associated with linking a daemon to unsafe frameworks (as described in the next section).</p></li>
+</ul>
+<a name="SECLIVINGDANGEROUSLY"></a><h3>Living Dangerously</h3>
+<p>If your daemon uses frameworks that aren't daemon-safe, you can run into a variety of problems.</p>
+<ul>
+<li>
+<p>Some frameworks fail at load time. That is, the framework has an initialization routine that assumes it's running in a per-session context and fails if it's not.</p>
+<p>This problem is rare on current systems because most frameworks are initialized lazily.</p>
+</li>
+<li>
+<p>If the framework doesn't fail at load time, you may still encounter problems as you call various routines from that framework.</p>
+<ul>
+<li><p>A routine might fail benignly. For example, the routine might fail silently, or print a message to <code>stderr</code>, or perhaps return a meaningful error code.</p></li>
+<li><p>A routine might fail hostilely. For example, it's quite common for the GUI frameworks to call <a href="x-man-page://3/abort">abort</a> if they're run by a daemon!</p></li>
+<li><p>A routine might work even though its framework is not officially daemon-safe.</p></li>
+<li><p>A routine might behave differently depending on its input parameters. For example, an image decompression routine might work for some types of images and fail for others.</p></li>
+</ul>
+</li>
+<li><p>The behavior of any given framework, and the routines within that framework, can change from release-to-release.</p></li>
+</ul>
+<p>The upshot of this is that, if your daemon links with a framework that's not daemon-safe, you can't predict how it will behave in general. It might work on your machine, but fail on some other user's machine, or fail on a future system release, or fail for different input data. You are living dangerously!</p>
+<p>If you must call a framework that's not daemon-safe from your daemon, you should start by <a href="http://developer.apple.com/bugreporter/">filing a bug</a> describing what you're doing and why. Apple will consider your input as it develops future system software.</p>
+<p>Next, you should try to minimize the number of potentially unsafe routines that you call. This will reduce (but not eliminate) the compatible risk.</p>
+<p>Finally, you should test your daemon on a wide variety of platforms. And make sure you test with the pre-release builds Mac OS X that are available via Apple's <a href="http://developer.apple.com/products/">developer software seeding program</a>.</p>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="SECFRAMEWORKCROSSREFERENCE"></a><h3>Framework Cross Reference</h3>
+<p><a href="#TABFRAMEWORKCROSSREFERENCE">Table 3</a> summarizes which frameworks are daemon-safe.</p>
+<a name="TABFRAMEWORKCROSSREFERENCE"></a><p class="smalltext"><strong>Table 3 : </strong>Daemon-Safe Frameworks</p>
+<table cellspacing="0" class="graybox">
+<tr>
+<th>Framework</th>
+<th>Daemon Safe?</th>
+<th>Framework</th>
+<th>Daemon Safe?</th>
+</tr>
+<tr>
+<td scope="row">Accelerate</td>
+<td>yes</td>
+<td>InstantMessage</td>
+<td>no</td>
+</tr>
+<tr>
+<td scope="row">AddressBook</td>
+<td>no</td>
+<td>InterfaceBuilder</td>
+<td>no</td>
+</tr>
+<tr>
+<td scope="row">AGL</td>
+<td>no</td>
+<td>IOBluetooth</td>
+<td>no</td>
+</tr>
+<tr>
+<td scope="row">AppKit</td>
+<td>no</td>
+<td>IOBluetoothUI</td>
+<td>no</td>
+</tr>
+<tr>
+<td scope="row">AppKitScripting</td>
+<td>no</td>
+<td>IOKit</td>
+<td>yes</td>
+</tr>
+<tr>
+<td scope="row">AppleScriptKit</td>
+<td>no</td>
+<td>JavaEmbedding</td>
+<td>no</td>
+</tr>
+<tr>
+<td scope="row">AppleShareClient</td>
+<td>no</td>
+<td>JavaFrameEmbedding</td>
+<td>no</td>
+</tr>
+<tr>
+<td scope="row">AppleShareClientCore</td>
+<td>yes</td>
+<td>JavaScriptCore</td>
+<td>no</td>
+</tr>
+<tr>
+<td scope="row">AppleTalk</td>
+<td>yes</td>
+<td>JavaVM</td>
+<td>yes [3]</td>
+</tr>
+<tr>
+<td scope="row">ApplicationServices</td>
+<td>no</td>
+<td>Kerberos</td>
+<td>yes [4]</td>
+</tr>
+<tr>
+<td scope="row">AudioToolbox</td>
+<td>yes</td>
+<td>LatentSemanticMapping</td>
+<td>no</td>
+</tr>
+<tr>
+<td scope="row">AudioUnit</td>
+<td>yes</td>
+<td>LDAP</td>
+<td>yes</td>
+</tr>
+<tr>
+<td scope="row">Automator</td>
+<td>no</td>
+<td>Message</td>
+<td>no</td>
+</tr>
+<tr>
+<td scope="row">CalendarStore</td>
+<td>no</td>
+<td>OpenAL</td>
+<td>yes</td>
+</tr>
+<tr>
+<td scope="row">Carbon</td>
+<td>no</td>
+<td>OpenGL</td>
+<td>no</td>
+</tr>
+<tr>
+<td scope="row">Cocoa</td>
+<td>no</td>
+<td>OSAKit</td>
+<td>no</td>
+</tr>
+<tr>
+<td scope="row">Collaboration</td>
+<td>no</td>
+<td>PCSC</td>
+<td>yes</td>
+</tr>
+<tr>
+<td scope="row">CoreAudio</td>
+<td>yes</td>
+<td>PreferencePanes</td>
+<td>no</td>
+</tr>
+<tr>
+<td scope="row">CoreAudioKit</td>
+<td>no</td>
+<td>PubSub</td>
+<td>no</td>
+</tr>
+<tr>
+<td scope="row">CoreData</td>
+<td>yes [1]</td>
+<td>Python</td>
+<td>yes [5]</td>
+</tr>
+<tr>
+<td scope="row">CoreFoundation</td>
+<td>yes</td>
+<td>QTKit</td>
+<td>no</td>
+</tr>
+<tr>
+<td scope="row">CoreMIDI</td>
+<td>yes</td>
+<td>Quartz</td>
+<td>no</td>
+</tr>
+<tr>
+<td scope="row">CoreMIDIServer</td>
+<td>yes [2]</td>
+<td>QuartzCore</td>
+<td>no</td>
+</tr>
+<tr>
+<td scope="row">CoreServices</td>
+<td>yes</td>
+<td>QuickLook</td>
+<td>no</td>
+</tr>
+<tr>
+<td scope="row">CoreVideo</td>
+<td>no</td>
+<td>QuickTime</td>
+<td>no</td>
+</tr>
+<tr>
+<td scope="row">CPlusTest</td>
+<td>yes</td>
+<td>Ruby</td>
+<td>yes</td>
+</tr>
+<tr>
+<td scope="row">DirectoryService</td>
+<td>yes</td>
+<td>RubyCocoa</td>
+<td>no</td>
+</tr>
+<tr>
+<td scope="row">DiscRecording</td>
+<td>no</td>
+<td>ScreenSaver</td>
+<td>no</td>
+</tr>
+<tr>
+<td scope="row">DiscRecordingUI</td>
+<td>no</td>
+<td>Scripting</td>
+<td>yes [1]</td>
+</tr>
+<tr>
+<td scope="row">DiskArbitration</td>
+<td>yes</td>
+<td>ScriptingBridge</td>
+<td>yes</td>
+</tr>
+<tr>
+<td scope="row">DrawSprocket</td>
+<td>no</td>
+<td>Security</td>
+<td>yes</td>
+</tr>
+<tr>
+<td scope="row">DVComponentGlue</td>
+<td>no</td>
+<td>SecurityFoundation</td>
+<td>yes</td>
+</tr>
+<tr>
+<td scope="row">DVDPlayback</td>
+<td>no</td>
+<td>SecurityInterface</td>
+<td>no</td>
+</tr>
+<tr>
+<td scope="row">EGL</td>
+<td>no</td>
+<td>SyncServices</td>
+<td>no</td>
+</tr>
+<tr>
+<td scope="row">ExceptionHandling</td>
+<td>yes [1]</td>
+<td>System</td>
+<td>yes</td>
+</tr>
+<tr>
+<td scope="row">ForceFeedback</td>
+<td>no</td>
+<td>SystemConfiguration</td>
+<td>yes</td>
+</tr>
+<tr>
+<td scope="row">Foundation</td>
+<td>yes</td>
+<td>Tcl</td>
+<td>yes</td>
+</tr>
+<tr>
+<td scope="row">FWAUserLib</td>
+<td>yes</td>
+<td>Tk</td>
+<td>no</td>
+</tr>
+<tr>
+<td scope="row">GLUT</td>
+<td>no</td>
+<td>TWAIN</td>
+<td>no</td>
+</tr>
+<tr>
+<td scope="row">ICADevices</td>
+<td>no</td>
+<td>vecLib</td>
+<td>yes</td>
+</tr>
+<tr>
+<td scope="row">InputMethodKit</td>
+<td>no</td>
+<td>WebKit</td>
+<td>no</td>
+</tr>
+<tr>
+<td scope="row">InstallerPlugins</td>
+<td>no</td>
+<td>XgridFoundation</td>
+<td>yes</td>
+</tr>
+</table>
+<p><strong>Notes:</strong></p>
+<ol>
+<li><p>This framework has been daemon-safe since at least Mac OS X 10.4. However, a previous version of this technote documented it as not being daemon safe.</p></li>
+<li><p>This is not a framework that you would usually call yourself.</p></li>
+<li><p>You should define the Java property <code>java.awt.headless</code> as <code>true</code>, which causes Java to throw an exception if you run code that connects to the window server. See <a href="/qa/qa2001/qa1328.html">Technical Q&amp;A QA1328, 'Server Processes and the Dock'</a>.</p></li>
+<li><p>With restrictions; please write to <a href="mailto:dts@apple.com">Developer Technical Support (DTS)</a> for the details.</p></li>
+<li><p>Core Python functionality is daemon safe, but certain modules are not. Thus, depending on the modules you use, your Python program may not be daemon safe.</p></li>
+</ol>
+<p>This table lists the frameworks as of Mac OS X 10.5. If a framework is not listed here, it is best to assume that it is not daemon-safe.</p>
+<p>If you're interested in the status of a subframework, and that subframework is not listed here, you should look up the status of the framework's umbrella. For example, you can tell that the OSServices framework is safe because its umbrella framework, CoreServices, is safe.</p>
+<p>If a framework is listed as safe, it will continue to be safe in future system releases. If a framework is listed as not being safe, it may become safe in future releases.</p>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="SECDESIGNRECOMMENDATIONS"></a><h2>Design Considerations</h2>
+<p>This section lists some important points that you should consider when designing a background program.</p>
+<a name="SEC"></a><h3>Is It Necessary?</h3>
+<p>When contemplating a background program, the first thing to consider is whether you need it at all. Background programs consume resources all the time (although you can minimize the resources they consume by <a href="#SECLAUNCHINGONDEMAND">launching on demand</a>), so if you can avoid using one you'll be doing the user a favor. Also, a background program can make the system less robust because it introduces a common point of failure (in this respect, a daemon is worse than an agent, which is worse than no background program at all). On the other hand, using a background program is often better than using a convoluted mechanism for distributed state management.</p>
+<p>If you've decided to implement a background program, you must then determine whether you need an agent or a daemon. The main reason for using a daemon is that you need to share some state between multiple processes in different login sessions. If you don't need this, consider using an agent.</p>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="SECMONOLITHPERILS"></a><h3>The Perils of the Monolith</h3>
+<p>A common question we get in DTS is "How can I launch a GUI application from my daemon?"  The answer is that you can't. This is a direct consequence of Mac OS X's <a href="#SECLAYEREDFRAMEWORKS">layered architecture</a>: a daemon can't launch a GUI application because the daemon is running in the wrong context. Even if it could choose which context to run the GUI application in, which would it choose?  And what happens if the computer is sitting at the login window, which means there are no valid GUI contexts?</p>
+<div class="notebox"><p><strong>Note: </strong>In Mac OS X 10.5 and later it is possible to launch a GUI application from a daemon by calling Launch Services. However, this capability comes with a number of caveats that make it difficult to use in practice. See <a href="#SECPROCESSMANAGER">Process Manager and Launch Services</a> for details.</p></div>
+<p>The correct solution to this problem is to split your program into multiple components, each specialized for a particular role. So, you might have a daemon for managing the global state and an agent operating on behalf of each of the logged in users. If the daemon needs the user to answer a question, it signals all the agents and the agents use local knowledge to decide what to do. For example, the agent might behave differently depending on whether it's running in a GUI or non-GUI login session, or whether the GUI session is active (that is, using the console in a fast user switched environment).</p>
+<p>The nice thing about this approach is that it simplifies the daemon's state. The daemon just knows that it's expecting one of the agents to provide the answer to the question; it doesn't care how many agents there are, what type of login context they're running in, or how they go about interacting with the user.</p>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="SECCLIENTSERVER"></a><h3>The Client/Server Model</h3>
+<p>If you do split your program into multiple components, try to use the client/server model. Specifically, remember that clients connect to servers, and not the other way around. This might sound obvious, but it's easy to forget this point and find yourself in the weeds.</p>
+<p>In this context, a server is the background program that contains the global state that's being shared, while the clients are the programs that want to access that state. The server might be an agent (if all of the clients run in the same login session), or it might be a daemon (if it handles clients from multiple login sessions, or it handles other daemons as clients); the key point is that there is a one-to-many relationship between the server and its clients.</p>
+<p>In this design, the server should not try to discover or connect to the clients. Rather, the clients should connect to the server. This approach is a good match for the common inter-process communication (IPC) APIs. For example, if you're using UNIX domain sockets, it's easy for a daemon to listen on a single UNIX domain socket and have the clients connect to that socket. It's also easy for the server to handle a client disconnecting (either because it quit or because it died unexpectedly). If you do things the other way around, things start to get messy.</p>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="SECGETTINGLAUNCHED"></a><h2>Getting Launched</h2>
+<p>Once you've got the basic design under control, you need to decide how to launch each component. <a href="#FIGGETTINGLAUNCHEDA">Figure 4</a> and <a href="#FIGGETTINGLAUNCHEDB">Figure 5</a> show how you can evaluate your needs to come up with the best approach.</p>
+<div class="notebox"><p><strong>IMPORTANT: </strong>These figures assume that you're targeting Mac OS X 10.5 and later. If you must support earlier systems, you should look at the equivalent figures in <a href="#SECGETTINGLAUNCHED104">Getting Launched Prior To Mac OS X 10.5</a>.</p></div>
+<a name="FIGGETTINGLAUNCHEDA"></a><p class="caption"><strong>Figure 4: </strong>Launching a daemon</p>
+<p><img src="images/tn2083_FlowchartA.png" width="444" height="482" alt="Figure 4, Launching a daemon"></p>
+<a name="FIGGETTINGLAUNCHEDB"></a><p class="caption"><strong>Figure 5: </strong>Launching an agent</p>
+<p><img src="images/tn2083_FlowchartB.png" width="344" height="559" alt="Figure 5, Launching an agent"></p>
+<p>As this algorithm shows, Apple recommends that, where possible, you implement background programs using <a href="#SECDAEMONS">launchd</a>. The reasons for this are:</p>
+<ul>
+<li><p><code>launchd</code> makes it easy for your background program to <a href="#SECLAUNCHINGONDEMAND">launch on demand</a></p></li>
+<li><p><code>launchd</code> makes it easy to install and manage your background program (using <a href="x-man-page://1/launchctl">launchctl</a>)</p></li>
+<li><p>Apple recommends that you use <a href="#SECUNIXDOMAINSOCKETS">UNIX domain sockets</a> for client/daemon communication, and <code>launchd</code> makes this easy</p></li>
+<li><p>use of the most common alternative, a startup item, is deprecated as of Mac OS X 10.4</p></li>
+</ul>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="SECDAEMONIPCRECOMMENDATIONS"></a><h2>Daemon IPC Recommendations</h2>
+<p>Most daemons use some sort of inter-process communication (IPC) to communicate between the daemon and its clients. If you're writing a daemon, one of your first design decisions should be the IPC mechanism to use. This section describes the pitfalls of using Mach message-based IPC in your daemon, and why you should consider UNIX domain sockets as an alternative.</p>
+<div class="notebox"><p><strong>IMPORTANT: </strong>The recommendations in this section are most important when writing a daemon that communicates with clients in a different <a href="#SECBOOTSTRAPNAMESPACES">bootstrap namespace</a>. If all of the processes run in the same bootstrap namespace, you can ignore these recommendations. For example, if you're writing an agent and all of the clients are GUI applications in the same login session, it's perfectly reasonable to communicate using Apple events.</p></div>
+<a name="SECMACHCONSIDEREDHARMFUL"></a><h3>Mach Considered Harmful</h3>
+<p>The Mach APIs represent the lowest level interface to the kernel. As such, they are the most likely to change as the system evolves. Apple has consistently recommended that third party developers avoid them. This applies to daemons and agents as it does to everything else.</p>
+<p>However, in the case of daemons and agents, Mach APIs are particularly troublesome because you have to worry about bootstrap namespaces. While it's possible—some would even claim easy—to manage bootstrap namespaces correctly, it's better to just avoid the problem altogether by avoiding Mach APIs.</p>
+<p>Apple's general recommendation for avoiding the use of Mach APIs includes the advice that it's better to use high-level wrappers. For example, rather than send and receive Mach messages using Mach APIs directly, it's better to use the higher-level CFMessagePort API. This is good advice in general; but, if you're writing a daemon or agent, you will still run into bootstrap namespace problem. Under the covers, <code>CFMessagePortCreateLocal</code> registers the service with the bootstrap service, and <code>CFMessagePortCreateRemote</code> uses the bootstrap service to look up a registered service by name. So, even if you avoid using Mach messages directly, if you use an API that's layered on top of Mach messages, you still have to worry about bootstrap namespaces.</p>
+<p>The high-level IPC APIs that are most likely to trip you up are:</p>
+<ul>
+<li><p>CFMessagePort — Within this API, all named message ports are implementing using the bootstrap service.</p></li>
+<li><p>Distributed Objects (DO) — Named DO connections (such as you would register using <code>-[NSConnection registerName:]</code>), are implemented using the bootstrap service.</p></li>
+<li><p>Apple events — Apple events are implemented in terms of Mach messages. While it is possible to use Apple events in a daemon (using the routines from <code>&lt;AE/AEMach.h&gt;</code>, it's still a tricky exercise.</p></li>
+</ul>
+<p>Overall, it is easier to just avoid Mach messages entirely. Mac OS X provides numerous alternative IPC mechanisms. My personal favorite is UNIX domain sockets.</p>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="SECUNIXDOMAINSOCKETS"></a><h3>UNIX Domain Sockets Are Your Friend</h3>
+<p>UNIX domain sockets are somewhat like TCP/IP sockets, except that the communication is always local to the computer. You access UNIX domain sockets using the same BSD sockets API that you'd use for TCP/IP sockets. The primary difference is the address format. For TCP/IP sockets, the address structure (that which you pass to <code>bind</code>, <code>connect</code>, and so on) is <code>(struct sockaddr_in)</code>, which contains an IP address and port number. For UNIX domain sockets, the address structure is <code>(struct sockaddr_un)</code>, which contains a path.</p>
+<p>When the server binds to a UNIX domain socket, the system creates a file system object that represents the socket. For example, the PPP daemon's UNIX domain socket is <code>/var/run/pppconfd</code>. When you look at this with <code>ls -l</code> (see <a href="#LISTPPPSOCKET">Listing 10</a>), you'll see the first character of the listing is 's', indicating that this object is a socket.</p>
+<a name="LISTPPPSOCKET"></a><p class="caption"><strong>Listing 10: </strong>Looking at PPP's UNIX domain socket</p>
+<pre class="sourcecodebox">$ ls -l /var/run/pppconfd 
+srwxrwxrwx  1 root  daemon  0  9 May 12:57 /var/run/pppconfd</pre>
+<p>Once the server is running, the client can connect to it by simply passing this path to the <code>connect</code> call. Once the connection is in place, communication proceeds as it would for TCP/IP sockets.</p>
+<p>To learn more about UNIX domain sockets, consult any standard UNIX reference. I particularly recommend <a href="#SECFURTHERREADING">UNIX Network Programming</a> by Stevens et al.</p>
+<p>For an example of using UNIX domain sockets in a client/server environment, see <a href="/samplecode/CFLocalServer/index.html">Sample Code 'CFLocalServer'</a>.</p>
+<a name="SECUNIXDOMAINADVANTAGES"></a><h4>Advantages of UNIX Domain Sockets</h4>
+<p>When implementing a daemon, the UNIX domain sockets API offers a number of advantages over other IPC mechanisms.</p>
+<ul>
+<li><p>Compared to a TCP socket, it guarantees that only processes running on your local machine can connect to your server. You can also get this guarantee with TCP, but it requires extra work.</p></li>
+<li><p>Compared to Apple events, it works on all versions of Mac OS X (there are problems using Apple events from a daemon prior to Mac OS X 10.2). Also, it's a connection-oriented API, so the server automatically learns about the death of a client and it's easy for the server to asynchronously notify the client.</p></li>
+<li><p>Compared to Mach messages (and any high-level wrappers, like CFMessagePort), it eliminates any bootstrap namespace concerns. Also, when you use Mach messages directly, you have to do extra work for the server to be notified when a client dies unexpectedly.</p></li>
+<li><p>It can be easily integrated into any server architecture, including those based on threads, a runloop (using CFSocket), a select loop, or kqueues.</p></li>
+<li><p>It is a well known POSIX API with numerous sources of good documentation.</p></li>
+<li><p>Source code based on UNIX domain sockets code is portable to other POSIX platforms.</p></li>
+<li><p>It can be nicely integrated into a launchd daemon. Specifically, starting with Mac OS X 10.4.6 it is possible for a launchd daemon to be <a href="#SECLAUNCHINGONDEMAND">launched on demand</a> when a client connects to a UNIX domain socket.</p></li>
+<li><p>It supports descriptor passing, which makes it easier for you to factor your program into privileged and non-privileged components.</p></li>
+</ul>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="SECUNIXDOMAINBESTPRACTICE"></a><h4>Best Practice</h4>
+<p>When using UNIX domain sockets, keep in mind the following points.</p>
+<ul>
+<li><p>A UNIX domain socket appears as an item in the file system. The client and server usually hard code the path to this socket. You should use a path to an appropriate directory (like <code>/var/tmp</code>) and then give the socket a unique name within that directory. For example, <a href="/samplecode/CFLocalServer/index.html">Sample Code 'CFLocalServer'</a> uses a path of <code>/var/tmp/com.apple.dts.CFLocalServer/Socket</code>.</p></li>
+<li><p>Use a socket path that's appropriate to the scope of communications. For example, a daemon can use a constant socket path because all clients connect to the same daemon. On the other hand, an agent should embed some scope identifier in the path. For example, if all of the agent's clients are in the same login session, it should include the <a href="#SECSECURITYCONTEXT">session identifier</a> in the path. Or if the agent is intended to be used by all processes of a particular user, it could embed the user ID in the path (or, better yet, the user's UUID).</p></li>
+<li><p>When creating your UNIX domain socket, you should be careful to avoid security problems caused by file system race conditions. <a href="/samplecode/CFLocalServer/index.html">Sample Code 'CFLocalServer'</a> shows one approach for this; download the sample and look at the <code>SafeBindUnixDomainSocket</code> routine in <code>Server.c</code>.</p></li>
+<li><p>Alternatively, if your daemon runs as root, you can put your UNIX domain socket in <code>/var/run</code>. This directory is only writable by privileged processes, which avoids the above mentioned security problems.</p></li>
+<li><p>You can confirm the identity of the program at the other end of the socket using the <a href="x-man-page://4/unix">LOCAL_PEERCRED</a> socket option, introduced in Mac OS X 10.4.</p></li>
+</ul>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="SECCROSSARCHITECTURE"></a><h3>Cross Architecture IPC</h3>
+<p>Regardless of what IPC mechanism you use, you will have to deal with cross-architectural issues. For example, a given daemon may have clients that have a different:</p>
+<ul>
+<li><p>byte order (endianness) — The most common case of this is an Intel daemon with a PowerPC client (being run using Rosetta).</p></li>
+<li><p>pointer size — For example, a 32-bit daemon with 64-bit clients, or vice versa.</p></li>
+</ul>
+<p>You must design your IPC mechanism to cope with these issues. Common strategy include:</p>
+<ul>
+<li><p>use a text-base protocol — For example, you might use a CFPropertyList that's been flattened to XML.</p></li>
+<li><p>define a byte order and stick to it — For example, you could require that all communications be in network byte order (big endian) and require little endian clients to swap the byte order.</p></li>
+<li><p>use native byte order and require compatibility code to swap</p></li>
+<li><p>include an indication of the byte order with the message (commonly called a <strong>byte order mark</strong>)</p></li>
+<li><p>don't pass pointers over the wire (doing so is a little strange anyway)</p></li>
+<li><p>when passing a size, define it in architecture neutral terms — For example, use <code>uint32_t</code> or <code>uint64_t</code> rather than <code>size_t</code>.</p></li>
+</ul>
+<p>Alternatively, require that all clients be of the same architecture.</p>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="SECCODINGRECOMMENDATIONS"></a><h2>Coding Recommendations</h2>
+<p>The following sections list various coding recommendations for background programs.</p>
+<a name="SECLAUNCHINGONDEMAND"></a><h3>Launching On Demand</h3>
+<p>To minimize your use of system resources, it's best to launch your background program (daemon or agent) on demand. That is, rather than always launching at startup (or, for an agent, at login), your program only launches when its services are required.</p>
+<p>The basic strategy for launching on demand is:</p>
+<ul>
+<li><p>You install a launchd configuration file that indicates the criteria under which you should be launched.</p></li>
+<li><p><code>launchd</code> will read this file and waits for your launch criteria to be satisfied.</p></li>
+<li><p>When your launch criteria are satisfied, <code>launchd</code> starts your program, providing it some way to get information about the event that triggered the launch.</p></li>
+</ul>
+<p>The launch criteria supported by <code>launchd</code> are listed in <a href="#TABLAUNCHCRITERIA">Table 4</a>. See <a href="x-man-page://5/launchd.plist">launchd.plist</a> for the details.</p>
+<a name="TABLAUNCHCRITERIA"></a><p class="smalltext"><strong>Table 4 : </strong>Launch Criteria</p>
+<table cellspacing="0" class="graybox">
+<tr>
+<th><strong>Criterion</strong></th>
+<th><strong>Property List Key</strong></th>
+<th><strong>Introduced</strong></th>
+</tr>
+<tr>
+<td scope="row">change to file system object</td>
+<td><code>WatchPaths</code></td>
+<td>10.4</td>
+</tr>
+<tr>
+<td scope="row">non-empty directory</td>
+<td><code>QueueDirectories</code></td>
+<td>10.4</td>
+</tr>
+<tr>
+<td scope="row">file system mount</td>
+<td><code>StartOnMount</code></td>
+<td>10.5</td>
+</tr>
+<tr>
+<td scope="row">periodic</td>
+<td><code>StartInterval</code></td>
+<td>10.4</td>
+</tr>
+<tr>
+<td scope="row">wall time</td>
+<td><code>StartCalendarInterval</code></td>
+<td>10.4</td>
+</tr>
+<tr>
+<td scope="row">Mach message [1]</td>
+<td><code>MachServices</code></td>
+<td>10.5</td>
+</tr>
+<tr>
+<td scope="row">connection to a stream socket [2]</td>
+<td><code>Sockets</code></td>
+<td>10.4</td>
+</tr>
+<tr>
+<td scope="row">traffic to a datagram port [3]</td>
+<td><code>Sockets</code></td>
+<td>10.4</td>
+</tr>
+</table>
+<p><strong>Notes:</strong></p>
+<ol>
+<li><p><code>launchd</code> will create a Mach port and register it in the appropriate bootstrap namespace. It launches your background program if any messages arrive on that port.</p></li>
+<li><p>Typically this is either a TCP socket or a UNIX domain socket. Launching on demand based on a connection to a UNIX domain socket was not feasible until Mac OS X 10.4.6. Specifically, the <code>SockPathMode</code> property list key was not supported on PowerPC until Mac OS X 10.4.6 
+			(r. <a href="rdar://problem/4252903">4252903</a>)
+		.</p></li>
+<li><p>Typically this is a UDP socket.</p></li>
+</ol>
+<p>By default <code>launchd</code> assumes that your background program wants to run on demand. This behavior is controlled by the <code>KeepAlive</code> property on Mac OS X 10.5 and later, and the now-deprecated <code>OnDemand</code> property on Mac OS X 10.4.x. <a href="#TABONDEMAND">Table 5</a> shows the more common behaviors, and the properties that you need to set in order to get that behavior.</p>
+<a name="TABONDEMAND"></a><p class="smalltext"><strong>Table 5 : </strong>Launch behavior versus launchd properties</p>
+<table cellspacing="0" class="graybox">
+<tr>
+<th><strong>Minimum System</strong></th>
+<th><strong>Desired Behavior</strong></th>
+<th><strong>Properties</strong></th>
+</tr>
+<tr>
+<td scope="row">10.4</td>
+<td>run when loaded and never quit</td>
+<td>
+<code>OnDemand</code> = false</td>
+</tr>
+<tr>
+<td scope="row">10.4</td>
+<td>run purely on demand</td>
+<td>
+<code>OnDemand</code> = true (default), <code>RunAtLoad</code> = false (default)</td>
+</tr>
+<tr>
+<td scope="row">10.4</td>
+<td>run once when loaded and thence on demand</td>
+<td>
+<code>OnDemand</code> = true (default), <code>RunAtLoad</code> = true</td>
+</tr>
+<tr>
+<td scope="row">10.5</td>
+<td>run when loaded and never quit</td>
+<td>
+<code>KeepAlive</code> = true</td>
+</tr>
+<tr>
+<td scope="row">10.5</td>
+<td>run purely on demand</td>
+<td>
+<code>KeepAlive</code> = false (default), <code>RunAtLoad</code> = false (default)</td>
+</tr>
+<tr>
+<td scope="row">10.5</td>
+<td>run once when loaded and thence on demand</td>
+<td>
+<code>KeepAlive</code> = false (default), <code>RunAtLoad</code> = true</td>
+</tr>
+<tr>
+<td scope="row">10.5</td>
+<td>run on demand as long as you exit successfully</td>
+<td>
+<code>KeepAlive</code> = { <code>SuccessfulExit</code> = true }, <code>RunAtLoad</code> = false (default)</td>
+</tr>
+<tr>
+<td scope="row">10.5</td>
+<td>run on demand as long as a particular path exists</td>
+<td>
+<code>KeepAlive</code> = { <code>PathState</code> = { /example/path = true } }, <code>RunAtLoad</code> = false (default)</td>
+</tr>
+</table>
+<p>As you can see, the <code>KeepAlive</code> property has a lot more flexibility than the <code>OnDemand</code> property that it replaces.</p>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="SECACCESSINGUSERSTATE"></a><h3>Daemons Accessing User State</h3>
+<p>It is not possible for a daemon to act on behalf of a user with 100% fidelity. While this might seem like a controversial statement, it's actually pretty easy to prove. For example, consider something as simple as accessing a preference file in the user's home directory. It's not possible for a daemon to reliably do this. If the user has an AFP home directory, or their home directory is protected by FileVault, the volume containing the home directory will only be mounted when the user is logged in. Moreover, it is not possible to mount the that volume without the user's security credentials (typically their password). So, if a daemon tries to get a user preference when the user is not logged in, it will fail.</p>
+<p>In some cases it is helpful to impersonate the user, at least as far as the permissions checking done by the BSD subsystem of the kernel. A single-threaded daemon can do this using <a href="x-man-page://2/seteuid">seteuid</a> and <a href="x-man-page://2/setegid">setegid</a>. These set the effective user and group ID of the process as a whole. This will cause problems if your daemon is using multiple threads to handle requests from different users. In that case you can set the effective user and group ID of a thread using <code>pthread_setugid_np</code>. This was introduced in Mac OS X 10.4.</p>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="SECLOGGING"></a><h3>Logging</h3>
+<p>In most cases you will want your background program to log information about its activity. These logs are useful during initial bring up, and can also help the user troubleshoot problems. Mac OS X supports a number of different logging facilities.</p>
+<a name="SECAPPLESYSTEMLOG"></a><h4>Apple System Log</h4>
+<p>The Apple System Log (ASL) is a logging facility introduced in Mac OS X 10.4. It allows you to create flexible, structured log entries. It also allows you to write management tools that query these logs.</p>
+<p>For information about ASL, see its <a href="x-man-page://3/asl">man page</a>. For an example of its use, see <a href="/samplecode/SampleD/index.html">Sample Code 'SampleD'</a>.</p>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="SECSYSLOG"></a><h4>Syslog</h4>
+<p>Syslog is a traditional BSD logging facility. It allows you to log (relatively unstructured) messages, and configure how those messages are processed.</p>
+<p>For information about syslog, see the man pages for the <a href="x-man-page://8/syslogd">syslogd</a>, <a href="x-man-page://1/syslog">syslog</a>, and <a href="x-man-page://1/logger">logger</a> programs; for the <a href="x-man-page://5/syslog.conf">syslog.conf</a> configuration file; and for the <a href="x-man-page://3/syslog">syslog</a> API.</p>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="SECLOGGINGWITHPRINTF"></a><h4>Logging With printf</h4>
+<p>If you're creating a launchd daemon or launchd agent, <code>launchd</code> makes it easy to log using <code>printf</code>. Specifically:</p>
+<ul>
+<li><p>You can supply a specific destination for <code>stdout</code> and <code>stderr</code> by setting the <code>StandardOutPath</code> and <code>StandardErrorPath</code> properties in your program's property list.</p></li>
+<li><p>If you don't supply these properties, the behavior in system-specific. Prior to Mac OS X 10.5, your program's <code>stdout</code> and <code>stderr</code> will be connected to <code>/dev/null</code>. In Mac OS X 10.5 and later, <code>launchd</code> will capture any output to these streams and redirect it to <a href="#SECAPPLESYSTEMLOG">ASL</a>.</p></li>
+</ul>
+<p>If you're not a launchd daemon or launchd agent, the situation is more complex.</p>
+<ul>
+<li><p>For daemons that aren't launchd daemons, <code>stdout</code> and <code>stderr</code> are typically connected to <code>/dev/null</code>. If you want to log using <code>printf</code>, you will have to redirect them appropriately.</p></li>
+<li><p>For applications running on Mac OS X 10.5 and later, <code>launchd</code> will redirect <code>stdout</code> and <code>stderr</code> to <a href="#SECAPPLESYSTEMLOG">ASL</a> (much as it does for launchd agents).</p></li>
+<li><p>For applications running on systems prior to Mac OS X 10.5, <code>stdout</code> and <code>stderr</code> go directly into the console log. For information about the console log, see <a href="/technotes/tn2004/tn2124.html">Technical Note TN2124, 'Mac OS X Debugging Magic'</a>.</p></li>
+</ul>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="SECSECURITY"></a><h3>Daemon Security Considerations</h3>
+<p>By definition, a daemon is a system-wide service. Thus, when creating a daemon, you need to worry about security. While a detailed discussion of secure programming is outside the scope of this document, here's a short list of things that you should consider.</p>
+<ul>
+<li><p>If possible, create an agent rather than a daemon. This will limit the scope of any security problems.</p></li>
+<li><p>If your daemon uses the network, do not trust data you receive from the network. Doing so might allow a remote attacker to subvert your daemon.</p></li>
+<li><p>When you install your daemon, make sure that you set the file system permissions correctly. Apple recommends that daemons be owned by <code>root</code>, have an owning group of <code>wheel</code>, and use permissions 755 (rwxr-xr-x) for executables and directories, and 644 (rw-r--r--) for files. In addition, every directory from your daemon up to the root directory must be owned by root and only writable by the owner (or owned by root and <a href="x-man-page://8/sticky">sticky</a>). If you don't do this correctly, a non-admin user might be able to escalate their privileges by modifying your daemon (or shuffling it aside).</p></li>
+<li><p>Try to avoid running your daemon with elevated privileges (for example, running it as root). If your daemon must run with elevated privileges, do not trust data received from non-privileged processes. Doing so might allow a local user to escalate their privileges.</p></li>
+<li><p>Watch out for denial of service attacks. If your daemon sends a message to a client, make sure that it works correctly if the client never responds. Don't allow clients to run your daemon out of memory, or file descriptors, or any other resource.</p></li>
+<li><p>Watch out for other common security problems, particularly buffer overruns. The nature of daemons makes these problems more worrisome.</p></li>
+</ul>
+<p>For more information about writing secure software, consult one of the numerous texts available on the topic. I highly recommend <a href="#SECFURTHERREADING">Building Secure Software</a>.</p>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="SECAGENTSANDFASTUSERSWITCHING"></a><h3>Agents and Fast User Switching</h3>
+<p>If you're writing an agent, you should be aware of the subtleties associated with fast user switching. For example, your agent might need to know:</p>
+<ul>
+<li><p>whether it's running in a GUI or non-GUI login session</p></li>
+<li><p>whether its GUI login session is active (that is, using the console)</p></li>
+<li><p>and so on</p></li>
+</ul>
+<p>For the detailed information about this, see <a href="http://developer.apple.com/documentation/MacOSX/Conceptual/BPMultipleUsers/index.html">Multiple User Environments</a>.</p>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="SECPROCESSMANAGER"></a><h3>Process Manager and Launch Services</h3>
+<p>Historically, neither Process Manager nor Launch Services were daemon safe. This represents a significant gotcha for daemon writers who, quite reasonably, expect that process services should be available to a daemon. However, if you look at the these APIs in their historical context, you can understand why this restriction existed.</p>
+<p>Consider the Process Manager routine <code>GetNextProcess</code>. Numerous programs, from both Apple and third parties, use this routine to display a list of running applications. It wouldn't make sense for this list to show applications running in other GUI login sessions. Thus, this routine uses the bootstrap namespace as an implicit parameter to determine the login session, and hence the list of running applications to return.</p>
+<p>Launch Services, which is layered on top of the Process Manager, had similar issues.</p>
+<p>Thus, both Process Manager and Launch Services have, historically, been located in the ApplicationServices framework, and were not available to daemons.</p>
+<p>Apple recognizes that this restriction is quite inconvenient and is working to improve things. Mac OS X 10.5 represents the first step on that path. Specifically, the underlying implementation of Process Manager has moved from the window server to the CoreServices daemon (<code>coreservicesd</code>). With this change, it is now possible to create daemon-safe system services that deal with Process Manager processes.</p>
+<p>The first beneficiary of this change in Launch Services. In Mac OS X 10.5 Launch Services has been moved down to the Core Services layer (it is now a subframework of the CoreServices framework). Thus, it is now daemon-safe.</p>
+<p>This raises the question of what happens when you use Launch Services to launch an application from a daemon. Because the daemon is running in the global bootstrap namespace, Launch Services can't use the bootstrap namespace to derive the login session. Rather, Launch Services uses the EUID of the calling process. The behavior is as follows:</p>
+<ul>
+<li><p>If the EUID of the calling process is zero, the application is launched in the context of the currently active GUI login session. If there is no currently active GUI login session (no one is logged in, or a logged in user has fast user switched to the login window), the behavior is unspecified 
+			(r. <a href="rdar://problem/5321293">5321293</a>)
+		.</p></li>
+<li><p>If the EUID of the calling process is not zero and it matches that of a user logged in via the GUI, the application is launched in the context of that user's GUI login session.</p></li>
+<li><p>If the EUID of the calling process is not zero but it does not match that of a user logged in via the GUI, the behavior is unspecified 
+			(r. <a href="rdar://problem/5321281">5321281</a>)
+		.</p></li>
+</ul>
+<p>Unfortunately, while the underlying implementation of Process Manager is now at the CoreServices layer, Process Manager itself remains in the ApplicationServices framework. Thus, it's still not possible to use Process Manager from a daemon.</p>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="SECHINTSANDTIPS"></a><h2>Hints and Tips</h2>
+<p>This section describes various hints and tips that you might find useful when developing a background program.</p>
+<a name="SECSTARTINGADAEMONFIRSTTIME"></a><h3>Starting a Daemon</h3>
+<p>If you're writing a daemon, you may encounter problems when you start the daemon immediately after installing it. There are two essentially conflicting requirements.</p>
+<ul>
+<li><p>You don't want to force the user to reboot.</p></li>
+<li><p>If you launch your daemon directly from your configuration application (or installer), it inherits the wrong context (see <a href="#SECEXECUTIONCONTEXTS">Execution Contexts</a> for details).</p></li>
+</ul>
+<p>There are a number of ways that you can resolve this conundrum, listed in order of most- to least-preferable.</p>
+<ul>
+<li>
+<p>If you have a <a href="#SECDAEMONS">launchd daemon</a>, you can start it by running <a href="x-man-page://1/launchctl">launchctl</a>. <code>launchctl</code> works by sending a message to <code>launchd</code>, asking it to launch the daemon on your behalf, so your daemon is a child of <code>launchd</code> and inherits the correct context.</p>
+<div class="notebox"><p><strong>IMPORTANT: </strong>For this to work properly, you must run <code>launchctl</code> as root (both its EUID and RUID must be 0). This ensures that <code>launchctl</code> communicates with the global instance of <code>launchd</code>.</p></div>
+</li>
+<li><p>Otherwise, you can launch the daemon in the global bootstrap namespace using the <a href="x-man-page://8/StartupItemContext">StartupItemContext</a> tool. This tool is not perfect 
+			(r. <a href="rdar://problem/4283301">4283301</a>)
+		, but it works in most situations.</p></li>
+<li>
+<p>Finally, if your daemon only uses daemon-safe frameworks and it doesn't use or register Mach messaging services directly or indirectly, you should be able to just launch it. It will be running in the wrong context, but that probably won't cause serious problems.</p>
+<div class="notebox"><p><strong>WARNING: </strong>If you take this approach, you must take steps for prevent launchd from <a href="#SECCAREFULWITHTHATFORKEUGENE">garbage collecting</a> your process.</p></div>
+</li>
+</ul>
+<div class="notebox"><p><strong>Note: </strong><code>StartupItemContext</code> was introduced in Mac OS X 10.3; moreover, the API on which it's based (<code>bootstrap_parent</code>) did not function properly until Mac OS X 10.3. If you need to start a daemon in the global bootstrap namespace from a configuration application (or installer) on older systems, please contact <a href="mailto:dts@apple.com">Developer Technical Support (DTS)</a>.</p></div>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="SECDEBUGGINGSTARTUP"></a><h3>Debugging Startup</h3>
+<p>Because background programs are usually run indirectly (that is, they're sublaunched by a system service, such as <code>launchd</code>), it can be tricky to debug their startup code. There are three tricks you can use here.</p>
+<ul>
+<li><p>You can add a command line option (traditionally it's "-d" for "debug") that causes your program to run as a standard tool (for example, a startup item wouldn't <a href="#SECDAEMONIZATION">daemonize itself</a>). This allows you to debug it directly from the GDB.</p></li>
+<li>
+<p>If you're developer a launchd daemon or agent, you can add the <code>WaitForDebugger</code> property to your property list file. A true value will cause <code>launchd</code> to start your program in a suspended state, whereupon you can attach with the debugger.</p>
+<p>This property is supported in Mac OS X 10.5 and later.</p>
+</li>
+<li><p>If the preceding options don't help, you can add a <a href="x-man-page://3/pause">pause</a> system call to your startup code, as illustrated by <a href="#LISTPAUSE">Listing 11</a>. This stops the program until a signal arrives and, as it turns out, attaching to the process with GDB sends a signal to the process and unblocks it.</p></li>
+</ul>
+<a name="LISTPAUSE"></a><p class="caption"><strong>Listing 11: </strong>Pausing at startup</p>
+<pre class="sourcecodebox">if (1) {
+    fprintf(
+        stderr, 
+        "Process %ld waiting for debugger.\n", 
+        (long) getpid()
+    );
+    pause();
+}</pre>
+<div class="notebox"><p><strong>Note: </strong>If your program is running as a different user, you will have to start GDB as that user, or root, in order to attach to and debug it. You typically do this using <code>sudo gdb</code>.</p></div>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="SECDEBUGGINGROGUEWINDOWSERVERUSE"></a><h3>Debugging Rogue Window Server Use</h3>
+<p>If your daemon dies with a message like that shown in <a href="#LISTNONCONSOLE">Listing 6</a>, and you can't think of any reason why it should be attaching to the window server, there are a variety of things you can do to debug the problem. The first is to set the <code>INIT_Processes</code> environment variable. When you see the resulting message in the system log, you can attached with GDB and do a backtrace to see what triggered the connection. For more details about this environment variable, see <a href="/technotes/tn2004/tn2124.html">Technical Note TN2124, 'Mac OS X Debugging Magic'</a>.</p>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="SECWATCHLOGS"></a><h3>Watch Your Logs!</h3>
+<p>While developing a background program, it's a good idea to habitually monitor its log file. You'd be amazed how often an unexpected log message will let you quickly isolate an obscure problem. This can be as simple as logging using <a href="#SECAPPLESYSTEMLOG">ASL</a> or <a href="#SECLOGGINGWITHPRINTF">printf</a> and running the Console application in the background.</p>
+<p>If you're writing a daemon that's launched at startup time (before you can launch the Console application or even SSH info the machine), you may be able to see its log messages by holding down command-V at startup (for "verbose boot"). To permanently enable verbose boots, add the "-v" argument to your <code>boot-args</code> NVRAM variable, as shown in <a href="#LISTVERBOSEBOOT">Listing 12</a>.</p>
+<a name="LISTVERBOSEBOOT"></a><p class="caption"><strong>Listing 12: </strong>Enabling verbose boots</p>
+<pre class="sourcecodebox">$ sudo nvram boot-args="-v"
+Password:********</pre>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="SECBOOTSTRAPONEMORE"></a><h3>Bootstrap Namespaces: One More Thing</h3>
+<p>The earlier discussion of bootstrap namespaces (see <a href="#SECBOOTSTRAPNAMESPACES">Bootstrap Namespaces</a>) talked extensively about how they are created, but it glossed over the issue of how they are destroyed. It turns out that a bootstrap namespace exists until the last process that references it quits. So, as long as your process is running, you are guaranteed that your bootstrap namespace will be valid.</p>
+<p>There is one gotcha, however. When the system creates a bootstrap namespace, it associates it with the process that created it. When that process quits, the namespace is deactivated. For example, if you start a daemon from within an SSH login session and then log out, the process that created the bootstrap namespace (effectively this is <code>sshd</code>) quits, and the bootstrap namespace that it created, which is the namespace that your daemon inherited, is deactivated.</p>
+<p>A <strong>deactivated bootstrap namespace</strong> allows you to look up services, but it does not allow you to register new services. Any attempt to register a service in a deactivate namespace will fail with an error <code>BOOTSTRAP_NOT_PRIVILEGED</code> (1100). Similarly, any high-level wrapper that registers a service will fail. For example, <code>CFMessagePortCreateLocal</code> will print an error message and return <code>NULL</code> if you call it after your namespace has been deactivated.</p>
+<p>Earlier versions of Mac OS X (prior to Mac OS X 10.2) did not deactivate bootstrap namespaces; rather, when the process that created a namespace quits, the bootstrap service would destroy the namespace immediately. Any process still referencing that namespace would find itself without any bootstrap namespace (technically, their bootstrap port would now be a Mach dead name).</p>
+<p>Apple started deactivating, rather that destroying, bootstrap namespaces as a stopgap measure to improve compatibility for programs that were incorrectly running in the wrong namespace (typically due to a lack of understand of bootstrap namespaces on behalf of the program's author). Future systems may eliminate the concept of deactivated bootstrap namespaces, and thus revert to the pre-10.2 behavior. As long as your program is running in the correct namespace, this should not cause any compatibility problems.</p>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="SECCAREFULWITHTHATFORKEUGENE"></a><h3>Careful With That Fork, Eugene</h3>
+<p>Starting in Mac OS X 10.5 <code>launchd</code> works to garbage collect any child processes of a launchd daemon or agent process when that process quits. Specifically, when a launchd daemon or agent quits, <code>launchd</code> will send a <code>SIGTERM</code> to the associated process group.</p>
+<p>This can cause problems if you're developing a launchd daemon that creates a child process to run some other program (by the traditional <a href="x-man-page://2/fork">fork</a> and <a href="x-man-page://2/execve">exec</a> combination, or via <a href="x-man-page://2/posix_spawn">posix_spawn</a>). The child process will inherit its process group ID from your daemon. If your daemon quits before the child process, the child process will receive a <code>SIGTERM</code> because it's in the same process group as your daemon.</p>
+<p>There are a number of ways to avoid being tripped up by this, listed below in order of most- to least-preferable.</p>
+<ul>
+<li><p>run the 'child' via <code>launchd</code> — If you make the 'child' a separate launchd job, everything will Just Work™.</p></li>
+<li><p>create a new session for the child — If you must continue to create the child process manually, have the child process run in a new session (and, consequently, in a new process group) by calling <a href="x-man-page://2/setsid">setsid</a>.</p></li>
+<li><p>use the <code>AbandonProcessGroup</code> property — If you add this property to your program's property list file, <code>launchd</code> will not attempt to garbage collect your child processes.</p></li>
+</ul>
+<div class="notebox">
+<p><strong>Note: </strong>There are good technical reasons for <code>launchd</code> doing this garbage collection 
+			(r. <a href="rdar://problem/5501131">5501131</a>)
+		. Specifically, if a daemon just spawns a child process without trying to isolate it from the daemon's environment, the child process will inherit things that it should not be inheriting, like a reference to the daemon's controlling terminal. Later on, when the daemon quits, the child is still running, and still holding on to that reference. If the controlling terminal closes, the child will get an unexpected <code>SIGHUP</code>, for which the default disposition is to terminate the process.</p>
+<p>Traditionally you would isolate the child process from the daemon by having the child call <a href="x-man-page://3/daemon">daemon</a>. And, if you did this, the child would indeed end up in a separate process group, and would not be garbage collected by <code>launchd</code>. Keep in mind, however, that the <code>daemon</code> routine is officially <a href="#SECDAEMONIZATION">deprecated</a> in Mac OS X 10.5 and later.</p>
+</div>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="SECFURTHERREADING"></a><h2>Further Reading</h2>
+<ul>
+<li><p><a href="http://developer.apple.com/documentation/MacOSX/Conceptual/BPSystemStartup/index.html">System Startup Programming Topics</a></p></li>
+<li><p><a href="http://developer.apple.com/documentation/MacOSX/Conceptual/BPMultipleUsers/index.html">Multiple User Environments</a></p></li>
+<li><p><a href="http://developer.apple.com/documentation/Darwin/Conceptual/KernelProgramming/index.html">Kernel Programming Guide</a> (specifically the "Bootstrap Contexts" section)</p></li>
+<li><p><a href="/technotes/tn2004/tn2124.html">Technical Note TN2124, 'Mac OS X Debugging Magic'</a></p></li>
+<li><p><a href="/samplecode/LoginItemsAE/index.html">Sample Code 'LoginItemsAE'</a></p></li>
+<li><p><a href="/samplecode/BootstrapDump/index.html">Sample Code 'BootstrapDump'</a></p></li>
+<li><p><a href="/samplecode/CFLocalServer/index.html">Sample Code 'CFLocalServer'</a></p></li>
+<li><p><a href="/samplecode/PreLoginAgents/index.html">Sample Code 'PreLoginAgents'</a></p></li>
+<li><p><a href="/samplecode/SampleD/index.html">Sample Code 'SampleD'</a></p></li>
+<li><p>"Advanced Programming in the UNIX Environment", W Richard Stevens, Stephen A Rago, ISBN 0201433079</p></li>
+<li><p>"UNIX Network Programming, Volume 1, The Sockets Networking API", W Richard Stevens, Bill Fenner, Andrew M Rudoff, ISBN 0131411551</p></li>
+<li><p><a href="http://www.buildingsecuresoftware.com">Building Secure Software: How to Avoid Security Problems the Right Way</a>, John Viega, Gary McGraw, ISBN 020172152X</p></li>
+<li><p><a href="http://launchd.macosforge.org/">launchd on Mac OS Forge</a></p></li>
+<li><p><a href="http://lists.macosforge.org/mailman/listinfo/launchd-dev">launchd mailing list</a></p></li>
+<li><p><a href="http://www.xinetd.org/">xinetd web site</a></p></li>
+<li><p><a href="x-man-page://8/launchd">launchd</a> tool man page</p></li>
+<li><p><a href="x-man-page://5/launchd.plist">launchd.plist</a> configuration file man page</p></li>
+<li><p><a href="x-man-page://1/launchctl">launchctl</a> tool man page</p></li>
+<li><p><a href="x-man-page://8/xinetd">xinetd</a> tool man page (not on Mac OS X 10.5 and later)</p></li>
+<li><p><a href="x-man-page://8/SystemStarter">SystemStarter</a> tool man page</p></li>
+<li><p><a href="x-man-page://8/StartupItemContext">StartupItemContext</a> tool man page</p></li>
+<li><p><a href="x-man-page://3/asl">ASL</a> API man page</p></li>
+<li><p><a href="x-man-page://8/syslogd">syslogd</a> tool man page</p></li>
+<li><p><a href="x-man-page://5/syslog.conf">syslog.conf</a> configuration file man page</p></li>
+<li><p><a href="x-man-page://1/logger">logger</a> tool man page</p></li>
+<li><p><a href="x-man-page://1/syslog">syslog</a> tool man page</p></li>
+<li><p><a href="x-man-page://3/syslog">syslog</a> API man page</p></li>
+<li><p><a href="x-man-page://1/open">open</a> tool man page</p></li>
+<li><p><a href="x-man-page://2/wait">wait</a> system routine man page</p></li>
+<li><p><a href="x-man-page://3/daemon">daemon</a> system routine man page</p></li>
+<li><p><a href="x-man-page://3/pause">pause</a> system routine man page</p></li>
+</ul>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="SECOLDSYSTEMSANDTECHNOLOGY"></a><h2>Old Systems and Technology</h2>
+<p>The bulk of this technote reflects the reality of Mac OS X 10.5. This section describes technology from earlier systems that is now deprecated or unsupported, and discusses other topics that do not apply on modern systems.</p>
+<a name="SECOLDDAEMONOMICON"></a><h3>Deprecated Daemonomicon</h3>
+<p>A number of mechanisms used to launch background programs are now deprecated or unsupported. This section describes these mechanisms.</p>
+<div class="notebox"><p><strong>IMPORTANT: </strong>You should only use these technologies on older systems. We recommend that you update your code to use a <a href="#SECDAEMONOMICON">supported mechanism</a> on current systems, and only resort to a deprecated mechanism when the recommended mechanism is not available. </p></div>
+<a name="SECSTARTUPITEM"></a><h4>Startup Item</h4>
+<p>A <strong>startup item</strong> is a daemon launched at startup time by the <a href="x-man-page://8/SystemStarter">SystemStarter</a> program (which is launched by <code>launchd</code> on Mac OS X 10.4 and later, and directly from <code>/etc/rc.local</code> on earlier systems). A third party startup item should be installed in the <code>/Library/StartupItems</code> directory. For more information about startup items, see <a href="http://developer.apple.com/documentation/MacOSX/Conceptual/BPSystemStartup/index.html">System Startup Programming Topics</a>. </p>
+<p>Starting with Mac OS X 10.4, startup items are deprecated in favor of <a href="#SECDAEMONS">launchd daemons</a>.</p>
+<div class="notebox"><p><strong>IMPORTANT: </strong>For compatibility reasons, in Mac OS X 10.4 and later, the system will not start any startup items until the network is up and running. As it often takes a while (many seconds) for the network to come up, you may find that your startup item launches much later than it would on previous systems. The best way around this is to switch to using a <a href="#SECDAEMONS">launchd daemon</a>.</p></div>
+<div class="notebox"><p><strong>Note: </strong>The Accounts preferences panel in Mac OS X 10.3.x used the term "startup item" to refer to login items; this aberrant terminology has been corrected in Mac OS X 10.4 and later.</p></div>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="SECMACHINITDAEMON"></a><h4>mach_init Daemon</h4>
+<p>A <strong>mach_init daemon</strong> is launched by the Mach initialization process (<code>mach_init</code> on Mac OS X 10.3.x and earlier, <code>launchd</code> on Mac OS X 10.4 and later). A mach_init daemon is installed by placing a property list file in the <code>/etc/mach_init.d</code> directory. Apple does not support third party development of mach_init daemons.</p>
+<p>Starting with Mac OS X 10.5, mach_init daemons are deprecated in favor of <a href="#SECDAEMONS">launchd daemons</a>; a launchd daemon can now specify a list of Mach service names to register as part of its property list file.</p>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="SECINETDXINETDDAEMON"></a><h4>inetd and xinetd Daemon</h4>
+<p><strong>inetd daemons</strong> and <strong>xinetd daemons</strong> are launched by the Internet super server (originally <code>inetd</code> and later <code>xinetd</code> and now <code>launchd</code>). An inetd daemon is installed by adding a line to <code>/etc/inetd.conf</code>. An xinetd daemon is installed by adding a configuration file to the <code>/etc/xinetd.d</code> directory.</p>
+<p><code>xinetd</code> was introduced with Mac OS X 10.2. Where <code>xinetd</code> is available, you should prefer it over <code>inetd</code> because it is easier to configure.</p>
+<p>Starting with Mac OS X 10.4, inetd and xinetd daemons are deprecated in favor of <a href="#SECDAEMONS">launchd daemons</a>; a launchd daemon can specify a list of TCP and UDP ports to listen on as part of its property list file.</p>
+<p>Starting with Mac OS X 10.5, inetd and xinetd daemons are no longer supported. However, it's easy to run an existing inetd or xinetd daemon by creating and installing a simple launchd property list file (resulting in an <strong>inetd-compatible launchd daemon</strong>). For an example of this, check out <code>/System/Library/LaunchDaemons/finger.plist</code>.</p>
+<p>For more information about inetd and xinetd daemons, see <a href="#SECFURTHERREADING">UNIX Network Programming</a> and <a href="#SECFURTHERREADING">xinetd web site</a>.</p>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="SECSYSTEMLOGINITEM"></a><h4>System Login Item</h4>
+<p>A <strong>system login item</strong> is a <a href="#SECGLOBALLOGINITEM">global login item</a> that is launched in each GUI login session before the user logs in. A system login item is useful if you need to use the window server while the login screen is displayed. An example of this is a screen sharing program that allows a remote user to log in via the login window.</p>
+<p>System login items are deprecated on Mac OS X 10.5 and later 
+			(r. <a href="rdar://problem/5316827">5316827</a>)
+		. You should, instead, use a <a href="#SECLAUNCHDAGENT">pre-login launchd agent</a>.</p>
+<div class="notebox"><p><strong>WARNING: </strong>If you're currently shipping a system login item, you must update your code to be a launchd agent in order to ensure long-term binary compatibility.</p></div>
+<p>If you need to develop a system login item for use on systems prior to Mac OS X 10.5, please contact <a href="mailto:dts@apple.com">Developer Technical Support (DTS)</a> for details.</p>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="SECMACHINITAGENT"></a><h4>mach_init Agent</h4>
+<p>A <strong>mach_init agent</strong> is like a mach_init daemon, except that it runs in the context of a particular user. It is launched (indirectly) by <code>loginwindow</code> as part of the process of logging in a GUI user. A mach_init agent is installed by placing a property list file in the <code>/etc/mach_init_per_user.d</code> directory. Apple does not support third party development of mach_init agents.</p>
+<div class="notebox"><p><strong>IMPORTANT: </strong>mach_init agents are not launched in non-GUI login sessions.</p></div>
+<p>Starting with Mac OS X 10.5, mach_init agents are deprecated in favor of <a href="#SECLAUNCHDAGENT">launchd agents</a>; a launchd agent can now specify a list of Mach service names to register as part of its property list file.</p>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="SECOLDCONTEXTCROSSREF"></a><h3>Execution Context Summary for Deprecated Technologies</h3>
+<p><a href="#TABOLDCONTEXTCROSSREFERENCE">Table 6</a> shows how the execution context of a deprecated background program is affected by the mechanism used to launch it.</p>
+<a name="TABOLDCONTEXTCROSSREFERENCE"></a><p class="smalltext"><strong>Table 6 : </strong>Context Cross Reference for Deprecated Mechanisms</p>
+<table cellspacing="0" class="graybox">
+<tr>
+<th>Program Type</th>
+<th>UID</th>
+<th>Bootstrap Namespace</th>
+<th>Security Context</th>
+</tr>
+<tr>
+<td scope="row">startup item</td>
+<td>root</td>
+<td>global</td>
+<td>global</td>
+</tr>
+<tr>
+<td scope="row">mach_init daemon</td>
+<td>root</td>
+<td>global</td>
+<td>global</td>
+</tr>
+<tr>
+<td scope="row">inetd daemon</td>
+<td>as configured [1]</td>
+<td>global</td>
+<td>global</td>
+</tr>
+<tr>
+<td scope="row">xinetd daemon</td>
+<td>as configured [2]</td>
+<td>as configured [3]</td>
+<td>as configured [4]</td>
+</tr>
+<tr>
+<td scope="row">system login item</td>
+<td>root</td>
+<td>pre-login</td>
+<td>pre-login</td>
+</tr>
+<tr>
+<td scope="row">mach_init agent</td>
+<td>user</td>
+<td>GUI per-session</td>
+<td>per-session</td>
+</tr>
+</table>
+<p><strong>Notes:</strong></p>
+<ol>
+<li><p>Configured using the fifth column of the daemon's entry in <code>inet.conf</code>.</p></li>
+<li><p>Configured using the <code>user</code> attribute in the configuration file; defaults to <code>root</code> if the attribute is not specified.</p></li>
+<li><p>Uses the global bootstrap namespace unless the <code>session_create</code> attribute is specified in the configuration file, in which case the daemon runs in its own per-session bootstrap namespace.</p></li>
+<li><p>Uses the global security context unless the <code>session_create</code> attribute is specified in the configuration file, in which case the daemon runs in its own per-session security context.</p></li>
+</ol>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="SECCONTEXTEXAMPLE104"></a><h3>Execution Context Example on Mac OS 10.4</h3>
+<p><a href="#FIGLAUNCHTREE104">Figure 6</a> is graphical example of execution contexts on Mac OS X 10.4. Before consulting this figure, you should read the up-to-date information in <a href="#SECCONTEXTEXAMPLE">Execution Context Example</a>. This explains the overall thrust of the diagram. The text in this section concentrates on the differences between this diagram and the equivalent diagram for a modern system.</p>
+<p>In this diagram there are three per-session bootstrap namespaces, two for GUI login sessions (users A and B) and one for an SSH login session (user A). These are represented by red boxes. Items that aren't in any red box are in the global bootstrap namespace.</p>
+<a name="FIGLAUNCHTREE104"></a><p class="caption"><strong>Figure 6: </strong>Process relationships in Mac OS X 10.4</p>
+<p><img src="images/tn2083_LaunchTree104a.png" width="552" height="524" alt="Figure 6, Process relationships in Mac OS X 10.4"></p>
+<p><strong>Notes:</strong></p>
+<ol>
+<li><p><code>WindowServer</code> runs with an EUID of <code>windowserver</code> (88) and an RUID of <code>root</code> (0).</p></li>
+<li><p><code>loginwindow</code> runs with an EUID of the logged in user and an RUID of <code>root</code> (0).</p></li>
+<li><p><code>ftpd</code> runs with an EUID of the logged in user and an RUID of <code>root</code> (0).</p></li>
+</ol>
+<p>As you look at <a href="#FIGLAUNCHTREE104">Figure 6</a>, consider the various different types of process that it shows.</p>
+<ul>
+<li><p>There is a single instance of the <code>WindowServer</code> process that resides in the global bootstrap namespace. However, the window server knows about all GUI per-session bootstrap namespaces. In this case, there's a GUI per-session bootstrap namespace for user A's login session, and another for user B's.</p></li>
+<li><p>All applications are children of window server, which does the work to ensure that they run in the correct bootstrap namespace.</p></li>
+<li><p>The first instance of <code>loginwindow</code>, the one associated with user A's login session, is a child of <code>launchd</code>. The second instance, created when user A fast user switched to user B, is a child of the window server.</p></li>
+<li><p>Each instance of <code>loginwindow</code> manages the context for its associated login session.</p></li>
+<li><p><code>loginwindow</code> also runs <code>pbs</code> (the pasteboard server) directly.</p></li>
+<li><p>The <code>Crash Reporter</code> application is actually a mach_init agent. Note how its parent process is <code>launchd</code>, but it runs in the appropriate user's bootstrap namespace.</p></li>
+<li><p><code>sshd</code> is a launchd daemon with the <code>SessionCreate</code> property set, which means that it runs in its own non-GUI login session</p></li>
+<li><p><code>lookupd</code> is a mach_init daemon.</p></li>
+<li><p><code>mds</code> (the Spotlight daemon) is a startup item.</p></li>
+<li><p><code>ftpd</code> is a launchd daemon.</p></li>
+</ul>
+<p>Differences between this and Mac OS X 10.5 include:</p>
+<ul>
+<li><p>In Mac OS X 10.4 you rarely see per-user instances of <code>launchd</code>.</p></li>
+<li><p>In Mac OS X 10.4, all applications are children of the window server. In Mac OS X 10.5, that responsibility has been taken over by the per-user instances of launchd.</p></li>
+<li><p>In Mac OS X 10.4 there are no per-user bootstrap namespaces. Thus, it is not possible to register a service, like the Kerberos credentials cache server (<code>CCacheServer</code>) on Mac OS X 10.5, that is available to all login sessions of a particular user.</p></li>
+<li><p>In Mac OS X 10.4 the pasteboard server (<code>pbs</code>) was launched directly by <code>loginwindow</code>. In Mac OS X 10.5, the pasteboard server (<code>pboard</code>) is a standard launchd agent.</p></li>
+<li><p>In Mac OS X 10.4 launchd agents are launched per-user, with no regard to the user's login session type. This severely limits their usefulness. In fact, Mac OS X 10.4 makes no use of launchd agents. In contrast, on Mac OS X 10.5 a launchd agent can specify which types of login sessions that it supports, and launchd agents are used extensively by the system.</p></li>
+<li><p>The mechanism by which the crash reporting application (<code>Crash Reporter</code> on 10.4, <code>ReportCrash</code> on 10.5) is launched has changed, making the crash reporting process simpler and more reliable.</p></li>
+</ul>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="SECGETTINGLAUNCHED104"></a><h3>Getting Launched Prior To Mac OS X 10.5</h3>
+<p>Prior to Mac OS X 10.5, <code>launchd</code> was significantly less powerful than it is today. Thus, a number of the techniques shown in the figures in <a href="#SECGETTINGLAUNCHED">Getting Launched</a> are not available. If you need to support older systems, you should consult <a href="#FIGGETTINGLAUNCHEDA104">Figure 7</a> and <a href="#FIGGETTINGLAUNCHEDB104">Figure 8</a> when deciding on the best approach to launching your program.</p>
+<div class="notebox"><p><strong>IMPORTANT: </strong>If you need to support a wide range of systems, you may be required to implement a hybrid approach. For example, if you want to run prior to login on Mac OS X 10.3 through Mac OS X 10.5, you must implement a <a href="#SECSYSTEMLOGINITEM">system login item</a> (for Mac OS X 10.3 and 10.4) and a <a href="#SECLAUNCHDAGENT">pre-login launchd agent</a> (for Mac OS X 10.5 and later).</p></div>
+<a name="FIGGETTINGLAUNCHEDA104"></a><p class="caption"><strong>Figure 7: </strong>Launching a daemon prior to Mac OS X 10.5</p>
+<p><img src="images/tn2083_FlowchartA104.png" width="569" height="383" alt="Figure 7, Launching a daemon prior to Mac OS X 10.5"></p>
+<a name="FIGGETTINGLAUNCHEDB104"></a><p class="caption"><strong>Figure 8: </strong>Launching an agent prior to Mac OS X 10.5</p>
+<p><img src="images/tn2083_FlowchartB104.png" width="410" height="600" alt="Figure 8, Launching an agent prior to Mac OS X 10.5"></p>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="SECOBSOLETEPROGRAMMINGTECHNIQUES"></a><h3>Obsolete Programming Techniques</h3>
+<p>This section covers some programming techniques that are only interesting if you're developing a deprecated background program.</p>
+<a name="SECDAEMONIZATION"></a><h4>Daemonization</h4>
+<p>If you're writing a daemon, you may need to isolate your process from the environment that it inherits from its parent. This step is known as <strong>daemonization</strong>. For the nitty-gritty details, see <a href="#SECFURTHERREADING">Advanced Programming In The UNIX Environment</a>; also, see <a href="#SECCAREFULWITHTHATFORKEUGENE">Careful With That Fork, Eugene</a>.</p>
+<p>Whether daemonization is necessary depends on how you were launched. <a href="#TABDAEMONIZATION">Table 7</a> shows this for each type of daemon.</p>
+<a name="TABDAEMONIZATION"></a><p class="smalltext"><strong>Table 7 : </strong>Daemonization required?</p>
+<table cellspacing="0" class="graybox">
+<tr>
+<th>Daemon Type</th>
+<th>Daemonize</th>
+</tr>
+<tr>
+<td scope="row">startup item</td>
+<td>must</td>
+</tr>
+<tr>
+<td scope="row">mach_init daemon</td>
+<td>should not</td>
+</tr>
+<tr>
+<td scope="row">inetd daemon</td>
+<td>must not</td>
+</tr>
+<tr>
+<td scope="row">xinetd daemon</td>
+<td>must not</td>
+</tr>
+<tr>
+<td scope="row">launchd daemon</td>
+<td>must not</td>
+</tr>
+</table>
+<p>If you need to daemonize, you can do so using the <a href="x-man-page://3/daemon">daemon</a> routine.</p>
+<div class="notebox"><p><strong>IMPORTANT: </strong>The <code>daemon</code> routine is officially deprecated in Mac OS X 10.5 and later. If you're still using it, you should carefully consider the reason why, and think about how your code might better fit in with the launchd model.</p></div>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="SECDAEMONIZATIONANDBOOTSTRAPNAMESPACES"></a><h4>Daemonization and Bootstrap Namespaces</h4>
+<p>Historically the <code>daemon</code> routine did not change the bootstrap namespace of the calling program. This has caused numerous problems, and necessitated the creation of the <a href="x-man-page://8/StartupItemContext">StartupItemContext</a> tool. For more information about this issue, see <a href="#SECSTARTINGADAEMONFIRSTTIME">Starting a Daemon</a>.</p>
+<p>Starting with Mac OS X 10.5 the <code>daemon</code> routine does switch the calling program into the global bootstrap namespace 
+			(r. <a href="rdar://problem/5185932">5185932</a>)
+		. However, this has, in turn, caused some compatibility problems 
+			(r. <a href="rdar://problem/5499553">5499553</a>)
+		. To avoid these problems the following rules now apply:</p>
+<ul>
+<li><p>If your program is built with the Mac OS X 10.5 SDK (or later) and you set the deployment target to Mac OS X 10.5 (or later), <code>daemon</code> will switch your program to the global bootstrap namespace.</p></li>
+<li><p>Otherwise, <code>daemon</code> behaves as it always has.</p></li>
+</ul>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="SECDAEMONVSFRAMEWORKS"></a><h4>Daemonizing Frameworks</h4>
+<p>Many Mac OS X frameworks do not work reliably if you call <a href="x-man-page://2/fork">fork</a> but do not call <a href="x-man-page://3/exec">exec</a>. The only exception is the System framework and, even there, the POSIX standard places severe constraints on what you can do between a <code>fork</code> and an <code>exec</code>.</p>
+<p>Under the covers the <a href="x-man-page://3/daemon">daemon</a> routine calls <a href="x-man-page://2/fork">fork</a>. Thus, if you call <code>daemon</code> and use frameworks above the System frameworks, you may run into problems. Critically, frameworks that are otherwise daemon safe, like Core Foundation, are not safe to call from this state.</p>
+<div class="notebox">
+<p><strong>IMPORTANT: </strong>In fact, in Mac OS X 10.5 and later, Core Foundation will detect this situation and print the warning message shown in <a href="#LISTCFFORKED">Listing 13</a>.</p>
+<a name="LISTCFFORKED"></a><p class="caption"><strong>Listing 13: </strong>Core Foundation complaining about fork-without-exec</p>
+<pre class="sourcecodebox">The process has forked and you cannot use this CoreFoundation \
+functionality safely. You MUST exec().
+Break on __THE_PROCESS_HAS_FORKED_AND_YOU_CANNOT_USE_THIS_\
+COREFOUNDATION_FUNCTIONALITY___YOU_MUST_EXEC__() to debug.</pre>
+</div>
+<p>There are two common solutions to this problem:</p>
+<ul>
+<li><p>adopt launchd — A launchd daemon does not call <code>daemon</code>, and thus does not suffer from this problem. This is the preferred solution.</p></li>
+<li><p>exec yourself — If you can't adopt launchd (perhaps your product needs to support Mac OS X 10.3.x), you can solve this problem by exec'ing yourself. <a href="#LISTEXECYOURSELF">Listing 14</a> shows the basic idea. Keep in mind that this is just a minimal sample—a real daemon would actually handle errors!</p></li>
+</ul>
+<a name="LISTEXECYOURSELF"></a><p class="caption"><strong>Listing 14: </strong>Using exec to avoid framework problems after daemonization</p>
+<pre class="sourcecodebox">#include &lt;getopt.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;string.h&gt;
+#include &lt;sys/param.h&gt;
+#include &lt;syslog.h&gt;
+#include &lt;mach-o/dyld.h&gt;
+
+extern char ** environ;
+
+int main(int argc, char **argv)
+{
+    if ( (argc &gt;= 2) &amp;&amp; (strcmp(argv[1], "daemon") == 0) ) {
+        optind = 2;
+
+        // ... process any post-daemonization arguments ...
+
+        // ... run as a daemon ...
+    } else {
+        char **     args;
+        char        execPath[PATH_MAX];
+        uint32_t    execPathSize;
+
+        // ... process any pre-daemonization arguments ...
+
+        // Calculate our new arguments, dropping any arguments that 
+        // have already been processed (that is, before optind) and 
+        // inserting the special flag that tells us that we've 
+        // already daemonized.
+        //
+        // Note that we allocate and copy one extra argument so that 
+        // args, like argv, is terminated by a NULL.
+        // 
+        // We get the real path to our executable using 
+        // _NSGetExecutablePath because argv[0] might be a relative 
+        // path, and daemon chdirs to the root directory. In a real 
+        // product you could probably substitute a hard-wired absolute 
+        // path.
+
+        execPathSize = sizeof(execPath);
+        (void) _NSGetExecutablePath(execPath, &amp;execPathSize);
+
+        args = malloc((argc - optind + 1) * sizeof(char *));
+        args[0] = execPath;
+        args[1] = "daemon";
+        memcpy(
+            &amp;args[2], 
+            &amp;argv[optind], 
+            (argc - optind + 1) * sizeof(char *)
+        );
+
+        // Daemonize ourself.
+
+        (void) daemon(0, 0);
+
+        // exec ourself.
+
+        (void) execve(execPath, args, environ);
+    }
+
+    return EXIT_SUCCESS;
+}</pre>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="document_revision_summary"></a><h2>Document Revision History</h2>
+<table cellspacing="0" class="graybox" width="680">
+<tr>
+<th width="100">Date</th>
+<th width="580">Notes</th>
+</tr>
+<tr>
+<td scope="row">2007-11-05</td>
+<td>Major update for Mac OS X 10.5 Leopard.</td>
+</tr>
+<tr>
+<td scope="row">2006-01-03</td>
+<td>Describes the most common problems encountered with daemons and agents, and suggests detailed solutions.</td>
+</tr>
+</table>
+<p><b>Posted: </b>2007-11-05</p>
+<!-- END CONTENTS -->
+</td></tr></table>
+<!-- END WIDE COLUMN --><!-- END MAIN CONTENT --><!-- START BOTTOM APPLE NAVIGATION -->	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/technotes/tn2005/tn2083.html%3Fid%3DDTS10003794-2.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/technotes/tn2005/tn2083.html%3Fid%3DDTS10003794-2.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/technotes/tn2005/tn2083.html%3Fid%3DDTS10003794-2.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+<!--#include virtual="/includes/footer" --><!-- END BOTTOM APPLE NAVIGATION --><!-- START CENTER CLOSE -->
+</center>
+<!-- END CENTER CLOSE -->
+</body>
+</html>

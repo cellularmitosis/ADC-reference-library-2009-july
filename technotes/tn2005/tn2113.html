@@ -1,0 +1,234 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/1999/REC-html401-19991224/loose.dtd">
+<html><head>
+<!-- BEGIN META TAG INFO -->
+<link rel="home" href="http://developer.apple.com/">
+<link rel="find" href="http://developer.apple.com/search/">
+<link rel="stylesheet" type="text/css" href="../../documentation/css/adcstyle.css" title="fonts">
+<script language="JavaScript" type="text/javascript" src="../../documentation/js/busnav.js"></script>
+<script language="JavaScript" src="../../documentation/js/adc.js" type="text/javascript"></script>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<!-- END META TAG INFO -->
+<!-- BEGIN TITLE -->
+<title>Technical Note TN2113: Using AudioDeviceRead in Mac OS 10.4</title>
+<!-- END TITLE -->
+</head>
+<!-- BEGIN BODY OPEN -->
+<body bgcolor="#ffffff"><a name="//apple_ref/doc/uid/DTS10003582" title="Using AudioDeviceRead in Mac OS 10.4"></a>
+<!--END BODY OPEN -->
+<!-- START CENTER OPEN -->
+<center>
+<!-- END CENTER OPEN -->
+<a name="top"></a>
+<!-- BEGIN LOGO AND SEARCH -->
+<!--#include virtual="/includes/adcnavbar"-->
+<!-- END LOGO AND SEARCH -->
+<!-- START BREADCRUMB -->
+<div id="breadcrumb"><table width="680" border="0" cellpadding="0" cellspacing="0"><tr>
+<td scope="row"><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+<td><img width="340" height="10" src="images/1dot.gif" alt=""></td></tr><tr valign="middle"><td align="left" colspan="2">
+<a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../technicalnotes/index.html">Technical Notes</a> &gt; <a href="../../technicalnotes/MusicAudio/index.html">Audio</a> &gt; <a href="../../technicalnotes/MusicAudio/idxCoreAudio-date.html">Core Audio</a> &gt; 
+</td></tr><tr><td colspan="2" scope="row"><img width="680" height="35" src="images/1dot.gif" alt=""></td></tr></table></div>
+<!-- END BREADCRUMB -->
+
+<!-- START MAIN CONTENT -->
+<!-- START TITLE GRAPHIC AND INTRO-->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top">
+<td><h1>
+<div id="pagehead">Technical Note TN2113</div>
+<div id="pageheadsub">Using AudioDeviceRead in Mac OS 10.4</div>
+</h1></td></tr></table>
+<!-- END TITLE GRAPHIC AND INTRO -->
+<!-- BEGIN WIDE COLUMN -->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td align="left" width="680">
+<!-- BEGIN CONTENTS -->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td><p>In order to support a wider variety of data formats, the structure of the data buffers used by the HAL (Hardware Abstraction Layer) and IOAudio-based drivers has changed. As a consequence, code that used the HAL API, <code>AudioDeviceRead</code>(), and the property <code>kAudioDevicePropertyRegisterBufferList</code>, needs to be updated to work correctly on Mac OS X Tiger.</p></td></tr><tr><td scope="row"><img width="680" height="10" src="images/1dot.gif" alt=""><br><img height="1" width="680" src="images/1dot_919699.gif" alt=""><br><img width="680" height="20" src="images/1dot.gif" alt=""></td></tr></table><table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td width="680"><ul><li><a href="#TNTAG1">Introduction</a></li><li><a href="#TNTAG2">Creating a AudioBufferList to use with AudioDeviceRead</a></li><li><a href="#TNTAG7">Preparing AudioBufferList for AudioDeviceRead </a></li><li><a href="#TNTAG5">Unregistering an AudioBufferList</a></li><li><a href="#TNT_HISTORY_TAG">Document Revision History</a></li></ul></td></tr><tr><td colspan="3" scope="row"><img width="680" height="10" src="images/1dot.gif" alt=""><br><img height="1" width="680" src="images/1dot_919699.gif" alt=""><br><img width="680" height="20" src="images/1dot.gif" alt=""></td></tr></table><div class="notebox"><p><strong>Note:</strong> These changes are only required for Tiger and later systems (10.4+). These changes will not work for previous releases.</p></div><A NAME="TNTAG1"></A><H2>Introduction</H2><p>Prior to Tiger, the <code>AudioBufferList</code> used with these APIs consisted of AudioBuffers that point to a block of unstructured memory to be used for reading the data. Starting with Tiger, this changes such that each <code>AudioBuffer</code> in the <code>AudioBufferList</code> points at an <code>IOAudioBufferDataDescriptor</code> structure. This structure is defined in &lt;IOKit/audio/IOAudioTypes.h&gt; as follows:</p><p class="smalltext"><strong>Listing 1:</strong> IOAudioBufferDataDescriptor structure as defined in &lt;IOKit/audio/IOAudioTypes.h&gt;</p><pre class="sourcecodebox">
+  typedef struct _IOAudioBufferDataDescriptor {
+    UInt32  fActualDataByteSize;
+    UInt32  fActualNumSampleFrames;
+    UInt32  fTotalDataByteSize;
+    UInt32  fNominalDataByteSize;
+    Byte    fData[kVariableLengthArray];
+  } IOAudioBufferDataDescriptor;
+</pre><p>This change impacts registering the <code>AudioBufferList</code> to be used with an AudioDevice.  To register an <code>AudioBufferList</code> to be used with an AudioDevice, the property <code>kAudioDevicePropertyRegisterBufferList</code> must be used with the <code>AudioDeviceSetProperty</code> method. The <code>kAudioDevicePropertyRegisterBufferList</code> property allows clients to register a fully populated <code>AudioBufferList</code> that matches the topology described by stream configuration of the audio device.</p><p>In addition to setting up the <code>AudioBufferList</code>, each <code>IOAudioBufferDataDescriptor</code> has to be fully filled out prior to calling <code>AudioDeviceSetProperty</code>(..., <code>kAudioDevicePropertyRegisterBufferList</code>, ...). The <code>fActualDataByteSize</code> field is set to the number of bytes out of fData that are used for a typical read. The <code>fActualNumSampleFrames</code> field is set to the number of sample frames used for a typical read. The <code>fTotalDataByteSize</code> field is set to the total number of bytes in the fData field. The <code>fNominalDataByteSize</code> field is set to the number of bytes out of fData that are used for a typical read. Note that <code>fActualDataByteSize</code> and <code>fNominalDataByteSize</code> are always the same value here. Typically, <code>fTotalDataByteSize</code> is also the same as <code>fActualDataByteSize</code> and <code>fNominalDataByteSize</code>, but can be larger. This is useful in situations where the application wants to read more or less data than typical to facilitate synchronization or reading variable sized data, such as a packet of compressed data.</p><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG2"></A><H2>Creating a AudioBufferList to use with AudioDeviceRead</H2><p class="smalltext"><strong>Listing 2:</strong> Registering an AudioBufferList for AudioDeviceRead</p><pre class="sourcecodebox">
+//  HAL's main header
+#include &lt;CoreAudio/AudioHardware.h&gt;
+
+//  need this for IOAudioBufferDataDescriptor
+#include &lt;IOKit/audio/IOAudioTypes.h&gt;
+
+//  from /Developer/Examples/CoreAudio/PublicUtility
+#include &quot;CAAudioBufferList.h&quot;
+#include &quot;CADebugMacros.h&quot;
+
+//  need this for memset
+#include &lt;string.h&gt;
+
+//  need to this to use vm_allocate
+#include &lt;mach/mach.h&gt;
+
+AudioBufferList* MakeABLForAudioDeviceRead(AudioDeviceID inDevice,
+UInt32 inNumberFramesToRead, UInt32 inNumberStreams,
+AudioStreamBasicDescription inStreamFormats[])
+{
+  //  allocate the ABL
+  AudioBufferList* theABL = CAAudioBufferList::Create(inNumberStreams);
+  theABL-&gt;mNumberBuffers = inNumberStreams;
+  UInt32 theABLSize = CAAudioBufferList::CalculateByteSize(inNumberStreams);
+
+  //  initialize each AudioBuffer in theABL
+  for(UInt32 theIndex = 0; theIndex &lt; inNumberStreams; ++theIndex)
+  {
+    //  we have to calculate how big the fData part of
+                //     the IOAudioBufferDataDescriptor is
+                //  (note that this code assumes linear PCM data)
+    UInt32 theDataByteSize = inNumberFramesToRead * inStreamFormats[theIndex].mBytesPerPacket;
+
+    //  we can now calculate how much memory we need to
+                //    allocate to hold the entire IOAudioBufferDataDescriptor
+    UInt32 theAllocationByteSize = offsetof(IOAudioBufferDataDescriptor, fData) + theDataByteSize;
+
+    //  allocate the IOAudioBufferDataDescriptor
+    IOAudioBufferDataDescriptor* theDescriptor = NULL;
+    kern_return_t theKernelError = vm_allocate(mach_task_self(),
+                                                              vm_address_t*)&amp;theDescriptor,
+                                                              theAllocationByteSize,
+                                                              VM_FLAGS_ANYWHERE);
+    AssertNoKernelError(theKernelError, &quot;vm_allocate failed&quot;);
+
+    //  the three byte size fields of the IOAudioBufferDataDescriptor
+                //     refer to the size of the fData field
+    theDescriptor-&gt;fActualDataByteSize = theDataByteSize;
+    theDescriptor-&gt;fTotalDataByteSize = theDataByteSize;
+    theDescriptor-&gt;fNominalDataByteSize = theDataByteSize;
+
+    //  the actual number of frames field is the number of frames to read
+    theDescriptor-&gt;fActualNumSampleFrames = inNumberFramesToRead;
+
+    //  clear out fData
+    memset(&amp;(theDescriptor-&gt;fData[0]), 0, theDataByteSize);
+
+    //  start filling the AudioBuffer out with the number of channels
+    theABL-&gt;mBuffers[theIndex].mNumberChannels = inStreamFormats[theIndex].mChannelsPerFrame;
+
+    //  note that the data byte size in the AudioBuffer refers to
+                //     the entire size of the IOAudioBufferDataDescriptor
+    theABL-&gt;mBuffers[theIndex].mDataByteSize = theAllocationByteSize;
+
+    //  and the data pointer points at the IOAudioBufferDataDescriptor
+    theABL-&gt;mBuffers[theIndex].mData = theDescriptor;
+  }
+
+  //  register the ABL with the device
+  OSStatus theError = AudioDeviceSetProperty(inDevice,
+                                                    NULL,
+                                                    0,
+                                                    true,
+                                                    kAudioDevicePropertyRegisterBufferList,
+                                                    theABLSize,
+                                                    theABL);
+
+  AssertNoError(theError, &quot;couldn't register the ABL&quot;);
+
+  return theABL;
+}
+</pre><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG7"></A><H2>Preparing AudioBufferList for AudioDeviceRead </H2><p>The <code>AudioBufferList</code> needs to be prepared prior to passing it to <code>AudioDeviceRead</code>(). Each <code>IOAudioBufferDataDescriptor</code> in the <code>AudioBufferList</code> must have its fields properly filled out to indicate how much data is to be read. The <code>fActualDataByteSize</code> field is set to the number of bytes out of fData that are to be read. The <code>fActualNumSampleFrames</code> field is set to the number of sample frames that are to be read. The <code>fTotalDataByteSize</code> field is set to the total number of bytes in the fData field. The <code>fNominalDataByteSize</code> field is set to the number of bytes out of fData that are used for a typical read (the same as was used for registering the <code>AudioBufferList</code>). Note that an application can use the <code>fActualDataByteSize</code> and <code>fActualNumSampleFrames</code> can be used to vary the amount of data that gets read. When <code>AudioDeviceRead</code> returns, the data that was read will be in the fData field of each <code>IOAudioBufferDataDescriptor</code> in the <code>AudioBufferList</code>.</p><p class="smalltext"><strong>Listing 3:</strong> Preparing AudioBufferList for AudioDeviceRead</p><pre class="sourcecodebox">
+//  HAL's main header
+#include &lt;CoreAudio/AudioHardware.h&gt;
+
+//  need this for IOAudioBufferDataDescriptor
+#include &lt;IOKit/audio/IOAudioTypes.h&gt;
+
+//  from /Developer/Examples/CoreAudio/PublicUtility
+#include &quot;CADebugMacros.h&quot;
+
+OSStatus  PrepareABLAndCallAudioDeviceRead(AudioBufferList* inABL,
+                                                             AudioTimeStamp* inTimeToReadFrom,
+                                                             AudioDeviceID inDevice,
+                                                             UInt32 inNumberFramesToRead,
+                                                             UInt32 inNumberStreams,
+                                                             AudioStreamBasicDescription inStreamFormats[])
+{
+  //  go through each AudioBuffer and update the
+        //     values in its IOAudioBufferDataDescriptor
+  for(UInt32 theIndex = 0; theIndex &lt; inNumberStreams; ++theIndex)
+  {
+    //  get the IOAudioBufferDataDescriptor
+    IOAudioBufferDataDescriptor* theDescriptor =
+                       (IOAudioBufferDataDescriptor*)inABL-&gt;mBuffers[theIndex].mData;
+
+    //  adjust the actual size fields
+    //  (note that this code assumes that the other fields were
+                //     filled out previously since they don't change)
+    theDescriptor-&gt;fActualDataByteSize = inNumberFramesToRead * inStreamFormats[theIndex].mBytesPerFrame;
+    theDescriptor-&gt;fActualNumSampleFrames = inNumberFramesToRead;
+  }
+
+  return AudioDeviceRead(inDevice, inTimeToReadFrom, inABL);
+}
+</pre><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG5"></A><H2>Unregistering an AudioBufferList</H2><p>To unregister an <code>AudioBufferList</code> that will no longer be  used with <code>AudioDeviceRead</code>, you must deallocate the <code>IOAudioBufferDataDescriptor</code> as well at the <code>AudioBufferList</code>.</p><p class="smalltext"><strong>Listing 4:</strong> Unregistering an AudioBufferList</p><pre class="sourcecodebox">
+void  DestroyABLForAudioDeviceRead(AudioBufferList* inABL,
+ AudioDeviceID inDevice,
+UInt32 inNumberFramesToRead,
+UInt32 inNumberStreams,
+AudioStreamBasicDescription inStreamFormats[])
+{
+  //  this routine assumes that inABL is already filled out
+        //    with the same values as when it was returned from MakeABLForAudioDeviceRead()
+
+  //  unregister the ABL with the HAL
+  UInt32 theABLSize = CAAudioBufferList::CalculateByteSize(inNumberStreams);
+  OSStatus theError = AudioDeviceGetProperty(inDevice,
+                                                             0,
+                                                             true,
+                                                             kAudioDevicePropertyRegisterBufferList,
+                                                             &amp;theABLSize,
+                                                             inABL);
+  AssertNoError(theError, &quot;couldn't unregister the ABL&quot;);
+
+  //  go through each AudioBuffer in theABL
+  for(UInt32 theIndex = 0; theIndex &lt; inNumberStreams; ++theIndex)
+  {
+    //  deallocate the IOAudioBufferDataDescriptor
+    vm_deallocate(mach_task_self(),
+                                       (vm_address_t) inABL-&gt;mBuffers[theIndex].mData,
+                                       inABL-&gt;mBuffers[theIndex].mDataByteSize);
+  }
+
+  //  deallocate the ABL
+  CAAudioBufferList::Destroy(inABL);
+}
+</pre><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNT_HISTORY_TAG"></A><H2>Document Revision History</H2><table cellspacing="0" class="graybox" width="680"><tr><th width="100">Date</th><th width="580">Notes</th></tr><tr><td scope="row">2006-11-29</td><td>fixed syntax error in example code</td></tr><tr><td scope="row">2005-05-18</td><td>How to use AudioBufferLists with AudioDeviceRead in Tiger and beyond.</td></tr></table><p><b>Posted:</b> 2006-11-29</p>
+<!-- END CONTENTS -->
+</td></tr></table>
+<!-- END WIDE COLUMN -->
+<!-- END MAIN CONTENT -->
+	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/technotes/tn2005/tn2113.html%3Fid%3DDTS10003582-1.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/technotes/tn2005/tn2113.html%3Fid%3DDTS10003582-1.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/technotes/tn2005/tn2113.html%3Fid%3DDTS10003582-1.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+
+<!-- START BOTTOM APPLE NAVIGATION -->
+<!--#include virtual="/includes/footer"-->
+<!-- END BOTTOM APPLE NAVIGATION -->
+<!-- START CENTER CLOSE -->
+</center>
+<!-- END CENTER CLOSE -->
+</body></html>

@@ -1,0 +1,365 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/1999/REC-html401-19991224/loose.dtd">
+<html><head>
+<!-- BEGIN META TAG INFO -->
+<link rel="home" href="http://developer.apple.com/">
+<link rel="find" href="http://developer.apple.com/search/">
+<link rel="stylesheet" type="text/css" href="../../documentation/css/adcstyle.css" title="fonts">
+<script language="JavaScript" type="text/javascript" src="../../documentation/js/busnav.js"></script>
+<script language="JavaScript" src="../../documentation/js/adc.js" type="text/javascript"></script>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<!-- END META TAG INFO -->
+<!-- BEGIN TITLE -->
+<title>Technical Note TN2095: Authorization for Everyone</title>
+<!-- END TITLE -->
+</head>
+<!-- BEGIN BODY OPEN -->
+<body bgcolor="#ffffff"><a name="//apple_ref/doc/uid/DTS10003110" title="Authorization for Everyone"></a>
+<!--END BODY OPEN -->
+<!-- START CENTER OPEN -->
+<center>
+<!-- END CENTER OPEN -->
+<a name="top"></a>
+<!-- BEGIN LOGO AND SEARCH -->
+<!--#include virtual="/includes/adcnavbar"-->
+<!-- END LOGO AND SEARCH -->
+<!-- START BREADCRUMB -->
+<div id="breadcrumb"><table width="680" border="0" cellpadding="0" cellspacing="0"><tr>
+<td scope="row"><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+<td><img width="340" height="10" src="images/1dot.gif" alt=""></td></tr><tr valign="middle"><td align="left" colspan="2">
+<a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../technicalnotes/index.html">Technical Notes</a> &gt; <a href="../../technicalnotes/Security/index.html">Security</a> &gt; <a href="../../technicalnotes/Security/idxAuthorization-date.html">Authorization</a> &gt; 
+</td></tr><tr><td colspan="2" scope="row"><img width="680" height="35" src="images/1dot.gif" alt=""></td></tr></table></div>
+<!-- END BREADCRUMB -->
+
+<!-- START MAIN CONTENT -->
+<!-- START TITLE GRAPHIC AND INTRO-->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top">
+<td><h1>
+<div id="pagehead">Technical Note TN2095</div>
+<div id="pageheadsub">Authorization for Everyone</div>
+</h1></td></tr></table>
+<!-- END TITLE GRAPHIC AND INTRO -->
+<!-- BEGIN WIDE COLUMN -->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td align="left" width="680">
+<!-- BEGIN CONTENTS -->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td><p>Mac OS X is a multi-user system that can be used in a variety of environments, each with radically different authorization requirements. For example, the iMac installed at your uncle's home is a completely open system, whereas an iMac installed in a university laboratory is extremely restricted.</p><p>There is no way that you, an application developer, can make authorization decisions that are appropriate for all of these environments. Instead, you should let the system administrator make those decisions. You can use Authorization Services to do this in a secure, standard way.</p><p>This technote is targeted at all Mac OS X application developers. It is of specific interest to those developers who have not used Authorization Services in the past. It explains how you can add authorization support to your application without compromising the out-of-box experience for your traditional customers.</p></td></tr><tr><td scope="row"><img width="680" height="10" src="images/1dot.gif" alt=""><br><img height="1" width="680" src="images/1dot_919699.gif" alt=""><br><img width="680" height="20" src="images/1dot.gif" alt=""></td></tr></table><table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td width="680"><ul><li><a href="#TNTAG1">Introduction</a></li><li><a href="#TNTAG2">Supporting Mac OS X version 10.3 and Later</a></li><li><a href="#TNTAG3">Define Your Authorization Right</a></li><li><a href="#TNTAG5">Acquiring the Right</a></li><li><a href="#TNTAG7">A Tour of the Authorization Policy Database</a></li><li><a href="#TNTAG9">Modifying the Policy Database</a></li><li><a href="#TNTAG11">Adding the Right Programmatically</a></li><li><a href="#TNTAG14">Localization</a></li><li><a href="#TNTAG16">Bundle Reference Count Problems</a></li><li><a href="#TNTAG18">Supporting Earlier Systems</a></li><li><a href="#TNTAG19">Summary</a></li><li><a href="#TNTAG20">References</a></li><li><a href="#TNT_HISTORY_TAG">Document Revision History</a></li></ul></td></tr><tr><td colspan="3" scope="row"><img width="680" height="10" src="images/1dot.gif" alt=""><br><img height="1" width="680" src="images/1dot_919699.gif" alt=""><br><img width="680" height="20" src="images/1dot.gif" alt=""></td></tr></table><A NAME="TNTAG1"></A><H2>Introduction</H2><p>Most developers who create applications for Mac OS X only consider authorization issues when the system's privileges model prevents them from performing their work. Using Authorization Services to implement this sort of application (called a <strong>system-restricted</strong> application in the <A HREF="../../documentation/Security/Conceptual/authorization_concepts/index.html">Authorization Services documentation</A>) is well understood, and there is a sample program, <A HREF="../../samplecode/BetterAuthorizationSample/index.html">BetterAuthorizationSample</A>, that demonstrate this clearly. However, Authorization Services is designed for more than just this. When you write a Mac OS X application, even if it has no system-restricted functionality, you should consider whether you can take advantage of Authorization Services. Specifically, you should think about whether a system administrator might want to restrict some features of your application to some subset of users. Consider the following examples:</p><ul><li><p>Imagine you're writing a CD burning application. A school system administrator might want to allow all users to burn data CDs, but only specific users to burn audio CDs.</p></li><li><p>Imagine you're writing a consumer TV tuner application. You might want to allow a parent (the system administrator, in this case) to restrict certain channels from the children.</p></li></ul><p>It's important to stress that the system privileges model does not prevent these sorts of activity. For example, as far as the CD driver is concerned, any user is allowed to burn discs. However, you can use Authorization Services to add an authorization layer to your application, which is then known as a <strong>self-restricted</strong> application.</p><p>The ability to create a self-restricted application has always been part of Authorization Services. However, prior to Mac OS X version 10.3, there was no way to do this and maintain the simple out-of-box experience (that is, no password dialogs) expected by those users who administer their own system. Mac OS X version 10.3 introduced new Authorization Services routines that give you the best of both worlds.</p><ul><li><p>You can use Authorization Services so that a system administrator, if one exists, can restrict access to certain parts of your application.</p></li><li><p>However, by default, these restrictions do not inconvenience users who administer their own systems.</p></li></ul><p>The next eight sections explain how to achieve this ideal solution on Mac OS X version 10.3 and later. The last section, <A HREF="#TNTAG18">Supporting Earlier Systems</A>, explains how to achieve a similar solution on earlier versions of Mac OS X.</p><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG2"></A><H2>Supporting Mac OS X version 10.3 and Later</H2><p>The following sections explain how you can use Authorization Services on Mac OS X version 10.3 and later to implement a self-restricted application which never displays a password dialog unless the system administrator configures it to do so. The first step is to <A HREF="#TNTAG3">define your custom authorization right</A>. Next you must modify your application to <A HREF="#TNTAG5">acquire that right</A>. To understand why this sometimes brings up an authorization dialog, you must understand the <A HREF="#TNTAG7">authorization policy database</A>. Once you understand the database you can modify it to include a right specification for your custom right, either <A HREF="#TNTAG9">manually</A> or <A HREF="#TNTAG11">programmatically</A>. Finally, you can learn about two common gotchas when using this technique, namely, how to support a <A HREF="#TNTAG14">localizable prompt</A> for your custom right and how to <A HREF="#TNTAG16">work around a bug</A> in Authorization Services.</p><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG3"></A><H2>Define Your Authorization Right</H2><p>The first step is to work out which user-level operations a system administrator might want to restrict and define a right name for each of these authorized operations. Right names form a hierarchical namespace using reverse DNS notation. In this example I'll use the right name shown in <A HREF="#TNTAG4">Listing 1</A>, which lists the company name first <code>com.apple.</code> then my organization within the company <code>dts.</code> then the product name <code>SelfRestrictedSample.</code> and finally the operation within that product (in this example it's the unimaginatively named <code>xyz</code>).</p><A NAME="TNTAG4"></A><p class="smalltext"><strong>Listing 1:</strong> Defining a right name.</p><pre class="sourcecodebox">
+const char kXYZRightName[] = &quot;com.apple.dts.SelfRestrictedSample.xyz&quot;;
+</pre><p>Typically you define one right per authorized operation. For example, a CD burning application might define <code>com.SurfSoftware.SurfBurner.Burn.Audio</code> and <code>com.SurfSoftware.SurfBurner.Burn.Data</code>.</p><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG5"></A><H2>Acquiring the Right</H2><p>The next step is to modify your the code so that it acquires the right before doing the operation. An example of this is shown in <A HREF="#TNTAG6">Listing 2</A>. The basic idea is to call <code>AuthorizationCopyRights</code>, passing it the name of the right you want to acquire (for example, the name defined in <A HREF="#TNTAG4">Listing 1</A>). <code>AuthorizationCopyRights</code> will try to acquire the right on your behalf (possibly displaying a password dialog; we'll get to that in the next section) and return an error code indicating whether it was successful.</p><A NAME="TNTAG6"></A><p class="smalltext"><strong>Listing 2:</strong> Obtaining the right.</p><pre class="sourcecodebox">
+extern OSStatus AcquireRight(const char *rightName)
+    // This routine calls Authorization Services to acquire
+    // the specified right.
+{
+    OSStatus                         err;
+    static const AuthorizationFlags  kFlags =
+                  kAuthorizationFlagInteractionAllowed
+                | kAuthorizationFlagExtendRights;
+    AuthorizationItem   kActionRight = { rightName, 0, 0, 0 };
+    AuthorizationRights kRights      = { 1, &amp;kActionRight };
+
+    assert(gAuthorization != NULL);
+
+    // Request the application-specific right.
+
+    err = AuthorizationCopyRights(
+        gAuthorization,         // authorization
+        &amp;kRights,               // rights
+        NULL,                   // environment
+        kFlags,                 // flags
+        NULL                    // authorizedRights
+    );
+
+    return err;
+}
+</pre><div class="notebox"><p><strong>Note:</strong> In <A HREF="#TNTAG6">Listing 2</A>, <code>gAuthorization</code> is a reference to the application's authorization instance. This is set up by the startup code in <A HREF="#TNTAG12">Listing 5</A>.</p></div><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG7"></A><H2>A Tour of the Authorization Policy Database</H2><p>If you modify your code as described above and then test it thoroughly, you'll find that under some circumstances it brings up a dialog asking you to enter an administrator user name and password. One easy way to reproduce this is to create a non-administrator user, log in as that user, then run your application and do the authorized operation. If you're shipping a consumer application, this authentication dialog is probably not what you want. However, before you try to prevent the dialog being displayed, you need to understand why it's displayed.</p><p>Authorization on Mac OS X is controlled by a policy database. In current versions of Mac OS X, this database is held in <code>/etc/authorization</code>. The database format is described in comments at the top of that file.</p><div class="notebox"><p><strong>WARNING:</strong> The location and format of the policy database is subject to change. Do not code any of this knowledge into an application that you expect to be binary compatible with future releases of Mac OS X.</p><p>In fact, the format of the policy database has changed with Mac OS X version 10.3. This section uses the new format, although it should be relatively easy for to you to map the concepts described here on to the old format.</p></div><p>To understand why Authorization Services brings up dialog when you ask for a custom right, you have to understand a little about how the policy database works. <A HREF="#TNTAG8">Listing 3</A> shows an extract from the policy database as installed by Mac OS X version 10.3.</p><A NAME="TNTAG8"></A><p class="smalltext"><strong>Listing 3:</strong> A policy database extract.</p><pre class="sourcecodebox">&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;
+&lt;!DOCTYPE plist PUBLIC [...]&gt;
+&lt;plist version=&quot;1.0&quot;&gt;
+&lt;dict&gt;
+    [...]
+    &lt;key&gt;rights&lt;/key&gt;
+    &lt;dict&gt;
+        &lt;key&gt;system.device.dvd.setregion.initial&lt;/key&gt;
+        &lt;dict&gt;
+            &lt;key&gt;class&lt;/key&gt;
+            &lt;string&gt;user&lt;/string&gt;
+            &lt;key&gt;comment&lt;/key&gt;
+            &lt;string&gt;Used by the dvd player to set the
+regioncode the first time.  Note that changed the region code
+after it has been set requires a different right
+(system.device.dvd.setregion.change) Credentials remain valid
+indefinitely after they've been obtained. An acquired
+credential is shared amongst all clients.&lt;/string&gt;
+            &lt;key&gt;group&lt;/key&gt;
+            &lt;string&gt;admin&lt;/string&gt;
+            &lt;key&gt;mechanisms&lt;/key&gt;
+            &lt;array&gt;
+               &lt;string&gt;builtin:authenticate&lt;/string&gt;
+            &lt;/array&gt;
+            &lt;key&gt;shared&lt;/key&gt;
+            &lt;true/&gt;
+        &lt;/dict&gt;
+        [...]
+        &lt;key&gt;config.add.&lt;/key&gt;
+        &lt;dict&gt;
+            &lt;key&gt;class&lt;/key&gt;
+            &lt;string&gt;allow&lt;/string&gt;
+            &lt;key&gt;comment&lt;/key&gt;
+            &lt;string&gt;wildcard right for adding rights.
+            Anyone is allowed to add any (non-wildcard)
+            rights&lt;/string&gt;
+        &lt;/dict&gt;
+        [...]
+        &lt;key&gt;&lt;/key&gt;
+        &lt;dict&gt;
+            &lt;key&gt;class&lt;/key&gt;
+            &lt;string&gt;rule&lt;/string&gt;
+            &lt;key&gt;comment&lt;/key&gt;
+            &lt;string&gt;All other rights will be matched by this rule.
+Credentials remain valid 5 minutes after they've been obtained.
+An acquired credential is shared amongst all clients.
+            &lt;/string&gt;
+            &lt;key&gt;rule&lt;/key&gt;
+            &lt;string&gt;default&lt;/string&gt;
+        &lt;/dict&gt;
+        [...]
+    &lt;/dict&gt;
+    &lt;key&gt;rules&lt;/key&gt;
+    &lt;dict&gt;
+        [...]
+    &lt;/dict&gt;
+&lt;/dict&gt;
+&lt;/plist&gt;
+</pre><p>The database consists of two dictionaries, <code>rights</code> and <code>rules</code>. In this discussion we'll concentrate on the <code>rights</code> dictionary. It contains a set of key/value pairs, called <strong>right specifications</strong>. The key is the right name and the value is information about the right, including a description of what the user must do to acquire the right. <A HREF="#TNTAG6">Listing 2</A> shows three rights.</p><ul><li><p><code>system.device.dvd.setregion.initial</code> controls whether the user is allowed to set the initial region code for the DVD drive. By default, a user must prove that they are an administrator (in group <code>admin</code>) in order to set the DVD region.</p></li><li><p><code>config.add.</code> is a <strong>wildcard right specification</strong> (it ends with a dot) that matches any right whose name starts with &quot;<code>config.add.</code>&quot;. It controls whether a user is allowed to add a right specification to the policy database. By default any user is allowed to add a right specification.</p></li><li><p>The right specification with an empty key string is known as the <strong>default right specification</strong>. To obtain this right a user must satisfy the default rule which, by default on current versions of Mac OS X, is to prove that they are an administrator.</p></li></ul><p>When your program asks for a right, Authorization Services executes the following algorithm.</p><ol><li><p>It searches the policy database for a right specification whose key exactly matches the right name.</p></li><li><p>If that fails, it searches the policy database for a wildcard right specification whose key matches the right name. If multiple are present, it uses the one with the longest key.</p></li><li><p>If that fails, it uses the default right specification.</p></li></ol><p>Once it has found the appropriate right specification, Authorization Services evaluates the specification to decide whether to grant the right. In some cases this is easy (in the example in <A HREF="#TNTAG8">Listing 3</A><code> config.add.</code> is always granted) but in other cases it can be more complex (for example, setting the DVD region requires that you enter an administrator password).</p><p>The presence of the default right has implications for self-restricted programs that use custom rights. Consider the code in <A HREF="#TNTAG4">Listing 1</A> and <A HREF="#TNTAG6">Listing 2</A>. The requested right, <code>com.apple.dts.SelfRestrictedSample.xyz</code>, does not match any particular right specification in the policy database, and thus the default right specification is used. This is why the code in <A HREF="#TNTAG6">Listing 2</A> brings up an dialog asking for an administrator password.</p><div class="notebox"><p><strong>Note:</strong> You may notice that the code <A HREF="#TNTAG6">Listing 2</A> does not always bring up a password dialog. This is because of the way authorization credentials are shared. See <A HREF="../../qa/qa2001/qa1277.html">DTS QA 1277 Security Credentials</A> for more information about this.</p></div><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG9"></A><H2>Modifying the Policy Database</H2><p>The obvious way to avoid this password dialog is to add a new right specification to the policy database that specifically allows anyone to acquire your custom right. For a system administrator this is easy. They can simply open the file with a text editor (or indeed Property List Editor), make the appropriate changes, and then save the changes back. For example, to add a right specification that allows anyone to acquire the right from <A HREF="#TNTAG4">Listing 1</A>, you can simply add the text in <A HREF="#TNTAG10">Listing 4</A> to the policy database.</p><A NAME="TNTAG10"></A><p class="smalltext"><strong>Listing 4:</strong> A 'always allow' right specification for the right from Listing 1.</p><pre class="sourcecodebox">
+    [...]
+        &lt;key&gt;com.apple.dts.SelfRestrictedSample.xyz&lt;/key&gt;
+        &lt;dict&gt;
+            &lt;key&gt;rule&lt;/key&gt;
+            &lt;string&gt;allow&lt;/string&gt;
+        &lt;/dict&gt;
+    [...]
+</pre><div class="notebox"><p><strong>Note:</strong> The policy database file is only writable by root. You can edit it using a Terminal-based text editor run via <A HREF="x-man-page://8/sudo">sudo</A>, or with a GUI text editor that prompts you for an administrator password when you attempt to save privileged files (such as modern versions of BBEdit).</p></div><p>This approach is appropriate if you expect your customers to have a skilled system administrator handy (for example, if your application is sold for use in university laboratories). However, it's not appropriate for programs sold to the majority of Mac users, who do not have a dedicated system administrator. Furthermore, programmatically modifying the policy database file directly is not an option because, as mentioned earlier, the location and format of the database is subject to change.</p><p>The solution to this conundrum is the new Authorization database API added in Mac OS X version 10.3.</p><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG11"></A><H2>Adding the Right Programmatically</H2><p>The code in <A HREF="#TNTAG12">Listing 5</A> shows how you can add a right specification to the policy database using the Authorization Services routines released with Mac OS X version 10.3. The code is fairly straightforward. It first calls <code>AuthorizationCreate</code> to create a reference to the application's authorization instance. It then calls <code>AuthorizationRightGet</code> to see whether there is an existing right specification for its custom right. If that exists, the code does nothing: either the system administrator has already added their own right specification or the program has previously been run. If, however, no specification exists for the custom right, the code creates a new specification (using <code>AuthorizationRightSet</code>) that allows anyone to obtain the right.</p><A NAME="TNTAG12"></A><p class="smalltext"><strong>Listing 5:</strong> Adding a right programmatically.</p><pre class="sourcecodebox">
+static OSStatus SetupRight(
+    AuthorizationRef    authRef,
+    const char *        rightName,
+    CFStringRef         rightRule,
+    CFStringRef         rightPrompt
+)
+    // Checks whether a right exists in the authorization database
+    // and, if not, creates the right and sets up its initial value.
+{
+    OSStatus err;
+
+    // Check whether our right is already defined.
+
+    err = AuthorizationRightGet(rightName, NULL);
+    if (err == noErr) {
+
+        // A right already exists, either set up in advance by
+        // the system administrator or because this is the second
+        // time we've run.  Either way, there's nothing more for
+        // us to do.
+
+    } else if (err == errAuthorizationDenied) {
+
+        // The right is not already defined.  Let's create a
+        // right definition based on the rule specified by the
+        // caller (in the rightRule parameter).  This might be
+        // kAuthorizationRuleClassAllow (which allows anyone to
+        // acquire the right) or
+        // kAuthorizationRuleAuthenticateAsAdmin (which requires
+        // the user to authenticate as an admin user)
+        // or some other value from &quot;AuthorizationDB.h&quot;.  The
+        // system administrator can modify this right as they
+        // see fit.
+
+        err = AuthorizationRightSet(
+            authRef,                // authRef
+            rightName,              // rightName
+            rightRule,              // rightDefinition
+            rightPrompt,            // descriptionKey
+            NULL,                   // bundle, NULL indicates main
+            NULL                    // localeTableName,
+        );                          // NULL indicates
+                                    // &quot;Localizable.strings&quot;
+
+        // The ability to add a right is, itself, governed by a non-NULLdescriptionKey
+        // right. If we can't get that right, we'll get an error
+        // from the above routine.  We don't want that error
+        // stopping the application from launching, so we
+        // swallow the error.
+
+        if (err != noErr) {
+            #if ! defined(NDEBUG)
+                fprintf(
+                    stderr,
+                    &quot;Could not create default right (%ld)\n&quot;,
+                    err
+                );
+            #endif
+            err = noErr;
+        }
+    }
+
+    return err;
+}
+
+extern OSStatus SetupAuthorization(void)
+    // Called as the application starts up.  Creates a connection
+    // to Authorization Services and then makes sure that our
+    // right (kActionRightName) is defined.
+{
+    OSStatus err;
+
+    // Connect to Authorization Services.
+
+    err = AuthorizationCreate(NULL, NULL, 0, &amp;gAuthorization);
+
+    // Set up our rights.
+
+    if (err == noErr) {
+        err = SetupRight(
+            gAuthorization,
+            kAlphaRightName,
+            CFSTR(kAuthorizationRuleClassAllow),
+            CFSTR(&quot;YOU MUST BE AUTHORIZED TO DO XYZ&quot;)
+        );
+    }
+    [...]
+
+    return err;
+}
+</pre><p>This sequence ensures that the right specification is added to the policy database so the system administrator, if any, can then look through the policy database to examine the right specification created by your application, and set its value appropriately. <A HREF="#TNTAG13">Listing 6</A> shows how that right specification might look.</p><A NAME="TNTAG13"></A><p class="smalltext"><strong>Listing 6:</strong> The right specification added by the code from Listing 5.</p><pre class="sourcecodebox">
+        [...]
+        &lt;key&gt;com.apple.dts.SelfRestrictedSample.xyz&lt;/key&gt;
+        &lt;dict&gt;
+            &lt;key&gt;default-prompt&lt;/key&gt;
+            &lt;dict&gt;
+                &lt;key&gt;&lt;/key&gt;
+                &lt;string&gt;YOU MUST BE AUTHORIZED TO DO XYZ&lt;/string&gt;
+            &lt;/dict&gt;
+            &lt;key&gt;rule&lt;/key&gt;
+            &lt;string&gt;allow&lt;/string&gt;
+        &lt;/dict&gt;
+        [...]
+</pre><p><code>AuthorizationRightSet</code> has a lot of flexibility that is not demonstrated by <A HREF="#TNTAG12">Listing 5</A>. The last two parameters allow you to supply a localized form of the right's prompt. This is explained in detail in the next section. In addition, the third parameter can either be a string (the name of one of the common rules for acquiring a right) or a dictionary (a detailed specification of how to acquire the right). You can read the header comments in <code>AuthorizationDB.h</code> (part of the Security framework) for more information about this.</p><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG14"></A><H2>Localization</H2><p>When you call <code>AuthorizationRightSet</code> you pass in three parameters that control the prompt displayed when the user must authenticate to obtain the right. These parameters are:</p><ul><li><p><code>descriptionKey</code>, a <code>CFStringRef</code></p></li><li><p><code>bundle</code>, a <code>CFBundleRef</code></p></li><li><p><code>localeTableName</code>, a <code>CFStringRef</code></p></li></ul><p>The <code>bundle</code> and <code>localeTableName</code> parameters determine the localization table file that contains the prompt. If <code>bundle</code> is <code>NULL</code>, the routine uses the main bundle (as returned by <code>CFBundleGetMainBundle</code>). If <code>localeTableName</code> is <code>NULL</code>, the routine uses the <code>Localizable.strings</code> file in the specified bundle.</p><p>The <code>descriptionKey</code> parameter is used to look up a string within the localization table file. If this is <code>NULL</code>, no prompt is associated with the right.</p><p>When you call <code>AuthorizationRightSet</code> with a non-<code>NULL</code><code>descriptionKey</code>, it iterates over every localization in the bundle. For each localization, it looks for the appropriate localization table file and then looks up the description key in that table. It then adds the resulting string to the <code>default-prompt</code> dictionary in the right specification.</p><p>For example, if your application has no localizations the code in <A HREF="#TNTAG12">Listing 5</A> generates the right specification in <A HREF="#TNTAG13">Listing 6</A>. However, if you have two localizations, English (en) and Australian English (en_AU), the code in <A HREF="#TNTAG12">Listing 5</A> will generate the right specification shown in <A HREF="#TNTAG15">Listing 7</A>.</p><A NAME="TNTAG15"></A><p class="smalltext"><strong>Listing 7:</strong> The localized right specification added by the code from Listing 5.</p><pre class="sourcecodebox">
+        [...]
+        &lt;key&gt;com.apple.dts.SelfRestrictedSample.xyz&lt;/key&gt;
+        &lt;dict&gt;
+            &lt;key&gt;default-prompt&lt;/key&gt;
+            &lt;dict&gt;
+                &lt;key&gt;&lt;/key&gt;
+                &lt;string&gt;YOU MUST BE AUTHORIZED TO DO XYZ&lt;/string&gt;
+                &lt;key&gt;en&lt;/key&gt;
+                &lt;string&gt;You must be authorized to do xyz.&lt;/string&gt;
+                &lt;key&gt;en_AU&lt;/key&gt;
+                &lt;string&gt;Strewth! You must be authorised to do xyz.&lt;/string&gt;
+            &lt;/dict&gt;
+            &lt;key&gt;rule&lt;/key&gt;
+            &lt;string&gt;allow&lt;/string&gt;
+        &lt;/dict&gt;
+        [...]
+</pre><p>With this right specification you will see that, when prompted to authorize, a user who prefers English over Australian English will see the message &quot;You must be authorized to do xyz&quot; while a user who prefers Australian English over English will see &quot;Strewth! You must be authorised to do xyz&quot;. For Australians it's very important that every sentence contains an expletive (and that &quot;authorised&quot; be spelt with an 's').</p><div class="notebox"><p><strong>IMPORTANT:</strong> For the right specification shown in <A HREF="#TNTAG15">Listing 7</A> the authorization dialog will never appear because the rule always allows the right to be granted. You can see the authorization dialog by editing the authorization policy database and changing <code>&lt;string&gt;allow&lt;/string&gt;</code> to <code>&lt;string&gt;authenticate-admin&lt;/string&gt;</code>.</p></div><div class="notebox"><p><strong>Note:</strong> You can tell the system that you prefer Australian English over English by reordering the items in the Language panel of the International panel of System Preferences. You must first enable Australian English in the dialog displayed by clicking the &quot;Edit List&quot; button.</p></div><p>When choosing a prompt it's important that you use an entire sentence. The string displayed in the authorization dialog is composed of a number of distinct sentences, and your prompt string must fit into that model.</p><p>Finally, you should be aware that, currently, Authorization Services does not support localization synonyms (r. <A HREF="rdar://problem/3430642">3430642</A>). Thus, the folder for the localization in your bundle must be &quot;en.lproj&quot;, not &quot;English.lproj&quot;.</p><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG16"></A><H2>Bundle Reference Count Problems</H2><p>There is one final gotcha associated with <code>AuthorizationRightSet</code>. Due to a bug (r. <A HREF="rdar://problem/3446163">3446163</A>), <code>AuthorizationRightSet</code> will decrement the reference count of the bundle on which it operates. If you call <code>AuthorizationRightSet</code> multiple times the bundle reference count will go to zero and the bundle will be released. If you pass <code>NULL</code> to the <code>bundle</code> parameter of <code>AuthorizationRightSet</code>, this will release the main bundle and your application will quickly crash.</p><p>This bug is fixed in Mac OS X 10.4 and later. However, you can still work around the bug by artificially incrementing the reference count of the bundle. <A HREF="#TNTAG17">Listing 8</A> shows the recommended code for this workaround.</p><A NAME="TNTAG17"></A><p class="smalltext"><strong>Listing 8:</strong> Recommended workaround for reference count bug.</p><pre class="sourcecodebox">
+static OSStatus AuthorizationRightSetWithWorkaround(
+    AuthorizationRef    authRef,
+    const char *        rightName,
+    CFTypeRef           rightDefinition,
+    CFStringRef         descriptionKey,
+    CFBundleRef         bundle,
+    CFStringRef         localeTableName
+)
+    // The AuthorizationRightSet routine has a bug where it
+    // releases the bundle parameter that you pass in (or the
+    // main bundle if you pass NULL).  If you do pass NULL and
+    // call AuthorizationRightSet multiple times, eventually the
+    // main bundle's reference count will hit zero and you crash.
+    //
+    // This routine works around the bug by doing an extra retain
+    // on the bundle.  It should also work correctly when the bug
+    // is fixed.
+    //
+    // Note that this technique is not thread safe, so it's
+    // probably a good idea to restrict your use of it to
+    // application startup time, where the threading environment
+    // is very simple.
+{
+    OSStatus        err;
+    CFBundleRef     clientBundle;
+    CFIndex         originalRetainCount;
+
+    // Get the effective bundle.
+
+    if (bundle == NULL) {
+        clientBundle = CFBundleGetMainBundle();
+    } else {
+        clientBundle = bundle;
+    }
+    assert(clientBundle != NULL);
+
+    // Remember the original retain count and retain it.  We force
+    // a retain because if the retain count was 1 and the bug still
+    // exists, the next call might decrement the count to 0, which
+    // would free the object.
+
+    originalRetainCount = CFGetRetainCount(clientBundle);
+    CFRetain(clientBundle);
+
+    // Call through to Authorization Services.
+
+    err = AuthorizationRightSet(
+        authRef,
+        rightName,
+        rightDefinition,
+        descriptionKey,
+        clientBundle,
+        localeTableName
+    );
+
+    // If the retain count is now magically back to its original
+    // value, we've encountered the bug and we print a message.
+    // Otherwise the bug must've been fixed and we just balance
+    // our retain with a release.
+
+    if ( CFGetRetainCount(clientBundle) == originalRetainCount ) {
+        fprintf(
+            stderr,
+            &quot;AuthForAll: Working around &lt;rdar://problems/3446163&gt;\n&quot;
+        );
+    } else {
+        CFRelease(clientBundle);
+    }
+
+    return err;
+}
+</pre><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG18"></A><H2>Supporting Earlier Systems</H2><p>The Authorization Services routines described in the previous sections do not help if your application needs to run on earlier versions of Mac OS X. There are two strategies that you can use if you need compatibility with earlier systems.</p><ul><li><p>You can simply test for the presence of the new Authorization Services routines and do no authorization at all if they're not present. This has the benefit of simplicity, although system administrators who have not updated to Mac OS X version 10.3 do not get any control over who can use which features of your application.</p></li><li><p>You can attempt to emulate <code>AuthorizationRightGet</code> by reading the authorization policy database directly. This directly contradicts the advice given earlier, but it is acceptable if you only do it on older systems, where the format and location of the authorization policy database will not change. On Mac OS X version 10.3 and later, where the new Authorization Services routines are present, you must use the new routines and not assume anything about the authorization policy database format.</p></li></ul><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG19"></A><H2>Summary</H2><p>Authorization Services allows you to create a self-restricted application, wherein a system administrator can control which users are allowed to access which features. With Mac OS X version 10.3 you can implement this without compromising the out-of-box experience for your typical customers. It's easy to adopt Authorization Services and doing so will make the system administrators of the world very happy.</p><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG20"></A><H2>References</H2><ul><li><p><A HREF="../../documentation/Security/Conceptual/authorization_concepts/index.html">Inside Mac OS X: Performing Privileged Operations With Authorization Services</A></p></li><li><p><A HREF="../../qa/qa2001/qa1277.html">Q&amp;A 1277 Security Credentials</A></p></li><li><p><A HREF="../../samplecode/BetterAuthorizationSample/index.html">BetterAuthorizationSample Code</A></p></li></ul><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNT_HISTORY_TAG"></A><H2>Document Revision History</H2><table cellspacing="0" class="graybox" width="680"><tr><th width="100">Date</th><th width="580">Notes</th></tr><tr><td scope="row">2008-01-30</td><td>Updated to include BetterAuthorizationSample References.</td></tr><tr><td scope="row">2003-10-23</td><td>Describes applications of Authorization Services beyond simple privilege requesting.</td></tr></table><p><b>Posted:</b> 2008-01-30</p>
+<!-- END CONTENTS -->
+</td></tr></table>
+<!-- END WIDE COLUMN -->
+<!-- END MAIN CONTENT -->
+	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/technotes/tn2002/tn2095.html%3Fid%3DDTS10003110-2.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/technotes/tn2002/tn2095.html%3Fid%3DDTS10003110-2.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/technotes/tn2002/tn2095.html%3Fid%3DDTS10003110-2.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+
+<!-- START BOTTOM APPLE NAVIGATION -->
+<!--#include virtual="/includes/footer"-->
+<!-- END BOTTOM APPLE NAVIGATION -->
+<!-- START CENTER CLOSE -->
+</center>
+<!-- END CENTER CLOSE -->
+</body></html>

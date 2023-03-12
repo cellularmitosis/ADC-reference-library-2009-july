@@ -1,0 +1,370 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<!-- BEGIN META TAG INFO --><link rel="home" href="http://developer.apple.com/">
+<link rel="find" href="http://developer.apple.com/search/">
+<link rel="stylesheet" type="text/css" href="../../documentation/css/adcstyle.css" title="fonts">
+<script language="JavaScript" type="text/javascript" src="../../documentation/js/busnav.js"></script><script language="JavaScript" src="../../documentation/js/adc.js" type="text/javascript"></script><!-- END META TAG INFO --><!-- BEGIN TITLE --><title>Technical Note TN2088: TWAIN Data Sources for Mac OS X</title>
+<!-- END TITLE -->
+</head>
+<!-- BEGIN BODY OPEN --><body bgcolor="#ffffff"><a name="//apple_ref/doc/uid/DTS10003102" title="TWAIN Data Sources for Mac OS X"></a>
+<!-- END BODY OPEN --><!-- START CENTER OPEN --><center>
+<!-- END CENTER OPEN --><a name="top"></a><!-- BEGIN LOGO AND SEARCH --><!--#include virtual="/includes/adcnavbar" --><!-- END LOGO AND SEARCH --><!-- START BREADCRUMB --><div id="breadcrumb"><table width="680" border="0" cellpadding="0" cellspacing="0">
+<tr>
+<td scope="row"><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+<td><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+</tr>
+<tr valign="middle"><td align="left" colspan="2">
+<a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../technicalnotes/index.html">Technical Notes</a> &gt; <a href="../../technicalnotes/QuickTime/index.html">QuickTime</a> &gt; <a href="../../technicalnotes/QuickTime/idxImportExport-date.html">Import &amp; Export</a> &gt; </td></tr>
+<tr><td colspan="2" scope="row"><img width="680" height="35" src="images/1dot.gif" alt=""></td></tr>
+</table></div>
+<!-- END BREADCRUMB --><!-- START MAIN CONTENT --><!-- START TITLE GRAPHIC AND INTRO --><table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td><h1>
+<div id="pagehead">Technical Note TN2088</div>
+<div id="pageheadsub">TWAIN Data Sources for Mac OS X</div>
+</h1></td></tr></table>
+<!-- END TITLE GRAPHIC AND INTRO --><!-- BEGIN WIDE COLUMN --><table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td align="left" width="680">
+<!-- BEGIN CONTENTS --><table width="680" border="0" cellpadding="0" cellspacing="0">
+<tr align="left" valign="top"><td><p>This technote describes how to implement a TWAIN Data Source (DS) for Mac OS X</p></td></tr>
+<tr><td scope="row">
+<img width="680" height="10" src="images/1dot.gif" alt=""><br><img width="680" height="1" src="images/1dot_919699.gif" alt=""><br><img width="680" height="20" src="images/1dot.gif" alt="">
+</td></tr>
+</table>
+<table width="680" border="0" cellpadding="0" cellspacing="0">
+<tr align="left" valign="top"><td width="680"><ul>
+<li><a href="#TAN4">TWAIN for Mac OS X</a></li>
+<li><a href="#TAN10">TWAIN DS packaging</a></li>
+<li><a href="#TAN18">TWAIN DS UI-less mode</a></li>
+<li><a href="#TAN22">TWAIN DS Property List Files</a></li>
+<li><a href="#TAN36">TWAIN DS Button Listener</a></li>
+<li><a href="#TAN69">TWAIN DS &amp; Carbon Events</a></li>
+<ul>
+<li><a href="#TAN77">Passing events from the Client Application to the DS - The Old Way</a></li>
+<li><a href="#TAN91">Passing events from the Client Application to the DS - The New Way</a></li>
+<li><a href="#TAN112">Communicating from the DS to the Client Application - The Old Way</a></li>
+<li><a href="#TAN128">Communicating from the DS to the Client Application - The New Way</a></li>
+</ul>
+<li><a href="#TAN148">References</a></li>
+<li><a href="#document_revision_summary">Document Revision History</a></li>
+</ul></td></tr>
+<tr><td colspan="3" scope="row">
+<img width="680" height="10" src="images/1dot.gif" alt=""><br><img width="680" height="1" src="images/1dot_919699.gif" alt=""><br><img width="680" height="20" src="images/1dot.gif" alt="">
+</td></tr>
+</table>
+<a name="TAN4"></a><h2>TWAIN for Mac OS X</h2>
+<p>TWAIN defines a standard software protocol and application programming interface (API) for communication between software applications and image acquisition devices (the source of the data). This technote assumes the reader is already familiar with the TWAIN specification. To get the full TWAIN specification, and to learn more about TWAIN, visit the <a href="http://www.twain.org">TWAIN Working Group website</a>.</p>
+<p>The Mac OS X TWAIN implementation includes a TWAIN Data Source Manager (DSM). This software manages the interactions between the application and the TWAIN Data Source. This DSM is implemented as a Mach-O framework, and is located in:</p>
+<p>/System/Library/Frameworks/TWAIN.framework</p>
+<p>All Mach-O based Cocoa and Carbon client applications should link to this TWAIN.framework.</p>
+<p>CFM-based applications require a CFM glue library that is located in:</p>
+<p>/System/Library/CFMSupport/TWAIN Source Manager.Shlb</p>
+<p>TWAIN Data Sources can be CFM or Mach-O based. They must be implemented as a bundle (see the section <a href="#TAN10">TWAIN DS packaging</a> below).</p>
+<p>Developers should place their TWAIN Data Sources in:</p>
+<p>/Library/Image Capture/TWAIN Data Sources/</p>
+<p>though Image Capture will also search:</p>
+<p>/System/Library/Image Capture/TWAIN Data Sources/</p>
+<p>Also, on Mac OS X 10.2 and later, Apple Image Capture uses a TWAIN software "bridge" TWAINBridge.app (found in: /System/Library/Image Capture/Devices/TWAINBridge.app) to access TWAIN Data Sources. This TWAINBridge software allows all Image Capture clients to access TWAIN devices transparently as if they were being handled by Image Capture native scanner drivers.</p>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="TAN10"></a><h2>TWAIN DS packaging</h2>
+<p>In order to be recognized by the TWAIN DSM, TWAIN Data Sources have to be laid-out as a new-style bundle as shown below:</p>
+<p class="caption"><strong>Figure 1: </strong>DS bundle layout. </p>
+<p><img src="images/tn2088_1.jpg" width="220" height="216" alt="Figure 1, DS bundle layout. "></p>
+<p>For more information about bundles see <a href="http://developer.apple.com/documentation/macosx/Essentials/SystemOverview/Bundles/">Mac OS X Bundles</a>.</p>
+<p>The bundle must contain a Contents directory and, inside it, an Info.plist file. It must also contain a Resources directory and, inside it, a DeviceInfo.plist file. For more information about the role of these property list files, see the section <a href="#TAN22">TWAIN DS Property List Files</a> below.</p>
+<p>Finally, the folder extension for the bundle must be .ds.</p>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="TAN18"></a><h2>TWAIN DS UI-less mode</h2>
+<p>A TWAIN DS for Mac OS X has to support the otherwise optional mode of operation in which the user interface (UI) is suppressed (check the <a href="http://www.twain.org">TWAIN specification</a> for the more information). This allows applications like Apple Image Capture to use the TWAIN DS via the Image Capture TWAINBridge software.</p>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="TAN22"></a><h2>TWAIN DS Property List Files</h2>
+<p>As with all other new-style bundles, a TWAIN DS carries an information property list file Info.plist in its Contents folder. The Info.plist has standard entries for keys like <code>CFBundleIdentifier</code> , <code>CFBundleName</code> and so on.</p>
+<p>In order to use a TWAIN DS, Image Capture needs a way to associate the TWAIN DS with a connected device. Adding device related information to the Info.plist for the Data Source allows this.</p>
+<p>For FireWire devices, the Info.plist contains the product and vendor identification and the device type which should be set to "scanner". For USB devices, the Info.plist contains the product and vendor ID values and the device type which should also be set to "scanner". The product and vendor values are taken from the IORegistry.</p>
+<p>You can connect your device and examine these IORegistry values using the IORegistryExplorer utility (this utility is part of the Apple Mac OS X Developer Tools, see <a href="http://developer.apple.com/tools/">Apple Mac OS X Developer Tools</a> ) or from the Terminal using the ioreg tool (type "ioreg -lw 0 dump" for example).</p>
+<p>More specifically, for USB devices, the properties can be found in the node representing the IOUSBDevice and are named "idVendor" and "idProduct". For FireWire devices, the properties are named "Vendor Identification" and "Product Identification" and can be found in the IOSCSIPeripheralDeviceNub node.</p>
+<p>Here's Terminal output from the ioreg tool for a USB device showing these properties:</p>
+<p class="caption"><strong>Listing 1: </strong>ioreg tool output for a USB device.</p>
+<pre class="sourcecodebox"> +-o IOUSBDevice@1100000 &lt;class IOUSBDevice&gt;
+   | {
+   |   "bDeviceSubClass" = 0
+   |   "bcdDevice" = 256
+   |   "USB Serial Number" = "AP94M1703PPE"
+   |   "IOUserClientClass" = "IOUSBDeviceUserClient"
+   |   "USB Vendor Name" = "ACME Peripherals"
+   |   "IOGeneralInterest" = ("_IOServiceInterestNotifier is not serial...
+   |   "idVendor" = 1452
+   |   "Device Speed" = 1
+   |   "sessionID" = 167599321426758
+   |   "locationID" = 17825792
+   |   "iManufacturer" = 1
+   |   "iProduct" = 2
+   |   "bDeviceProtocol" = 0
+   |   "bDeviceClass" = 0
+   |   "idProduct" = 291
+   |   "Bus Power Available" = 250
+   |   "bMaxPacketSize0" = 8
+   |   "USB Address" = 2
+   |   "PortNum" = 1
+   |   "IOCFPlugInTypes" = {"9dc7b780-9ec0-11d4-a54f-000a27052861"="IOUSB...
+   |   "bNumConfigurations" = 1
+   |   "iSerialNumber" = 3
+   | }</pre>
+<p>Here's Terminal output from the ioreg tool for a FireWire device showing these properties:</p>
+<p class="caption"><strong>Listing 2: </strong>ioreg tool output for a FireWire device.</p>
+<pre class="sourcecodebox">+-o IOSCSIPeripheralDeviceNub &lt;class IOSCSIPeripheralDeviceNub&lt;
+   | {
+   |   "Product Identification" = "ABC 2000"
+   |   "Product Revision Level" = "2.03"
+   |   "IOProviderClass" = "IOSCSIProtocolServices"
+   |   "CFBundleIdentifier" = "com.apple.iokit.IOSCSIArchitectureModelFam...
+   |   "Vendor Identification" = "ACME Peripherals"
+   |   "Protocol Characteristics" = {"Physical Interconnect Location"="Ex...
+   |   "IOMatchCategory" = "SCSITaskUserClientIniter"
+   |   "IOUserClientClass" = "SCSITaskUserClient"
+   |   "IOClass" = "IOSCSIPeripheralDeviceNub"
+   |   "IOProbeScore" = 0
+   |   "Peripheral Device Type" = 3
+   |   "IOCFPlugInTypes" = {"7D66678E-08A2-11D5-A1B8-0030657D052A"="IOSCS...
+   |   "SCSITaskUserClient GUID" = &lt;02e41c00000023363114ca1d&gt;
+   |   "SCSITaskDeviceCategory" = "SCSITaskUserClientDevice"
+   | }
+   |</pre>
+<p>Here's sample output from the Property List Editor utility (also from the Mac OS X Developer Tools) for a typical scanner device property list file with the appropriate product and vendor values added:</p>
+<p class="caption"><strong>Figure 2: </strong>A typical scanner device property list file.</p>
+<p><img src="images/tn2088_2.jpg" width="470" height="310" alt="Figure 2, A typical scanner device property list file."></p>
+<p>The DeviceInfo.plist property list file (the second property list file in the bundle's Resource directory) for the device contains information that allows the Image Capture TWAINBridge to use the TWAIN DS. This file must contain an entry "ProductNames" that allows a mapping of the Data Source bundle to whatever the Data Source returns as the TWAIN identifier. Here's how it looks:</p>
+<p class="caption"><strong>Figure 3: </strong>A DeviceInfo.plist property list file.</p>
+<p><img src="images/tn2088_3.jpg" width="494" height="97" alt="Figure 3, A DeviceInfo.plist property list file."></p>
+<p>The DeviceInfo.plist may also contain a reference to a button listener plug-in code module (see <a href="#TAN36">TWAIN DS Button Listener</a> below) in the "ButtonListener" entry. This plug-in module gets loaded by the TWAINBridge and does the "button listening" for the connected device. Once a device button is pressed, a user-selected application gets launched.</p>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="TAN36"></a><h2>TWAIN DS Button Listener</h2>
+<p>As mentioned in the previous section <a href="#TAN22">TWAIN DS Property List Files</a>, a TWAIN DS may specify a reference to a button listener plug-in code module in its DeviceInfo.plist property list file. This code module resides in the Resources folder of the DS, and is loaded by the TWAINBridge to query for button presses for the device.</p>
+<p>Sample code for a button listener plug-in ("SampleButtonPlugin") can be found on the Apple Developer website here: <a href="http://developer.apple.com/samplecode/Sample_Code/Image_Capture.htm">SampleButtonPlugin sample code</a>.</p>
+<p>This plug-in code module is packaged as a bundle. The bundle file must end with .btn. Here's how the layout looks:</p>
+<p class="caption"><strong>Figure 4: </strong>Button listener bundle layout.</p>
+<p><img src="images/tn2088_4.jpg" width="348" height="389" alt="Figure 4, Button listener bundle layout."></p>
+<p>The plug-in code module must export the following symbols:</p>
+<p class="caption"><strong>Listing 3: </strong>Module Entry-Points.</p>
+<pre class="sourcecodebox">_TWAINButtonPluginStart
+_TWAINButtonPluginStop</pre>
+<p>The <code>TWAINButtonPluginStart</code> entry point is called by the TWAINBridge to initiate button listening by the plug-in, and the TWAINButtonPluginStop entry point is called by the TWAINBridge to terminate button listening by the plug-in.</p>
+<p>Prototypes for these entry points are as follows:</p>
+<p class="caption"><strong>Listing 4: </strong>Module Entry-Point Prototypes.</p>
+<pre class="sourcecodebox">OSErr TWAINButtonPluginStart(UInt32* locationID,
+                             UInt64* guid,
+                             io_string_t twainPath,
+                             ButtonPressedCallback callback);
+
+OSErr TWAINButtonPluginStop(UInt32* locationID,
+                            UInt64* guid,
+                            io_string_t twainPath);</pre>
+<p>For USB devices, the <code>locationID</code> parameter passed to the <code>TWAINButtonPluginStart</code> entry point will contain a valid value uniquely identifying the USB device. The <code>guid</code> parameter (corresponding to the GUID, the globally unique identifier) in this case is not used.</p>
+<p>For FireWire devices, the <code>guid</code> parameter (corresponding to the GUID) passed to the <code>TWAINButtonPluginStart</code> entry point will contain a valid value uniquely identifying the FireWire device. The <code>locationID</code> parameter in this case is not used.</p>
+<p>The <code>twainPath</code> specifies the file path to the plug-in module.</p>
+<p>When the <code>TWAINButtonPluginStart</code> entry point is called, the plug-in will typically begin polling for key-presses (via a timer) to determine whether or not a button is pressed. When the plug-in determines a button has been pressed, it must call the button-press callback procedure (which was passed via the <code>callback</code> parameter to the <code>TWAINButtonPluginStart</code> entry point). Calling the button-press callback in this manner will cause the application specified in the Image Capture application Scanner Preferences to be launched.</p>
+<p>Here's the prototype for the button-press callback procedure:</p>
+<p class="caption"><strong>Listing 5: </strong>Button-press Callback Prototype.</p>
+<pre class="sourcecodebox">typedef CALLBACK_API_C( void, ButtonPressedCallback )(OSType message,
+                                                      UInt32*  locationID,
+                                                      UInt64*  guid);</pre>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="TAN69"></a><h2>TWAIN DS &amp; Carbon Events</h2>
+<p>Previous TWAIN implementations for Mac OS 9 were implemented around the <code>WaitNextEvent</code> loop. This meant the client application was actively polling the TWAIN DS by passing NULL events and all other events to the DS. The DS would then decide if the event should be handled or returned to the client application.</p>
+<p>This type of event handling is not suitable for the Mac OS X environment, where Carbon or Cocoa applications do not even have a user exposed event loop. For old-style <code>WaitNextEvent</code> applications, the TWAIN DSM will currently block the <code>MSG_PROCESSEVENT</code> and not even pass it on to the TWAIN DS.</p>
+<a name="TAN77"></a><h3>Passing events from the Client Application to the DS - The Old Way</h3>
+<p>Pages 3-28 through 3-31 of the <a href="http://www.twain.org">TWAIN Specification Version 1.9</a> describe how to modify the application's event loop to pass events from the client application to the DS so the DS can properly respond to them, and how to properly check for messages sent from the DS. Page 3-30 illustrates typical modifications necessary for a Macintosh application to support TWAIN-connected sources by polling for events with an old-style <code>WaitNextEvent</code> loop.</p>
+<p>For sending events to the DS, an application normally uses <code>DG_CONTROL / DAT_EVENT / MSG_PROCESSEVENT</code> and the <code>pEvent</code> field of the <code>TW_EVENT</code> data structure used for these events points to the Macintosh <code>EventRecord</code> . The DS then receives the event from the Source Manager and determines who the event belongs to.</p>
+<p>While this technique for sending events to the DS is still supported by the Mac OS X TWAIN DSM, it is no longer the preferred technique.</p>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="TAN91"></a><h3>Passing events from the Client Application to the DS - The New Way</h3>
+<p>Instead of getting called by the application with a <code>MSG_PROCESSEVENT</code> message as described above for each event on Mac OS X, the TWAIN DS should now setup CarbonEvent handlers to receive events. Note these event handlers are also used for the user-interface (UI) interactions.</p>
+<p>For more detailed information about Carbon Events, see the <a href="http://developer.apple.com/documentation/Carbon/oss/CarbonEventManager/carboneventmanager.html">Carbon Event Manager Reference</a>.</p>
+<p>This means instead of getting called with a <code>MSG_PROCESSEVENT</code> that has an old style <code>EventRecord</code> in its <code>TW_EVENT</code> structure <code>pData</code> field, the TWAIN DS must set up Carbon Event handlers using the Carbon APIs as follows:</p>
+<p class="caption"><strong>Listing 6: </strong>Setting-Up Carbon Event Handlers.</p>
+<pre class="sourcecodebox">InstallStandardEventHandler(GetWindowEventTarget(GetDialogWindow(gDialog)));
+
+InstallWindowEventHandler(GetDialogWindow(gDialog),
+          NewEventHandlerUPP((EventHandlerProcPtr) windowEventHandler),
+          GetEventTypeCount(windowEvents), windowEvents,
+          0,
+          NULL);</pre>
+<p>The event handler will also get called for all UI interactions.</p>
+<p>Here's a more detailed code example, taken from our Data Source sample code (which you can get from the Apple Developer website here: <a href="http://developer.apple.com/samplecode/Sample_Code/Image_Capture.htm">Data Source sample code</a>) showing how to set up Carbon Event handlers:</p>
+<p class="caption"><strong>Listing 7: </strong>Carbon Event Handlers Setup.</p>
+<pre class="sourcecodebox">// ------------------------------------------------------------------
+//    DisplayUserInterface
+// ------------------------------------------------------------------
+//
+
+void DisplayUserInterface()
+{
+    SInt16       savedResRefNum;
+    SInt16       resRefNum = 0;
+    OSStatus     status = noErr;
+    CFBundleRef  selfBundleRef;
+    ControlRef   pictureControlRef;
+
+EventTypeSpec windowEvents[] = {{kEventClassWindow,kEventWindowDrawContent},
+    { kEventClassWindow, kEventWindowUpdate },
+    { kEventClassWindow, kEventWindowClose },
+    { kEventClassWindow, kEventWindowClickDragRgn },
+    { kEventClassMouse, kEventMouseDown },
+    { kEventClassMouse, kEventMouseMoved } };
+
+    selfBundleRef = 
+         CFBundleGetBundleWithIdentifier(CFSTR("com.apple.sampleds"));
+
+    if (selfBundleRef)
+        resRefNum = CFBundleOpenBundleResourceMap ( selfBundleRef );
+
+    savedResRefNum = CurResFile();
+    UseResFile ( resRefNum );
+
+    gDialog = GetNewDialog(128, nil, (WindowRef)-1);
+
+    UseResFile ( savedResRefNum );
+
+    ChangeWindowAttributes(GetDialogWindow(gDialog),
+                           kWindowStandardHandlerAttribute |
+                           kWindowCloseBoxAttribute,
+                           kWindowCollapseBoxAttribute);
+
+    GetDialogItemAsControl(gDialog, kScanButton,   &amp;gScanButton);
+    GetDialogItemAsControl(gDialog, kCancelButton, &amp;gCancelButton);
+
+InstallStandardEventHandler(GetWindowEventTarget(GetDialogWindow(gDialog)));
+    InstallWindowEventHandler(GetDialogWindow(gDialog),
+          NewEventHandlerUPP((EventHandlerProcPtr) windowEventHandler),
+          GetEventTypeCount(windowEvents), windowEvents,
+          0,NULL);
+
+    DS_LogText("InstallWindowEventHandler done\n");
+
+    ShowWindow(GetDialogWindow(gDialog));
+
+    status = GetDialogItemAsControl ( gDialog, 3, &amp;pictureControlRef );
+    require_noerr ( status, BAIL );
+
+    gPicture = GetPicture(130);
+    status = SetControlData ( pictureControlRef,
+                              kControlPicturePart,
+                              kControlPictureHandleTag,
+                              sizeof ( PicHandle ),
+                              &amp;gPicture );
+    require_noerr ( status, BAIL );
+
+    DrawOneControl ( pictureControlRef );
+
+BAIL:
+
+    return;
+}
+
+
+
+// -------------------------------------------------------------------
+//    windowEventHandler
+// -------------------------------------------------------------------
+//
+
+OSStatus  windowEventHandler(EventHandlerCallRef eventHandlerCallRef,
+                             EventRef            eventRef,
+                             void*               userData)
+{
+#pragma unused (eventHandlerCallRef, userData)
+
+    OSStatus    result = eventNotHandledErr;
+    UInt32      eventClass;
+    UInt32      eventKind;
+    EventRecord eventRecord;
+
+    eventClass = GetEventClass(eventRef);
+    eventKind  = GetEventKind(eventRef);
+
+    switch(eventClass)
+    {
+             // event class window
+        case kEventClassWindow: 
+
+            ConvertEventRefToEventRecord(eventRef,&amp;eventRecord);
+
+            switch(eventKind)
+            {
+                case kEventWindowUpdate:
+
+                    doDrawContent(GetDialogWindow(gDialog));
+
+                    break;
+
+              /* etc. */
+            }
+    }
+}</pre>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="TAN112"></a><h3>Communicating from the DS to the Client Application - The Old Way</h3>
+<p>The <a href="http://www.twain.org">TWAIN Specification Version 1.9</a> pages 5-111 through 5-114 describe handling of events by the DS, and techniques for transmitting notices from the DS to the application. Normally, the DS uses a <code>TW_EVENT</code> structure to send its notice to the application. More specifically, the DS places one of <code>MSG_XFERREADY</code> , <code>MSG_CLOSEDSREQ</code> , <code>MSG_CLOSEDSOK</code> or <code>MSG_DEVICEEVENT</code> in the <code>TW_EVENT</code>.TWMessage field as described on page 5-113 of this specification.</p>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="TAN128"></a><h3>Communicating from the DS to the Client Application - The New Way</h3>
+<p>To pass information back to the client application (such as with <code>MSG_XFERREADY</code> or <code>MSG_CLOSEDSREQ</code> ) the TWAIN DS now has to use a callback mechanism through the DSM_Entry as follows:</p>
+<p class="caption"><strong>Listing 8: </strong>Client Application Callback Mechanism.</p>
+<pre class="sourcecodebox"> TW_CALLBACK   callback = {};
+
+     callback.Message = MSG_CLOSEDSREQ;
+     result = DSM_Entry((pTW_IDENTITY)&amp;Identity,
+                         (pTW_IDENTITY)NULL,
+                         (TW_UINT32)DG_CONTROL,
+                         (TW_UINT16)DAT_CALLBACK,
+                         (TW_UINT16)MSG_INVOKE_CALLBACK,
+                         (TW_MEMREF) &amp;callback);</pre>
+<p>The DSM actually will take care of the case where the client application is the older <code>WaitNextEvent</code> based type.</p>
+<p>Once the DSM gets the <code>callback.Message</code> , it will pass the message back the next time it gets called with a <code>MSG_PROCESSEVENT</code> and an <code>EventRecord</code> . This allows applications like the <code>WaitNextEvent</code> based Photoshop 7 to use the new TWAIN.framework and the new style TWAIN Data Sources.</p>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="TAN148"></a><h2>References</h2>
+<ul>
+<li><p><a href="http://www.twain.org">TWAIN Working Group website</a></p></li>
+<li><p><a href="http://developer.apple.com/documentation/Carbon/oss/CarbonEventManager/carboneventmanager.tml">Carbon Event Manager</a></p></li>
+<li><p><a href="http://developer.apple.com/documentation/macosx/Essentials/SystemOverview/Bundles/">Mac OS X Bundles</a></p></li>
+<li><p><a href="http://developer.apple.com/tools/">Apple Developer Tools</a></p></li>
+<li><p><a href="http://developer.apple.com/samplecode/Sample_Code/Image_Capture.htm">SampleButtonPlugin sample code</a></p></li>
+<li><p><a href="http://developer.apple.com/samplecode/Sample_Code/Image_Capture.htm">Data Source (DS) sample code</a></p></li>
+</ul>
+<a name="document_revision_summary"></a><h2>Document Revision History</h2>
+<table cellspacing="0" class="graybox" width="680">
+<tr>
+<th width="100">Date</th>
+<th width="580">Notes</th>
+</tr>
+<tr>
+<td scope="row">2003-06-19</td>
+<td>Describes how to implement a TWAIN Data Source (DS) for Mac OS X</td>
+</tr>
+</table>
+<p><b>Posted: </b>2003-06-19</p>
+<!-- END CONTENTS -->
+</td></tr></table>
+<!-- END WIDE COLUMN --><!-- END MAIN CONTENT --><!-- START BOTTOM APPLE NAVIGATION -->	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/technotes/tn2002/tn2088.html%3Fid%3DDTS10003102-1.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/technotes/tn2002/tn2088.html%3Fid%3DDTS10003102-1.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/technotes/tn2002/tn2088.html%3Fid%3DDTS10003102-1.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+<!--#include virtual="/includes/footer" --><!-- END BOTTOM APPLE NAVIGATION --><!-- START CENTER CLOSE -->
+</center>
+<!-- END CENTER CLOSE -->
+</body>
+</html>

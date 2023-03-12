@@ -1,0 +1,277 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/1999/REC-html401-19991224/loose.dtd">
+<html><head>
+<!-- BEGIN META TAG INFO -->
+<link rel="home" href="http://developer.apple.com/">
+<link rel="find" href="http://developer.apple.com/search/">
+<link rel="stylesheet" type="text/css" href="../../documentation/css/adcstyle.css" title="fonts">
+<script language="JavaScript" type="text/javascript" src="../../documentation/js/busnav.js"></script>
+<script language="JavaScript" src="../../documentation/js/adc.js" type="text/javascript"></script>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<!-- END META TAG INFO -->
+<!-- BEGIN TITLE -->
+<title>Technical Note TN2155: Saving Printer Settings for Automatic Printing</title>
+<!-- END TITLE -->
+</head>
+<!-- BEGIN BODY OPEN -->
+<body bgcolor="#ffffff"><a name="//apple_ref/doc/uid/DTS10004231" title="Saving Printer Settings for Automatic Printing"></a>
+<!--END BODY OPEN -->
+<!-- START CENTER OPEN -->
+<center>
+<!-- END CENTER OPEN -->
+<a name="top"></a>
+<!-- BEGIN LOGO AND SEARCH -->
+<!--#include virtual="/includes/adcnavbar"-->
+<!-- END LOGO AND SEARCH -->
+<!-- START BREADCRUMB -->
+<div id="breadcrumb"><table width="680" border="0" cellpadding="0" cellspacing="0"><tr>
+<td scope="row"><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+<td><img width="340" height="10" src="images/1dot.gif" alt=""></td></tr><tr valign="middle"><td align="left" colspan="2">
+<a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../technicalnotes/index.html">Technical Notes</a> &gt; <a href="../../technicalnotes/Carbon/index.html">Carbon</a> &gt; <a href="../../technicalnotes/Carbon/idxPrinting-date.html">Printing</a> &gt; 
+</td></tr><tr><td colspan="2" scope="row"><img width="680" height="35" src="images/1dot.gif" alt=""></td></tr></table></div>
+<!-- END BREADCRUMB -->
+
+<!-- START MAIN CONTENT -->
+<!-- START TITLE GRAPHIC AND INTRO-->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top">
+<td><h1>
+<div id="pagehead">Technical Note TN2155</div>
+<div id="pageheadsub">Saving Printer Settings for Automatic Printing</div>
+</h1></td></tr></table>
+<!-- END TITLE GRAPHIC AND INTRO -->
+<!-- BEGIN WIDE COLUMN -->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td align="left" width="680">
+<!-- BEGIN CONTENTS -->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td><p>The Printer ID is a unique internal representation that specifies a particular print queue. It is possible for the user to create multiple print queues that use the same user visible name, however each queue will have a unique Printer ID. To reliably reference a particular print queue, and therefore a specific printer, it is necessary to always use a Printer ID. The <code>PMPrinter</code> data type neatly wraps up both concepts in a single package. This Technote describes how you can save and restore a <code>PMPrinter</code> in order to save a printer that the user has selected.</p><p>Typically you do not need to know the Printer ID to print. However in some limited situations it makes sense to save the selected printer and automatically use it when needed (for example to print receipts for a point-of-sale application). The Printer ID provides the necessary persistent reference, since you cannot save a <code>PMPrinter</code> to your preferences. So using a Printer ID you can save a reference to a print queue that is valid for the life of that print queue.</p></td></tr><tr><td scope="row"><img width="680" height="10" src="images/1dot.gif" alt=""><br><img height="1" width="680" src="images/1dot_919699.gif" alt=""><br><img width="680" height="20" src="images/1dot.gif" alt=""></td></tr></table><table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td width="680"><ul><li><a href="#PMPRINTER">Collecting Printing Information</a><ul><li><a href="#PMSERVERCREATEPRINTERLIST">Choosing From Available Printers</a></li><li><a href="#PMSESSIONGETCURRENTPRINTER">Obtaining Print settings via the Print & Page Setup Dialogs</a></li><li><a href="#PERSISTINGPMPRINTER">Saving and Loading Print Settings</a></li></ul></li><li><a href="#VALIDATINGPRINTERID">Validating a Printer ID</a></li><li><a href="#TNT_HISTORY_TAG">Document Revision History</a></li></ul></td></tr><tr><td colspan="3" scope="row"><img width="680" height="10" src="images/1dot.gif" alt=""><br><img height="1" width="680" src="images/1dot_919699.gif" alt=""><br><img width="680" height="20" src="images/1dot.gif" alt=""></td></tr></table><A NAME="PMPRINTER"></A><H2>Collecting Printing Information</H2><p>Depending on the expected workflow of your application, there are a number of ways that you may wish to approach obtaining the original <code>PMPrinter</code> that you use to print.</p><p>One method is to obtain a list of available printers, and ask the user to choose one. This is acceptable if print options mean little to the consumer of your application; simply printing is the goal. <A HREF="#PMSERVERCREATEPRINTERLIST">Choosing From Available Printers</A> demonstrates this method.</p><p>The second method is to ask the user to select a printer and print settings using the standard Print &amp; Page Setup dialog boxes. This allows the user to set other options, such as page size and layout, as well as select the printer itself. In this case, you may also wish to save all print settings in addition to the printer selection. <A HREF="#PMSESSIONGETCURRENTPRINTER">Obtaining Print settings via the Print &amp; Page Setup Dialogs</A> demonstrates this method.</p><p>In either case, the entire point is to save and restore this printer selection from your preferences. This is demonstrated in <A HREF="#PERSISTINGPMPRINTER">Saving and Loading Print Settings</A>.</p><A NAME="PMSERVERCREATEPRINTERLIST"></A><H3>Choosing From Available Printers</H3><p>You can obtain a list of available printers by calling <code>PMServerCreatePrinterList</code>. This call will return a <code>CFArray</code> of PMPrinters containing all the printers that it was able to discover. <A HREF="#EXAMPLE1">Listing 1</A> demonstrates how to turn the <code>CFArray</code> of PMPrinters into a <code>CFArray</code> of printer names to display to the user.</p><div class="notebox"><p><strong>Note:</strong> The list that is returned by <code>PMServerCreatePrinterList</code> may not be as complete as the list that is available when you add a printer via the Print &amp; Fax preference pane. However printers that the user has already setup (manually or automatically) will always appear in this list.</p></div><A NAME="EXAMPLE1"></A><p class="smalltext"><strong>Listing 1:</strong> Obtaining the list of available printers</p><pre class="sourcecodebox">
+OSStatus CreatePMPrintersAndPrinterNames( CFArrayRef *outPrinters, CFArrayRef *outPrinterNames )
+{
+  *outPrinters = NULL;
+  *outPrinterNames = NULL;
+  // Obtain the list of PMPrinters
+  OSStatus err = PMServerCreatePrinterList( kPMServerLocal, outPrinters );
+  if( err == noErr )
+  {
+    CFIndex i, count = CFArrayGetCount( printers );
+    // Create another array to hold the printer names. You may use this to create a menu or list for
+    // the user to select a printer.
+    CFMutableArrayRef printerNames = CFArrayCreateMutable( NULL, count, kCFTypeArrayCallBacks );
+    if( printerNames )
+    {
+      for(i = 0; i &lt; count; ++i)
+      {
+        PMPrinter printer = (PMPrinter)CFArrayGetValueAtIndex( printers, i );
+        CFStringRef name = PMPrinterGetName( printer );
+        CFArrayAppendValue( printerNames, name );
+      }
+    }
+    *outPrinterNames = printerNames;
+  }
+  return err;
+}
+</pre><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="PMSESSIONGETCURRENTPRINTER"></A><H3>Obtaining Print settings via the Print & Page Setup Dialogs</H3><p>More flexibility is available however if you allow the user to select a printer and print settings using the standard Print Dialog. By doing so you allow the user to customize all of the print settings for the print job and save these settings as a template for future print jobs. After the user prints for the first time you can simply save the print settings and use them again later. <A HREF="#EXAMPLE2">Listing 2</A> shows you how to display a Print Dialog and obtain the printer and print settings in order to reuse them again later.</p><A NAME="EXAMPLE2"></A><p class="smalltext"><strong>Listing 2:</strong> Saving Printer information from a Print Dialog</p><pre class="sourcecodebox">
+OSStatus CreatePageFormat( PMPageFormat * outFormat )
+{
+  PMPrintSession printSession;
+  OSStatus err;
+  Boolean accepted;
+
+  // In order to create the Page Format we're going to
+  // ask the user to setup that page format using Page Setup.
+  *outFormat = NULL;
+
+  err = PMCreateSession( &amp;printSession );
+  if( !err )
+  {
+    // We could create a session, so create and default the page format.
+    err = PMCreatePageFormat( outFormat );
+    if( !err )
+      err = PMSessionDefaultPageFormat( printSession, *outFormat );
+
+    // Present the Page Setup dialog, if the user cancels or there
+    // is an error, we'll dispose of the created page format,
+    // return a NULL format, and whatever error may have been returned
+    // from PMSessionPageSetupDialog.
+    err = PMSessionPageSetupDialog( printSession, *outFormat, &amp;accepted );
+    if( err || !accepted )
+    {
+      PMRelease( *outFormat );
+      *outFormat = NULL;
+    }
+
+    PMRelease( printSession );
+  }
+  return err;
+}
+
+OSStatus CreatePrintSettings( PMPageFormat ioFormat, PMPrinter * outPrinter, PMPrintSettings * outSettings)
+{
+  PMPrintSession printSession;
+  OSStatus err;
+  Boolean accepted = false;
+
+  *outPrinter = NULL;
+  *outSettings = NULL;
+
+  // In order to create the Print Settings &amp; select a printer we'll
+  // ask the user to create their settings using the Print dialog.
+  err = PMCreateSession( &amp;printSession );
+  if( !err )
+  {
+    // Validate the Page Format against the current Printer, which may update
+    // that format.
+    err = PMSessionValidatePageFormat( printSession, ioFormat, kPMDontWantBoolean );
+
+    // Create and default the print settings
+    if( !err )
+      err = PMCreatePrintSettings( outSettings );
+    if( !err )
+      err = PMSessionDefaultPrintSettings( printSession, *outSettings );
+
+    // Present the Print dialog.
+    if( !err )
+      err = PMSessionPrintDialog( printSession, *outSettings, ioFormat, &amp;accepted );
+    if( !err &amp;&amp; accepted )
+    {
+      // If the user accepted, then we'll retain the printer selected
+      // so that it survives the scope of this session.
+      // If there is an error getting the printer, then it will
+      // remain NULL
+      err = PMSessionGetCurrentPrinter( printSession, outPrinter );
+      if( !err )
+        PMRetain( *outPrinter );
+    }
+    else
+    {
+      // We got an error, or the user canceled the operation
+      // so we'll release our settings and NULL them out.
+      // The PMPrinter hasn't been set yet, so it will remain NULL.
+      PMRelease( *outSettings );
+      *outSettings = NULL;
+    }
+
+    PMRelease( printSession );
+  }
+  return err;
+}
+</pre><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="PERSISTINGPMPRINTER"></A><H3>Saving and Loading Print Settings</H3><p>The simplest way to save a reference to the printer that your user has selected previously is via CFPreferences. The Printer ID is returned via a <code>CFString</code> and all flattened printer data is returned via a CFDataRef, both of which are easily stored via CFPreferences. <A HREF="#EXAMPLE3">Listing 3</A> shows how to save these settings to your preferences and <A HREF="#EXAMPLE4">Listing 4</A> shows you how to recover the printer and print settings from your preferences.</p><div class="notebox"><p><strong>WARNING:</strong> Because the user can easily change their printer configuration during runtime, your code should be prepared for the situation where the printer that you are using does not exist. In this case your code should ask the user to select a new printer. You can see one way of checking validity in <A HREF="#VALIDATINGPRINTERID">Validating a Printer ID</A></p></div><A NAME="EXAMPLE3"></A><p class="smalltext"><strong>Listing 3:</strong> Saving Print Settings to your Preferences</p><pre class="sourcecodebox">
+OSStatus SavePrintSettings( PMPrintSession inSession, PMPrintSettings inSettings, PMPageFormat inFormat )
+{
+  CFStringRef printerID;
+  PMPrinter printer;
+  CFDataRef flatSettings, flatFormat;
+  OSStatus err, tempErr;
+
+  // We need the current printer from the print session before we can do anything else
+  // If we get an error retrieving it, then we will simply return that error and do nothing else
+  err = PMSessionGetCurrentPrinter( inSession, &amp;printer );
+  if( err == noErr )
+  {
+    // If PMSessionGetCurrentPrinter returns successfully, then the printer is valid
+    // for as long as the session is valid, therefore we will assume that the printer name is valid.
+    printerID = PMPrinterGetID( printer );
+    CFPreferencesSetAppValue( kPrinterID, printerID, kCFPreferencesCurrentApplication );
+    CFRelease( printerID );
+
+    tempErr = PMFlattenPrintSettingsToCFData( inSettings, &amp;flatSettings );
+    if( tempErr == noErr )
+    {
+      // If we can flatten the print settings, then save them to preferences
+      CFPreferencesSetAppValue( kPrintSettings, flatSettings, kCFPreferencesCurrentApplication );
+      CFRelease( flatSettings );
+    }
+    else
+    {
+      // If we cannot flatten print settings, then remove them from preferences
+      CFPreferencesSetAppValue( kPrintSettings, NULL, kCFPreferencesCurrentApplication );
+    }
+
+    tempErr = PMFlattenPageFormatToCFData( inFormat, &amp;flatFormat );
+    if( tempErr == noErr )
+    {
+      // If we can flatten the the page format, then save them to preferences
+      // if we could not, then we can reuse them with another printer
+      CFPreferencesSetAppValue( kPageFormat, flatFormat, kCFPreferencesCurrentApplication );
+      CFRelease( flatFormat );
+    }
+  }
+
+  return err;
+}
+</pre><A NAME="EXAMPLE4"></A><p class="smalltext"><strong>Listing 4:</strong> Recovering Print Settings from your Preferences</p><pre class="sourcecodebox">
+void CopyPrintSettings( CFStringRef * outPrinterID, PMPrintSettings * outSettings, PMPageFormat * outFormat )
+{
+  CFDataRef flatSettings, flatFormat;
+
+  *outPrinterID = CFPreferencesCopyAppValue( kPrinterID, kCFPreferencesCurrentApplication );
+  *outSettings = NULL;
+  *outFormat = NULL;
+
+  // load the printer ID via CFPreferences
+  if( *outPrinterID != NULL )
+  {
+    flatSettings = CFPreferencesCopyAppValue( kPrintSettings, kCFPreferencesCurrentApplication );
+    flatFormat = CFPreferencesCopyAppValue( kPageFormat, kCFPreferencesCurrentApplication );
+
+    // Ignoring errors unflattening, as if there is an error the corresponding setting
+    // will be NULL, indicating that it wasn't available.
+    if( flatSettings != NULL )
+    {
+      PMUnflattenPrintSettings( flatSettings, outSettings );
+      CFRelease( flatSettings );
+    }
+
+    if( flatFormat != NULL )
+    {
+      PMUnflattenPageFormatWithCFData( flatFormat, outFormat );
+      CFRelease( flatFormat );
+    }
+  }
+}</pre><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="VALIDATINGPRINTERID"></A><H2>Validating a Printer ID</H2><p>Since the user is able to reconfigure their printing setup at anytime, even while your application is running, in order to provide a seamless experience, you will need to validate the printer that you plan to print with prior to every printing operation. In order to do this, you need to try to recreate the <code>PMPrinter</code> from the Printer ID. This is not necessary in normal circumstances, as the standard Print dialog box and the default settings will automatically choose the correct printer.</p><p class="smalltext"><strong>Listing 5:</strong> Checking the Printer ID is valid</p><pre class="sourcecodebox">
+// This function demonstrates one way to validate a printer.
+// A more sensible method of doing this would be to attempt
+// to create the printer, use it on success, and ask the
+// user to update their settings on failure.
+Boolean IsValidPrinter( CFStringRef inPrinterID )
+{
+  PMPrinter printer = PMPrinterCreateFromPrinterID( inPrinterID );
+  Boolean valid = printer != NULL;
+  // It is safe to pass NULL to PMRelease, as we'd just get an error
+  // since we just want to make sure that a non-NULL printer gets
+  // released, we can safely ignore that error.
+  PMRelease( printer );
+  return valid;
+}
+</pre><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNT_HISTORY_TAG"></A><H2>Document Revision History</H2><table cellspacing="0" class="graybox" width="680"><tr><th width="100">Date</th><th width="580">Notes</th></tr><tr><td scope="row">2007-03-29</td><td>First Version</td></tr></table><p><b>Posted:</b> 2007-03-29</p>
+<!-- END CONTENTS -->
+</td></tr></table>
+<!-- END WIDE COLUMN -->
+<!-- END MAIN CONTENT -->
+	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/technotes/tn2007/tn2155.html%3Fid%3DDTS10004231-1.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/technotes/tn2007/tn2155.html%3Fid%3DDTS10004231-1.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/technotes/tn2007/tn2155.html%3Fid%3DDTS10004231-1.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+
+<!-- START BOTTOM APPLE NAVIGATION -->
+<!--#include virtual="/includes/footer"-->
+<!-- END BOTTOM APPLE NAVIGATION -->
+<!-- START CENTER CLOSE -->
+</center>
+<!-- END CENTER CLOSE -->
+</body></html>

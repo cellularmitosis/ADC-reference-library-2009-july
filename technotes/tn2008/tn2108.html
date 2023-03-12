@@ -1,0 +1,286 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<!-- BEGIN META TAG INFO --><link rel="home" href="http://developer.apple.com/">
+<link rel="find" href="http://developer.apple.com/search/">
+<link rel="stylesheet" type="text/css" href="../../documentation/css/adcstyle.css" title="fonts">
+<script language="JavaScript" type="text/javascript" src="../../documentation/js/busnav.js"></script><script language="JavaScript" src="../../documentation/js/adc.js" type="text/javascript"></script><!-- END META TAG INFO --><!-- BEGIN TITLE --><title>Technical Note TN2108: Debugging An Authorization Plug-In With Xcode</title>
+<!-- END TITLE -->
+</head>
+<!-- BEGIN BODY OPEN --><body bgcolor="#ffffff"><a name="//apple_ref/doc/uid/DTS40007965" title="Debugging An Authorization Plug-In With Xcode"></a>
+<!-- END BODY OPEN --><!-- START CENTER OPEN --><center>
+<!-- END CENTER OPEN --><a name="top"></a><!-- BEGIN LOGO AND SEARCH --><!--#include virtual="/includes/adcnavbar" --><!-- END LOGO AND SEARCH --><!-- START BREADCRUMB --><div id="breadcrumb"><table width="680" border="0" cellpadding="0" cellspacing="0">
+<tr>
+<td scope="row"><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+<td><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+</tr>
+<tr valign="middle"><td align="left" colspan="2">
+<a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../technicalnotes/index.html">Technical Notes</a> &gt; <a href="../../technicalnotes/DeveloperTools/index.html">Tools</a> &gt; <a href="../../technicalnotes/DeveloperTools/idxXcode-date.html">Xcode</a> &gt; </td></tr>
+<tr><td colspan="2" scope="row"><img width="680" height="35" src="images/1dot.gif" alt=""></td></tr>
+</table></div>
+<!-- END BREADCRUMB --><!-- START MAIN CONTENT --><!-- START TITLE GRAPHIC AND INTRO --><table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td><h1>
+<div id="pagehead">Technical Note TN2108</div>
+<div id="pageheadsub">Debugging An Authorization Plug-In With Xcode</div>
+</h1></td></tr></table>
+<!-- END TITLE GRAPHIC AND INTRO --><!-- BEGIN WIDE COLUMN --><table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td align="left" width="680">
+<!-- BEGIN CONTENTS --><table width="680" border="0" cellpadding="0" cellspacing="0">
+<tr align="left" valign="top"><td><p>This technote describes how you can use Xcode's SSH-based debugging feature to remotely debug an authorization plug-in. It is targeted at Mac OS X developers who are developing an authorization plug-in.</p></td></tr>
+<tr><td scope="row">
+<img width="680" height="10" src="images/1dot.gif" alt=""><br><img width="680" height="1" src="images/1dot_919699.gif" alt=""><br><img width="680" height="20" src="images/1dot.gif" alt="">
+</td></tr>
+</table>
+<table width="680" border="0" cellpadding="0" cellspacing="0">
+<tr align="left" valign="top"><td width="680"><ul>
+<li><a href="#SECINTRODUCTION">Introduction</a></li>
+<li><a href="#SECGETTINGSTARTED">Getting Started</a></li>
+<li><a href="#SECSHAREDSOURCE">Sharing The Source</a></li>
+<li><a href="#SECROOTSSH">Enable Key-Based SSH For Root</a></li>
+<li><a href="#SECCONFIGXCODE">Configuring Xcode and Debug</a></li>
+<li><a href="#SECREPEAT">Lather, Rinse, Repeat</a></li>
+<li><a href="#SECUNDO">Restoring Your System</a></li>
+<li><a href="#SECFURTHERREADING">Further Reading</a></li>
+<li><a href="#document_revision_summary">Document Revision History</a></li>
+</ul></td></tr>
+<tr><td colspan="3" scope="row">
+<img width="680" height="10" src="images/1dot.gif" alt=""><br><img width="680" height="1" src="images/1dot_919699.gif" alt=""><br><img width="680" height="20" src="images/1dot.gif" alt="">
+</td></tr>
+</table>
+<a name="SECINTRODUCTION"></a><h2>Introduction</h2>
+<p>The authorization plug-in facility allows you to run code during the login process. You can't use standard Xcode techniques to debug an authorization plug-in because there is no way to run Xcode at the time that the plug-in runs. This technote describes how you can use Xcode's SSH-based debugging feature to remotely debug an authorization plug-in. The setup is rather complicated (it requires two computers, setting up SSH login for root, and a shared build directory), but it's well worth the effort if you do a lot of work with authorization plug-ins.</p>
+<div class="notebox">
+<p><strong>WARNING: </strong>The instructions in this technote are only appropriate if your computers are running on a secure private network (ideally behind a firewall, but behind a NAT will typically be OK as well). There are at least two major security risks:</p>
+<ul>
+<li><p>You have to enable the root account and Remote Login (SSH), never a good combination.</p></li>
+<li><p>You have to enable AFP guest access to your source code.</p></li>
+</ul>
+<p>Once you're done debugging, you should restore your computers to their default state by following the instructions in <a href="#SECUNDO">Restoring Your System</a>.</p>
+</div>
+<div class="notebox"><p><strong>IMPORTANT: </strong>These instructions were tested with Xcode 3.1 on Mac OS X 10.5.4. They should work back to Xcode 3.0 on Mac OS X 10.5. If you need help setting this up on older versions of Xcode or Mac OS X, please contact <a href="mailto:dts@apple.com">Developer Technical Support</a>.</p></div>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="SECGETTINGSTARTED"></a><h2>Getting Started</h2>
+<p>To start, you'll need to do some basic configuration of your computers.</p>
+<ol>
+<li><p>Start with two machines, the <strong>development machine</strong> (which runs Xcode) and the <strong>target machine</strong> (which runs your authorization plug-in).</p></li>
+<li><p>In the Sharing panel of System Preferences, name the development machine "Development" and the target machine "Target".</p></li>
+<li><p>Install the Xcode developer tools on both machines.</p></li>
+</ol>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="SECSHAREDSOURCE"></a><h2>Sharing The Source</h2>
+<p>For debugging to work properly, both machines will need access to your source code with exactly the same path.</p>
+<ol>
+<li>
+<p>On the development machine, put your source code on a volume other than the root volume (if you don't have another volume handy, you can use a disk image). Rename the volume to "Source".</p>
+<div class="notebox"><p><strong>Note: </strong>This step is necessary so that the path encoded in your debugger symbols is the same on both development and target machines (that is, it starts with <code>/Volumes/Source</code>).</p></div>
+</li>
+<li><p>On the development machine ensure that the Guest Account is enabled for sharing access ("Allow guests to connect to shared folders" in the Accounts panel of System Preferences).</p></li>
+<li><p>On the development machine, in the Sharing panel of System Preferences, enable File Sharing over AFP.</p></li>
+<li><p>In the same panel, drag the "Source" volume into the Shared Folders list and ensure that Everyone has Read Only access.</p></li>
+<li><p>On the target machine use Connect to Server in the Finder to connect to the development machine as a guest user and verify that you can mount the "Source" volume and see the source code. Then unmount the "Source" volume.</p></li>
+<li>
+<p>On the target machine, add a mount record to your local directory store and refresh the automounter, as shown in <a href="#LISTMOUNTRECORD">Listing 1</a>.</p>
+<a name="LISTMOUNTRECORD"></a><p class="caption"><strong>Listing 1: </strong>Adding a mount record</p>
+<pre class="sourcecodebox">$ # Create the mount record
+$ sudo dscl . -create /Mounts/Development.local.:\\/Source
+$ sudo dscl . -create /Mounts/Development.local.:\\/Source VFSType url
+$ sudo dscl . -create /Mounts/Development.local.:\\/Source VFSLinkDir \
+/Volumes/Source
+$ sudo dscl . -create /Mounts/Development.local.:\\/Source VFSOpts \
+url==afp://\;AUTH=NO%20USER%20AUTHENT@Development.local./Source
+$ # Refresh the automounter
+$ sudo /usr/sbin/automount -c</pre>
+</li>
+<li>
+<p>On the target machine, confirm that the automount is working by listing the <code>/Volumes/Source</code> directory, as shown in <a href="#LISTCONFIRMMOUNT">Listing 2</a>. This should automatically mount the "Source" volume on the target machine. However, because the volume is automounted it will not show up in the Finder.</p>
+<a name="LISTCONFIRMMOUNT"></a><p class="caption"><strong>Listing 2: </strong>Confirming the automount</p>
+<pre class="sourcecodebox">$ ls -lh /Volumes/Source
+total 32
+-r--r--r--@ 1 apple  wheel   1.0K Jun 26 17:23 Desktop DB
+-r--r--r--@ 1 apple  wheel     2B Jun 26 15:55 Desktop DF
+drwxrwxrwx@ 7 apple  wheel   264B Nov 28  2007 NullAuthPlugin</pre>
+</li>
+</ol>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="SECROOTSSH"></a><h2>Enable Key-Based SSH For Root</h2>
+<p>On current systems an authorization plug-in is hosted by either <code>SecurityAgent</code> or <code>authorizationhost</code>. These run as UID 92 (<code>_securityagent</code>) or UID 0 (<code>root</code>), respectively. To debug them, you'll have to run GDB as root on the target machine. To keep things simple, we will enable the root account and then enable key-based SSH authentication for that account.</p>
+<ol>
+<li><p>On the target machine, enable Remote Login (SSH) in the Sharing panel of System Preferences.</p></li>
+<li><p>On the target machine, run Directory Utility and choose enable the root user (choose Enable Root User on the Edit menu).</p></li>
+<li>
+<p>On the development machine, generate an SSH key pair as shown by <a href="#LISTKEYGEN">Listing 3</a>.</p>
+<a name="LISTKEYGEN"></a><p class="caption"><strong>Listing 3: </strong>Generating an SSH key pair</p>
+<pre class="sourcecodebox">$ mkdir -p .ssh
+$ ssh-keygen 
+Generating public/private rsa key pair.
+Enter file in which to save the key (/Users/apple/.ssh/id_rsa): .ssh/id_rsa-wideopen
+Enter passphrase (empty for no passphrase): 
+Enter same passphrase again: 
+Your identification has been saved in .ssh/id_rsa-wideopen.
+Your public key has been saved in .ssh/id_rsa-wideopen.pub.
+The key fingerprint is:
+90:cc:24:66:ef:bf:8e:61:4a:f3:d0:9c:0f:d4:ac:5f apple@Development.local</pre>
+</li>
+<li>
+<p>Copy the SSH public key to the root user's home directory on the target machine, as shown by <a href="#LISTCOPYKEY">Listing 4</a>.</p>
+<a name="LISTCOPYKEY"></a><p class="caption"><strong>Listing 4: </strong>Copying the SSH public key to the root user's home directory</p>
+<pre class="sourcecodebox">$ scp .ssh/id_rsa-wideopen.pub root@Target.local.:</pre>
+</li>
+<li>
+<p>On the target machine, log in as root and install the SSH public key, as shown by <a href="#LISTINSTALLKEY">Listing 5</a>.</p>
+<a name="LISTINSTALLKEY"></a><p class="caption"><strong>Listing 5: </strong>Installing the SSH public key</p>
+<pre class="sourcecodebox"># mkdir -p .ssh
+# cat id_rsa-wideopen.pub &gt; .ssh/authorized_keys</pre>
+</li>
+<li>
+<p>On the development machine, add the SSH key to your <a href="x-man-page://1/ssh-agent">ssh-agent</a> and then confirm that you can SSH as root to the target machine without requiring a password (see <a href="#LISTTESTKEY">Listing 6</a>).</p>
+<a name="LISTTESTKEY"></a><p class="caption"><strong>Listing 6: </strong>Testing the SSH setup</p>
+<pre class="sourcecodebox">$ ssh-add .ssh/id_rsa-wideopen
+$ ssh root@Target.local.
+Last login: Thu Jun 26 23:58:23 2008 from Development.local
+#</pre>
+</li>
+</ol>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="SECCONFIGXCODE"></a><h2>Configuring Xcode and Debug</h2>
+<p>The last step is to configure Xcode and debug your program. In this step we'll use <a href="/samplecode/NullAuthPlugin/index.html">Sample Code 'NullAuthPlugin'</a> to provide a concrete illustration as to the steps involved. To start, you wil have to build and install your code and then configure Xcode.</p>
+<ol>
+<li><p>On the development machine, download <a href="/samplecode/NullAuthPlugin/index.html">Sample Code 'NullAuthPlugin'</a> and unpack it to the root directory of your "Source" volume.</p></li>
+<li><p>Open the project in Xcode and build it.</p></li>
+<li>
+<p>On the target machine, copy the built plug-in to <code>/Library/Security/SecurityAgentPlugins/</code>, as shown by <a href="#LISTINSTALLPLUGIN">Listing 7</a>.</p>
+<a name="LISTINSTALLPLUGIN"></a><p class="caption"><strong>Listing 7: </strong>Installing the plug-in</p>
+<pre class="sourcecodebox">$ sudo cp -R \
+/Volumes/Source/NullAuthPlugin/build/Debug/NullAuthPlugin.bundle \
+/Library/Security/SecurityAgentPlugins/</pre>
+<div class="notebox"><p><strong>Note: </strong>The command in <a href="#LISTINSTALLPLUGIN">Listing 7</a> only works because of the automount you set up in <a href="#SECSHAREDSOURCE">Sharing The Source</a>.</p></div>
+</li>
+<li>
+<p>On the target machine, modify the <code>system.login.console</code> right in the authorization database (currently <code>/etc/authorization</code>) to invoke the plug-in. Start by making a backup of the authorization database, as shown by <a href="#LISTBACKUPAUTHDB">Listing 8</a>.</p>
+<a name="LISTBACKUPAUTHDB"></a><p class="caption"><strong>Listing 8: </strong>Backing up the authorization database</p>
+<pre class="sourcecodebox">$ sudo cp /etc/authorization /etc/authorization-orig</pre>
+<p>Then edit the file (using your favorite text editor) to add the mechanism string "NullAuthPlugin:WaitForDebugger" after the mechanism string "HomeDirMechanism:status". Confirm your change using the command shown in <a href="#LISTAUTHDBAFTER">Listing 9</a>.</p>
+<a name="LISTAUTHDBAFTER"></a><p class="caption"><strong>Listing 9: </strong>Check the authorization database modification</p>
+<pre class="sourcecodebox">$ grep -A 2 HomeDirMechanism /etc/authorization
+                &lt;string&gt;HomeDirMechanism:login,privileged&lt;/string&gt;
+                &lt;string&gt;HomeDirMechanism:status&lt;/string&gt;
+                &lt;string&gt;NullAuthPlugin:WaitForDebugger&lt;/string&gt;
+                &lt;string&gt;MCXMechanism:login&lt;/string&gt;</pre>
+</li>
+<li><p>On the target machine, log out and then log back in. The login should hang as <code>NullAuthPlugin</code> waits for the debugger to connect.</p></li>
+<li><p>On the development machine, bring the <code>NullAuthPlugin</code> project to the front in Xcode and choose New Custom Executable from the Project menu. In the resulting dialog leave the Executable Name field set to "Executable" and enter "/System/Library/CoreServices/SecurityAgent.app/Contents/MacOS/SecurityAgent" into the Executable Path field. Then click Finish.</p></li>
+<li><p>In the Debugging tab of the Executable Info window, check the "Debug executable remotely via SSH" checkbox. Enter "root@Target.local." into the "Connect to:" field. And uncheck the "Start executable after starting the debugger" checkbox. The window should now look like <a href="#FIGEXECINFO">Figure 1</a>.</p></li>
+</ol>
+<a name="FIGEXECINFO"></a><p class="caption"><strong>Figure 1: </strong>Xcode's Executable Info window</p>
+<p><img src="images/tn2108_ExecInfo.png" width="470" height="673" alt="Figure 1, Xcode's Executable Info window"></p>
+<a name="ANCDEBUG"></a><p>Once everything is set up you can use the following steps to actually debug your code.</p>
+<ol>
+<li><p>In Xcode, choose Debugger from the Run menu to show the debugger window, then choose Console from the Run menu to show the console window.</p></li>
+<li><p>In Xcode, choose Debug from the Run menu. This console window will now show you the state of GDB running as root on the target machine!</p></li>
+<li>
+<p>In the console window, attach to the <code>SecurityAgent</code> as shown in <a href="#LISTATTACH">Listing 10</a>.</p>
+<a name="LISTATTACH"></a><p class="caption"><strong>Listing 10: </strong>Attaching to the SecurityAgent</p>
+<pre class="sourcecodebox">(gdb) attach SecurityAgent
+Attaching to program: `/System/Library/CoreServices/SecurityAgent.app/Contents/MacOS/SecurityAgent', process 263.
+Reading symbols for shared libraries ...[…]... done
+0x920dd806 in __sigsuspend_nocancel ()
+[…]</pre>
+</li>
+<li><p>In Xcode, you can now use the debugger window to debug the authorization plug-in as you would any other code.</p></li>
+</ol>
+<p>Phew!  It's been a long haul, but I trust that the result is worth the effort.</p>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="SECREPEAT"></a><h2>Lather, Rinse, Repeat</h2>
+<p>Inevitably your debugging efforts will lead to code changes, and that requires you to reinstall your authorization plug-in and debug the new version. This is surprisingly simple.</p>
+<ol>
+<li><p>In Xcode on the development machine, stop the debugger.</p></li>
+<li><p>Make your code changes and rebuild your project.</p></li>
+<li><p>On the target machine, reinstall the plug-in by repeating the command in <a href="#LISTINSTALLPLUGIN">Listing 7</a>.</p></li>
+<li><p>On the target machine, log out and then log back in. The login should hang as <code>NullAuthPlugin</code> waits for the debugger to connect.</p></li>
+<li><p>Follow the <a href="#ANCDEBUG">steps from the previous section</a> to start the debugger.</p></li>
+</ol>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="SECUNDO"></a><h2>Restoring Your System</h2>
+<p>Once you're done debugging you should restore your computers to a reasonable state. This section describes the necessary steps.</p>
+<ol>
+<li>
+<p>On the target machine, remove the reference to your authorization plug-in from the <code>system.login.console</code> right in the authorization database (<code>/etc/authorization</code>). You can do this by restoring the database from the backup you made earlier, as shown in <a href="#LISTRESTOREAUTHDB">Listing 11</a>.</p>
+<a name="LISTRESTOREAUTHDB"></a><p class="caption"><strong>Listing 11: </strong>Restoring the authorization database from your backup</p>
+<pre class="sourcecodebox">$ sudo cp /etc/authorization-orig /etc/authorization</pre>
+</li>
+<li><p>On the target machine, remove your authorization plug-in from the <code>/Library/Security/SecurityAgentPlugins/</code> directory.</p></li>
+<li>
+<p>On the target machine, remove the SSH public key for the root user. Log in as root and then run the command in <a href="#LISTDELETEROOTPUBLICKEY">Listing 12</a>.</p>
+<a name="LISTDELETEROOTPUBLICKEY"></a><p class="caption"><strong>Listing 12: </strong>Removing the SSH public key</p>
+<pre class="sourcecodebox"># rm .ssh/authorized_keys</pre>
+</li>
+<li><p>On the target machine, disable SSH login (Remote Login in the Sharing panel of System Preferences).</p></li>
+<li><p>On the target machine, disable the root user (in Directory Utility).</p></li>
+<li>
+<p>On the target machine, remove the mount record from your local directory store, as shown in <a href="#LISTREMOVEMOUNTRECORD">Listing 13</a>.</p>
+<a name="LISTREMOVEMOUNTRECORD"></a><p class="caption"><strong>Listing 13: </strong>Remove the mount record</p>
+<pre class="sourcecodebox">$ # Delete the mount record
+$ sudo dscl . -delete /Mounts/Development.local.:\\/Source
+$ # Refresh the automounter
+$ sudo /usr/sbin/automount -c</pre>
+</li>
+<li><p>Restart the target machine.</p></li>
+<li><p>On the development machine, quit Xcode.</p></li>
+<li><p>On the development machine, remove the "Source" volume from the Shared Folders list (in the Sharing panel of System Preferences).</p></li>
+<li><p>On the development machine, disable File Sharing over AFP (in the Sharing panel of System Preferences).</p></li>
+<li><p>On the development machine, restore the Guest Account to your preferred state (in the Accounts panel of System Preferences).</p></li>
+<li><p>Restart the development machine.</p></li>
+<li><p>On each of the development and target machines, restore the computer name to its previous value (in the Sharing panel of System Preferences).</p></li>
+</ol>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="SECFURTHERREADING"></a><h2>Further Reading</h2>
+<ul>
+<li><p><a href="http://developer.apple.com/documentation/Security/Reference/AuthorizationPluginRef/index.html">Authorization Plug-in Reference</a></p></li>
+<li><p><a href="/samplecode/NullAuthPlugin/index.html">Sample Code 'NullAuthPlugin'</a></p></li>
+<li><p><a href="http://developer.apple.com/referencelibrary/DeveloperTools/idxXcode-date.html">ADC Home &gt; Reference Library &gt; Tools &gt; Xcode</a></p></li>
+<li><p><a href="http://developer.apple.com/documentation/DeveloperTools/gdb/gdb/gdb_toc.html">Debugging with GDB</a></p></li>
+<li><p><a href="x-man-page://1/ssh">ssh man page</a></p></li>
+<li><p><a href="x-man-page://1/ssh-keygen">ssh-keygen man page</a></p></li>
+<li><p><a href="x-man-page://1/ssh-add">ssh-add man page</a></p></li>
+<li><p><a href="x-man-page://8/sshd">sshd man page</a></p></li>
+<li><p><a href="x-man-page://5/sshd_config">sshd_config man page</a></p></li>
+</ul>
+<a name="document_revision_summary"></a><h2>Document Revision History</h2>
+<table cellspacing="0" class="graybox" width="680">
+<tr>
+<th width="100">Date</th>
+<th width="580">Notes</th>
+</tr>
+<tr>
+<td scope="row">2008-09-08</td>
+<td>First Version</td>
+</tr>
+</table>
+<p><b>Posted: </b>2008-09-08</p>
+<!-- END CONTENTS -->
+</td></tr></table>
+<!-- END WIDE COLUMN --><!-- END MAIN CONTENT --><!-- START BOTTOM APPLE NAVIGATION -->	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/technotes/tn2008/tn2108.html%3Fid%3DDTS40007965-1.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/technotes/tn2008/tn2108.html%3Fid%3DDTS40007965-1.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/technotes/tn2008/tn2108.html%3Fid%3DDTS40007965-1.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+<!--#include virtual="/includes/footer" --><!-- END BOTTOM APPLE NAVIGATION --><!-- START CENTER CLOSE -->
+</center>
+<!-- END CENTER CLOSE -->
+</body>
+</html>

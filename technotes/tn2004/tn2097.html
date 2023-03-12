@@ -1,0 +1,384 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/1999/REC-html401-19991224/loose.dtd">
+<html><head>
+<!-- BEGIN META TAG INFO -->
+<link rel="home" href="http://developer.apple.com/">
+<link rel="find" href="http://developer.apple.com/search/">
+<link rel="stylesheet" type="text/css" href="../../documentation/css/adcstyle.css" title="fonts">
+<script language="JavaScript" type="text/javascript" src="../../documentation/js/busnav.js"></script>
+<script language="JavaScript" src="../../documentation/js/adc.js" type="text/javascript"></script>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<!-- END META TAG INFO -->
+<!-- BEGIN TITLE -->
+<title>Technical Note TN2097: Playing a sound file using the Default Output Audio Unit</title>
+<!-- END TITLE -->
+</head>
+<!-- BEGIN BODY OPEN -->
+<body bgcolor="#ffffff"><a name="//apple_ref/doc/uid/DTS10003287" title="Playing a sound file using the Default Output Audio Unit"></a>
+<!--END BODY OPEN -->
+<!-- START CENTER OPEN -->
+<center>
+<!-- END CENTER OPEN -->
+<a name="top"></a>
+<!-- BEGIN LOGO AND SEARCH -->
+<!--#include virtual="/includes/adcnavbar"-->
+<!-- END LOGO AND SEARCH -->
+<!-- START BREADCRUMB -->
+<div id="breadcrumb"><table width="680" border="0" cellpadding="0" cellspacing="0"><tr>
+<td scope="row"><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+<td><img width="340" height="10" src="images/1dot.gif" alt=""></td></tr><tr valign="middle"><td align="left" colspan="2">
+<a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../technicalnotes/index.html">Technical Notes</a> &gt; <a href="../../technicalnotes/MusicAudio/index.html">Audio</a> &gt; <a href="../../technicalnotes/MusicAudio/idxCoreAudio-date.html">Core Audio</a> &gt; 
+</td></tr><tr><td colspan="2" scope="row"><img width="680" height="35" src="images/1dot.gif" alt=""></td></tr></table></div>
+<!-- END BREADCRUMB -->
+
+<!-- START MAIN CONTENT -->
+<!-- START TITLE GRAPHIC AND INTRO-->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top">
+<td><h1>
+<div id="pagehead">Technical Note TN2097</div>
+<div id="pageheadsub">Playing a sound file using the Default Output Audio Unit</div>
+</h1></td></tr></table>
+<!-- END TITLE GRAPHIC AND INTRO -->
+<!-- BEGIN WIDE COLUMN -->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td align="left" width="680">
+<!-- BEGIN CONTENTS -->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td><p>Playing an audio file through Core Audio gives more flexibility on how audio data can be used.  Core Audio removes several limitations that the Sound Manager imposes on audio in Mac OS X.  Audio can now have higher resolutions and improved performance when processed using Core Audio. The Core Audio APIs provide easy interfaces to the hardware, codecs, and audio data giving a programmer a wide range of opportunities to be creative and produce quality audio.</p><p>This technote gives a walk through of how to play a small audio file without using the Public Utility C++ classes included in the Core Audio SDK.  The purpose of this document is to expose the programmer to some essential Core Audio concepts using the Default Output Audio Unit.  It covers usage of Audio Units, Audio Converters, and some Core Audio data structures used for holding audio data.</p></td></tr><tr><td scope="row"><img width="680" height="10" src="images/1dot.gif" alt=""><br><img height="1" width="680" src="images/1dot_919699.gif" alt=""><br><img width="680" height="20" src="images/1dot.gif" alt=""></td></tr></table><table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td width="680"><ul><li><a href="#PARTONE">Setting up the Default Output AudioUnit</a></li><li><a href="#PARTTWO">Getting information from an Audio File</a></li><li><a href="#NAME">Setting up the Audio Converter</a></li><li><a href="#PART4">Rendering audio data</a></li><li><a href="#CONCLUSION">Conclusion</a></li><li><a href="#TNTAG1">References</a></li><li><a href="#TNT_HISTORY_TAG">Document Revision History</a></li></ul></td></tr><tr><td colspan="3" scope="row"><img width="680" height="10" src="images/1dot.gif" alt=""><br><img height="1" width="680" src="images/1dot_919699.gif" alt=""><br><img width="680" height="20" src="images/1dot.gif" alt=""></td></tr></table><p>Playing a sound file through Core Audio requires learning a few basic concepts.  One of the most important concepts to understand is the role of an AudioUnit within Core Audio.</p><p>AudioUnits are a single processing unit that either is a source of audio data (for example, a software synthesizer), a destination of audio data (for example an AudioUnit that wraps an audio device), or both a source and destination, for example a DSP unit, such as a reverb, that takes audio data and processes or transforms this data. For more information on Audio units please refer to <A HREF="../../audio/pdf/coreaudio.pdf">Audio and MIDI on Mac OS X </A>.</p><p>This example will use an AudioUnit and an AudioConverter to convert audio data from a file format so it can be played and managed by Core Audio.</p><A NAME="PARTONE"></A><H2>Setting up the Default Output AudioUnit</H2><p>AudioUnits are used for a variety of purposes; to generate, process, receive, or otherwise manipulate streams of audio. They can either be a source of data (for example, a software synthesizer), a destination of audio data (for example an AudioUnit serves as an interface to a Audio Device) or both. They are building blocks that may be used singly or connected together to form an audio signal graph. An AudioUnit is also a component, which is a piece of code that provides a defined set of services to one or more clients. A predefined AudioUnit in the AudioUnit framework is the Default Output AudioUnit, which is an interface to the device selected by the user in the sound preference panel.  This AudioUnit can easily be constructed by using a <code>ComponentDescription</code>.</p><p class="smalltext"><strong>Listing 1:</strong> Constructing a DefaultOutputAudioUnit</p><pre class="sourcecodebox">
+    //An AudioUnit is an OS component.
+    //A component description must be setup, then used to
+    //initialize an AudioUnit
+
+    ComponentDescription desc;
+    Component comp;
+
+    //There are several Different types of AudioUnits.
+    //Some audio units serve as Outputs, Mixers, or DSP
+    //units. See AUComponent.h for listing
+
+    desc.componentType = kAudioUnitType_Output;
+
+    //Every Component has a subType, which will give a clearer picture
+    //of what this components function will be.
+
+    desc.componentSubType = kAudioUnitSubType_DefaultOutput;
+
+    //All AudioUnits in AUComponent.h must use
+    //&quot;kAudioUnitManufacturer_Apple&quot; as the Manufacturer
+
+    desc.componentManufacturer = kAudioUnitManufacturer_Apple;
+    desc.componentFlags = 0;
+    desc.componentFlagsMask = 0;
+
+    //Finds a component that meets the desc spec's
+    comp = FindNextComponent(NULL, &amp;desc);
+    if (comp == NULL) exit (-1);
+
+    //gains access to the services provided by the component
+    err = OpenAComponent(comp, theOutputUnit);
+
+
+
+
+</pre><p>Because AudioUnits are used for a variety of audio processing on audio streams, they have many internal properties. The properties of an AudioUnit can easily be modified by using the <code>AudioUnitGetProperty</code> and <code>AudioUnitSetProperty</code> calls.  <code>AudioUnitGetPropertyInfo</code> can be used to determine the size of a property and whether or not the property can be modified.  <code>AudioUnitGetPropertyInfo</code> may be used prior to <code>AudioUnitGetProperty</code> and <code>AudioUnitSetProperty</code> calls to avoid error.</p><p>One of the most important properties of an AudioUnit is its stream format.  Stream formats describe the nature of a stream of audio data.  They provide formatting information on a stream of data like sample rates, data packet information and encoding types.</p><p>Stream formats are stored in structures called AudioStreamBasicDescriptions (ASBD) that are used widely throughout Core Audio. Because AudioUnits can be viewed as having two ends, an input and output, the stream format of the input and output should be set before using the AudioUnit.  To obtain the current output stream format selected by a user, a call to <code>AudioUnitGetProperty()</code> with the parameters <code>kAudioUnitScope_Output</code> and <code>kAudioUnitProperty_StreamFormat</code> will return the current ASBD.</p><p class="smalltext"><strong>Listing 2:</strong> Using AudioUnit Get and Set routines</p><pre class="sourcecodebox">
+ //AudioUnit *theUnit - points to the current AudioUnit
+ //AudioStreamBasicDescription *theDesc  - current ASBD for user output
+
+/***Getting the size of a Property***/
+UInt32 size;
+
+
+//Gets the size of the Stream Format Property and if it is writable
+OSStatus result = AudioUnitGetPropertyInfo(*theUnit,
+                            kAudioUnitProperty_StreamFormat,
+                            kAudioUnitScope_Output,
+                            0,
+                            &amp;size,
+                            &amp;outWritable);
+
+//Get the current stream format of the output
+result = AudioUnitGetProperty (*theUnit,
+                            kAudioUnitProperty_StreamFormat,
+                            kAudioUnitScope_Output,
+                            0,
+                            theDesc,
+                            &amp;size);
+
+//Set the stream format of the output to match the input
+result = AudioUnitSetProperty (*theUnit,
+                            kAudioUnitProperty_StreamFormat,
+                            kAudioUnitScope_Input,
+                            theInputBus,
+                            theDesc,
+                            size);
+</pre><p>Initialize the AudioUnit with <code>AudioUnitInitialize</code>  after the stream format property has been established.  Initialization of an AudioUnit can be an expensive operation, as it can involve the acquisition of assets (e.g. a sound bank for a MusicDevice), allocation of memory buffers required for the processing involved within the unit, and so forth. Once a unit is initialized it is basically in a state in which it can be largely expected to do work.</p><p>We must also specify where this AudioUnit will obtain its input data from by setting up its render callback.  This can be done by setting the <code>kAudioUnitProperty_SetRenderCallback</code> property with a <code>AURenderCallbackStruct</code>.</p><p class="smalltext"><strong>Listing 3:</strong> Setting the Rendering Callback for a AudioUnit</p><pre class="sourcecodebox">
+OSStatus SetupCallbacks(AudioUnit *theOutputUnit,
+                                    AURenderCallbackStruct *renderCallback)
+{
+    OSStatus err= noErr;
+    memset(renderCallback, 0, sizeof(AURenderCallbackStruct));
+
+
+    //inputProc takes a name of a method that will be used as the
+    //input procedure when rendering data to the AudioUnit.
+    //The input procedure will be called only when the Audio Converter needs
+    //more data to process.
+
+
+    //Set &quot;fileRenderProc&quot; as the name of the input proc
+    renderCallback-&gt;inputProc = MyFileRenderProc;
+    //Can pass ref Con with callback, but this isnt needed in out example
+    renderCallback-&gt;inputProcRefCon =0;
+
+    //Sets the callback for the AudioUnit to the renderCallback
+
+    err = AudioUnitSetProperty (*theOutputUnit,
+                                kAudioUnitProperty_SetRenderCallback,
+                                kAudioUnitScope_Input,
+                                0,
+                                renderCallback,
+                                sizeof(AURenderCallbackStruct));
+    //Note: Some old V1 examples may use
+    //&quot;kAudioUnitProperty_SetInputCallback&quot; which existed in
+    //the old API, instead of &quot;kAudioUnitProperty_SetRenderCallback&quot;.
+    //&quot;kAudioUnitProperty_SetRenderCallback&quot; should
+    //be used from now on.
+
+
+    return err;
+}
+
+</pre><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="PARTTWO"></A><H2>Getting information from an Audio File</H2><p>The AudioFile API provides an interface for creating, opening, modifying and saving audio files. After a sound file is opened, information can be obtained regarding format and size of the file.  Before playing an <code>AudioFile</code>, a good idea is to obtain the total packet count, the file byte count, and the maximum packet size to use later for grabbing data from the audio file.</p><p class="smalltext"><strong>Listing 4:</strong> Getting information from an audio file</p><pre class="sourcecodebox">
+UInt64 gTotalPacketCount=0;
+UInt64 gFileByteCount =0;
+UInt32 gMaxPacketSize =0;
+
+...
+
+OSStatus GetFileInfo(FSRef *fileRef,
+                               AudioFileID *fileID,
+                               AudioStreamBasicDescription *fileASBD,
+                               const char *fileName)
+{
+    OSStatus err= noErr;
+    UInt32 size;
+
+
+    //Obtain filesystem reference to the file using the file path
+    FSPathMakeRef ((const UInt8 *)fileName, fileRef, 0);
+   //Open an AudioFile and obtain AudioFileID using the file system ref
+    err = AudioFileOpen(fileRef, fsRdPerm,0,fileID);
+
+    size = sizeof(AudioStreamBasicDescription);
+    memset(fileASBD, 0, size);
+
+    //Fetch the AudioStreamBasicDescription of the audio file.   we can
+    //skip calling AudioFileGetPropertyInfo because we already know the
+    //size of a ASBD
+    err = AudioFileGetProperty(*fileID,
+                                               kAudioFilePropertyDataFormat,
+                                               &amp;size,
+                                               fileASBD);
+    if(err)
+      return err;
+
+
+    //We need to get the total packet count, byte count, and max packet size
+    //Theses values will be used later when grabbing data from the
+    //audio file in the input callback procedure.
+    size = sizeof(gTotalPacketCount); //type is UInt64
+    err = AudioFileGetProperty(*fileID,
+                           kAudioFilePropertyAudioDataPacketCount,
+                                              &amp;size,
+                                              &amp;gTotalPacketCount);
+    if(err)
+      return err;
+
+    size = sizeof(gFileByteCount); //type is UInt64
+    err = AudioFileGetProperty(*fileID,
+                                   kAudioFilePropertyAudioDataByteCount,
+                                              &amp;size,
+                                              &amp;gFileByteCount);
+   if(err)
+      return err;
+
+    size = sizeof(gMaxPacketSize); //type is UInt32
+    err = AudioFileGetProperty(*fileID,
+                                      kAudioFilePropertyMaximumPacketSize,
+                                      &amp;size,
+                                      &amp;gMaxPacketSize);
+   if(err)
+      return err;
+
+    return err;
+}
+</pre><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="NAME"></A><H2>Setting up the Audio Converter</H2><p>Audio Converters should be used when decoding or encoding audio data. AudioConverters can handle  changing sample rates and integer &lt;=&gt; float conversions. A very common use of the <code>AudioConverter </code>is to converting audio data obtained from a sound file to PCM data so it can be played.  The Audio Converter provides an easy way of decoding data from one format to another. An <code>AudioConverter </code>requires an audio codec, the source stream format and the destination stream format for creation.</p><p class="smalltext"><strong>Listing 5:</strong> Creating a new Audio Converter instance</p><pre class="sourcecodebox">
+
+AudioStreamBasicDescription *source_AudioStreamBasicDescription;
+AudioStreamBasicDescription *destination_AudioStreamBasicDescription;
+AudioConverterRef *converter;
+
+...
+
+AudioConverterNew(source_AudioStreamBasicDescription,
+                               destination_AudioStreamBasicDescription ,
+                               converter);
+</pre><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="PART4"></A><H2>Rendering audio data</H2><p>Use <code>AudioFileReadPackets</code> to read data from an audio file. In our example, we are reading audio data from a very small audio file; therefore, we can this directly into memory before converting the data. When larger files are being read it wouldn't be sensible to read an entire file into memory, the data must be threaded into the <code>AudioConverter</code> when it needs more data. In general, reading and processing audio data must be done in separate threads. The AudioFilePlayer in the Public Utility C++ classes included in the Core Audio SDK defers reading the audio data to another thread (See Sample Code: PlayAudioFile). Reading from an audio file in the I/O thread can block, therefore must be implemented in another thread.</p><p class="smalltext"><strong>Listing 6:</strong> Reading from an audio file into memory</p><pre class="sourcecodebox">
+//Reads the entire audio file into memory. No Conversions are done here.
+OSStatus ReadFileIntoMem()
+{
+    OSStatus err = noErr;
+
+    //total bytes read from audio file
+    UInt32  bytesReturned = 0;
+
+    //total amount of packets in audio file
+    UInt32 packets =gTotalPacketCount;
+
+    //alloc a buffer of memory to hold the data read from disk.
+    gEntireFileBuffer = malloc(gFileByteCount);
+    memset(gEntireFileBuffer, 0, gFileByteCount);
+
+    //Read in the ENTIRE file into a memory buffer
+    err = AudioFileReadPackets (*gSourceAudioFileID,
+                                false,
+                                &amp;bytesReturned,
+                                NULL,
+                                0,
+                                &amp;packets,
+                                gEntireFileBuffer);
+
+
+    return err;
+}
+
+
+</pre><p>To actually begin the conversion of data obtained from the Audio File, the AudioUnit must be started by calling <code>AudioOutputUnitStart</code>. The AudioUnit will then &quot;pull&quot; data from wherever its input is set to.  Currently in our example, we have only named the input procedure for the AudioUnit (MyFileRenderProc).  We have not yet created the input procedure for the AudioUnit.    Inside the input proc, we want to obtain converted audio data from the audio file. Calling <code>AudioConverterFillComplexBuffer</code> within the rendering callback will return converted data to the AudioUnit.  Because this rendering callback is demand driven and will call the method you provided every time the AudioUnit needs more data.  The data will be returned in an AudioBufferList, which then can be used for processing. However, <code>AudioConverterFillComplexBuffer</code> does require that another input procedure be written to supply data to the Audio Converter.</p><p class="smalltext"><strong>Listing 7:</strong> Example Render using AudioConverterFillComplexBuffer</p><pre class="sourcecodebox">
+
+OSStatus MyFileRenderProc(void     *inRefCon,
+                        AudioUnitRenderActionFlags  *inActionFlags,
+                        const AudioTimeStamp *inTimeStamp,
+                        UInt32     inBusNumber,
+                        UInt32    inNumFrames,
+                        AudioBufferList     *ioData)
+
+{
+    OSStatus err= noErr;
+    //To obtain a data buffer of converted data from a complex input
+    //source(compressed files, etc.) use AudioConverterFillComplexBuffer.
+    AudioConverterFillComplexBuffer(converter,
+                MyACComplexInputProc ,
+                0 ,
+                &amp;inNumFrames,
+                ioData,
+                0);
+
+    return err;
+}
+/*
+Parameters for AudioConverterFillComplexBuffer()
+
+converter - the converter being used
+
+MyACComplexInputProc() - input procedure to supply data to the Audio
+ Converter.
+
+inNumFrames - The amount of requested data on input.  On output, this
+number is the amount actually received.
+
+ioData - Buffer of the converted data recieved on return
+*/
+</pre><p>This is an example of an input procedure that supplies data to an Audio Converter.  The parameters of this callback are determined by what was included in the <code>AudioConverterFillComplexBuffer()</code> call.  The new data to be returned is the AudioBufferList given in the parameters (ioData in this example).</p><p class="smalltext"><strong>Listing 8:</strong> Example Complex Input Procedure reading from an Audio File</p><pre class="sourcecodebox">
+OSStatus MyACComplexInputProc (AudioConverterRef        inAudioConverter,
+                 UInt32        *ioNumberDataPackets,
+                 AudioBufferList             *ioData,
+                 AudioStreamPacketDescription    **outDataPacketDescription,
+                 void          *inUserData)
+{
+    OSStatus    err = noErr;
+    UInt32  bytesCopied = 0;
+
+    // initialize in case of failure
+    ioData-&gt;mBuffers[0].mData = NULL;
+    ioData-&gt;mBuffers[0].mDataByteSize = 0;
+
+    //if there are not enough packets to satisfy request,
+    //then read what's left
+    if (gPacketOffset + *ioNumberDataPackets &gt; gTotalPacketCount)
+        *ioNumberDataPackets = gTotalPacketCount - gPacketOffset;
+
+    // do nothing if there are no packets available
+    if (*ioNumberDataPackets)
+    {
+        if (gSourceBuffer != NULL) {
+            free(gSourceBuffer);
+            gSourceBuffer = NULL;
+        }
+
+        //the total amount of data requested by the AudioConverter
+        bytesCopied = *ioNumberDataPackets * gMaxPacketSize;
+        //alloc a small buffer for the AudioConverter to use.
+        gSourceBuffer = (void *) calloc (1, bytesCopied);
+
+        //copy the amount of data needed (bytesCopied)
+        //from buffer of audio file
+        memcpy(gSourceBuffer, gEntireFileBuffer + gByteOffset,bytesCopied);
+
+        // keep track of where we want to read from next time
+        gByteOffset +=*ioNumberDataPackets * gMaxPacketSize;
+        gPacketOffset += *ioNumberDataPackets;
+
+        // tell the Audio Converter where it's source data is
+        ioData-&gt;mBuffers[0].mData = gSourceBuffer;
+        // tell the Audio Converter how much data in each buffer
+        ioData-&gt;mBuffers[0].mDataByteSize = bytesCopied;
+    }
+    else
+    {
+        // there aren't any more packets to read.
+        // Set the amount of data read (mDataByteSize) to zero
+        // and return noErr to signal the AudioConverter there are
+        // no packets left.
+
+        ioData-&gt;mBuffers[0].mData = NULL;
+        ioData-&gt;mBuffers[0].mDataByteSize = 0;
+        gIsPlaying=FALSE;
+        err = noErr;
+    }
+
+    return err;
+
+}
+
+</pre><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="CONCLUSION"></A><H2>Conclusion</H2><p>Core Audio will give you more control over audio in Mac OS X.  Audio data processed in Core Audio has greater resolution and performance than the Sound Manager, which enables you to give a better audio experience to customers.</p><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG1"></A><H2>References</H2><ul><li><p><A HREF="../../documentation/MusicAudio/index.html">Audio Documentation</A></p></li><li><p><A HREF="../../audio/pdf/coreaudio.pdf">Audio and MIDI on Mac OS X</A></p></li><li><p><A HREF="http://lists.apple.com/mailman/listinfo/coreaudio-api">CoreAudio Mailing List</A></p></li><li><p><A HREF="../../samplecode/PlayAudioFileLite/index.html">PlayAudioFileLite</A></p></li><li><p>PublicUtility - /Developer/Examples/CoreAudio/PublicUtility/</p></li><li><p>CoreAudio SDK</p></li></ul><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNT_HISTORY_TAG"></A><H2>Document Revision History</H2><table cellspacing="0" class="graybox" width="680"><tr><th width="100">Date</th><th width="580">Notes</th></tr><tr><td scope="row">2006-11-15</td><td>First Version</td></tr></table><p><b>Posted:</b> 2006-11-15</p>
+<!-- END CONTENTS -->
+</td></tr></table>
+<!-- END WIDE COLUMN -->
+<!-- END MAIN CONTENT -->
+	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/technotes/tn2004/tn2097.html%3Fid%3DDTS10003287-1.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/technotes/tn2004/tn2097.html%3Fid%3DDTS10003287-1.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/technotes/tn2004/tn2097.html%3Fid%3DDTS10003287-1.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+
+<!-- START BOTTOM APPLE NAVIGATION -->
+<!--#include virtual="/includes/footer"-->
+<!-- END BOTTOM APPLE NAVIGATION -->
+<!-- START CENTER CLOSE -->
+</center>
+<!-- END CENTER CLOSE -->
+</body></html>

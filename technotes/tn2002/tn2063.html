@@ -1,0 +1,706 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<!-- BEGIN META TAG INFO --><link rel="home" href="http://developer.apple.com/">
+<link rel="find" href="http://developer.apple.com/search/">
+<link rel="stylesheet" type="text/css" href="../../documentation/css/adcstyle.css" title="fonts">
+<script language="JavaScript" type="text/javascript" src="../../documentation/js/busnav.js"></script><script language="JavaScript" src="../../documentation/js/adc.js" type="text/javascript"></script><!-- END META TAG INFO --><!-- BEGIN TITLE --><title>Technical Note TN2063: Understanding and Debugging Kernel Panics</title>
+<!-- END TITLE --><style>
+			.sourcecodebox {
+				white-space: pre-wrap;
+				white-space: -moz-pre-wrap !important;
+				white-space: -pre-wrap;
+				white-space: -o-pre-wrap;
+				word-wrap: break-word;
+			}
+			</style>
+</head>
+<!-- BEGIN BODY OPEN --><body bgcolor="#ffffff"><a name="//apple_ref/doc/uid/DTS10003091" title="Understanding and Debugging Kernel Panics"></a>
+<!-- END BODY OPEN --><!-- START CENTER OPEN --><center>
+<!-- END CENTER OPEN --><a name="top"></a><!-- BEGIN LOGO AND SEARCH --><!--#include virtual="/includes/adcnavbar" --><!-- END LOGO AND SEARCH --><!-- START BREADCRUMB --><div id="breadcrumb"><table width="680" border="0" cellpadding="0" cellspacing="0">
+<tr>
+<td scope="row"><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+<td><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+</tr>
+<tr valign="middle"><td align="left" colspan="2">
+<a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../technicalnotes/index.html">Technical Notes</a> &gt; <a href="../../technicalnotes/Darwin/index.html">Darwin</a> &gt; <a href="../../technicalnotes/Darwin/idxKernel-date.html">Kernel</a> &gt; </td></tr>
+<tr><td colspan="2" scope="row"><img width="680" height="35" src="images/1dot.gif" alt=""></td></tr>
+</table></div>
+<!-- END BREADCRUMB --><!-- START MAIN CONTENT --><!-- START TITLE GRAPHIC AND INTRO --><table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td><h1>
+<div id="pagehead">Technical Note TN2063</div>
+<div id="pageheadsub">Understanding and Debugging Kernel Panics</div>
+</h1></td></tr></table>
+<!-- END TITLE GRAPHIC AND INTRO --><!-- BEGIN WIDE COLUMN --><table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td align="left" width="680">
+<!-- BEGIN CONTENTS --><table width="680" border="0" cellpadding="0" cellspacing="0">
+<tr align="left" valign="top"><td>
+<p>When the kernel crashes on Mac OS X, the system displays a panic message. At this point the system will have to be restarted. But before hitting the power button, how can one find out what caused the crash?</p>
+<p>This technote addresses kernel panics: what they are and how to debug the code that caused the panic.</p>
+<p>The foundation of Mac OS X is an operating system core commonly known as <a href="http://developer.apple.com/darwin/">Darwin</a>. This technote contains links to source files available from the Darwin open source site. Access to these files requires a username and password obtained by agreeing to the <a href="http://www.opensource.apple.com/apsl/">Apple Public Source License</a>.</p>
+</td></tr>
+<tr><td scope="row">
+<img width="680" height="10" src="images/1dot.gif" alt=""><br><img width="680" height="1" src="images/1dot_919699.gif" alt=""><br><img width="680" height="20" src="images/1dot.gif" alt="">
+</td></tr>
+</table>
+<table width="680" border="0" cellpadding="0" cellspacing="0">
+<tr align="left" valign="top"><td width="680"><ul>
+<li><a href="#WHATISPANIC">What is a Kernel Panic?</a></li>
+<li><a href="#HOWPANICLOOKS">What Does a Panic Look Like?</a></li>
+<li><a href="#EXCEPTIONBASICS">Basics of Processor Exception Handling in the Mac OS X Kernel</a></li>
+<ul>
+<li><a href="#TNTAG21">Intel Processor Exception Handling</a></li>
+<li><a href="#TNTAG22">PowerPC Processor Exception Handling</a></li>
+</ul>
+<li><a href="#PANICLOGS">Panic Logs</a></li>
+<ul>
+<li><a href="#TNTAG31">How to Read the Panic Log from an Intel-Based Mac</a></li>
+<li><a href="#TNTAG32">How to Read the Panic Log from a PowerPC-Based Mac</a></li>
+</ul>
+<li><a href="#TNTAG5">Isolating the Crash</a></li>
+<ul>
+<li><a href="#TNTAG51">Deciphering a Panic Log from an Intel-based Mac</a></li>
+<li><a href="#TNTAG52">Deciphering a Panic Log from a PowerPC-based Mac</a></li>
+</ul>
+<li><a href="#SUMMARY">Summary</a></li>
+<li><a href="#REFERENCES">References</a></li>
+<li><a href="#DOWNLOADABLES">Downloadables</a></li>
+<li><a href="#document_revision_summary">Document Revision History</a></li>
+</ul></td></tr>
+<tr><td colspan="3" scope="row">
+<img width="680" height="10" src="images/1dot.gif" alt=""><br><img width="680" height="1" src="images/1dot_919699.gif" alt=""><br><img width="680" height="20" src="images/1dot.gif" alt="">
+</td></tr>
+</table>
+<a name="WHATISPANIC"></a><h2>What is a Kernel Panic?</h2>
+<p>In UNIX, a <a href="#BSDPANIC">panic</a> is an unrecoverable system error detected by the kernel as opposed to similar errors detected by user space code. It is possible for kernel code to indicate such a condition by calling the <code>panic</code> function located in the <code>Kernel.framework</code> header file <code>sys/systm.h</code>. However, most panics are the result of unhandled processor exceptions in kernel code, such as references to invalid memory addresses. These are typically indicative of a bug somewhere in the call chain leading up to the panic.</p>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="HOWPANICLOOKS"></a><h2>What Does a Panic Look Like?</h2>
+<p>A panic is typically indicated by the multi-lingual panic alert shown in <a href="#PANICALERT">Figure 1</a>. After restarting the system, a log file named with the date and time of the panic should be present in <code>/Library/Logs/PanicReporter</code>. (Prior to Mac OS X 10.5 Leopard, this log is <code>/Library/Logs/panic.log</code>.) The panic log contains information about the state of the machine at the time of the panic. Starting with Mac OS X 10.4 Tiger, after restarting the system, the user will be given an opportunity to send this panic log to Apple. To protect a user’s privacy, the only information transmitted to Apple are the panic log, a simple hardware description without identifying IP address, and any user comments.</p>
+<a name="PANICALERT"></a><p class="caption"><strong>Figure 1: </strong>Mac OS X panic alert.</p>
+<p><img src="images/tn2063_panic_alert.jpg" width="468" height="256" alt="Figure 1, Mac OS X panic alert."></p>
+<p>Other behaviors can be specified by setting flags in the <code>debug</code> boot argument passed to the kernel when it starts up. These boot arguments can be set via the <code>boot-args</code> firmware variable using the <a href="x-man-page://8/nvram">nvram</a> command-line tool. A list of flags affecting remote debugging is given in <a href="../../documentation/Darwin/Conceptual/KernelProgramming/build/build.html#//apple_ref/doc/uid/TP30000905-CH221-BABDGEGF" target="_top">Table 19-1</a> of Kernel Programming Guide and <a href="../tn2004/tn2118.html#//apple_ref/doc/uid/DTS10003352">Technical Note TN2118: Kernel Core Dumps</a>.</p>
+<p>The most common use of <code>boot-args</code> is to enable remote (two-machine) kernel debugging. This causes the system to wait for a connection from a remote GDB debugger session after either the panic alert or textual panic dump has been displayed. For more details on remote kernel debugging, please refer to <a href="../../documentation/Darwin/Conceptual/KEXTConcept/KEXTConceptDebugger/hello_debugger.html#//apple_ref/doc/uid/20002367" target="_top">Hello Debugger: Debugging a Device Driver With GDB</a>.</p>
+<div class="notebox"><p><strong>Note: </strong>Prior to Mac OS X 10.5 Leopard, a panic log is not written to disk if remote kernel debugging has been enabled. In this case, you can attach to the panicked machine with GDB and use the <code>paniclog</code> kernel debugging macro to retrieve the log.</p></div>
+<div class="notebox"><p><strong>Note: </strong>The panic alert is not displayed if verbose booting has been enabled, either by setting the <code>-v</code> option in <code>boot-args</code> or by holding down the command and V keys at boot time.</p></div>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="EXCEPTIONBASICS"></a><h2>Basics of Processor Exception Handling in the Mac OS X Kernel</h2>
+<p>An <strong>exception</strong> is a condition encountered by the processor that requires special processing. </p>
+<a name="TNTAG21"></a><h3>Intel Processor Exception Handling</h3>
+<p>On Intel IA-32 and Intel 64 architecture processors, each architecturally-defined exception is assigned a unique identification number called a vector. The processor uses the vector assigned to an exception as an index into the interrupt descriptor table (IDT). The IDT provides the entry point to the exception handler. Some of the processor registers are stored on the stack before control is transferred to the exception handler.</p>
+<p>Exceptions are classified as faults, traps, and aborts depending on the way they are reported and whether the instruction that caused the exception can be restarted without loss of program continuity. </p>
+<p>The most common exceptions are:</p>
+<ul>
+<li><p>Page faults, caused by an attempt to access data at an invalid memory address, such as dereferencing a NULL pointer.</p></li>
+<li><p>Invalid/undefined opcode exceptions, caused by an attempt to execute an instruction with an invalid opcode.</p></li>
+<li><p>General protection faults, caused by any of a number of conditions, including transferring execution to a non-executable code segment or writing to either a code segment or read-only data segment.</p></li>
+</ul>
+<p>Details on exception handling on Intel processors can be found in Chapter 5 "Interrupt and Exception Handling" of the document <a href="http://www.intel.com/products/processor/manuals/index.htm">Intel 64 and IA-32 Architectures Software Developer’s Manual, Volume 3A: System Programming Guide, Part 1</a>.</p>
+<p>The processor registers that are shown in a panic log are: </p>
+<ul>
+<li><p><strong>Control Register 0 (CR0).</strong> Contains flags that control the processor's operating mode and indicate the state of the processor.</p></li>
+<li>
+<a name="CR2"></a><p><strong>Control Register 2 (CR2).</strong> Contains the address that caused a page fault.</p>
+</li>
+<li><p><strong>Control Register 3 (CR3).</strong> Contains the physical address of the base of the page directory.</p></li>
+<li><p><strong>Control Register 4 (CR4).</strong> Contains a group of flags that enable several architectural extensions and indicate operating system support for specific processor capabilities.</p></li>
+<li><p><strong>EAX.</strong> General-purpose register, also used as an accumulator for operands and results data.</p></li>
+<li><p><strong>EBX.</strong> General-purpose register, also used as a pointer to data in the DS segment.</p></li>
+<li><p><strong>ECX.</strong> General-purpose register, also used as a counter for string and loop operations.</p></li>
+<li><p><strong>EDX.</strong> General-purpose register, also used as an I/O pointer.</p></li>
+<li><p><strong>EBP.</strong> General-purpose register mainly used as a pointer to data on the stack (stack frame).</p></li>
+<li><p><strong>ESI.</strong> General-purpose register, used as a pointer to data in the segment pointed to by the DS register and as a source pointer for string operations.</p></li>
+<li><p><strong>EDI.</strong> General-purpose register, used as a pointer to data (or destination) in the segment pointed to by the ES register and as a destination pointer for string operations.</p></li>
+<li><p><strong>EFLAGS.</strong> Program status and control register. Contains status, control, and system flags. Status flags are set as the result of compare and arithmetic operations. This register is displayed in panics as <code>EFL</code>.</p></li>
+<li>
+<a name="EIP"></a><p><strong>Instruction Pointer (EIP).</strong> Contains the address of the next instruction to be executed. Depending on the exception, this may be the address of the instruction which caused the exception or the next instruction in the program flow.</p>
+</li>
+<li><p><strong>CS.</strong> Segment register pointing to the code segment.</p></li>
+<li><p><strong>DS.</strong> Segment register pointing to the data segment.</p></li>
+</ul>
+<p>Details on the Intel 64 and IA-32 register sets can be found in Chapter 3 "Basic Execution Environment" of the document <a href="http://www.intel.com/products/processor/manuals/index.htm">Intel 64 and IA-32 Architectures Software Developer’s Manual, Volume 1: Basic Architecture</a>.</p>
+<p>The Mac OS X kernel follows this execution flow when handling an Intel 64 or IA-32 exception:</p>
+<ol>
+<li>
+<p><code>xnu/osfmk/i386/idt64.s: master_idt</code></p>
+<p>(<code>xnu/osfmk/i386/idt.s: master_idt</code> on Core Duo processors)</p>
+</li>
+<li>
+<p><code>xnu/osfmk/i386/locore.s: lo_alltraps</code></p>
+<p>Each exception handler in the IDT eventually branches to <code>lo_alltraps</code></p>
+</li>
+<li><p><code>xnu/osfmk/i386/locore.s: trap_from_kernel</code></p></li>
+<li><p><code>xnu/osfmk/i386/trap.c: kernel_trap</code></p></li>
+<li><p><code>xnu/osfmk/i386/trap.c: panic_trap</code></p></li>
+<li><p><code>xnu/osfmk/kern/debug.c: panic</code></p></li>
+<li><p><code>xnu/osfmk/i386/AT386/model_dep.c: Debugger</code></p></li>
+<li><p><code>xnu/osfmk/i386/AT386/model_dep.c: panic_i386_backtrace</code></p></li>
+</ol>
+<p>The functions <code>panic_trap</code> and <code>panic_i386_backtrace</code> produce the panic log.</p>
+<div class="notebox"><p><strong>Note: </strong>The symbol <code>panic_trap</code> is visible in the source only. It does not appear in the kernel binary because of tail call optimization done by the compiler when the kernel is built.</p></div>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="TNTAG22"></a><h3>PowerPC Processor Exception Handling</h3>
+<p>The PowerPC microprocessor family handles exceptions by switching to supervisor state, saving the processor state to certain registers, and then jumping to an exception handler routine. Each major type of exception (data memory access, alignment, etc.) has its own exception vector located at an absolute address defined in the PowerPC architecture.</p>
+<p>The most common exceptions are:</p>
+<ul>
+<li><p><strong>DSI</strong> (data storage interrupt, or data memory access) exceptions, caused by an attempt to access data at an invalid memory address, such as dereferencing a NULL pointer.</p></li>
+<li><p><strong>ISI</strong> (instruction storage interrupt) exceptions, caused by an attempt to execute an instruction at an invalid memory address, such as branching to location zero.</p></li>
+<li><p>Illegal instruction exceptions, caused by an attempt to execute an instruction with an invalid opcode.</p></li>
+</ul>
+<p>Details on PowerPC exception handling can be found in Chapter 6 of the document <a href="http://www.ibm.com/chips/techlib/techlib.nsf/productfamilies/PowerPC_7XX_and_6XX_Microprocessors">PowerPC Microprocessor Family: The Programming Environments For 32-Bit Microprocessors</a> (hereafter referred to as <strong>TPE</strong>).</p>
+<p>The processor registers that are shown in a panic log are: </p>
+<ul>
+<li><p><strong>DSISR.</strong> Identifies the cause of DSI and alignment exceptions such as a direct-store error exception, or the operand of an integer double-word load or store instruction is not word-aligned.</p></li>
+<li>
+<a name="DAR"></a><p><strong>Data Access Register (DAR).</strong> Contains the effective address of the memory element which caused a DSI or alignment exception.</p>
+</li>
+<li><p><strong>Machine State Register (MSR).</strong> Defines the state of the processor. Settings include interrupt enable, privilege level, machine check enable, and address translation bits.</p></li>
+<li>
+<a name="PC"></a><p><strong>Machine Status Save/Restore Register 0 (SRR0).</strong> Contains the address used to calculate where instruction processing should continue after the exception is handled. Depending on the exception, this may be the effective address of the instruction which caused the exception or the next instruction in the program flow. This register is displayed in panics as <code>PC</code> (program counter).</p>
+</li>
+<li><p><strong>Machine Status Save/Restore Register 1 (SRR1).</strong> Contains exception-specific information and selected bits from the MSR at the time the exception occurred. This register is displayed in panics as <code>MSR</code>.</p></li>
+<li><p><strong>Link Register (LR).</strong> Contains the address of the instruction following the last subroutine call (<code>bl</code>: branch then link) instruction.</p></li>
+<li><p><strong>General Purpose Register 1 (GPR1).</strong> Used as the stack pointer to store parameters and other temporary data items. This register is displayed in panics as <code>R1</code>.</p></li>
+</ul>
+<p>Details on the PowerPC register set can be found in <a href="http://www.ibm.com/chips/techlib/techlib.nsf/productfamilies/PowerPC_7XX_and_6XX_Microprocessors">TPE</a> Chapter 2.</p>
+<p>The Mac OS X kernel follows this execution flow when handling a PowerPC exception:</p>
+<ol>
+<li>
+<p><code>xnu/osfmk/ppc/lowmem_vectors.s: L_handlerXXXX</code></p>
+<p>(where <code>XXXX</code> is the exception handler vector in the range 100 to 2FFF; only 100-2000 are currently used)</p>
+</li>
+<li><p><code>xnu/osfmk/ppc/lowmem_vectors.s: L_exception_entry</code></p></li>
+<li><p><code>xnu/osfmk/ppc/hw_exception.s: thandler</code></p></li>
+<li><p><code>xnu/osfmk/ppc/trap.c: trap</code></p></li>
+<li><p><code>xnu/osfmk/ppc/trap.c: unresolved_kernel_trap</code></p></li>
+</ol>
+<p>The last function (<code>unresolved_kernel_trap</code>) is where panic information is displayed.</p>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="PANICLOGS"></a><h2>Panic Logs</h2>
+<a name="TNTAG31"></a><h3>How to Read the Panic Log from an Intel-Based Mac</h3>
+<p><a href="#PANICLOG_I386">Listing 1</a> is a typical panic display from an Intel-based Macintosh computer running Mac OS X 10.5.4. Line numbers have been added for ease of reference.</p>
+<a name="PANICLOG_I386"></a><p class="caption"><strong>Listing 1: </strong>Example Intel panic log.</p>
+<pre class="sourcecodebox"><a href="#I386_LINE_1">1</a> panic(cpu 0 caller 0x001A8CD4): Kernel trap at 0x223ab275, type 14=page fault, registers:
+<a href="#I386_LINE_2">2</a> CR0: 0x8001003b, CR2: 0xdeadbeef, CR3: 0x01251000, CR4: 0x00000660
+<a href="#I386_LINE_3">3</a> EAX: 0xdeadbeef, EBX: 0x0049be30, ECX: 0x0050d444, EDX: 0x00534da0
+<a href="#I386_LINE_4">4</a> CR2: 0xdeadbeef, EBP: 0x220dbe48, ESI: 0x06d59600, EDI: 0x02cecd00
+<a href="#I386_LINE_5">5</a> EFL: 0x00010206, EIP: 0x223ab275, CS: 0x00000008, DS: 0x032f0010
+<a href="#I386_LINE_6">6</a> Error code: 0x00000002
+<a href="#I386_LINE_7">7</a> 
+<a href="#I386_LINE_8">8</a> Backtrace, Format - Frame : Return Address (4 potential args on stack) 
+<a href="#I386_LINE_9">9</a> 0x220dbc48 : 0x12b0fa (0x4592a4 0x220dbc7c 0x133243 0x0) 
+<a href="#I386_LINE_10">10</a> 0x220dbc98 : 0x1a8cd4 (0x46280c 0x223ab275 0xe 0x461fbc) 
+<a href="#I386_LINE_11">11</a> 0x220dbd78 : 0x19ede5 (0x220dbd90 0x2cecd00 0x220dbe48 0x223ab275) 
+<a href="#I386_LINE_12">12</a> 0x220dbd88 : 0x223ab275 (0xe 0x48 0x61330010 0x31340010) 
+<a href="#I386_LINE_13">13</a> 0x220dbe48 : 0x410db2 (0x6d59600 0x2cecd00 0x13315e 0x1331fa) 
+<a href="#I386_LINE_14">14</a> 0x220dbea8 : 0x412c47 (0x2cecd00 0x6d59600 0x49be30 0x1) 
+<a href="#I386_LINE_15">15</a> 0x220dbf28 : 0x4124ab (0x2cecd00 0x3312740 0x0 0x3f05c9) 
+<a href="#I386_LINE_16">16</a> 0x220dbf78 : 0x411127 (0x2cecd00 0x8 0x220dbfac 0x1) 
+<a href="#I386_LINE_17">17</a> 0x220dbfc8 : 0x19ebdc (0x30db910 0x0 0x1a20b5 0x3b3e5d0) 
+<a href="#I386_LINE_18">18</a> Backtrace terminated-invalid frame pointer 0
+<a href="#I386_LINE_19">19</a> Kernel loadable modules in backtrace (with dependencies):
+<a href="#I386_LINE_20">20</a> com.apple.dts.driver.PanicDriver(1.1)@0x223aa000-&gt;0x223abfff
+<a href="#I386_LINE_21">21</a>
+<a href="#I386_LINE_22">22</a> BSD process name corresponding to current thread: kernel_task
+<a href="#I386_LINE_23">23</a>
+<a href="#I386_LINE_24">24</a> Mac OS version:
+<a href="#I386_LINE_25">25</a> 9E17
+<a href="#I386_LINE_26">26</a>
+<a href="#I386_LINE_27">27</a> Kernel version:
+<a href="#I386_LINE_28">28</a> Darwin Kernel Version 9.4.0: Mon Jun  9 19:30:53 PDT 2008; root:xnu-1228.5.20~1/RELEASE_I386
+<a href="#I386_LINE_29">29</a> System model name: MacPro1,1 (Mac-F4208DC8)
+<a href="#I386_LINE_30">30</a> ethernet MAC address: 00:17:f2:00:00:00
+<a href="#I386_LINE_31">31</a> ip address: 192.0.2.1
+<a href="#I386_LINE_32">32</a> 
+<a href="#I386_LINE_33">33</a> Waiting for remote debugger connection.</pre>
+<p>For each line of the panic log, the name of the kernel source file and function that displays that line is given, followed by an explanation of the information on that line.</p>
+<a name="I386_LINE_1"></a><p><strong>Line 1: </strong><code>xnu/osfmk/i386/trap.c: panic_trap</code> </p>
+<p><code>panic(</code>: This function calls <code>panic</code> to display its output. </p>
+<p><code>cpu 3</code>: The number of the processor core which called <code>panic</code>. Note that on a multicore system it's possible for one core to be panicked while the others continue to run.</p>
+<p><code>caller 0x001A8CD4):</code>: The address from which <code>panic</code> was called. If the panic is the result of an unhandled processor exception, this address will be inside the <code>panic_trap</code> function.</p>
+<p><code>Kernel trap at 0x223ab275</code>: Textual description of the cause of the panic and the address of the instruction that was executing at the time of the panic.</p>
+<p><code>Type 14=page fault</code>: trap name. This is a textual description of the exception. The trap names are found in the array <code>trap_type</code> in <code>xnu/osfmk/i386/trap.c</code>, which is initialized from the macro <code>TRAP_NAMES</code> found in the corresponding header file <code>xnu/osfmk/i386/trap.h</code>. The processor exception vector <code>trapno</code> (defined in <code>xnu/osfmk/i386/trap.h</code>) is initially pushed onto the stack by the exception handler the IDT points to (see <code>xnu/osfmk/i386/idt64.s</code> and <code>xnu/osfmk/i386/idt.s</code>).</p>
+<p>The <code>14</code> at the beginning is the exception vector in decimal. Using this value one can look up details on the specific exception in <a href="http://www.intel.com/products/processor/manuals/index.htm">Intel 64 and IA-32 Architectures Software Developer’s Manual, Volume 3A: System Programming Guide, Part 1</a> Chapter 5.</p>
+<p>Back to <a href="#PANICLOG_I386">Listing 1</a></p>
+<a name="I386_LINE_2"></a><p><strong>Line 2: </strong><code>xnu/osfmk/i386/trap.c: panic_trap</code></p>
+<p>Contents of registers <code>CR0, CR2, CR3, </code> and <code>CR4</code> at the time the panic log is generated.</p>
+<p>Back to <a href="#PANICLOG_I386">Listing 1</a></p>
+<a name="I386_LINE_3"></a><p><strong>Line 3: </strong><code>xnu/osfmk/i386/trap.c: panic_trap</code></p>
+<p>Contents of registers <code>EAX, EBX, ECX, </code> and <code>EDX</code> from the exception handler. </p>
+<p>Back to <a href="#PANICLOG_I386">Listing 1</a></p>
+<a name="I386_LINE_4"></a><p><strong>Line 4: </strong><code>xnu/osfmk/i386/trap.c: panic_trap</code></p>
+<p>Contents of registers <code>CR2, EBP, ESI, </code> and <code>EDI</code> from the exception handler. </p>
+<p>Back to <a href="#PANICLOG_I386">Listing 1</a></p>
+<a name="I386_LINE_5"></a><p><strong>Line 5: </strong><code>xnu/osfmk/i386/trap.c: panic_trap</code></p>
+<p>Contents of registers <code>EFLAGS, EIP, CS, </code> and <code>DS</code> from the exception handler. </p>
+<p>Back to <a href="#PANICLOG_I386">Listing 1</a></p>
+<a name="I386_LINE_6"></a><p><strong>Line 6: </strong><code>xnu/osfmk/i386/trap.c: panic_trap</code></p>
+<p><code>Error code: 0x00000002</code>: An error code is reported for each exception related to a specific segment. The format of the error code for a page fault (exception vector 14) is different from that for other exceptions. The page fault error code reports if the fault was caused by a not-present page or some other reason and whether the memory access was a read or a write. See <a href="http://www.intel.com/products/processor/manuals/index.htm">Intel 64 and IA-32 Architectures Software Developer’s Manual, Volume 3A: System Programming Guide, Part 1</a> Section 5.3 for details. </p>
+<p>Common error code values for exception vector 14 are <code>0x00000000</code> indicating a read from a non-present page, and <code>0x00000002</code> indicating a write to a non-present page.</p>
+<p>Back to <a href="#PANICLOG_I386">Listing 1</a></p>
+<a name="I386_LINE_7"></a><p><strong>Line 7: </strong><code>xnu/osfmk/kern/debug.c: panic</code></p>
+<a name="I386_LINE_8"></a><p><strong>Line 8: </strong><code>xnu/osfmk/i386/AT386/model_dep.c: panic_i386_backtrace</code></p>
+<p>This is the actual stack backtrace. Each line shows the address of the stack frame, a colon ":", the return address saved in that frame, then four potential arguments in the stack frame enclosed in parentheses.</p>
+<p>The first stack frame is located using the value of the stack pointer (<code>EBP</code>) at the time the backtrace is captured. The next stack frame is located using the value of <code>EBP</code> saved in the stack frame. Up to 16 stack frames will be shown, fewer than that if a zero stack pointer is encountered.</p>
+<p>Details on how the stack is used by Mac OS X can be found in the document <a href="../../documentation/DeveloperTools/Conceptual/LowLevelABI/000-Introduction/introduction.html#//apple_ref/doc/uid/TP40002437" target="_top">Mac OS X ABI Function Call Guide</a>.</p>
+<p>The backtrace is typically the most useful information in a panic log because it can be used to reconstruct the call chain that led to the exception. This is discussed in the next section <a href="#TNTAG5">Isolating the Crash</a>.</p>
+<p>Back to <a href="#PANICLOG_I386">Listing 1</a></p>
+<a name="I386_LINE_9"></a><a name="I386_LINE_10"></a><a name="I386_LINE_11"></a><a name="I386_LINE_12"></a><a name="I386_LINE_13"></a><a name="I386_LINE_14"></a><a name="I386_LINE_15"></a><a name="I386_LINE_16"></a><a name="I386_LINE_17"></a><a name="I386_LINE_18"></a><p><strong>Lines 9 through 18: </strong><code>xnu/osfmk/i386/AT386/model_dep.c: panic_i386_backtrace</code></p>
+<p>Back to <a href="#PANICLOG_I386">Listing 1</a></p>
+<a name="I386_LINE_19"></a><p><strong>Line 19: </strong><code>xnu/osfmk/kern/kmod.c: kmod_dump_to</code></p>
+<p>This looks at the addresses in the backtrace and prints out the module name, version, and the starting and ending addresses of each kernel loadable module in the backtrace. (A kernel loadable module is simply the executable portion of a kernel extension, or KEXT.) It also prints out the same information for the dependencies of each kernel extension. The module name and version is the same as that shown by the <code>kextstat</code> command and is the value of <code>MODULE_NAME</code> and <code>MODULE_VERSION</code> in the Xcode build settings. The dependencies are those specified in the <code>OSBundleLibraries</code> property in the KEXT's <code>Info.plist</code> property list.</p>
+<p>Back to <a href="#PANICLOG_I386">Listing 1</a></p>
+<a name="I386_LINE_20"></a><p><strong>Line 20: </strong><code>xnu/osfmk/kern/kmod.c: kmod_dump_to</code></p>
+<p>Back to <a href="#PANICLOG_I386">Listing 1</a></p>
+<a name="I386_LINE_21"></a><p><strong>Line 21: </strong><code>xnu/osfmk/kern/debug.c: panic_display_process_name</code></p>
+<a name="I386_LINE_22"></a><p><strong>Line 22: </strong><code>xnu/osfmk/kern/debug.c: panic_display_process_name</code></p>
+<p>If the current thread originated from within the kernel, the task name shown is <code>kernel_task</code>.</p>
+<p>Back to <a href="#PANICLOG_I386">Listing 1</a></p>
+<a name="I386_LINE_23"></a><p><strong>Line 23: </strong><code>xnu/osfmk/kern/debug.c: panic_display_system_configuration</code></p>
+<a name="I386_LINE_24"></a><p><strong>Line 24: </strong><code>xnu/osfmk/kern/debug.c: panic_display_system_configuration</code></p>
+<a name="I386_LINE_25"></a><p><strong>Line 25: </strong><code>xnu/osfmk/kern/debug.c: panic_display_system_configuration</code></p>
+<p>The build number is obtained from the kernel global variable <code>osversion</code>.</p>
+<p>Back to <a href="#PANICLOG_I386">Listing 1</a></p>
+<a name="I386_LINE_26"></a><p><strong>Line 26: </strong><code>xnu/osfmk/kern/debug.c: panic_display_system_configuration</code></p>
+<p>Back to <a href="#PANICLOG_I386">Listing 1</a></p>
+<a name="I386_LINE_27"></a><p><strong>Line 27: </strong><code>xnu/osfmk/kern/debug.c: panic_display_system_configuration</code></p>
+<a name="I386_LINE_28"></a><p><strong>Line 28: </strong><code>xnu/osfmk/kern/debug.c: panic_display_system_configuration</code></p>
+<p>This is the value of the kernel global variable <code>version</code>, set at the time the kernel is built. </p>
+<p>The string <code>Mon Jun  9 19:30:53 PDT 2008</code> is the date and time the kernel was built. The string <code>xnu-1228.5.20~1</code> is the source revision used to build this kernel. This information can be used to locate the source for this kernel version in the <a href="http://developer.apple.com/opensource">Darwin open source</a>.</p>
+<p>To see the version of a running kernel, use the <code>sysctl</code> command as illustrated in <a href="#KERNELVERSION">Listing 2</a>.</p>
+<a name="KERNELVERSION"></a><p class="caption"><strong>Listing 2: </strong>Displaying the kernel version.</p>
+<pre class="sourcecodebox">$ sysctl kern.version
+kern.version = Darwin Kernel Version 9.4.0: Mon Jun  9 19:30:53 PDT 2008; root:xnu-1220.5.20~1/RELEASE_I386</pre>
+<p>The steps to build a custom kernel can be found in the chapter <a href="../../documentation/Darwin/Conceptual/KernelProgramming/build/build.html#//apple_ref/doc/uid/TP30000905-CH221" target="_top">Building and Debugging Kernels</a> of the document Kernel Programming Guide.</p>
+<p>Back to <a href="#PANICLOG_I386">Listing 1</a></p>
+<a name="I386_LINE_29"></a><p><strong>Line 29: </strong><code>xnu/osfmk/kern/debug.c: panic_display_model_name</code></p>
+<p>The model name gives a high-level description of the panicked system. The first part <code>MacPro1,1</code> contains the product name and version. The second part is only useful if the panic log is sent to Apple.</p>
+<p>Back to <a href="#PANICLOG_I386">Listing 1</a></p>
+<a name="I386_LINE_30"></a><p><strong>Line 30: </strong><code>xnu/osfmk/kdp/kdp_udp.c: kdp_connection_wait</code></p>
+<p>This is the built-in Ethernet MAC address of the panicked machine. This and the IP address (line <a href="#I386_LINE_31">31</a>) are used to establish a remote debugging session.</p>
+<div class="notebox"><p><strong>Note: </strong>This line is displayed on the screen only; it is not included in panic log files on disk.</p></div>
+<p>Back to <a href="#PANICLOG_I386">Listing 1</a></p>
+<a name="I386_LINE_31"></a><p><strong>Line 31: </strong><code>xnu/osfmk/kdp/kdp_udp.c: kdp_connection_wait</code></p>
+<p>This is the IP address of the panicked machine. This and the Ethernet MAC address (line <a href="#I386_LINE_30">30</a>) are used to establish a remote debugging session.</p>
+<div class="notebox"><p><strong>Note: </strong>This line is displayed on the screen only; it is not included in panic log files on disk.</p></div>
+<p>Back to <a href="#PANICLOG_I386">Listing 1</a></p>
+<a name="I386_LINE_32"></a><p><strong>Line 32: </strong><code>xnu/osfmk/kdp/kdp_udp.c: kdp_connection_wait</code></p>
+<a name="I386_LINE_33"></a><p><strong>Line 33: </strong><code>xnu/osfmk/kdp/kdp_udp.c: kdp_connection_wait</code></p>
+<p>At this point the system is waiting for a connection from a remote debugger.</p>
+<p>Back to <a href="#PANICLOG_I386">Listing 1</a></p>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="TNTAG32"></a><h3>How to Read the Panic Log from a PowerPC-Based Mac</h3>
+<p><a href="#PANICLOG_PPC">Listing 3</a> is a typical panic display from a PowerPC-based Macintosh computer running Mac OS X 10.5.4. Line numbers have been added for ease of reference.</p>
+<a name="PANICLOG_PPC"></a><p class="caption"><strong>Listing 3: </strong>Example PowerPC panic log.</p>
+<pre class="sourcecodebox"><a href="#PPC_LINE_1">1</a> Unresolved kernel trap(cpu 0): 0x300 - Data access DAR=0x00000000DEADBEEF PC=0x000000001918F504
+<a href="#PPC_LINE_2">2</a> Latest crash info for cpu 0:
+<a href="#PPC_LINE_3">3</a> Exception state (sv=0x1a85d500)
+<a href="#PPC_LINE_4">4</a> PC=0x1918F504; MSR=0x00009030; DAR=0xDEADBEEF; DSISR=0x42000000; LR=0x1918F4F0; R1=0x19997C50; XCP=0x0000000C (0x300 - Data access)
+<a href="#PPC_LINE_5">5</a> Backtrace:
+<a href="#PPC_LINE_6">6</a> 0x1918F4F0 0x0034380C 0x00344960 0x00346810 0x00345930 0x000B05D4 
+<a href="#PPC_LINE_7">7</a> Kernel loadable modules in backtrace (with dependencies):
+<a href="#PPC_LINE_8">8</a> com.apple.dts.driver.PanicDriver(1.1)@0x1918e000-&gt;0x1918ffff
+<a href="#PPC_LINE_9">9</a> Proceeding back via exception chain:
+<a href="#PPC_LINE_10">10</a> Exception state (sv=0x1a85d500)
+<a href="#PPC_LINE_11">11</a> previously dumped as "Latest" state. skipping...
+<a href="#PPC_LINE_12">12</a> Exception state (sv=0x19f2ac80)
+<a href="#PPC_LINE_13">13</a> PC=0x00000000; MSR=0x0000D030; DAR=0x00000000; DSISR=0x00000000; LR=0x00000000; R1=0x00000000; XCP=0x00000000 (Unknown)
+<a href="#PPC_LINE_14">14</a>
+<a href="#PPC_LINE_15">15</a> BSD process name corresponding to current thread: kernel_task
+<a href="#PPC_LINE_16">16</a>
+<a href="#PPC_LINE_17">17</a> Mac OS version:
+<a href="#PPC_LINE_18">18</a> 9E17
+<a href="#PPC_LINE_19">19</a>
+<a href="#PPC_LINE_20">20</a> Kernel version:
+<a href="#PPC_LINE_21">21</a> Darwin Kernel Version 9.4.0: Mon Jun  9 19:36:17 PDT 2008; root:xnu-1228.5.20~1/RELEASE_PPC
+<a href="#PPC_LINE_22">22</a> System model name: PowerMac7,2
+<a href="#PPC_LINE_23">23</a> Memory access exception (1,0,0)
+<a href="#PPC_LINE_24">24</a> ethernet MAC address: 00:0a:95:00:00:00
+<a href="#PPC_LINE_25">25</a> ip address: 192.0.2.2
+<a href="#PPC_LINE_26">26</a> 
+<a href="#PPC_LINE_27">27</a> Waiting for remote debugger connection.</pre>
+<p>For each line of the panic log, the name of the kernel source file and function that displays that line is given, followed by an explanation of the information on that line.</p>
+<a name="PPC_LINE_1"></a><p><strong>Line 1: </strong><code>xnu/osfmk/ppc/trap.c: unresolved_kernel_trap</code> </p>
+<p><code>Unresolved kernel trap</code>: Textual description of the cause of the panic.</p>
+<p><code>(cpu 0)</code>: The number of the processor core on which the exception occurred. Note that on a multicore system it's possible for one core to be panicked while the others continue to run.</p>
+<p><code>0x300 - Data access</code>: trap name. This is a textual description of the exception. The trap names are found in the array <code>trap_type</code> in <code>xnu/osfmk/ppc/trap.c</code>. The hardware exception code <code>trapno</code> (defined in <code>xnu/osfmk/ppc/exception.h</code>) is initially set by the exception handler <code>xnu/osfmk/ppc/lowmem_vectors.s: L_handlerXXXX</code> where <code>XXXX</code> is the PowerPC exception vector. The index into the <code>trap_type</code> array is computed by dividing <code>trapno</code> by <code>T_VECTOR_SIZE</code>, defined to be 4 (the size of a function pointer), also in <code>xnu/osfmk/ppc/exception.h</code>.</p>
+<p>The <code>0x300</code> at the beginning is the PowerPC exception vector. Using this value one can look up details on the specific exception in <a href="http://www.ibm.com/chips/techlib/techlib.nsf/productfamilies/PowerPC_7XX_and_6XX_Microprocessors">TPE</a> Chapter 6.</p>
+<p><code>DAR</code>: contents of Data Access Register</p>
+<p><code>PC</code>: contents of register SRR0</p>
+<p>The interpretation of <code>DAR</code> and <code>PC</code> varies depending on the definition of each exception.</p>
+<p>Back to <a href="#PANICLOG_PPC">Listing 3</a></p>
+<a name="PPC_LINE_2"></a><p><strong>Line 2: </strong><code>xnu/osfmk/ppc/model_dep.c: print_backtrace</code></p>
+<p>Back to <a href="#PANICLOG_PPC">Listing 3</a></p>
+<a name="PPC_LINE_3"></a><p><strong>Line 3: </strong><code>xnu/osfmk/ppc/model_dep.c: print_backtrace</code></p>
+<p>PowerPC exception states are stored in data structures of type <code>savearea</code> (see <code>xnu/osfmk/ppc/exception.h</code>). <code>sv</code> is the address of the <code>savearea</code> for the latest exception.</p>
+<p>Back to <a href="#PANICLOG_PPC">Listing 3</a></p>
+<a name="PPC_LINE_4"></a><p><strong>Line 4: </strong><code>xnu/osfmk/ppc/model_dep.c: dump_savearea</code></p>
+<p><code>PC</code>: contents of SRR0</p>
+<p><code>MSR</code>: contents of SRR1</p>
+<p><code>DAR</code>: contents of Data Access Register</p>
+<p><code>DSISR</code>: contents of DSISR</p>
+<p><code>LR</code>: contents of Link Register</p>
+<p><code>R1</code>: contents of GPR1</p>
+<p><code>XCP</code>: This is not a register but is the exception code stored in the <code>savearea</code> corresponding to the current exception. It is followed by the trap name (see line <a href="#PPC_LINE_1">1</a>).</p>
+<p>Back to <a href="#PANICLOG_PPC">Listing 3</a></p>
+<a name="PPC_LINE_5"></a><p><strong>Line 5: </strong><code>xnu/osfmk/ppc/model_dep.c: dump_backtrace</code></p>
+<p>Back to <a href="#PANICLOG_PPC">Listing 3</a></p>
+<a name="PPC_LINE_6"></a><p><strong>Line 6: </strong><code>xnu/osfmk/ppc/model_dep.c: dump_backtrace</code></p>
+<p>This is the actual stack backtrace. The initial stack pointer is the value of GPR1 in the <code>savearea</code>. The value of LR from the linkage area of the stack frame is printed, then the next stack frame is located using the value of GPR1 saved in the stack frame. Up to 32 stack frames will be printed, fewer than that if a zero GPR1 is encountered or if a <code>savearea</code> exists for an earlier exception.</p>
+<p>Details on how the stack is used by Mac OS X can be found in the document <a href="../../documentation/DeveloperTools/Conceptual/LowLevelABI/000-Introduction/introduction.html#//apple_ref/doc/uid/TP40002437" target="_top">Mac OS X ABI Function Call Guide</a>.</p>
+<p>The backtrace is typically the most useful information in a panic dump because it can be used to reconstruct the call chain that led to the exception. This is discussed in the next section <a href="#TNTAG5">Isolating the Crash</a>.</p>
+<p>Back to <a href="#PANICLOG_PPC">Listing 3</a></p>
+<a name="PPC_LINE_7"></a><p><strong>Line 7: </strong><code>xnu/osfmk/kern/kmod.c: kmod_dump_to</code></p>
+<p>This looks at the addresses in the backtrace and prints out the module name, version, and starting and ending addresses of each kernel loadable module in the backtrace. (A kernel loadable module is simply the executable portion of a kernel extension, or KEXT.) It also prints out the same information for the dependencies of each kernel extension. The module name and version is the same as that shown by the <code>kextstat</code> command and is the value of <code>MODULE_NAME</code> and <code>MODULE_VERSION</code> in the Xcode build settings. The dependencies are those specified in the <code>OSBundleLibraries</code> property in the KEXT's <code>Info.plist</code> property list.</p>
+<p>Back to <a href="#PANICLOG_PPC">Listing 3</a></p>
+<a name="PPC_LINE_8"></a><p><strong>Line 8: </strong><code>xnu/osfmk/kern/kmod.c: kmod_dump_to</code></p>
+<a name="PPC_LINE_9"></a><p><strong>Line 9: </strong><code>xnu/osfmk/ppc/model_dep.c: print_backtrace</code></p>
+<p>Each exception state is now dumped. The first one was already shown in lines <a href="#PPC_LINE_3">3</a> through <a href="#PPC_LINE_6">6</a> (note the same value of <code>sv</code> in both locations) so it is skipped.</p>
+<p>Back to <a href="#PANICLOG_PPC">Listing 3</a></p>
+<a name="PPC_LINE_10"></a><p><strong>Line 10: </strong><code>xnu/osfmk/ppc/model_dep.c: print_backtrace</code></p>
+<p>Back to <a href="#PANICLOG_PPC">Listing 3</a></p>
+<a name="PPC_LINE_11"></a><p><strong>Line 11: </strong><code>xnu/osfmk/ppc/model_dep.c: print_backtrace</code></p>
+<p>Back to <a href="#PANICLOG_PPC">Listing 3</a></p>
+<a name="PPC_LINE_12"></a><p><strong>Line 12: </strong><code>xnu/osfmk/ppc/model_dep.c: dump_savearea</code></p>
+<p>Same as line <a href="#PPC_LINE_3">3</a>.</p>
+<p>Back to <a href="#PANICLOG_PPC">Listing 3</a></p>
+<a name="PPC_LINE_13"></a><p><strong>Line 13: </strong><code>xnu/osfmk/ppc/model_dep.c: dump_savearea</code></p>
+<p>Same as line <a href="#PPC_LINE_4">4</a>.</p>
+<p>Back to <a href="#PANICLOG_PPC">Listing 3</a></p>
+<a name="PPC_LINE_14"></a><p><strong>Line 14: </strong><code>xnu/osfmk/kern/debug.c: panic_display_process_name</code></p>
+<a name="PPC_LINE_15"></a><p><strong>Line 15: </strong><code>xnu/osfmk/kern/debug.c: panic_display_process_name</code></p>
+<p>If the current thread originated from within the kernel, the process name shown is <code>kernel_task</code>.</p>
+<p>Back to <a href="#PANICLOG_PPC">Listing 3</a></p>
+<a name="PPC_LINE_16"></a><p><strong>Line 16: </strong><code>xnu/osfmk/kern/debug.c: panic_display_system_configuration</code></p>
+<a name="PPC_LINE_17"></a><p><strong>Line 17: </strong><code>xnu/osfmk/kern/debug.c: panic_display_system_configuration</code></p>
+<a name="PPC_LINE_18"></a><p><strong>Line 18: </strong><code>xnu/osfmk/kern/debug.c: panic_display_system_configuration</code></p>
+<p>The build number is obtained from the kernel global variable <code>osversion</code>.</p>
+<p>Back to <a href="#PANICLOG_PPC">Listing 3</a></p>
+<a name="PPC_LINE_19"></a><p><strong>Line 19: </strong><code>xnu/osfmk/kern/debug.c: panic_display_system_configuration</code> </p>
+<a name="PPC_LINE_20"></a><p><strong>Line 20: </strong><code>xnu/osfmk/kern/debug.c: panic_display_system_configuration</code></p>
+<a name="PPC_LINE_21"></a><p><strong>Line 21: </strong><code>xnu/osfmk/kern/debug.c: panic_display_system_configuration</code></p>
+<p>This is the value of the kernel global variable <code>version</code>, set at the time the kernel is built. </p>
+<p>The string <code>Mon Jun  9 19:36:17 PDT 2008</code> is the date and time the kernel was built. The string <code>xnu-1228.5.20~1</code> is the source revision used to build this kernel. This information can be used to locate the source for this kernel version in the <a href="http://developer.apple.com/opensource">Darwin open source</a>.</p>
+<p>To see the version of a running kernel, use the <code>sysctl</code> command as illustrated in <a href="#KERNELVERSION">Listing 2</a>.</p>
+<p>The steps to build a custom kernel can be found in the chapter <a href="../../documentation/Darwin/Conceptual/KernelProgramming/build/build.html#//apple_ref/doc/uid/TP30000905-CH221" target="_top">Building and Debugging Kernels</a> of the document Kernel Programming Guide.</p>
+<p>Back to <a href="#PANICLOG_PPC">Listing 3</a></p>
+<a name="PPC_LINE_22"></a><p><strong>Line 22: </strong><code>xnu/osfmk/kern/debug.c: panic_display_model_name</code></p>
+<p>The model name includes the product name and version of the panicked system.</p>
+<p>Back to <a href="#PANICLOG_I386">Listing 1</a></p>
+<a name="PPC_LINE_23"></a><p><strong>Line 23: </strong><code>xnu/osfmk/kdp/kdp_udp.c: kdp_raise_exception</code></p>
+<p>This line contains an exception message followed by the exception number, code, and subcode in parentheses.</p>
+<p><code>exception</code>: The array <code>kdp_trap_codes</code> defined in <code>xnu/osfmk/kdp/ml/ppc/kdp_machdep.c</code> is used to convert PowerPC-specific exception codes to the generic Mach exception codes used by KDB (kernel debugger). The Mach codes are defined in <code>mach/exception_type.h</code>, but this isn't generally useful because most unhandled PowerPC exceptions are mapped to <code>EXC_BAD_ACCESS</code> (1).</p>
+<p><code>exception_message</code>: The Mach exception code is used to look up a text message describing the exception. The message table <code>exception_message</code> is defined in <code>xnu/osfmk/kdp/kdp_udp.c</code>.</p>
+<p><code>code</code> and <code>subcode</code> are not used and are always zero.</p>
+<div class="notebox"><p><strong>Note: </strong>This line is displayed on the screen only; it is not included in panic log files on disk.</p></div>
+<p>Back to <a href="#PANICLOG_PPC">Listing 3</a></p>
+<a name="PPC_LINE_24"></a><p><strong>Line 24: </strong><code>xnu/osfmk/kdp/kdp_udp.c: kdp_connection_wait</code></p>
+<p>This is the built-in Ethernet MAC address of the panicked machine. This and the IP address (line <a href="#PPC_LINE_25">25</a>) are used to establish a remote debugging session.</p>
+<div class="notebox"><p><strong>Note: </strong>This line is displayed on the screen only; it is not included in panic log files on disk.</p></div>
+<p>Back to <a href="#PANICLOG_PPC">Listing 3</a></p>
+<a name="PPC_LINE_25"></a><p><strong>Line 25: </strong><code>xnu/osfmk/kdp/kdp_udp.c: kdp_connection_wait</code></p>
+<p>This is the IP address of the panicked machine. This and the Ethernet MAC address (line <a href="#PPC_LINE_24">24</a>) are used to establish a remote debugging session.</p>
+<div class="notebox"><p><strong>Note: </strong>This line is displayed on the screen only; it is not included in panic log files on disk.</p></div>
+<p>Back to <a href="#PANICLOG_PPC">Listing 3</a></p>
+<a name="PPC_LINE_26"></a><p><strong>Line 26: </strong><code>xnu/osfmk/kdp/kdp_udp.c: kdp_connection_wait</code></p>
+<a name="PPC_LINE_27"></a><p><strong>Line 27: </strong><code>xnu/osfmk/kdp/kdp_udp.c: kdp_connection_wait</code></p>
+<p>At this point the system is waiting for a connection from a remote debugger.</p>
+<p>Back to <a href="#PANICLOG_PPC">Listing 3</a></p>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="TNTAG5"></a><h2>Isolating the Crash</h2>
+<p>Assume that one of your customers or testers had your kernel extension installed and experienced a kernel panic. Fortunately they sent you the panic log like the ones shown earlier. How can you go about finding the cause of the crash?</p>
+<p>The first thing to do is to run the same version of the operating system on a computer with the same processor architecture as the panicked machine. Use the OS, kernel, and KEXT version numbers from the panic log to confirm that you're running the correct versions. </p>
+<p>Next, take a quick glance at the kind of crash and in which kernel extension the crash occurred.</p>
+<p>Finally, the backtrace can be used to get a more precise picture of the sequence of calls that led up to the crash. To decipher the backtrace, it's necessary to create relocated symbol files for the kernel and each kernel extension listed in the backtrace. A new set of symbol files must be generated each time a kernel extension is loaded because the load addresses of the KEXT or its dependencies are likely to be different each time.</p>
+<a name="TNTAG51"></a><h3>Deciphering a Panic Log from an Intel-based Mac</h3>
+<p>In our <a href="#PANICLOG_I386">example</a>, a page fault exception occurred with the <a href="#EIP">instruction pointer</a> containing <code>0x223ab275</code>. Looking at the <a href="#I386_LINE_19">list of loaded kernel extensions</a>, the closest match is <code>com.apple.dts.driver.PanicDriver</code> which is located  between addresses <code>0x223aa000</code> and <code>0x223abfff</code>. Then, because this is a page fault, <a href="#CR2">CR2</a> contains the address which could not be accessed, and the <a href="#I386_LINE_6">error code</a> describes the reason for the page fault. In this case, it was an attempt to write to memory at <code>0xdeadbeef</code> that triggered the exception.</p>
+<p>The kernel and kernel extensions on a running Mac OS X system contain just enough symbolic information to resolve dependencies between them. In order to translate all of the return addresses in Mac OS X kernel code, download the <a href="http://developer.apple.com/hardwaredrivers/download/KernelDebugKits.html">Kernel Debug Kit</a> corresponding to the version and build of Mac OS X on the panicked system. Kernel Debug Kits contain symbol-rich versions of the kernel and many I/O Kit families. Mount the Kernel Debug Kit disk image, and you're ready to go.</p>
+<p>Your own kernel extensions will already have full line number and function name information provided they were built using Xcode's Debug build configuration. On Mac OS X 10.5 and later, be sure the <code>Debug Information Format</code> build setting in your Xcode target settings is set to <code>DWARF with dSYM File</code>.</p>
+<p>Generating symbol files is done using the <a href="x-man-page://8/kextload">kextload</a> command as illustrated in <a href="#KEXTLOAD_I386">Listing 4</a>. The <code>-s</code> option specifies the directory where to write the symbol files. The <code>-n</code> option causes <code>kextload</code> to prompt for the load address of each kernel extension and its dependencies.</p>
+<p>Alternatively, you can use the <code>createsymbolfiles</code> script included as part of each Kernel Debug Kit to simplify symbol file generation as shown in <a href="#CREATESYMBOLFILES_I386">Listing 5</a>.</p>
+<div class="notebox"><p><strong>Note: </strong>While it's possible to perform cross-architecture remote kernel debugging, symbol files can only be generated on a system with the same architecture as the panicked system.</p></div>
+<a name="KEXTLOAD_I386"></a><p class="caption"><strong>Listing 4: </strong>Generating the symbol file using kextload.</p>
+<pre class="sourcecodebox">localhost:~ me$ kextload -c -e -k /Volumes/KernelDebugKit/mach_kernel -n -z -r /Volumes/KernelDebugKit/ -s /tmp PanicDriver/build/Debug/PanicDriver.kext/
+kextload: notice: extension PanicDriver/build/PanicDriver.kext/ has debug properties set
+enter the hexadecimal load addresses for these modules:
+com.apple.dts.driver.PanicDriver: 0x223aa000</pre>
+<a name="CREATESYMBOLFILES_I386"></a><p class="caption"><strong>Listing 5: </strong>Generating the symbol file using createsymbolfiles.</p>
+<pre class="sourcecodebox">localhost:~ me$ /Volumes/KernelDebugKit/createsymbolfiles -s /tmp PanicDriver/build/Debug/PanicDriver.kext
+kextload: notice: extension PanicDriver/build/PanicDriver.kext/ has debug properties set
+enter the hexadecimal load addresses for these modules:
+com.apple.dts.driver.PanicDriver: 0x223aa000</pre>
+<p>This results in a separate symbol file for each module in <code>/tmp</code>, named <code>&lt;module-name&gt;.sym</code>.</p>
+<p>Next, start GDB and load the symbol files using the <code>add-kext</code> command as demonstrated in <a href="#ADDKEXT_I386">Listing 6</a>. The <code>set kext-symbol-file-path</code> command tells GDB where to look for <code>.sym</code> symbol files. By default, GDB will look for symbol files in the same directory as the KEXT being loaded by <code>add-kext</code>.</p>
+<a name="ADDKEXT_I386"></a><p class="caption"><strong>Listing 6: </strong>Loading the symbol file into GDB.</p>
+<pre class="sourcecodebox">localhost:~ me$ gdb /Volumes/KernelDebugKit/mach_kernel
+GNU gdb 6.3.50-20050815 (Apple version gdb-960) (Sun May 10 10:38:33 UTC 2008)
+Copyright 2004 Free Software Foundation, Inc.
+GDB is free software, covered by the GNU General Public License, and you are
+welcome to change it and/or distribute copies of it under certain conditions.
+Type "show copying" to see the conditions.
+There is absolutely no warranty for GDB. Type "show warranty" for details.
+This GDB was configured as "i386-apple-darwin"...
+(gdb) set kext-symbol-file-path /tmp
+(gdb) add-kext PanicDriver/build/Debug/PanicDriver.kext
+add symbol table from file "/tmp/com.apple.dts.driver.PanicDriver.sym" (y or n) y
+Reading symbols from /private/tmp/com.apple.dts.driver.PanicDriver.sym...Reading symbols from PanicDriver/build/Debug/PanicDriver.kext.dSYM/
+  Contents/Resources/DWARF/PanicDriver...done.
+done.
+(gdb)</pre>
+<p>Repeat the <code>add-kext</code> command for each of your KEXT's dependencies as shown in the <a href="#I386_LINE_19">panic log</a>.</p>
+<p>If your project is configured to produce <code>stabs</code> debugging information instead of <code>DWARF</code>, use the <code>add-symbol-file</code> command instead as shown in <a href="#ADDSYMBOLFILE_I386">Listing 7</a>. <code>stabs</code> debugging information was the default on systems older than Mac OS X 10.5 Leopard.</p>
+<a name="ADDSYMBOLFILE_I386"></a><p class="caption"><strong>Listing 7: </strong>Loading the symbol file into GDB when using stabs debugging information.</p>
+<pre class="sourcecodebox">localhost:~ me$ gdb /Volumes/KernelDebugKit/mach_kernel
+GNU gdb 6.3.50-20050815 (Apple version gdb-573) (Fri Oct 20 15:50:43 GMT 2006)
+Copyright 2004 Free Software Foundation, Inc.
+GDB is free software, covered by the GNU General Public License, and you are
+welcome to change it and/or distribute copies of it under certain conditions.
+Type "show copying" to see the conditions.
+There is absolutely no warranty for GDB. Type "show warranty" for details.
+This GDB was configured as "i386-apple-darwin"...
+(gdb) add-symbol-file /tmp/com.apple.dts.driver.PanicDriver.sym
+add symbol table from file "/tmp/com.apple.dts.driver.PanicDriver.sym" at
+(y or n) y
+Reading symbols from /tmp/com.apple.dts.driver.PanicDriver.sym...done.
+(gdb)</pre>
+<p>In the case of I/O Kit C++ function names, you may find it helpful to unmangle the names to make them more readable. The command <code>set print asm-demangle on</code> is a handy way to do this. This command controls the demangling of C++ and Objective-C names in disassembly listings.</p>
+<p>Display the instruction located at the instruction pointer (<a href="#EIP">EIP</a>) using the "examine memory as instruction" command <code>x/i &lt;address&gt;</code>. Depending on the type of exception, this will either be the instruction that caused the exception or the one immediately following. An example is shown in <a href="#DISASSIP_I386">Listing 8</a>.</p>
+<a name="DISASSIP_I386"></a><p class="caption"><strong>Listing 8: </strong>Disassembling from the instruction pointer.</p>
+<pre class="sourcecodebox">(gdb) set print asm-demangle on
+(gdb) x/i 0x223ab275
+0x223ab275 &lt;com_apple_dts_driver_PanicDriver::start(IOService*)+77&gt;: movl   $0x7fff,(%eax)
+(gdb)</pre>
+<p>Next, for each return address in the backtrace, disassemble the function containing that address using the command <code>disass &lt;address&gt;</code>. <a href="#DECODEBT_I386">Listing 9</a> shows the results of disassembling the backtrace shown in <a href="#PANICLOG_I386">Listing 1</a>.</p>
+<a name="DECODEBT_I386"></a><p class="caption"><strong>Listing 9: </strong>Decoding the backtrace.</p>
+<pre class="sourcecodebox">(gdb) disass 0x12b0fa
+Dump of assembler code for function panic:
+0x0012af54 &lt;panic+0&gt;: push   %ebp
+...
+0x0012b0f5 &lt;panic+417&gt;: call   0x1ae39f &lt;Debugger&gt;
+0x0012b0fa &lt;panic+422&gt;: mov    0x4d5278,%eax
+...
+
+(gdb) disass 0x1a8cd4
+Dump of assembler code for function kernel_trap:
+0x001a872a &lt;kernel_trap+0&gt;: push   %ebp
+...
+0x001a8ccf &lt;kernel_trap+1445&gt;: call   0x12af54 &lt;panic&gt;
+0x001a8cd4 &lt;kernel_trap+1450&gt;: add    $0xcc,%esp
+...
+
+(gdb) disass 0x19ede5
+Dump of assembler code for function trap_from_kernel:
+0x0019edcb &lt;trap_from_kernel+0&gt;: mov    %esp,%eax
+...
+0x0019ede0 &lt;trap_from_kernel+21&gt;: call   0x1a872a &lt;kernel_trap&gt;
+0x0019ede5 &lt;trap_from_kernel+26&gt;: mov    %edi,%esp
+...
+
+(gdb) disass 0x223ab275
+Dump of assembler code for function _ZN32com_apple_dts_driver_PanicDriver5startEP9IOService:
+0x223ab228 &lt;com_apple_dts_driver_PanicDriver::start(IOService*)+0&gt;: push   %ebp
+...
+0x223ab272 &lt;com_apple_dts_driver_PanicDriver::start(IOService*)+74&gt;: mov -0xc(%ebp),%eax
+0x223ab275 &lt;com_apple_dts_driver_PanicDriver::start(IOService*)+77&gt;: movl   $0x7fff,(%eax)
+...
+
+(gdb) disass 0x410db2
+Dump of assembler code for function _ZN9IOService14startCandidateEPS_:
+0x00410d3c &lt;IOService::startCandidate(IOService*)+0&gt;: push   %ebp
+...
+0x00410dac &lt;IOService::startCandidate(IOService*)+112&gt;: call   *0x2cc(%eax)
+0x00410db2 &lt;IOService::startCandidate(IOService*)+118&gt;: xor    %edx,%edx
+...
+
+(gdb) disass 0x412c47
+Dump of assembler code for function _ZN9IOService15probeCandidatesEP12OSOrderedSet:
+0x004125a8 &lt;IOService::probeCandidates(OSOrderedSet*)+0&gt;: push   %ebp
+...
+0x00412c41 &lt;IOService::probeCandidates(OSOrderedSet*)+1689&gt;: call   *0x3c4(%eax)
+0x00412c47 &lt;IOService::probeCandidates(OSOrderedSet*)+1695&gt;: mov    %al,-0x3a(%ebp)
+...
+
+(gdb) disass 0x4124ab
+Dump of assembler code for function _ZN9IOService14doServiceMatchEm:
+0x00412334 &lt;IOService::doServiceMatch(unsigned long)+0&gt;: push   %ebp
+...
+0x004124a5 &lt;IOService::doServiceMatch(unsigned long)+369&gt;: call   *0x3c0(%eax)
+0x004124ab &lt;IOService::doServiceMatch(unsigned long)+375&gt;: mov (%ebx),%eax
+...
+
+(gdb) disass 0x411127
+Dump of assembler code for function _ZN15_IOConfigThread4mainEPS_:
+0x00411016 &lt;_IOConfigThread::main(_IOConfigThread*)+0&gt;: push   %ebp
+...
+0x00411121 &lt;_IOConfigThread::main(_IOConfigThread*)+267&gt;: call   *0x3d4(%edx)
+0x00411127 &lt;_IOConfigThread::main(_IOConfigThread*)+273&gt;: jmp    0x411142 &lt;_IOConfigThread::main(_IOConfigThread*)+300&gt;
+...
+
+(gdb) disass 0x19ebdc
+Dump of assembler code for function call_continuation:
+0x0019ebc0 &lt;call_continuation+0&gt;: mov    0x4(%esp),%eax
+...
+0x0019ebda &lt;call_continuation+26&gt;: call   *%eax
+0x0019ebdc &lt;call_continuation+28&gt;: add    $0x10,%esp
+...
+
+(gdb)</pre>
+<p>Then locate the function containing the instruction pointed to by the instruction pointer. In this example, this is the function <code>com_apple_dts_driver_PanicDriver::start</code> beginning at the address <code>0x223ab228</code>. Since the saved instruction pointer from a page fault  generally points to the instruction that generated the exception, the <code>movl</code> instruction at <code>0x223ab275</code> is the suspect. The instruction attempts to write the value <code>0x7fff</code> to the address pointed to by <code>EAX</code>. The panic log shows <code>EAX</code> contains the invalid pointer value <code>0xdeadbeef</code>, which explains the cause of the page fault exception. This diagnosis is consistent with the earlier result from disassembling the single instruction located at the instruction pointer.</p>
+<p>Also examine the other disassembled functions, looking for the instruction immediately before the address from the backtrace. Note that this instruction should be some form of branch instruction. To understand why, recall that the backtrace is a listing of the return addresses saved prior to executing a function call. If the disassembly shows something other than a branch instruction, this is a clue that you may not have generated your symbol file correctly, or that the operating system or Kernel Debug Kit version does not match the panicked machine. (This guideline does not apply to the leaf function which contains the instruction that generated an exception.) </p>
+<p>Another handy technique is to use the "examine memory as instruction" command to disassemble instructions near the address from the backtrace as in <a href="#EXAMMEM_I386">Listing 10</a>.</p>
+<a name="EXAMMEM_I386"></a><p class="caption"><strong>Listing 10: </strong>Disassembling a block of instructions.</p>
+<pre class="sourcecodebox">(gdb) x/16i 0x19ebdc-32
+0x19ebbc &lt;thread_exception_return+12&gt;: add    %eax,(%eax)
+0x19ebbe &lt;thread_exception_return+14&gt;: add    %dl,0x424448b(%eax)
+0x19ebc4 &lt;call_continuation+4&gt;: mov    0x8(%esp),%edx
+0x19ebc8 &lt;call_continuation+8&gt;: mov    0xc(%esp),%ecx
+...
+0x19ebd9 &lt;call_continuation+25&gt;: push   %edx
+0x19ebda &lt;call_continuation+26&gt;: call   *%eax
+0x19ebdc &lt;call_continuation+28&gt;: add    $0x10,%esp
+0x19ebdf &lt;call_continuation+31&gt;: mov    %gs:0x4,%eax
+...</pre>
+<p>One thing to be aware of when using this technique is that the first few instructions may not be correct because the disassembly is likely to begin in the middle of an instruction.</p>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="TNTAG52"></a><h3>Deciphering a Panic Log from a PowerPC-based Mac</h3>
+<p>In our <a href="#PANICLOG_I386">example</a>, a data access exception occurred with the <a href="#PC">program counter</a> containing <code>0x1918F504</code>. Looking at the <a href="#PPC_LINE_7">list of loaded kernel extensions</a>, the closest match is <code>com.apple.dts.driver.PanicDriver</code> which is located  between addresses <code>0x1918e000</code> and <code>0x1918ffff</code>. Then, because this is a data access exception, <a href="#DAR">DAR</a> contains the address which could not be accessed. In this case, it was an attempt to access memory at <code>0xdeadbeef</code> that triggered the exception.</p>
+<p>The kernel and kernel extensions on a running Mac OS X system contain just enough symbolic information to resolve dependencies between them. In order to translate all of the return addresses in Mac OS X kernel code, download the <a href="http://developer.apple.com/hardwaredrivers/download/KernelDebugKits.html">Kernel Debug Kit</a> corresponding to the version and build of Mac OS X on the panicked system. Kernel Debug Kits contain symbol-rich versions of the kernel and many I/O Kit families. Mount the Kernel Debug Kit disk image, and you're ready to go.</p>
+<p>Your own kernel extensions will already have full line number and function name information provided they were built using Xcode's Debug build configuration. On Mac OS X 10.5 and later, be sure the <code>Debug Information Format</code> build setting in your Xcode target settings is set to <code>DWARF with dSYM File</code>.</p>
+<p>Generating symbol files is done using the <a href="x-man-page://8/kextload">kextload</a> command as illustrated in <a href="#KEXTLOAD_PPC">Listing 11</a>. The <code>-s</code> option specifies the directory where to write the symbol files. The <code>-n</code> option causes <code>kextload</code> to prompt for the load address of each kernel extension and its dependencies.</p>
+<p>Alternatively, you can use the <code>createsymbolfiles</code> script included as part of each Kernel Debug Kit to simplify symbol file generation as shown in <a href="#CREATESYMBOLFILES_PPC">Listing 12</a>.</p>
+<div class="notebox"><p><strong>Note: </strong>While it's possible to perform cross-architecture remote kernel debugging, symbol files can only be generated on a system with the same architecture as the panicked system.</p></div>
+<a name="KEXTLOAD_PPC"></a><p class="caption"><strong>Listing 11: </strong>Generating the symbol file using kextload.</p>
+<pre class="sourcecodebox">localhost:~ me$ kextload -c -e -k /Volumes/KernelDebugKit/mach_kernel -n -z -r /Volumes/KernelDebugKit/ -s /tmp PanicDriver/build/Debug/PanicDriver.kext 
+kextload: notice: extension PanicDriver/build/Debug/PanicDriver.kext has debug properties set
+enter the hexadecimal load addresses for these modules:
+com.apple.dts.driver.PanicDriver: 0x1918e000</pre>
+<a name="CREATESYMBOLFILES_PPC"></a><p class="caption"><strong>Listing 12: </strong>Generating the symbol file using createsymbolfiles.</p>
+<pre class="sourcecodebox">localhost:~ me$ /Volumes/KernelDebugKit/createsymbolfiles -s /tmp PanicDriver/build/Debug/PanicDriver.kext
+kextload: notice: extension PanicDriver/build/PanicDriver.kext/ has debug properties set
+enter the hexadecimal load addresses for these modules:
+com.apple.dts.driver.PanicDriver: 0x1918e000</pre>
+<p>This results in a separate symbol file for each module, named <code>&lt;module-name&gt;.sym</code>.</p>
+<p>Next, start GDB and load the symbol files using the <code>add-kext</code> command as demonstrated in <a href="#ADDKEXT_PPC">Listing 13</a>. The <code>set kext-symbol-file-path</code> command tells GDB where to look for <code>.sym</code> symbol files. By default, GDB will look for symbol files in the same directory as the KEXT being loaded by <code>add-kext</code>.</p>
+<a name="ADDKEXT_PPC"></a><p class="caption"><strong>Listing 13: </strong>Loading the symbol file into GDB.</p>
+<pre class="sourcecodebox">localhost:~ me$ gdb /Volumes/KernelDebugKit/mach_kernel
+GNU gdb 6.3.50-20050815 (Apple version gdb-960) (Sun May 18 18:41:56 UTC 2008)
+Copyright 2004 Free Software Foundation, Inc.
+GDB is free software, covered by the GNU General Public License, and you are
+welcome to change it and/or distribute copies of it under certain conditions.
+Type "show copying" to see the conditions.
+There is absolutely no warranty for GDB. Type "show warranty" for details.
+This GDB was configured as "powerpc-apple-darwin"...
+(gdb) set kext-symbol-file-path /tmp
+(gdb) add-kext PanicDriver/build/Debug/PanicDriver.kext 
+add symbol table from file "/tmp/com.apple.dts.driver.PanicDriver.sym"? (y or n) y
+Reading symbols from /private/tmp/com.apple.dts.driver.PanicDriver.sym...Reading symbols from PanicDriver/build/Debug/PanicDriver.kext.dSYM/
+  Contents/Resources/DWARF/PanicDriver...done.
+done.
+(gdb)</pre>
+<p>Repeat the <code>add-kext</code> command for each of your KEXT's dependencies as shown in the <a href="#PPC_LINE_7">panic log</a>.</p>
+<p>If your project is configured to produce <code>stabs</code> debugging information instead of <code>DWARF</code>, use the <code>add-symbol-file</code> command instead as shown in <a href="#ADDSYMBOLFILE_PPC">Listing 14</a>. <code>stabs</code> debugging information was the default on systems older than Mac OS X 10.5 Leopard.</p>
+<a name="ADDSYMBOLFILE_PPC"></a><p class="caption"><strong>Listing 14: </strong>Loading the symbol file into GDB when using stabs debugging information.</p>
+<pre class="sourcecodebox">localhost:~ me$ gdb /mach_kernel
+GNU gdb 6.3.50-20050815 (Apple version gdb-573) (Fri Oct 20 15:54:33 GMT 2006)
+Copyright 2004 Free Software Foundation, Inc.
+GDB is free software, covered by the GNU General Public License, and you are
+welcome to change it and/or distribute copies of it under certain conditions.
+Type "show copying" to see the conditions.
+There is absolutely no warranty for GDB. Type "show warranty" for details.
+This GDB was configured as "powerpc-apple-darwin"...
+(gdb) add-symbol-file /tmp/com.apple.dts.driver.PanicDriver.sym
+add symbol table from file "/tmp/com.apple.dts.driver.PanicDriver.sym" at
+(y or n) y
+Reading symbols from /tmp/com.apple.dts.driver.PanicDriver.sym...done.
+(gdb)</pre>
+<p>In the case of I/O Kit C++ function names, you may find it helpful to unmangle the names to make them more readable. The command <code>set print asm-demangle on</code> is a handy way to do this. This command controls the demangling of C++ and Objective-C names in disassembly listings.</p>
+<p>Display the instruction located at the program counter (<a href="#PC">PC</a>) using the "examine memory as instruction" command <code>x/i &lt;address&gt;</code>. Depending on the type of exception, this will either be the instruction that caused the exception or the one immediately following. An example is shown in <a href="#DISASSPC">Listing 15</a>.</p>
+<a name="DISASSPC"></a><p class="caption"><strong>Listing 15: </strong>Disassembling from the program counter.</p>
+<pre class="sourcecodebox">(gdb) set print asm-demangle on
+(gdb) x/i 0x1918F504
+0x1918f504 &lt;com_apple_dts_driver_PanicDriver::start(IOService*)+120&gt;: stw     r0,0(r2)
+(gdb)</pre>
+<p>Next, for each return address in the backtrace, display the instruction located immediately prior to that address using the command <code>x/i &lt;address&gt;-4</code>. This will yield the name of the function in which the address is located. Note that each instruction disassembled from the backtrace should be some form of branch instruction. To understand why, recall that the backtrace is a listing of the return addresses saved prior to executing a function call. If the disassembly shows something other than a branch instruction, this is a clue that you may not have generated your symbol file correctly, or that the operating system version is not the same as on the panicked machine.</p>
+<p><a href="#DECODEBT_PPC">Listing 16</a> shows the results of decoding the backtrace shown in <a href="#PANICLOG_PPC">Listing 3</a>.</p>
+<a name="DECODEBT_PPC"></a><p class="caption"><strong>Listing 16: </strong>Decoding the backtrace.</p>
+<pre class="sourcecodebox">(gdb) x/i 0x1918F4F0-4
+0x1918f4ec &lt;com_apple_dts_driver_PanicDriver::start(IOService*)+96&gt;: bl      0x1918f56c &lt;com_apple_dts_driver_PanicDriver::start(IOService*)+224&gt;
+
+(gdb) x/i 0x0034380C-4
+0x343808 &lt;IOService::startCandidate(IOService*)+188&gt;: bctrl
+
+(gdb) x/i 0x00344960-4
+0x34495c &lt;IOService::probeCandidates(OSOrderedSet*)+2228&gt;: bctrl
+
+(gdb) x/i 0x00346810-4
+0x34680c &lt;IOService::doServiceMatch(unsigned long)+524&gt;: bctrl
+
+(gdb) x/i 0x00345930-4
+0x34592c &lt;_IOConfigThread::main(_IOConfigThread*)+352&gt;: bctrl
+
+(gdb) x/i 0x000B05D4-4
+0xb05d0 &lt;Call_continuation+16&gt;: blrl
+
+(gdb)</pre>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="SUMMARY"></a><h2>Summary</h2>
+<p>Using the techniques discussed in this technote, it is possible to perform an effective post-mortem analysis of a kernel panic. While the information in a panic dump may have been cryptic at first, it should now be just another debugging tool available to the Mac OS X developer.</p>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="REFERENCES"></a><h2>References</h2>
+<a name="BSDPANIC"></a><p>The Design and Implementation of the 4.4BSD Operating System, McKusick et al., Addison-Wesley, 1996.</p>
+<p><a href="../../documentation/Darwin/Conceptual/KEXTConcept/KEXTConceptDebugger/hello_debugger.html#//apple_ref/doc/uid/20002367" target="_top">Hello Debugger: Debugging a Device Driver With GDB</a></p>
+<p><a href="http://www.intel.com/products/processor/manuals/index.htm">Intel 64 and IA-32 Architectures Software Developer’s Manual, Volume 1: Basic Architecture</a>, Intel Order Number 253665-027US, revised April 2008.</p>
+<p><a href="http://www.intel.com/products/processor/manuals/index.htm">Intel 64 and IA-32 Architectures Software Developer’s Manual, Volume 3A: System Programming Guide, Part 1</a>, Intel Order Number 253668-027US, revised July 2008.</p>
+<p><a href="http://www.ibm.com/chips/techlib/techlib.nsf/productfamilies/PowerPC_7XX_and_6XX_Microprocessors">PowerPC Microprocessor Family: The Programming Environments For 32-Bit Microprocessors</a>, IBM document G522-0290-01 revised 02/21/2000.</p>
+<p><a href="http://www.freescale.com/files/product/doc/MPCFPE32B.pdf?srch=1">Programming Environments Manual For 32-Bit Implementations of the PowerPC Architecture</a>, Freescale Semiconductor document MPCFPE32B, revision 3, 9/2005.</p>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="DOWNLOADABLES"></a><h2>Downloadables</h2>
+<ul><li><p><a href="downloads/tn2063_PanicDriver.zip">PanicDriver sample code</a> ("tn2063_PanicDriver.zip", 37.1K)
+
+</p></li></ul>
+<a name="document_revision_summary"></a><h2>Document Revision History</h2>
+<table cellspacing="0" class="graybox" width="680">
+<tr>
+<th width="100">Date</th>
+<th width="580">Notes</th>
+</tr>
+<tr>
+<td scope="row">2008-08-14</td>
+<td>Added content for Intel-based Macs and updated for Leopard. </td>
+</tr>
+<tr>
+<td scope="row">2008-08-13</td>
+<td>Added content for Intel-based Macs and updated for Leopard. </td>
+</tr>
+<tr>
+<td scope="row">2002-11-11</td>
+<td>Addresses kernel panics: what they are and how to debug the code that caused the panic.</td>
+</tr>
+</table>
+<p><b>Posted: </b>2008-08-14</p>
+<!-- END CONTENTS -->
+</td></tr></table>
+<!-- END WIDE COLUMN --><!-- END MAIN CONTENT --><!-- START BOTTOM APPLE NAVIGATION -->	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/technotes/tn2002/tn2063.html%3Fid%3DDTS10003091-2.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/technotes/tn2002/tn2063.html%3Fid%3DDTS10003091-2.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/technotes/tn2002/tn2063.html%3Fid%3DDTS10003091-2.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+<!--#include virtual="/includes/footer" --><!-- END BOTTOM APPLE NAVIGATION --><!-- START CENTER CLOSE -->
+</center>
+<!-- END CENTER CLOSE -->
+</body>
+</html>

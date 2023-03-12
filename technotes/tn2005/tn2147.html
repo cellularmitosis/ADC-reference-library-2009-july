@@ -1,0 +1,374 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/1999/REC-html401-19991224/loose.dtd">
+<html><head>
+<!-- BEGIN META TAG INFO -->
+<link rel="home" href="http://developer.apple.com/">
+<link rel="find" href="http://developer.apple.com/search/">
+<link rel="stylesheet" type="text/css" href="../../documentation/css/adcstyle.css" title="fonts">
+<script language="JavaScript" type="text/javascript" src="../../documentation/js/busnav.js"></script>
+<script language="JavaScript" src="../../documentation/js/adc.js" type="text/javascript"></script>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<!-- END META TAG INFO -->
+<!-- BEGIN TITLE -->
+<title>Technical Note TN2147: JNI Development on Mac OS X</title>
+<!-- END TITLE -->
+</head>
+<!-- BEGIN BODY OPEN -->
+<body bgcolor="#ffffff"><a name="//apple_ref/doc/uid/DTS10003827" title="JNI Development on Mac OS X"></a>
+<!--END BODY OPEN -->
+<!-- START CENTER OPEN -->
+<center>
+<!-- END CENTER OPEN -->
+<a name="top"></a>
+<!-- BEGIN LOGO AND SEARCH -->
+<!--#include virtual="/includes/adcnavbar"-->
+<!-- END LOGO AND SEARCH -->
+<!-- START BREADCRUMB -->
+<div id="breadcrumb"><table width="680" border="0" cellpadding="0" cellspacing="0"><tr>
+<td scope="row"><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+<td><img width="340" height="10" src="images/1dot.gif" alt=""></td></tr><tr valign="middle"><td align="left" colspan="2">
+<a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../technicalnotes/index.html">Technical Notes</a> &gt; <a href="../../technicalnotes/Java/index.html">Java</a> &gt; <a href="../../technicalnotes/Java/idxDesignGuidelines-date.html">Design Guidelines</a> &gt; 
+</td></tr><tr><td colspan="2" scope="row"><img width="680" height="35" src="images/1dot.gif" alt=""></td></tr></table></div>
+<!-- END BREADCRUMB -->
+
+<!-- START MAIN CONTENT -->
+<!-- START TITLE GRAPHIC AND INTRO-->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top">
+<td><h1>
+<div id="pagehead">Technical Note TN2147</div>
+<div id="pageheadsub">JNI Development on Mac OS X</div>
+</h1></td></tr></table>
+<!-- END TITLE GRAPHIC AND INTRO -->
+<!-- BEGIN WIDE COLUMN -->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td align="left" width="680">
+<!-- BEGIN CONTENTS -->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td><p>The Java Native Interface (JNI) is the standard mechanism for integrating Java code with code written in any C-derived language (C, C++, Objective-C).  It can be used to access data, incorporate native elements into a Java user interface, even create a Java Virtual Machine (JVM) from within a native application.</p><p>This technote discusses techniques and concerns specific to JNI programming on Mac OS X with explicit examples of what to do (and what not to do).</p><p>You should read this technote if you are already working with the JNI on Mac OS X, or if you are writing an application in Java 1.4 or later which needs to interface with one of the many non-Java frameworks on Mac OS X.  You should also read this technote if you are a Core Foundation or Cocoa developer who needs to leverage Java libraries or APIs from your application.</p></td></tr><tr><td scope="row"><img width="680" height="10" src="images/1dot.gif" alt=""><br><img height="1" width="680" src="images/1dot_919699.gif" alt=""><br><img width="680" height="20" src="images/1dot.gif" alt=""></td></tr></table><table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td width="680"><ul><li><a href="#TNTAG1">Introduction</a></li><li><a href="#TNTAG39">Building JNI Applications in Xcode</a></li><li><a href="#TNTAG7">Data Transfer Between Java and Native Code</a><ul><li><a href="#TNTAG6">Working With Strings</a><ul><li><a href="#TNTAG8">Creating Java Strings From Native Strings</a><li><a href="#TNTAG9">Creating Native Strings From Java Strings</a><li><a href="#TNTAG43">Handling Unicode Supplementary Characters</a></li></ul></li><li><a href="#TNTAG30">Working With Object References</a></li></ul></li><li><a href="#TNTAG2">Java-Native Graphical Interaction</a><ul><li><a href="#TNTAG13">AWT Native Interface</a></li><li><a href="#TNTAG14">CocoaComponent</a><ul><li><a href="#TNTAG18">Messaging CocoaComponent</a><li><a href="#TNTAG21">Receiving Messages From CocoaComponent</a></li></ul></li></ul></li><li><a href="#TNTAG24">Thread-Safe JNI Programming</a><ul><li><a href="#TNTAG25">Calling AppKit From AWT/Swing</a></li><li><a href="#TNTAG26">Calling AWT/Swing From AppKit</a></li><li><a href="#TNTAG38">Calling AppKit or AWT from non-event threads</a></li></ul></li><li><a href="#TNTAG31">Invoking the Java Virtual Machine from Native Code</a><ul><li><a href="#TNTAG32">Creating a JVM from Core Foundation</a></li><li><a href="#TNTAG33">Creating a JVM from Cocoa</a></li><li><a href="#TNTAG40">Staying off the Main Thread</a></li><li><a href="#TNTAG34">Requesting a specific J2SE version</a></li></ul></li><li><a href="#TNTAG5">Further Reading</a></li><li><a href="#TNT_HISTORY_TAG">Document Revision History</a></li></ul></td></tr><tr><td colspan="3" scope="row"><img width="680" height="10" src="images/1dot.gif" alt=""><br><img height="1" width="680" src="images/1dot_919699.gif" alt=""><br><img width="680" height="20" src="images/1dot.gif" alt=""></td></tr></table><A NAME="TNTAG1"></A><H2>Introduction</H2><p>The JNI is a low-level mechanism for communication between Java and C-based code.  The most common use of the technology is accessing system functionality that does not easily match up with cross-platform Java features or APIs.  In the case of Mac OS X, this could mean accessing data from the Mac OS X Address Book, or even displaying Quartz Composer compositions.</p><p>The JNI can also be used to facilitate incremental migration of a C codebase to Java, or vice-versa.  Instead of migrating the entire project at once, conversion can occur across multiple releases, using the JNI to maintain integration between, for example, the new Java code and remaining C code.</p><p>Finally, the JNI provides an invocation interface for creating and communicating with a JVM from a native application.</p><p>This technote discusses the specific details of working with the JNI on Mac OS X.  It begins with simple translation of data and object references, and moves on to the more advanced topic of integrating native Cocoa GUI objects within a Java GUI.  Threading concerns and techniques for addressing and avoiding problems are also discussed.  Finally, it explains how to correctly create a JVM from within a Core Foundation or Cocoa application.</p><p>The information and techniques described in this technote are specific to Java 1.4 and later on Mac OS X.  Basic knowledge of the JNI is assumed.  Developers unfamiliar with the JNI should first read <A HREF="http://java.sun.com/docs/books/jni/">The Java Native Interface: Programmer's Guide and Specification</A>.</p><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG39"></A><H2>Building JNI Applications in Xcode</H2><p>The Xcode IDE can be a very powerful tool for building JNI applications, as both Java and native code can be built and bundled from a single project.  However, this technote focuses mainly on JNI programming.  The numerous samples cited below all include Xcode projects as starting points.  For information on building a JNI project in Xcode from scratch, see <A HREF="../../java/jniuniversal.html">Building a Universal JNI Project With Xcode</A>.</p><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG7"></A><H2>Data Transfer Between Java and Native Code</H2><A NAME="TNTAG6"></A><H3>Working With Strings</H3><p>Accessing or creating Java <code>String</code> objects with the JNI is no different than on any other platform.  As in Java, Core Foundation and Cocoa string objects represent an array of UTF-16 Unicode characters; Unicode is therefore the preferred character type when translating between Java strings and other native string types on Mac OS X.  This is worth mentioning because many of the older JNI tutorials use UTF-8 characters when dealing with Java strings.</p><A NAME="TNTAG8"></A><H4>Creating Java Strings From Native Strings</H4><p>On Mac OS X, the <code>jchar</code> and <code>UniChar</code> types are interchangeable and can be safely casted back and forth, making conversion between Java and native string objects much easier.  Converting a Cocoa string (<code>NSString</code>) to a Java string (<code>jstring</code>) is illustrated in Listing 1.</p><p class="smalltext"><strong>Listing 1:</strong> Creating a Java String from an NSString</p><pre class="sourcecodebox">
+NSString *myNSString = @&quot;This is an NSString&quot;;
+// Note that length returns the number of UTF-16 characters,
+// which is not necessarily the number of printed/composed characters
+jsize buflength = [myNSString length];
+unichar buffer[buflength];
+[myNSString getCharacters:buffer];
+jstring javaStr = (*env)-&gt;NewString(env, (jchar *)buffer, buflength);
+</pre><p>Listing 2 demonstrates creating a <code>jstring</code> from a Core Foundation <code>CFString</code> when programming in C or C++.</p><p class="smalltext"><strong>Listing 2:</strong> Creating a Java String from a CFString</p><pre class="sourcecodebox">
+CFStringRef myCFString = CFSTR(&quot;This is a CFString&quot;);
+CFRange range;
+range.location = 0;
+// Note that CFStringGetLength returns the number of UTF-16 characters,
+// which is not necessarily the number of printed/composed characters
+range.length = CFStringGetLength(myCFString);
+UniChar charBuf[range.length];
+CFStringGetCharacters(myCFString, range, charBuf);
+jstring javaStr = (*env)-&gt;NewString(env, (jchar *)charBuf, (jsize)range.length);
+</pre><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG9"></A><H4>Creating Native Strings From Java Strings</H4><p>Creating native strings (<code>NSString</code>/<code>CFString</code>) from Java strings is equally simple and both techniques are demonstrated in Listings 3 and 4.</p><p class="smalltext"><strong>Listing 3:</strong> Creating an NSString from a Java String</p><pre class="sourcecodebox">
+const jchar *chars = (*env)-&gt;GetStringChars(env, my_jstring, NULL);
+NSString *myNSString = [NSString stringWithCharacters:(UniChar *)chars
+            length:(*env)-&gt;GetStringLength(env, my_jstring)];
+(*env)-&gt;ReleaseStringChars(env, my_jstring, chars);
+</pre><p class="smalltext"><strong>Listing 4:</strong> Creating a CFString from a Java String</p><pre class="sourcecodebox">
+const jchar *chars = (*env)-&gt;GetStringChars(env, my_jstring, NULL);
+CFStringRef myCFString = CFStringCreateWithCharacters (kCFAllocatorDefault,
+      chars, (*env)-&gt;GetStringLength(env, my_jstring));
+(*env)-&gt;ReleaseStringChars(env, my_jstring, chars);
+</pre><div class="notebox"><p><strong>IMPORTANT:</strong> Both of these examples finish with a necessary call to <code>ReleaseStringChars</code>, which notifies the JVM that you no longer require access to the Java string.  <A HREF="http://java.sun.com/docs/books/jni/html/pitfalls.html#29163">Section 10.11 of The Java Native Interface: Programmer's Guide and Specification</A> states: &quot;Forgetting to call the <code>ReleaseStringChars</code> function may cause either the <code>jstring</code> object to be pinned indefinitely, leading to memory fragmentation, or the C copy to be retained indefinitely, a memory leak.&quot;  You can alternately pass Java <code>char</code> or <code>byte</code> arrays through the JNI, eliminating the need to call <code>GetStringChars</code> or <code>ReleaseStringChars</code>.</p></div><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG43"></A><H4>Handling Unicode Supplementary Characters</H4><p>The previous examples demonstrate conversion of full strings between environments. Accessing single characters or substrings has repercussions when dealing with Unicode supplemental characters (from <code>0x10000</code> to <code>0x10FFFF</code>). Mac OS X and Java both treat supplemental characters as surrogate pairs of UTF-16 characters. Accessing UTF-16 characters from an arbitrary index, then, risks extracting only half of a surrogate pair. To ensure you obtain all the data you need, use the following APIs:</p><ul><li><p>Core Foundation (<code>CFString</code>): <A HREF="../../documentation/CoreFoundation/Reference/CFStringRef/Reference/reference.html#//apple_ref/c/func/CFStringGetRangeOfComposedCharactersAtIndex"><code>CFStringGetRangeOfComposedCharactersAtIndex</code></A></p></li><li><p>Cocoa (<code>NSString</code>): <A HREF="../../documentation/Cocoa/Reference/Foundation/ObjC_classic/Classes/NSString.html#//apple_ref/occ/instm/NSString/rangeOfComposedCharacterSequenceAtIndex:"><code>rangeOfComposedCharacterSequenceAtIndex:</code></A></p></li><li><p>Java (<code>String</code>): <A HREF="http://java.sun.com/j2se/1.5.0/docs/api/java/lang/String.html#codePointAt(int)"><code>codePointAt</code></A>, <A HREF="http://java.sun.com/j2se/1.5.0/docs/api/java/lang/String.html#codePointBefore(int)"><code>codePointBefore</code></A>, <A HREF="http://java.sun.com/j2se/1.5.0/docs/api/java/lang/String.html#codePointCount(int,%20int)"><code>codePointCount</code></A></p><div class="notebox"><p><strong>Note:</strong> Supplemental character support is new to J2SE 5.0 (JDK 1.5); previous versions of Java did not contain these APIs.</p></div></li></ul><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG30"></A><H3>Working With Object References</H3><p>The rules for using Java object references in native code, as well as C pointers in Java code, are no different on Mac OS X from other platforms.  However, the key points in sharing object references across the JNI are worth a brief discussion.</p><p>References to nearly every type of Java object are represented in the JNI by the generic <code>jobject</code> type.  The other explicit types are <code>jstring</code> (discussed in the previous section) and <code>jclass</code> (which represents a <code>java.lang.Class</code> reference).  <code>jobject</code> references are typically stored in C structures or C++/Objective-C objects using JNI <strong>global references</strong>.  The techniques and rules for using global references are described in <A HREF="http://java.sun.com/docs/books/jni/html/refs.html">Chapter 5 of The Java Native Interface: Programmer's Guide and Specification</A>.</p><p>JNI functions which return pointers to Java code should have a return type of <code>jlong</code>.  This allows the pointer to be stored in a 64-bit Java <code>long</code> variable that can later be passed back down to JNI functions for any necessary operations.    Casting a <code>jlong</code> to the appropriate pointer type on 32-bit systems correctly preserves the lower 32 bits where the address is stored.</p><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG2"></A><H2>Java-Native Graphical Interaction</H2><p>Aside from simply sharing data, the JNI can also be used to access the user interface resources of the underlying platform. There are a number of mechanisms for integrating Java and Cocoa user interface components using the JNI.  This section discusses those mechanisms, and the important guidelines for using them successfully.  The content and examples below will assume some understanding of Quartz and Cocoa; for familiarity with these technologies see <A HREF="../../referencelibrary/GettingStarted/GS_Cocoa/index.html">Getting Started With Cocoa</A> and <A HREF="../../documentation/GraphicsImaging/Conceptual/drawingwithquartz2d/index.html">Quartz 2D Programming Guide</A>.</p><A NAME="TNTAG13"></A><H3>AWT Native Interface</H3><p>The AWT Native Interface (JAWT) is the oldest and most universal method for drawing into a Java component with native code.  A JAWT-enabled AWT component can use a native library to access Quartz (Core Graphics), Core Image, or any other graphical framework available on Mac OS X.</p><p>For an introduction to the JAWT and how to use it, see <A HREF="http://java.sun.com/j2se/1.5.0/docs/guide/awt/1.3/AWT_Native_Interface.html">The AWT Native Interface</A>.  <A HREF="../../samplecode/JAWTExample/JAWTExample.html">Sample Code Project 'JAWTExample'</A> demonstrates steps and structures specific to Mac OS X.</p><p>In addition to native rendering, the JAWT also allows access to platform-specific resources such as (in the case of Mac OS X) a Java component's <code>NSView</code>-based native peer and parent <code>NSWindow</code>, allowing for some less-conventional but still legitimate uses.  <A HREF="../../samplecode/JSheets/JSheets.html">Sample Code Project 'JSheets'</A> uses the JAWT to display a document modal sheet from a <code>JFrame</code>.</p><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG14"></A><H3>CocoaComponent</H3><p><code><code>CocoaComponent</code></code> is an extendable class which allows you to embed a native Cocoa view inside a Java container.  Once added to a container and shown, a <code><code>CocoaComponent</code></code> object allows the underlying Cocoa view to do all of the drawing and event processing.  This technology can be used, for example, to place a <code>WebView</code> from the Web Kit framework inside a Java frame and instantly turn your Java application into a web browser.</p><p>A <code>CocoaComponent</code> implementation has two parts: a Java class to be instantiated and added to your AWT hierarchy; and an Objective-C <code>NSView</code> subclass which dictates the <code>CocoaComponent</code> object's runtime behavior.  To create your own <code>CocoaComponent</code>, you must:</p><ul><li><p>Extend the <code>com.apple.eawt.<code>CocoaComponent</code></code> class.</p></li><li><p>Implement the <code>createNSView</code> and <code>createNSViewLong</code> methods.  Depending on the system architecture, one of these methods is called around the time your <code>CocoaComponent</code> is added to the component hierarchy and returns a Java <code><code>int</code></code> (or <code>long</code>) representing a pointer to your underlying <code>NSView</code>.  It is recommended that you implement <code>createNSViewLong</code>, which returns the pointer in a 64-bit Java <code>long</code>, and implement <code>createNSView</code> to simply return the result of <code>createNSViewLong</code> cast down to a Java <code><code>int</code></code> (for 32-bit support).</p><p class="smalltext"><strong>Listing 5:</strong> createNSView and createNSViewLong methods</p><pre class="sourcecodebox">
+// Instantiate the NSView on the native side and return it as a long
+public native long createNSViewLong();
+
+// Deprecated; just cast the correct createNSViewLong implementation
+public int createNSView() {
+  return (int)createNSViewLong();
+}
+</pre></li><li><p>Implement your <code>NSView</code> subclass in Objective-C.  This is where you decide exactly what your <code>CocoaComponent</code> will be and do: it could be a <code>WebView</code>, an <code>ABPeoplePickerView</code> from the Address Book framework, or any other <code>NSView</code>-based object.</p></li><li><p>Provide a native implementation of <code>createNSViewLong</code>.  This is where you instantiate your <code>NSView</code> and return its pointer to Java as a <code>jlong</code>.  There is no need to retain the view &mdash; it is retained by the AWT implementation when the <code>CocoaComponent</code> object is added to the container hierarchy.</p><p class="smalltext"><strong>Listing 6:</strong> Native implementation of createNSViewLong</p><pre class="sourcecodebox">
+JNIEXPORT jlong JNICALL Java_com_mycompany_MyCocoaComponent_createNSViewLong (JNIEnv *env, jobject caller) {
+  MyCCView *newView = [[[MyCCView alloc] init] autorelease];
+  return (jlong)newView;
+}
+</pre></li></ul><p>This is all that is required to create a trivial <code>CocoaComponent</code> and have it show up in a Java container.  However, you may also need to communicate back and forth between your Cocoa view and its Java peer.</p><A NAME="TNTAG18"></A><H4>Messaging CocoaComponent</H4><p><code>CocoaComponent</code> provides a <code>sendMessage</code> convenience method for Java-to-Cocoa communication.  This allows you to pass in an opcode (defined by you) and a single parameter object for your underlying cocoa view to use and interpret in its own <code>awtMessage:message:env</code> method.  <A HREF="../../samplecode/QCCocoaComponent/QCCocoaComponent.html">Sample Code Project QCCocoaComponent</A> uses <code>sendMessage</code> to load and play Quartz Composer compositions inside a Java frame.  Listing 7 shows a controller class making calls on methods defined by the sample project's <code>JavaQCView</code> class.</p><p class="smalltext"><strong>Listing 7:</strong> Example use of CocoaComponent.sendMessage</p><pre class="sourcecodebox">
+public void actionPerformed(ActionEvent e) {
+  if (e.getSource() == loadButton) {
+    view.loadComposition (&quot;Particle System.qtz&quot;);
+  } else {
+    view.startRendering();
+  }
+}
+</pre><p>The above <code>loadComposition</code> and <code>startRendering</code> methods use the <code>sendMessage</code> API to communicate with the underlying Quartz Composer view.</p><p class="smalltext"><strong>Listing 8:</strong> Abstracting sendMessage for specific use</p><pre class="sourcecodebox">
+final static int LOAD_MESSAGE = 0;
+final static int START_MESSAGE = 1;
+
+public void loadComposition(String fullPath) {
+  sendMessage(LOAD_MESSAGE, fullPath);
+}
+
+public void startRendering() {
+  sendMessage(START_MESSAGE, null);
+}
+</pre><p>Finally, the <code>QCView</code> subclass implements <code>awtMessage:message:env</code> to respond to calls from the <code>CocoaComponent</code> object.</p><p class="smalltext"><strong>Listing 9:</strong> Implementation of awtMessage:message:env: responds to Java sendMessage calls</p><pre class="sourcecodebox">
+- (void) awtMessage:(jint)messageID message:(jobject)message env:(JNIEnv *)env {
+  jchar *chars;
+  switch (messageID) {
+    case apple_dts_samplecode_qccocoacomponent_JavaQCView_LOAD_MESSAGE:
+      // CocoaComponent.sendMessage takes an Object; we need a String here
+      if ((*env)-&gt;IsInstanceOf(env, message, (*env)-&gt;FindClass(env, &quot;java/lang/String&quot;))) {
+        chars = (*env)-&gt;GetStringChars(env, (jstring)message, NULL);
+        NSString *cocoaPath = [NSString stringWithCharacters:(unichar *)chars
+          length:(*env)-&gt;GetStringLength(env, message)];
+        [self loadCompositionFromFile:cocoaPath];
+        (*env)-&gt;ReleaseStringChars(env, message, chars);
+      } else {
+        jclass argExcClass = (*env)-&gt;FindClass(env, &quot;java/lang/IllegalArgumentException&quot;);
+        (*env)-&gt;ThrowNew(env, argExcClass,
+          &quot;JavaQCView: sendMessage with an ID of LOAD_MESSAGE must be accompanied by a String&quot;);
+      }
+      break;
+    case apple_dts_samplecode_qccocoacomponent_JavaQCView_START_MESSAGE:
+      [self startRendering];
+      break;
+    default:
+      break;
+  }
+}
+</pre><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG21"></A><H4>Receiving Messages From CocoaComponent</H4><p>Calling back into Java is a little more complicated, although it still involves completely standard JNI practices.  Simply displaying a Java dialog to alert the user, for example, does not require a specific point of entry.  However, it may be necessary for your Cocoa view to talk directly to its Java peer (the <code>CocoaComponent</code> object).  This can be facilitated by using JNI global references as you would on other platforms.  By creating and holding a global reference to the Java object, you can make calls on it whenever necessary.  An opportune time to create your global reference is inside the native implementation of <code>createNSViewLong</code>, as that function receives a reference to the <code>jobject</code> representing your <code>CocoaComponent</code>.  Listing 10 shows how <A HREF="../../samplecode/CWCocoaComponent/CWCocoaComponent.html">Sample Code Project 'CWCocoaComponent'</A> does this.</p><p class="smalltext"><strong>Listing 10:</strong> Saving a global reference to a CocoaComponent</p><pre class="sourcecodebox">
+JNIEXPORT jlong JNICALL Java_apple_dts_samplecode_cwcocoacomponent_JavaColorWell_createNSViewLong
+    (JNIEnv *env, jobject caller) {
+  return (jlong)[JavaColorWell colorWellWithCaller:caller env:env];
+}
+
+@implementation JavaColorWell
+
++ (id) colorWellWithCaller:(jobject) caller env:(JNIEnv *)env {
+  return [[[JavaColorWell alloc] initWithCaller:caller env:env] autorelease];
+}
+
+// Obtain a JNI global reference to the enclosing Java object
+// This will be used later to fire AWT events after a color change
+- (id) initWithCaller:(jobject)caller env:(JNIEnv *)env {
+  self = [super init];
+  // &quot;javaPeer&quot; is declared in JavaColorWell.h;
+  javaPeer = (*env)-&gt;NewGlobalRef(env, caller);
+  return self;
+}
+</pre><p>The Cocoa <code>JavaColorWell</code> class then makes calls on the global reference using standard JNI method lookups.  See <A HREF="http://java.sun.com/docs/books/jni/html/fldmeth.html#26010">Section 4.2 of The Java Native Interface: Programmer's Guide and Specification</A> for the basics of calling Java methods from C.</p><p>Those familiar with the JNI will realize that the above technique presents a problem: since global reference affect garbage collection, the <code>CocoaComponent</code> object will not be collected as long as the global reference exists.  The <code>CocoaComponent</code>'s removal from its container, signalled by the inherited <code>java.awt.Component.<code>removeNotify</code></code> method, is an opportune time to delete the global reference, and <code>sendMessage</code> makes the task simple.  We again turn to <A HREF="../../samplecode/CWCocoaComponent/CWCocoaComponent.html">Sample Code Project 'CWCocoaComponent'</A> for a demonstration, illustrated in Listings 11 and 12.</p><p class="smalltext"><strong>Listing 11:</strong> Relaying removeNotify to the underlying Cocoa view</p><pre class="sourcecodebox">
+final static int REMOVE_NOTIFY = 0;
+
+// Tell the peer we've been removed from the hierarchy
+public void removeNotify() {
+  sendMessage(REMOVE_NOTIFY, null);
+  super.removeNotify();
+}
+</pre><p class="smalltext"><strong>Listing 12:</strong> Deleting a JNI global reference in response to removeNotify</p><pre class="sourcecodebox">
+- (void) awtMessage:(jint)messageID message:(jobject)message env:(JNIEnv *)env {
+  switch (messageID) {
+  // Delete the globalRef to the Java peer when the component is removed from its container
+    case apple_dts_samplecode_cwcocoacomponent_JavaColorWell_REMOVE_NOTIFY:
+      if (javaPeer != NULL) {
+        (*env)-&gt;DeleteGlobalRef(env, javaPeer);
+      }
+      break;
+    // more cases...
+  }
+}
+</pre><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG24"></A><H2>Thread-Safe JNI Programming</H2><p>The examples presented in the previous section are fairly simple in principle: clear entry points are defined, and the Java and Cocoa environments do their respective jobs with no evident change in normal application behavior.  Care must be taken, however, when integrating code that makes use of both the Cocoa and AWT event models.</p><p>While it is true that the AWT in Java 1.4 and later is implemented in Cocoa, the AWT Event Queue runs on a separate thread from the underlying Cocoa application's main event loop (which executes on the main thread, sometimes called &quot;Thread-0&quot;).  Using JNI techniques such as JAWT and <code>CocoaComponent</code>, then, does carry synchronization concerns, which are discussed below.</p><div class="notebox"><p><strong>Note:</strong> Although this section uses the term &quot;AWT&quot; almost exclusively, it also applies to Swing applications.  The term &quot;AppKit&quot; refers to the Cocoa Application Kit framework and supporting APIs.</p></div><p>The <A HREF="../../documentation/Java/Reference/1.5.0/appledoc/api/com/apple/eawt/CocoaComponent.html">javadoc for <code>CocoaComponent</code></A> states:</p><ul><li><p>Do not block the AWT event dispatch thread against the AppKit thread. Doing so likely results in a deadlock.</p></li><li><p>Do not block the AppKit thread against the AWT event thread. Doing so likely results in a deadlock. Note that grabbing a Java-accessible lock (such as the AWT TreeLock) from the AppKit thread is considered unsafe for this reason. Avoid calling AWT or Swing methods from the AppKit thread.</p></li><li><p>Once the <code>NSView</code> you are using has been added to the Cocoa view hierarchy on the AppKit thread, all calls on the implementation's <code>NSView</code> must be made on the AppKit thread.</p></li></ul><p>When working with <code>CocoaComponent</code> you should assume that your Cocoa view is added to the hierarchy immediately after <code>createNSView</code> (or <code>createNSViewLong</code>) returns, and that the call takes place on the thread that adds your Java component.  <strong>Do not</strong> assume the call occurs on the AWT event thread, for example, if you add your component from <code>main</code>.</p><p>The first two items above, apply to <strong>any</strong> integration of AppKit and AWT (<code>CocoaComponent</code> or otherwise).  The inability to block either thread against the other forces us to adopt an asynchronous model when communicating between AppKit code and AWT code.  Both environments have utility methods for accomplishing this.</p><A NAME="TNTAG25"></A><H3>Calling AppKit From AWT/Swing</H3><p>When you make calls to AppKit that may result in a view refresh or some other event-based action, you must make those calls on the main AppKit thread.  Isolate your call into a method that can be passed into one of the <code>performSelectorOnMainThread:</code> methods defined in <code>NSObject</code>.  An excerpt from <A HREF="../../samplecode/JSheets/JSheets.html">Sample Code Project 'JSheets'</A>, shown below, demonstrates this technique.</p><p class="smalltext"><strong>Listing 13:</strong> Using performSelectorOnMainThread for AppKit operations</p><pre class="sourcecodebox">
+JNIEXPORT void JNICALL Java_apple_dts_samplecode_jsheets_JSheetDelegate_nativeShowSheet
+    (JNIEnv *env, jclass caller, jint type, jobject parent, jobject listener) {
+  // Never assume an AutoreleasePool is in place, unless you are on the main AppKit thread
+  NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+
+  JSheetDelegate *jdel;
+
+  NSWindow *parentWindow = GetWindowFromComponent(parent, env);
+  switch (type) {
+    case apple_dts_samplecode_jsheets_JSheetDelegate_OPEN_PANEL:
+      jdel = [JSheetDelegate delegateWithListener:listener env:env];
+      // We retain the delegate for use later; released after use in openPanelDidEnd:
+      [jdel retain];
+      [jdel performSelectorOnMainThread:@selector(showOpenPanelForWindow:)
+            withObject:parentWindow waitUntilDone:NO];
+      break;
+  }
+
+  [pool release];
+}
+
+- (void) showOpenPanelForWindow:(NSWindow *)parentWindow {
+  NSOpenPanel *op = [NSOpenPanel openPanel];
+  [op setAllowsMultipleSelection:YES];
+  [op beginSheetForDirectory:NSHomeDirectory() file:nil types:nil
+      modalForWindow:parentWindow modalDelegate:self
+      didEndSelector:@selector(openPanelDidEnd:returnCode:contextInfo:) contextInfo:nil];
+}
+</pre><p>There are two important things to note here: the call to <code>performSelectorOnMainThread:</code> and the <code>waitUntilDone:NO</code> parameter.  It is not enough to simply execute on the main thread; <strong>you must do so asynchronously</strong>.  Passing <code>waitUntilDone:YES</code> can cause as much trouble as being on the wrong thread.  The <A HREF="../../samplecode/JSheets/JSheets.html">Sample Code Project 'JSheets'</A> includes a (disabled) alternate implementation of the <code>nativeShowSheet</code> function which does not call <code>performSelectorOnMainThread:</code>  Be sure to see what happens in the alternate case.</p><p>This technique is necessary even in pure Cocoa applications, for example when a peripheral thread needs to refresh the user interface after receiving information from a socket.</p><p>At this point you may be asking why none of the previous <code>CocoaComponent</code> examples make explicit use of this technique.  This is because the <code>sendMessage</code> method is implemented to asynchronously message your underlying Cocoa view on the main thread (this explains why <code>sendMessage</code> has a return type of <code>void</code>).  <code>sendMessage</code>, then, is a double convenience: it eliminates the need for numerous JNI functions, and it provides automatic asynchronous messaging to the main AppKit thread.</p><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG26"></A><H3>Calling AWT/Swing From AppKit</H3><p>The same principle applies in the opposite direction &mdash; making AWT calls from AppKit.  Say your native code receives a Cocoa notification you are subscribed to.  Notifications occur on the main AppKit thread, so making a direct AWT call from your notification handler can easily deadlock your application.  The solution is to use the standard <code>invokeLater</code> method in the <code>java.awt.<code>EventQueue</code></code> and <code>javax.swing.<code>SwingUtilities</code></code> classes (<code>SwingUtilities</code> is just a wrapper class for <code>EventQueue</code>).  Again we reference <A HREF="../../samplecode/JSheets/JSheets.html">Sample Code Project 'JSheets'</A>:</p><p class="smalltext"><strong>Listing 14:</strong> Reporting NSSavePanel results to Java</p><pre class="sourcecodebox">
+- (void)savePanelDidEnd:(NSSavePanel *)sheet returnCode:(int)returnCode contextInfo:(void *)contextInfo {
+  JNIEnv *env;
+  bool shouldDetach = false;
+
+  if (GetJNIEnv(&amp;env, &amp;shouldDetach) != JNI_OK) {
+    NSLog(@&quot;savePanelDidEnd: could not attach to JVM&quot;);
+    return;
+  }
+
+  // Call back to Java if the user clicked Save
+  if (returnCode == NSOKButton) {
+    if (saveFinish_mID != NULL) {
+      jsize buflength = [[sheet filename] length];
+      jchar buffer[buflength];
+      [[sheet filename] getCharacters:(unichar *)buffer];
+      jstring str = (*env)-&gt;NewString(env, buffer, buflength);
+
+      (*env)-&gt;CallStaticVoidMethod(env, jDelegateClass, saveFinish_mID, sheetListener, str);
+      (*env)-&gt;DeleteLocalRef(env, str);
+    } else NSLog(@&quot;savePanelDidEnd: null Java methodID&quot;);
+  } else if (cancel_mID != NULL) {
+    (*env)-&gt;CallStaticVoidMethod(env, jDelegateClass, cancel_mID, sheetListener);
+  }
+
+  (*env)-&gt;DeleteGlobalRef(env, sheetListener);
+
+  if (shouldDetach) {
+    (*jvm)-&gt;DetachCurrentThread(jvm);
+  }
+  [self autorelease];
+}
+</pre><p class="smalltext"><strong>Listing 15:</strong> Using invokeLater for AWT operations</p><pre class="sourcecodebox">
+private static void fireSaveSheetFinished(final SaveSheetListener ssl, final String filename) {
+  EventQueue.invokeLater(new Runnable() {
+    public void run() {
+      ssl.saveSheetFinished(new SheetEvent(filename));
+    }
+  });
+}
+</pre><div class="notebox"><p><strong>Note:</strong> The <code>saveFinish_mID</code> and <code>cancel_mID</code> variables in Listing 14 are references to Java methods (of type <code>jmethodID</code>) defined and cached elsewhere in the source file.  See the full JSheets project for more.</p></div><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG38"></A><H3>Calling AppKit or AWT from non-event threads</H3><p>The guidelines listed above change very little when dealing with peripheral &quot;worker&quot; threads: AppKit must still be messaged using one of the <code>performSelectorOnMainThread:</code> variants, and AWT must still be called using the appropriate <code>EventQueue</code> or <code>SwingUtilities</code> methods.  SwingWorker threads, for example, must still observe Cocoa threading rules when making AppKit calls.  One difference is that it may be possible to make these calls in a blocking fashion (using <code>waitUntilDone:YES</code> in Cocoa or <code>invokeAndWait</code> in Java).  However, it is still possible to create a scenario that blocks AWT and AppKit against each other, even if you are working from a non-event thread.  As with any multithreaded design, be mindful of these decisions.</p><p>For more on thread safety in both Java and Cocoa, see <A HREF="../../documentation/Cocoa/Conceptual/Multithreading/articles/CocoaSafety.html#//apple_ref/doc/uid/20000736-123351-BBCFIIEB">Multithreaded Programming Topics: Cocoa Thread Safety</A> and <A HREF="http://java.sun.com/products/jfc/tsc/articles/threads/threads1.html">Threads and Swing</A>.</p><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG31"></A><H2>Invoking the Java Virtual Machine from Native Code</H2><p>The VM Invocation Interface is described in detail in <A HREF="http://java.sun.com/docs/books/jni/html/invoke.html">Chapter 7 of The Java Native Interface: Programmer's Guide and Specification</A>.  Embedding a JVM into a native Mac OS X application has one major difference from other platforms:  <strong>If using AWT, the JVM must not be started on the application's main thread</strong>.  Many tutorials and documents start the JVM on the main thread, so it is important to recognize this unique requirement of Mac OS X.</p><p>The following sections explain how to correctly create a JVM from both Core Foundation and Cocoa environments, as well as how to request an explicit version of Java.</p><A NAME="TNTAG32"></A><H3>Creating a JVM from Core Foundation</H3><p>Core Foundation developers wishing to create a JVM must create a new thread (using the <code>pthreads</code> API)  and pass it a function which performs the VM invocation.  This ensures that the JVM is created on a thread other than the application's main thread.  The below excerpt from <A HREF="../../samplecode/simpleJavaLauncher/simpleJavaLauncher.html">Sample Code Project 'simpleJavaLauncher'</A> demonstrates this process.</p><p class="smalltext"><strong>Listing 16:</strong> Creating a new pthread to invoke a JVM</p><pre class="sourcecodebox">
+/* Start the thread that runs the VM. */
+pthread_t vmthread;
+
+/* create a new pthread copying the stack size of the primordial pthread */
+struct rlimit limit;
+size_t stack_size = 0;
+int rc = getrlimit(RLIMIT_STACK, &amp;limit);
+if (rc == 0) {
+  if (limit.rlim_cur != 0LL) {
+    stack_size = (size_t)limit.rlim_cur;
+  }
+}
+
+pthread_attr_t thread_attr;
+pthread_attr_init(&amp;thread_attr);
+pthread_attr_setscope(&amp;thread_attr, PTHREAD_SCOPE_SYSTEM);
+pthread_attr_setdetachstate(&amp;thread_attr, PTHREAD_CREATE_DETACHED);
+if (stack_size &gt; 0) {
+  pthread_attr_setstacksize(&amp;thread_attr, stack_size);
+}
+
+/* Start the thread that we will start the JVM on. */
+/* startupJava is a separate function that creates the JVM */
+pthread_create(&amp;vmthread, &amp;thread_attr, startupJava, launchOptions);
+pthread_attr_destroy(&amp;thread_attr);
+</pre><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG33"></A><H3>Creating a JVM from Cocoa</H3><p>The principles behind invoking a JVM from Cocoa are the same as from Core Foundation.  Cocoa developers can use the <code>NSThread</code> APIs to move JVM invocation off the application's main thread.  Listing 16 demonstrates a very simple example of such an approach.</p><p class="smalltext"><strong>Listing 17:</strong> Detaching a new NSThread to invoke a JVM</p><pre class="sourcecodebox">
+- (IBAction)applicationWillFinishLaunching:(id)sender {
+    // Detach a new thread, and in that thread invoke the VM.
+    [NSThread detachNewThreadSelector:@selector(startupJava:) toTarget:self withObject:nil];
+}
+
+- (void)startupJava:(id)userData {
+    // All new native threads (Cocoa and Java) need an autorelease pool.
+    NSAutoreleasePool *pool = [[NSAutoreleasePool allocWithZone:NULL] init];
+
+    // Startup the JVM (startupJava is a C function defined elsewhere)
+    startupJava();
+
+    [pool release];
+
+    // Once the JVM has exited we will want to exit this application.
+    [[NSApplication sharedApplication] terminate:self];
+}
+</pre><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG40"></A><H3>Staying off the Main Thread</H3><p>It is important to understand that the JVM cannot be started from the native application's main thread if your Java code uses an AWT/Swing-based GUI; in such applications the main thread must be kept free for use by Cocoa's event loop.  Both of the above examples abide by this rule:  Listing 16 starts a <code>CFRunLoop</code> in <code>main</code>, which is used by the <code>NSApplication</code> instance that the AWT creates.  Listing 17 responds to <code>NSApplication</code>'s <code>applicationWillFinishLaunching:</code> delegate method, indicating that an <code>NSApplication</code> is already in place on the main thread.  Starting an AWT application from the native launcher's main thread significantly affects performance and may produce unrecoverable errors.  Listing 18 shows a paraphrased example of the most common error thrown.</p><p class="smalltext"><strong>Listing 18:</strong> Error initializing AWT after starting Java on the main thread </p><pre class="sourcecodebox">
+Exception in thread &quot;main&quot; java.lang.InternalError: Can't start the AWT [...]
+        at java.lang.ClassLoader$NativeLibrary.load(Native Method)
+        at java.lang.ClassLoader.loadLibrary0(ClassLoader.java:1751)
+        at java.lang.ClassLoader.loadLibrary(ClassLoader.java:1668)
+        at java.lang.Runtime.loadLibrary0(Runtime.java:822)
+        at java.lang.System.loadLibrary(System.java:992)
+        at sun.security.action.LoadLibraryAction.run(LoadLibraryAction.java:50)
+        at java.security.AccessController.doPrivileged(Native Method)
+        at sun.awt.NativeLibLoader.loadLibraries(NativeLibLoader.java:38)
+        at sun.awt.DebugHelper.&lt;clinit&gt;(DebugHelper.java:29)
+        at java.awt.Component.&lt;clinit&gt;(Component.java:545)
+</pre><p>Native launchers running &quot;headless&quot; Java code &mdash; code that does not use AWT &mdash; do not have this requirement and can safely start the JVM on the main thread.  However, if there is <strong>any</strong> chance that your invoked Java code will use the AWT event queue, keep the main thread free.  Regardless of your situation, it is highly recommended to minimize risk by starting the JVM from a non-main thread.</p><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG34"></A><H3>Requesting a specific J2SE version</H3><p>The presence of multiple Java versions on Mac OS X presents a dilemma for native launchers: selecting the Java version you actually want.  This problem is solved by defining a <code>JAVA_JVM_VERSION</code> environment variable prior to calling <code>JNI_CreateJavaVM</code>, typically using the <code>setenv</code> function.  Set the <code>version</code> member of your <code>JavaVMInitArgs</code> struct to <code>JNI_VERSION_1_4</code>.</p><p>A few things to remember when using the invocation API on Mac OS X:</p><ul><li><p>Before setting <code>JAVA_JVM_VERSION</code>, check for the existence of the desired Java version by inspecting the JavaVM framework.  The behavior of <code>JNI_CreateJavaVM</code> when <code>JAVA_JVM_VERSION</code> is set to an unsupported or non-existent version is undefined.</p></li><li><p>If you require a specific major version (1.4, 1.5, etc.) of Java, be sure to request it even if the version you want appears to launch without guidance.  Never assume that a specific version of Java is the &quot;default&quot; on a given system.</p></li><li><p>Invocation of a 1.3 JVM is not supported.  Note that passing <code>JNI_VERSION_1_2</code> explicitly requests Java 1.3; use <code>JNI_VERSION_1_4</code>.</p></li></ul><p><A HREF="../../samplecode/simpleJavaLauncher/simpleJavaLauncher.html">Sample Code Project 'simpleJavaLauncher'</A> declares a <code>startupJava</code> function that could be used by the two previous examples, including logic to detect and explicitly request J2SE 5.0.</p><p class="smalltext"><strong>Listing 19:</strong> Detecting and requesting J2SE 5.0 from Core Foundation</p><pre class="sourcecodebox">
+CFStringRef targetJVM = CFSTR(&quot;1.5&quot;);
+CFBundleRef JavaVMBundle;
+CFURLRef    JavaVMBundleURL;
+CFURLRef    JavaVMBundlerVersionsDirURL;
+CFURLRef    TargetJavaVM;
+UInt8 pathToTargetJVM [PATH_MAX];
+struct stat sbuf;
+
+// Look for the JavaVM bundle using its identifier
+JavaVMBundle = CFBundleGetBundleWithIdentifier(CFSTR(&quot;com.apple.JavaVM&quot;) );
+
+if(JavaVMBundle != NULL) {
+  // Get a path for the JavaVM bundle
+  JavaVMBundleURL = CFBundleCopyBundleURL(JavaVMBundle);
+  CFRelease(JavaVMBundle);
+
+  if(JavaVMBundleURL != NULL) {
+    // Append to the path the Versions component
+    JavaVMBundlerVersionsDirURL = CFURLCreateCopyAppendingPathComponent
+      (kCFAllocatorDefault,JavaVMBundleURL,CFSTR(&quot;Versions&quot;),true);
+    CFRelease(JavaVMBundleURL);
+
+    if(JavaVMBundlerVersionsDirURL != NULL) {
+      // Append to the path the target JVM's version
+      TargetJavaVM = CFURLCreateCopyAppendingPathComponent
+        (kCFAllocatorDefault,JavaVMBundlerVersionsDirURL,targetJVM,true);
+      CFRelease(JavaVMBundlerVersionsDirURL);
+
+      // Verify the desired major version exists in the framework
+      if(TargetJavaVM != NULL) {
+        if(CFURLGetFileSystemRepresentation
+          (TargetJavaVM,true,pathToTargetJVM,PATH_MAX )) {
+          if(stat((char*)pathToTargetJVM,&amp;sbuf) == 0) {
+            if(CFStringGetCString(targetJVM, (char*)pathToTargetJVM,
+              PATH_MAX, kCFStringEncodingUTF8)) {
+              setenv(&quot;JAVA_JVM_VERSION&quot;, (char*)pathToTargetJVM,1);
+            }
+          }
+          CFRelease(TargetJavaVM);
+        }
+      }
+    }
+  }
+}
+
+</pre><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG5"></A><H2>Further Reading</H2><ul><li><p><A HREF="http://java.sun.com/docs/books/jni/">The Java Native Interface: Programmer's Guide and Specification</A></p></li><li><p><A HREF="http://java.sun.com/j2se/1.4.2/docs/guide/jni/index.html">JNI Documentation</A></p></li><li><p><A HREF="http://java.sun.com/j2se/1.5.0/docs/guide/awt/1.3/AWT_Native_Interface.html">The AWT Native Interface</A></p></li><li><p><A HREF="http://java.sun.com/products/jfc/tsc/articles/threads/threads1.html">Threads and Swing (Sun Developer Network)</A></p></li><li><p><A HREF="../../documentation/Cocoa/Conceptual/Multithreading/articles/CocoaSafety.html#//apple_ref/doc/uid/20000736-123351-BBCFIIEB">Multithreaded Programming Topics: Cocoa Thread Safety</A></p></li><li><p><A HREF="../../referencelibrary/GettingStarted/GS_Cocoa/index.html">Getting Started With Cocoa</A></p></li><li><p><A HREF="../../documentation/GraphicsImaging/Conceptual/drawingwithquartz2d/index.html">Quartz 2D Programming Guide</A></p></li><li><p><A HREF="../../java/jniuniversal.html">Building a Universal JNI Project With Xcode</A></p></li><li><p><A HREF="http://java.sun.com/developer/codesamples/jni.html">Java Native Interface Code Samples (Sun Developer Network)</A></p></li><li><p><A HREF="../../samplecode/MyFirstJNIProject/MyFirstJNIProject.html">Sample Code Project 'MyFirstJNIProject'</A></p></li><li><p><A HREF="../../samplecode/HelpHook/HelpHook.html">Sample Code Project 'HelpHook'</A></p></li><li><p><A HREF="../../samplecode/QCCocoaComponent/QCCocoaComponent.html">Sample Code Project 'QCCocoaComponent'</A></p></li><li><p><A HREF="../../samplecode/CWCocoaComponent/CWCocoaComponent.html">Sample Code Project 'CWCocoaComponent'</A></p></li><li><p><A HREF="../../samplecode/QDCocoaComponent/QDCocoaComponent.html">Sample Code Project 'QDCocoaComponent'</A></p></li><li><p><A HREF="../../samplecode/JAWTExample/JAWTExample.html">Sample Code Project 'JAWTExample'</A></p></li><li><p><A HREF="../../samplecode/JSheets/JSheets.html">Sample Code Project 'JSheets'</A></p></li><li><p><A HREF="../../samplecode/simpleJavaLauncher/simpleJavaLauncher.html">Sample Code Project 'simpleJavaLauncher'</A></p></li></ul><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNT_HISTORY_TAG"></A><H2>Document Revision History</H2><table cellspacing="0" class="graybox" width="680"><tr><th width="100">Date</th><th width="580">Notes</th></tr><tr><td scope="row">2006-04-17</td><td>First Version</td></tr></table><p><b>Posted:</b> 2006-04-17</p>
+<!-- END CONTENTS -->
+</td></tr></table>
+<!-- END WIDE COLUMN -->
+<!-- END MAIN CONTENT -->
+	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/technotes/tn2005/tn2147.html%3Fid%3DDTS10003827-1.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/technotes/tn2005/tn2147.html%3Fid%3DDTS10003827-1.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/technotes/tn2005/tn2147.html%3Fid%3DDTS10003827-1.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+
+<!-- START BOTTOM APPLE NAVIGATION -->
+<!--#include virtual="/includes/footer"-->
+<!-- END BOTTOM APPLE NAVIGATION -->
+<!-- START CENTER CLOSE -->
+</center>
+<!-- END CENTER CLOSE -->
+</body></html>

@@ -1,0 +1,110 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/1999/REC-html401-19991224/loose.dtd">
+<html><head>
+<!-- BEGIN META TAG INFO -->
+<link rel="home" href="http://developer.apple.com/">
+<link rel="find" href="http://developer.apple.com/search/">
+<link rel="stylesheet" type="text/css" href="../../documentation/css/adcstyle.css" title="fonts">
+<script language="JavaScript" type="text/javascript" src="../../documentation/js/busnav.js"></script>
+<script language="JavaScript" src="../../documentation/js/adc.js" type="text/javascript"></script>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<!-- END META TAG INFO -->
+<!-- BEGIN TITLE -->
+<title>Technical Note TN2148: Multi-Buffer Aware Image Decompressors</title>
+<!-- END TITLE -->
+</head>
+<!-- BEGIN BODY OPEN -->
+<body bgcolor="#ffffff"><a name="//apple_ref/doc/uid/DTS10003757" title="Multi-Buffer Aware Image Decompressors"></a>
+<!--END BODY OPEN -->
+<!-- START CENTER OPEN -->
+<center>
+<!-- END CENTER OPEN -->
+<a name="top"></a>
+<!-- BEGIN LOGO AND SEARCH -->
+<!--#include virtual="/includes/adcnavbar"-->
+<!-- END LOGO AND SEARCH -->
+<!-- START BREADCRUMB -->
+<div id="breadcrumb"><table width="680" border="0" cellpadding="0" cellspacing="0"><tr>
+<td scope="row"><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+<td><img width="340" height="10" src="images/1dot.gif" alt=""></td></tr><tr valign="middle"><td align="left" colspan="2">
+<a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../technicalnotes/index.html">Technical Notes</a> &gt; <a href="../../technicalnotes/QuickTime/index.html">QuickTime</a> &gt; <a href="../../technicalnotes/QuickTime/idxQuickTimeComponentCreation-date.html">QuickTime Component Creation</a> &gt; 
+</td></tr><tr><td colspan="2" scope="row"><img width="680" height="35" src="images/1dot.gif" alt=""></td></tr></table></div>
+<!-- END BREADCRUMB -->
+
+<!-- START MAIN CONTENT -->
+<!-- START TITLE GRAPHIC AND INTRO-->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top">
+<td><h1>
+<div id="pagehead">Technical Note TN2148</div>
+<div id="pageheadsub">Multi-Buffer Aware Image Decompressors</div>
+</h1></td></tr></table>
+<!-- END TITLE GRAPHIC AND INTRO -->
+<!-- BEGIN WIDE COLUMN -->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td align="left" width="680">
+<!-- BEGIN CONTENTS -->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td><p>This technical note discusses how Image Decompressors can maximize performance by supporting multi-buffer decompression and turning on the <code>subCodecIsMultiBufferAware</code> flag added in QuickTime 7.</p></td></tr><tr><td scope="row"><img width="680" height="10" src="images/1dot.gif" alt=""><br><img height="1" width="680" src="images/1dot_919699.gif" alt=""><br><img width="680" height="20" src="images/1dot.gif" alt=""></td></tr></table><table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td width="680"><ul><li><a href="#TNTAG1">Overview</a></li><li><a href="#TNTAG5">What You Need To Do</a></li><li><a href="#TNTAG2">Compatibility Notes</a></li><li><a href="#TNTAG3">Sample Code</a></li><li><a href="#TNT_HISTORY_TAG">Document Revision History</a></li></ul></td></tr><tr><td colspan="3" scope="row"><img width="680" height="10" src="images/1dot.gif" alt=""><br><img height="1" width="680" src="images/1dot_919699.gif" alt=""><br><img width="680" height="20" src="images/1dot.gif" alt=""></td></tr></table><A NAME="TNTAG1"></A><H2>Overview</H2><p>For maximum performance, video decompressor components should be marked as multi-buffer aware by setting the <code>subCodecIsMultiBufferAware</code> flag to <code>true</code>.</p><p>By setting this flag, the decompressor informs the Image Compression Manager that it is able to draw each frame to a new pixel buffer. This contract with the Image Compression Manager reduces the amount of buffer copies necessary to play through Core Video.</p><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG5"></A><H2>What You Need To Do</H2><p>In your image decompressor's <code>ImageCodecInitialize</code> function, make sure to set the <code>subCodecIsMultiBufferAware</code> flag to <code>true</code>. This flag is part of the <code>ImageSubCodecDecompressCapabilities</code> structure passed to the <code>Initialize</code> function. See Listing 1.</p><p class="smalltext"><strong>Listing 1:</strong> ImageCodecInitialize function.</p><pre class="sourcecodebox">
+ComponentResult MyDecompressor_Initialize(MyDecompressorGlobals *storage,
+                                          ImageSubCodecDecompressCapabilities *cap)
+{
+    // Specify the size of the ImageSubCodecDecompressRecord structure
+    cap-&gt;decompressRecordSize = sizeof(MyDecompressRecord);
+
+    // Say we can support asynchronous decompression - With the help of the base
+    // image decompressor, any image decompressor that uses only interrupt-safe
+    // calls for decompression operations can support asynchronous decompression
+    cap-&gt;canAsync = true;
+
+    // set other capabilities as appropriate
+
+    .
+    .
+    .
+
+    // subCodecIsMultiBufferAware added in QuickTime 7
+    // tell the base codec that we are &quot;multi-buffer aware&quot; - This promises that we
+    // always draw using ImageSubCodecDecompressRecord.baseAddr/rowBytes
+    // passed to our ImageCodecDrawBand function, and that we always overwrite every
+    // pixel in the buffer - it is important to set this in order to get optimal
+    // performance when playing through Core Video
+    //
+    // add this line of code
+    cap-&gt;subCodecIsMultiBufferAware = true;
+
+    .
+    .
+    .
+}
+</pre><p><strong>By setting this flag, a decompressor MUST honor a contract with the Image Compression Manager and be able to do the following</strong>:</p><ul><li><p>Always draw using the <code>ImageSubCodecDecompressRecord.baseAddr/rowBytes</code> passed to <code>ImageCodecDrawBand</code>. Do not save the values of these fields in <code>ImageCodecBeginBand</code>, because that function may be called before the actual destination buffer is known.</p></li><li><p>Ignore the base address and row bytes in the <code>port</code> and <code>dstPixMap</code> passed to <code>ImageCodecBeginBand</code> as part of the <code>CodecDecompressParams</code> struct. During multi-buffer playback, these will not point to the correct buffer. In particular, the decompressor must not call QuickDraw to draw to the <code>port</code>.</p><p>NOTE: It's OK to use the <code>dstPixMap</code> to find the pixel format of the output buffers during the <code>ImageCodecPreflight</code> function.</p></li><li><p>Always write every pixel in the buffer.</p></li></ul><p>Decompressors that do not set this flag will use a compatibility mode which involves an extra buffer copy per frame when playing to a multi-buffer destination through Core Video.</p><p>Some old decompressors (particularly those that do not perform motion compensation), do not write every pixel of difference frames, relying on the old pixels staying present. These decompressors should <strong>NOT</strong> set the <code>subCodecIsMultiBufferAware</code> flag.</p><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG2"></A><H2>Compatibility Notes</H2><p>While <code>subCodecIsMultiBufferAware</code> is new field added to the <code>ImageSubCodecDecompressCapabilities</code> structure for QuickTime 7 and Mac OS 10.4, it is completely safe to set this field all the way back to QuickTime 5.0.1. This is because this byte reuses a former padding field. On releases before QuickTime 7 this field is simply ignored.</p><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG3"></A><H2>Sample Code</H2><p>The <A HREF="../../samplecode/ExampleIPBCodec/ExampleIPBCodec.html">ExampleIPBCodec</A> sample demonstrates modern (QuickTime 7 and greater) techniques for writing both Image Compressors and Decompressors.</p><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNT_HISTORY_TAG"></A><H2>Document Revision History</H2><table cellspacing="0" class="graybox" width="680"><tr><th width="100">Date</th><th width="580">Notes</th></tr><tr><td scope="row">2005-07-12</td><td>Describes how to mark a video decompressor component as multi-buffer aware for maximum performance with CoreVideo.</td></tr></table><p><b>Posted:</b> 2005-07-12</p>
+<!-- END CONTENTS -->
+</td></tr></table>
+<!-- END WIDE COLUMN -->
+<!-- END MAIN CONTENT -->
+	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/technotes/tn2005/tn2148.html%3Fid%3DDTS10003757-1.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/technotes/tn2005/tn2148.html%3Fid%3DDTS10003757-1.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/technotes/tn2005/tn2148.html%3Fid%3DDTS10003757-1.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+
+<!-- START BOTTOM APPLE NAVIGATION -->
+<!--#include virtual="/includes/footer"-->
+<!-- END BOTTOM APPLE NAVIGATION -->
+<!-- START CENTER CLOSE -->
+</center>
+<!-- END CENTER CLOSE -->
+</body></html>

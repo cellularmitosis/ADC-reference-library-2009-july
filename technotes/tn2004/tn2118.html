@@ -1,0 +1,681 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<!-- BEGIN META TAG INFO --><link rel="home" href="http://developer.apple.com/">
+<link rel="find" href="http://developer.apple.com/search/">
+<link rel="stylesheet" type="text/css" href="../../documentation/css/adcstyle.css" title="fonts">
+<script language="JavaScript" type="text/javascript" src="../../documentation/js/busnav.js"></script><script language="JavaScript" src="../../documentation/js/adc.js" type="text/javascript"></script><!-- END META TAG INFO --><!-- BEGIN TITLE --><title>Technical Note TN2118: Kernel Core Dumps</title>
+<!-- END TITLE --><style>
+			.sourcecodebox {
+				white-space: pre-wrap;
+				white-space: -moz-pre-wrap !important;
+				white-space: -pre-wrap;
+				white-space: -o-pre-wrap;
+				word-wrap: break-word;
+			}
+			</style>
+</head>
+<!-- BEGIN BODY OPEN --><body bgcolor="#ffffff"><a name="//apple_ref/doc/uid/DTS10003352" title="Kernel Core Dumps"></a>
+<!-- END BODY OPEN --><!-- START CENTER OPEN --><center>
+<!-- END CENTER OPEN --><a name="top"></a><!-- BEGIN LOGO AND SEARCH --><!--#include virtual="/includes/adcnavbar" --><!-- END LOGO AND SEARCH --><!-- START BREADCRUMB --><div id="breadcrumb"><table width="680" border="0" cellpadding="0" cellspacing="0">
+<tr>
+<td scope="row"><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+<td><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+</tr>
+<tr valign="middle"><td align="left" colspan="2">
+<a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../technicalnotes/index.html">Technical Notes</a> &gt; <a href="../../technicalnotes/Darwin/index.html">Darwin</a> &gt; <a href="../../technicalnotes/Darwin/idxHardwareDrivers-date.html">Hardware &amp; Drivers</a> &gt; </td></tr>
+<tr><td colspan="2" scope="row"><img width="680" height="35" src="images/1dot.gif" alt=""></td></tr>
+</table></div>
+<!-- END BREADCRUMB --><!-- START MAIN CONTENT --><!-- START TITLE GRAPHIC AND INTRO --><table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td><h1>
+<div id="pagehead">Technical Note TN2118</div>
+<div id="pageheadsub">Kernel Core Dumps</div>
+</h1></td></tr></table>
+<!-- END TITLE GRAPHIC AND INTRO --><!-- BEGIN WIDE COLUMN --><table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td align="left" width="680">
+<!-- BEGIN CONTENTS --><table width="680" border="0" cellpadding="0" cellspacing="0">
+<tr align="left" valign="top"><td>
+<p>This technote explains how you can enable remote kernel core dumps on Mac OS X 10.3 and later. Kernel core dumps allow you to examine the state of the kernel after a kernel panic or hang. You can use this to debug a kernel problem when circumstances prevent you from using the two-machine kernel debugger.</p>
+<p>This technote is targeted at two distinct audiences. Kernel extension developers can use this information to debug kernel panics or hangs that they can't reproduce locally. In addition, system administrators can use this information to record details about which machines are panicking and why, and to perform offline debugging on high-availability systems.</p>
+</td></tr>
+<tr><td scope="row">
+<img width="680" height="10" src="images/1dot.gif" alt=""><br><img width="680" height="1" src="images/1dot_919699.gif" alt=""><br><img width="680" height="20" src="images/1dot.gif" alt="">
+</td></tr>
+</table>
+<table width="680" border="0" cellpadding="0" cellspacing="0">
+<tr align="left" valign="top"><td width="680"><ul>
+<li><a href="#SECINTRO">Introduction</a></li>
+<li><a href="#SECSERVER">Configuring the Server</a></li>
+<ul>
+<li><a href="#SECCREATEDIR1">Creating a Core Dump Directory</a></li>
+<li><a href="#ACTIVATEKDUMP">Activating the Kernel Dump Server Process</a></li>
+</ul>
+<li><a href="#SECSERVERS">Configuring the Kernel Core Dump Server for Mac OS X prior to 10.5</a></li>
+<ul>
+<li><a href="#SECSERVER2">Configuring the Kernel Core Dump Server for Mac OS X 10.4.x</a></li>
+<li><a href="#SECSERVER3">Configuring the Kernel Core Dump Server for Mac OS X 10.3.x</a></li>
+<ul>
+<li><a href="#SECCONFDAEMON">Configure xinetd</a></li>
+<li><a href="#SECSIGNALDAEMON">Signal xinetd</a></li>
+<li><a href="#SECCONFIRMCONF">Confirm Configuration</a></li>
+</ul>
+</ul>
+<li><a href="#SECCLIENT">Configuring a Client</a></li>
+<ul><li><a href="#SECDEBUGFLAGS">Debug Flags in Depth</a></li></ul>
+<li><a href="#SECTESTING">Testing Your Configuration</a></li>
+<ul>
+<li><a href="#DTRACEPANICTRIGGER">Triggering a Kernel Panic with DTrace</a></li>
+<li><a href="#INSTANTPANICALT">Triggering a Kernel Panic with the Instant Panic Kernel Extension</a></li>
+<li><a href="#COREDUMPOCCURS">The Kernel Panic Core Dump File</a></li>
+</ul>
+<li><a href="#SECDEBUG">Debugging with Kernel Core Dumps</a></li>
+<li><a href="#DUMPOPTIONS">Kernel Core Dump Options</a></li>
+<ul>
+<li><a href="#CONFIGPORT">Configuring the Client and Server UDP Port Assignment</a></li>
+<ul>
+<li><a href="#CONFIGCLIENTPORT">Configuring the Client UDP Port Assignment</a></li>
+<li><a href="#CONFIGSERVERPORT">Configuring the Server UDP Port Assignment</a></li>
+</ul>
+<li><a href="#CONFIGROUTER">Configuring the Client Router Usage</a></li>
+<li><a href="#SECCHOOSEYOURINTERFACE">Specifying the Ethernet Interface</a></li>
+</ul>
+<li><a href="#SECCONCLUSION">Conclusion</a></li>
+<li><a href="#SECFURTHERREF">Further Reading</a></li>
+<li><a href="#SECDOWNLOADABLES">Downloadables</a></li>
+<li><a href="#document_revision_summary">Document Revision History</a></li>
+</ul></td></tr>
+<tr><td colspan="3" scope="row">
+<img width="680" height="10" src="images/1dot.gif" alt=""><br><img width="680" height="1" src="images/1dot_919699.gif" alt=""><br><img width="680" height="20" src="images/1dot.gif" alt="">
+</td></tr>
+</table>
+<a name="SECINTRO"></a><h2>Introduction</h2>
+<p>The Mac OS X kernel should never panic because, when it does, it seriously inconveniences the user. Thus, a kernel panic is always the result of a bug, either in Apple's code or in the code of some third party kernel extension. Such bugs need to be investigated and resolved.</p>
+<p>There are a number of circumstances in which the ability to capture a kernel core dump is useful.</p>
+<ul>
+<li><p>When you're writing a kernel extension and you encounter a kernel panic, you can usually debug the problem with the <a href="http://developer.apple.com/documentation/Darwin/Conceptual/KEXTConcept/KEXTConceptDebugger/hello_debugger.html">two-machine kernel debugger</a>. However, there are circumstances where this isn't possible. For example, if a tester or end user reports a problem that you can't reproduce on your desktop—either because it happens infrequently or because it only happens with obscure hardware or in a non-standard environment—you will not be able to debug using the standard tools. In these circumstances it's helpful if you can capture a core dump of the panicked kernel and debug using that core dump.</p></li>
+<li><p>If you manage a large group of Macintosh computers, you might want to monitor which computers are panicking and why. You can use this information to determine how frequently kernel panics occurs, whether there are any common symptoms, and, most importantly, whether any third party kernel extensions are involved.</p></li>
+<li><p>Finally, if you manage a high-availability Macintosh server and you have problems with the server panicking, you can capture a kernel core dump, immediately restart the server, and then debug the problem offline.</p></li>
+</ul>
+<p>To assist you in these situations, Apple provides a remote kernel core dump facility which has been present since Mac OS X 10.3 for PowerPC-based Macintosh systems, and since Mac OS X 10.4.7 for Intel-based Macintosh systems. You can configure a Mac OS X computer so that, when the machine panics, it transmits a core dump of the kernel to a server via TCP/IP. The core dump server is a daemon that collects the kernel core dump from the client and writes it to disk. You can then analyze the core dump using a variety of tools, most notably GDB.</p>
+<p>There are two components of core dumping, the server side and client side. The server side is the destination of the core dump file, the client side enables the kernel on the machine which panics, to dump its core to the server.</p>
+<div class="notebox"><p><strong>Note: </strong>The source for the kernel core dump server is part of <a href="http://developer.apple.com/darwin/">Darwin</a> (in the <code>network_cmds</code>) project). It should be feasible to port this server to other UNIX-like platforms, including earlier versions of Mac OS X, although such endeavors are not covered by this technical note.</p></div>
+<p>This technical note focuses on describing the core dump process across an internet connection. A FireWire connection can also be used to transmit the core dump. FireWire is a useful alternative when the kernel panic on the client system involves the built-in Ethernet driver, or some other network code such that the core dump cannot be sent across an Ethernet connection. </p>
+<p>The Read Me file in the FireWire SDK for Mac OS X describes the setup process for using FireWire to transmit a core dump. You can access the FireWire SDK from the <a href="http://developer.apple.com/hardwaredrivers/download/">Apple Developer Hardware &amp; Drivers - Downloads</a> web page.</p>
+<p>Once you succeeded in saving the core dump across the FireWire connection, you can learn more about analyzing the core dump by reading the section <a href="#SECDEBUG">Debugging with Kernel Core Dumps</a>.</p>
+<p>This technical note provides information on the following tasks.</p>
+<ul>
+<li><p><a href="#SECSERVER">Setting up a kernel core dump server</a>.</p></li>
+<li><p><a href="#SECCLIENT">Configuring a client computer to dump its core to the core dump server</a> when the client panics.</p></li>
+<li><p><a href="#SECTESTING">Testing your setup</a>.</p></li>
+<li><p><a href="#SECDEBUG">Understanding and debugging the resulting kernel core dumps</a>.</p></li>
+<li><p><a href="#DUMPOPTIONS">Understanding optional settings for kernel core dumps</a>.</p></li>
+</ul>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="SECSERVER"></a><h2>Configuring the Server</h2>
+<p>The first step in collecting kernel core dumps is to set up a kernel core dump server. To start you must choose a machine to act as the server, taking into account the following points.</p>
+<ul>
+<li><p>The kernel core dump server is not computationally expensive; it will run easily on any machine capable of running Mac OS X.</p></li>
+<li><p>Kernel core dumps are large, typically running to the order of 200-500+ MB (this varies based on the client's kernel map size, physical memory size, usage patterns, and so on). Your server should have a lot of free disk space.</p></li>
+<li><p>The server must have a static IP address.</p></li>
+<li><p>The server's IP address must be visible to all of the clients. You can't place the server behind a NAT or firewall unless your clients are also behind the same NAT or firewall.</p></li>
+</ul>
+<div class="notebox">
+<p><strong>WARNING: </strong>To simplify the setup process this technical note assumes that your client and server are on a trusted network, and that you trust all of the users who have accounts on the server.</p>
+<p>Furthermore, when a client panics, it transmits the contents of kernel memory to the server in the clear. It's quite possible that this data includes sensitive information. You should configure your network (using, for example, switched hubs, a firewall, or a VPN) so that this data can't be seen by unauthorized persons.</p>
+</div>
+<p>To enable the kernel core dump server, execute the following steps:</p>
+<ul>
+<li><p>Create the core dump directory as described in <a href="#SECCREATEDIR1">Creating a Core Dump Directory</a>.</p></li>
+<li><p>Activate the Kernel Dump Server Process as described in <a href="#ACTIVATEKDUMP">Activating the Kernel Dump Server Process</a>.</p></li>
+<ul>
+<li><p>For Mac OS X 10.4, configure and activate the Kernel Dump Server Process as described in <a href="#SECSERVER2">Configuring the Kernel Core Dump Server for Mac OS X 10.4.x</a>.</p></li>
+<li><p>For Mac OS X 10.3, configure and activate the Kernel Dump Server Process as described in <a href="#SECSERVER3">Configuring the Kernel Core Dump Server for Mac OS X 10.3.x</a>.</p></li>
+</ul>
+</ul>
+<a name="SECCREATEDIR1"></a><h3>Creating a Core Dump Directory</h3>
+<p>To start, you must create a directory into which the server writes core dumps. That directory must be writable by the program that's dumping the core. The easiest way to guarantee this is to make it writable by everyone. We recommend that you create this directory with the commands shown in <a href="#LISTCREATEDIR1">Listing 1</a>. </p>
+<a name="LISTCREATEDIR1"></a><p class="caption"><strong>Listing 1: </strong>Creating the core dump directory.</p>
+<pre class="sourcecodebox">server$ sudo mkdir /PanicDumps
+Password:********
+server$ sudo chown root:wheel /PanicDumps
+server$ sudo chmod 1777 /PanicDumps</pre>
+<a name="ACTIVATEKDUMP"></a><h3>Activating the Kernel Dump Server Process</h3>
+<p>For Mac OS X 10.5 and greater, a disabled launchd property list file is present as part of the basic system installation. The<code> com.apple.kdump.plist</code> property list file assumes that you will use the <code>/PanicDumps</code> directory to store the kernel core dumps. If you want to use a different directory,  create the directory using similar instructions as shown in <a href="#LISTCREATEDIR1">Listing 1</a> then modify the <code>/System/Library/LaunchDaemons/com.apple.kdump.plist</code> property list file  and update the <code>ProgramArguments</code> property with the full path to the desired directory.</p>
+<p>To activate the server, use <code>launchctl</code> shown in <a href="#ACTIVATE_KDUMPD">Listing 2</a>. This will update the property list file so that the core dump server will always startup automatically across system restarts.</p>
+<a name="ACTIVATE_KDUMPD"></a><p class="caption"><strong>Listing 2: </strong>Activating the core dump server.</p>
+<pre class="sourcecodebox">server$ sudo launchctl load -w /System/Library/LaunchDaemons/com.apple.kdumpd.plist
+Password:********</pre>
+<div class="notebox"><p><strong>Note: </strong>The -w argument to launchctl removes the <code> disabled </code>key from the property list file and the file is written back out to disk. On future restarts, the core dump server process will always start. For more information on the options to <code>launchctl</code>, refer to the man page for <a href="x-man-page://1/launchctl">launchctl</a>.</p></div>
+<p>You can verify that the core dump  server is active by using the <code>launchctl list</code> command as shown in <a href="#VERIFY_KDUMPD_ACTIVE">Listing 3</a>. </p>
+<a name="VERIFY_KDUMPD_ACTIVE"></a><p class="caption"><strong>Listing 3: </strong>Verifying the core dump server is active.</p>
+<pre class="sourcecodebox">server$ sudo launchctl list | grep kdump
+Password:********
+ - 0     com.apple.kdumpd</pre>
+<p>There may be no PID associated with the <code>com.apple.kdumpd</code> launchd job label as the process may not be active just yet. The status 0 value indicates that the server is ready for on-demand use.</p>
+<p>Once you have the server configured correctly, you can proceed on to the next step, <a href="#SECCLIENT">Configuring a Client</a>.</p>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="SECSERVERS"></a><h2>Configuring the Kernel Core Dump Server for Mac OS X prior to 10.5</h2>
+<p>If you have server machine with a version of Mac OS X prior to 10.5, there are different instructions to follow. For a server machine with Mac OS X 10.4, follow the instructions in the section, <a href="#SECSERVER2">Configuring the Kernel Core Dump Server for Mac OS X 10.4.x</a>. For a server machine with Mac OS X 10.3, follow the instructions in the section, <a href="#SECSERVER3">Configuring the Kernel Core Dump Server for Mac OS X 10.3.x</a>.</p>
+<a name="SECSERVER2"></a><h3>Configuring the Kernel Core Dump Server for Mac OS X 10.4.x</h3>
+<p>The procedure for setting up the Kernel Core Dump server under Mac OS X 10.4.x is similar to the procedure for Mac OS X 10.5. The only difference is that the launchd property list file is not installed by default, so you have to create it yourself. Create the launchd property list file shown in <a href="#TIGERKDUMPPLIST">Listing 4</a>. These instructions assume that you are using the <code>/PanicDumps</code> directory to store the kernel core dumps. If you use a different directory, you will have to substitute the full path to that directory in place of the <code>ProgramArguments</code> string property <code>/PanicDumps</code>. </p>
+<a name="TIGERKDUMPPLIST"></a><p class="caption"><strong>Listing 4: </strong>Creating the Server launchd property list file</p>
+<pre class="sourcecodebox">server$ sudo cat &gt; /tmp/com.mycompany.kdump.plist
+Password: ********
+&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;!DOCTYPE plist PUBLIC "-//Apple Computer//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"&gt;
+&lt;plist version="1.0"&gt;
+&lt;dict&gt;
+    &lt;key&gt;InitGroups&lt;/key&gt;
+    &lt;true/&gt;
+    &lt;key&gt;Label&lt;/key&gt;
+    &lt;string&gt;com.mycompany.kdumpd&lt;/string&gt;
+    &lt;key&gt;ProgramArguments&lt;/key&gt;
+    &lt;array&gt;
+        &lt;string&gt;/usr/libexec/kdumpd&lt;/string&gt;
+        &lt;string&gt;/PanicDumps&lt;/string&gt;
+    &lt;/array&gt;
+    &lt;key&gt;Sockets&lt;/key&gt;
+    &lt;dict&gt;
+        &lt;key&gt;Listener&lt;/key&gt;
+        &lt;dict&gt;
+            &lt;key&gt;SockServiceName&lt;/key&gt;
+            &lt;string&gt;1069&lt;/string&gt;
+            &lt;key&gt;SockType&lt;/key&gt;
+            &lt;string&gt;dgram&lt;/string&gt;
+        &lt;/dict&gt;
+    &lt;/dict&gt;
+    &lt;key&gt;UserName&lt;/key&gt;
+    &lt;string&gt;nobody&lt;/string&gt;
+    &lt;key&gt;inetdCompatibility&lt;/key&gt;
+    &lt;dict&gt;
+        &lt;key&gt;Wait&lt;/key&gt;
+        &lt;true/&gt;
+    &lt;/dict&gt;
+&lt;/dict&gt;
+&lt;/plist&gt;
+^D
+client$ ls -l /tmp/com.mycompany.kdump.plist
+-rw-r--r-- 1 admin  wheel  831 Sep 10 15:25 /tmp/com.mycompany.kdump.plist
+client$ sudo cp /tmp/com.mycompany.kdump.plist /Library/LaunchDaemons/
+Password: ********
+client$ ls -l /Library/LaunchDaemons/com.mycompany.kdump.plist
+-rw-r--r-- 1 root  wheel  831 Sep 10 15:26 /Library/LaunchDaemons/com.mycompany.kdump.plist</pre>
+<p>Once you have the created the launchd property list, restart the system. The core dump server process should be active on restart. You can verify that the core dump server process is active by using the <code>launchctl list</code> command as shown in <a href="#VERIFY_KDUMPD_ACTIVE104">Listing 5</a>. </p>
+<a name="VERIFY_KDUMPD_ACTIVE104"></a><p class="caption"><strong>Listing 5: </strong>Verifying the core dump server is active for Mac OS X 10.4.x</p>
+<pre class="sourcecodebox">server$ sudo launchctl list | grep kdump
+Password:********
+com.mycompany.kdumpd</pre>
+<p>The presence of the <code>com.mycompany.kdumpd</code> launchd job label indicates that the core dump server is ready for on-demand use.</p>
+<p>With the server configured, configure the client as described in <a href="#SECCLIENT">Configuring a Client</a>.</p>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="SECSERVER3"></a><h3>Configuring the Kernel Core Dump Server for Mac OS X 10.3.x</h3>
+<p>Follow these instructions to configure the Kernel Core Dump server for Mac OS X 10.3. These instructions assume that you are using the <code>/PanicDumps</code> directory to store the kernel core dumps. If you use a different directory, you will have to substitute the full path to that directory in place of <code>/PanicDumps</code> in subsequent steps.</p>
+<a name="SECCONFDAEMON"></a><h4>Configure xinetd</h4>
+<p>Configure the <a href="x-man-page://8/xinetd">extended Internet services daemon</a>, <code>xinetd</code>, to run the server when a client connects. Copy the text from <a href="#LISTFILE">Listing 6</a> into a file called <code>macosxkdump</code> in the <code>/etc/xinetd.d</code> directory. <a href="#LISTFILEINSTALL">Listing 7</a> shows one way to do this.</p>
+<a name="LISTFILE"></a><p class="caption"><strong>Listing 6: </strong>Contents of the 'macosxkdump' configuration file</p>
+<pre class="sourcecodebox">service macosxkdump
+{
+    disable     = no
+    type        = UNLISTED
+    socket_type = dgram
+    protocol    = udp
+    port        = 1069
+    user        = nobody
+    groups      = yes
+    server      = /usr/libexec/kdumpd
+    server_args = /PanicDumps
+    wait        = yes
+}</pre>
+<a name="LISTFILEINSTALL"></a><p class="caption"><strong>Listing 7: </strong>Creating the 'macosxkdump' file</p>
+<pre class="sourcecodebox">server$ cat &gt; /tmp/macosxkdump
+service macosxkdump
+{
+    disable     = no
+    type        = UNLISTED
+    socket_type = dgram
+    protocol    = udp
+    port        = 1069
+    user        = nobody
+    groups      = yes
+    server      = /usr/libexec/kdumpd
+    server_args = /PanicDumps
+    wait        = yes
+}
+^D
+server$ ls -l /tmp/macosxkdump
+-rw-r--r-- 1 quinn  staff  278 14 Jul 15:25 /tmp/macosxkdump
+server$ sudo cp /tmp/macosxkdump /etc/xinetd.d 
+Password: ********
+server$ ls -l /etc/xinetd.d/macosxkdump 
+-rw-r--r-- 1 root  wheel  278 14 Jul 15:26 /etc/xinetd.d/macosxkdump</pre>
+<div class="notebox"><p><strong>IMPORTANT: </strong>To maintain system security, the configuration file (<code>/etc/xinetd.d/macosxkdump</code>) should have the permissions shown by the final command in <a href="#LISTFILEINSTALL">Listing 7</a>.</p></div>
+<a name="SECSIGNALDAEMON"></a><h4>Signal xinetd</h4>
+<p>You must send the <code>SIGHUP</code> signal to the <code>xinetd</code> daemon for it to recognize your configuration changes. <a href="#LISTSIGHUP">Listing 8</a> shows how to do this. When entering the first command, make sure to use backquotes (ASCII 96), not single quotes (ASCII 39).</p>
+<a name="LISTSIGHUP"></a><p class="caption"><strong>Listing 8: </strong>Signalling xinetd</p>
+<pre class="sourcecodebox">server$ sudo kill -HUP `cat /var/run/xinetd.pid`
+Password: ********</pre>
+<p>Alternatively, you can simply reboot the machine, which also causes <code>xinetd</code> to recognize the new configuration.</p>
+<a name="SECCONFIRMCONF"></a><h4>Confirm Configuration</h4>
+<p>You can confirm that everything is configured correctly using one of two methods.</p>
+<ul>
+<li><p>If you look in the system log you will see text similar to that shown in <a href="#LISTSYSTEMLOG">Listing 9</a> indicating that <code>xinetd</code> has started a new service. You can view the system log manually (<code>/var/log/system.log</code>) or in the Console application.</p></li>
+<li><p>You can send a <code>SIGUSR1</code> signal to <code>xinetd</code> to ask it to dump its current configuration. <a href="#LISTSIGUSR1">Listing 10</a> shows how to do this. The daemon appends the information to <code>/var/run/xinetd.dump</code>. You should see a record indicating that the <code>macosxkdump</code> service is active, similar to the one shown in <a href="#LISTDUMPCONFIRM">Listing 11</a>.</p></li>
+</ul>
+<a name="LISTSYSTEMLOG"></a><p class="caption"><strong>Listing 9: </strong>System log confirmation</p>
+<pre class="sourcecodebox">Jul 14 15:40:57 localhost xinetd[349]: Starting reconfiguration
+Jul 14 15:40:57 localhost xinetd[349]: readjusting service ssh
+Jul 14 15:40:57 localhost xinetd[349]: Reconfigured: new=1 old=1 dropped=0 (services)</pre>
+<a name="LISTSIGUSR1"></a><p class="caption"><strong>Listing 10: </strong>Signalling xinetd to dump its configuration</p>
+<pre class="sourcecodebox">server$ sudo kill -USR1 `cat /var/run/xinetd.pid`
+Password: ********</pre>
+<a name="LISTDUMPCONFIRM"></a><p class="caption"><strong>Listing 11: </strong>xinetd dump confirmation</p>
+<pre class="sourcecodebox">Service = macosxkdump
+    State = Active
+    Service configuration: macosxkdump
+        id = macosxkdump
+        flags = IPv4
+        type = UNLISTED
+        socket_type = dgram
+        Protocol (name,number) = (udp,17)
+        port = 1069
+        wait = yes
+        user = -2
+        Groups = yes
+        PER_SOURCE = -1
+        Bind = All addresses.
+        Server = /usr/libexec/kdumpd
+        Server argv = kdumpd /PanicDumps
+        Only from: All sites
+        No access: No blocked sites
+        Logging to syslog. Facility = daemon, level = info
+        Log_on_success flags = HOST PID HOST
+        Log_on_failure flags = HOST
+    running servers = 0
+    retry servers = 0
+    attempts = 0
+    service fd = 6</pre>
+<p>Once you have the server configured, you can configure the client as described in <a href="#SECCLIENT">Configuring a Client</a>.</p>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="SECCLIENT"></a><h2>Configuring a Client</h2>
+<p>To enable kernel core dumps on a client machine, you must modify the <code>boot-args</code> NVRAM variable to include two arguments.</p>
+<ul>
+<li><p>Set the 0x0400 flag in the <code>debug</code> argument. Furthermore, there are a number of other useful flags for this argument which are described in detail below.</p></li>
+<li><p>Set the <code>_panicd_ip</code> argument to the IP address of the kernel core dump server. You must use an IPv4 address in dotted decimal notation; IPv6 and DNS addresses are not supported.</p></li>
+<li>
+<p>If you are configuring a <strong>Mac OS X Server</strong> system as a core dump client, you must limit or turn off <code>watchdogtimerd</code>. On the Mac OS X Server system the watchdog timer reboots the machine after a panic occurs. You must limit or disable <code>watchdogtimerd</code> so that the server system will not reboot while the client is in the process of sending the core dump to the server.</p>
+<div class="notebox"><p><strong>Note: </strong>On a Mac OS X Server system you can turn off <code>watchdogtimerd</code> using the Energy Saver preference pane Options tab, or from the command line. Alternatively, you can modify the amount of time <code>watchdogtimerd</code> waits before rebooting. See <a href="x-man-page://8/watchdogtimerd"><code>watchdogtimerd</code></a> for further information on modification of the watchdog behavior.</p></div>
+</li>
+</ul>
+<p><a href="#LISTNVRAM">Listing 12</a> shows an example of how to set the <code>boot-args</code> firmware variable, assuming that the kernel core dump server's IP address is 10.0.40.2.</p>
+<a name="LISTNVRAM"></a><p class="caption"><strong>Listing 12: </strong>Setting the boot-args firmware variable</p>
+<pre class="sourcecodebox">client$ sudo nvram boot-args="debug=0xd44 _panicd_ip=10.0.40.2"
+Password: ********</pre>
+<p>You must restart to enable this setting.</p>
+<div class="notebox"><p><strong>IMPORTANT: </strong>The <code>boot-args</code> NVRAM variable may be reset whenever you install new system software, including software updates, and whenever you change the startup disk using System Preferences.</p></div>
+<a name="SECDEBUGFLAGS"></a><h3>Debug Flags in Depth</h3>
+<p>You can use the <code>boot-args</code> debug flags to control various aspects of kernel debugging. Many of these flags are documented in <a href="http://developer.apple.com/documentation/Darwin/Conceptual/KernelProgramming/build/chapter_18_section_5.html">existing documentation</a>. <a href="#LISTDEBUGFLAGS">Table 1</a> describes the flags most relevant to kernel core dumps. <a href="#LISTDEBUGFLAGSCOMB">Table 2</a> shows how to combine these flags to effect various useful behaviors.</p>
+<a name="LISTDEBUGFLAGS"></a><p class="smalltext"><strong>Table 1 : </strong>Debug flags</p>
+<table cellspacing="0" class="graybox">
+<tr>
+<th>Symbolic Name </th>
+<th>Flag</th>
+<th>Description</th>
+</tr>
+<tr>
+<td scope="row"><code>DB_NMI</code></td>
+<td>0x0004</td>
+<td>Activates the kernel debugging facility, including support for NMI (the programmer's switch on the front of the computer; see <a href="http://developer.apple.com/qa/qa2001/qa1264.html">Technical Q&amp;A QA1264: Generating a Non-Maskable Interrupt (NMI)</a> if your machine does not have a programmer's switch).</td>
+</tr>
+<tr>
+<td scope="row"><code>DB_ARP</code></td>
+<td>0x0040</td>
+<td>Allows the kernel debugger nub to use ARP and thus support debugging across subnets. You would typically enable this flag when collecting kernel core dumps.</td>
+</tr>
+<tr>
+<td scope="row"><code>DB_LOG_PI_SCRN</code></td>
+<td>0x0100</td>
+<td>Disable the graphical panic screen. You typically want to do this when you enable kernel core dumps so that you can see progress for the kernel core dump transmission.</td>
+</tr>
+<tr>
+<td scope="row"><code>DB_KERN_DUMP_ON_PANIC</code></td>
+<td>0x0400</td>
+<td>Causes the kernel to core dump when the system panics.</td>
+</tr>
+<tr>
+<td scope="row"><code>DB_KERN_DUMP_ON_NMI</code></td>
+<td>0x0800</td>
+<td>Causes the kernel to core dump when the user triggers an NMI.</td>
+</tr>
+<tr>
+<td scope="row"><code>DB_DBG_POST_CORE</code></td>
+<td>0x1000</td>
+<td>Controls the kernel's behavior after dumping core in response to an NMI (<code>DB_KERN_DUMP_ON_NMI</code>). If the user triggers an NMI and this flag is clear, the kernel will dump core and then continue. Conversely, if this flag is set the kernel will dump core and then wait for a debugger connection.</td>
+</tr>
+<tr>
+<td scope="row"><code>DB_PANICLOG_DUMP</code></td>
+<td>0x2000</td>
+<td>Controls whether the kernel dumps a full core (if the flag is clear) or simply a panic log (if the flag is set).</td>
+</tr>
+</table>
+<a name="LISTDEBUGFLAGSCOMB"></a><p class="smalltext"><strong>Table 2 : </strong>Useful debug flag combinations</p>
+<table cellspacing="0" class="graybox">
+<tr>
+<th>Value</th>
+<th>Scenario</th>
+</tr>
+<tr>
+<td scope="row">0x0044</td>
+<td>Used for day-to-day two-machine debugging. <code>DB_NMI</code> allows you to enter the kernel debugger by triggering NMI. <code>DB_ARP</code> lets you debug without futzing around with permanent ARP table entries.</td>
+</tr>
+<tr>
+<td scope="row">0x0444</td>
+<td>Used for capturing kernel core dumps. <code>DB_NMI</code> is on in order to activate kernel debugging. <code>DB_ARP</code> is on, as explained above. <code>DB_KERN_DUMP_ON_PANIC</code> activates the kernel core dump facility.</td>
+</tr>
+<tr>
+<td scope="row">0x2444</td>
+<td>Used for capturing kernel panic logs. The flags are set per the previous row except that <code>DB_PANICLOG_DUMP</code> is set, causing the kernel to generate panic logs rather than core dumps.</td>
+</tr>
+<tr>
+<td scope="row">0x0844</td>
+<td>Useful when the user reports mysterious kernel-level freezes. When a freeze occurs, the user can trigger NMI and the system generates a kernel core dump and then continues. There's no need to set <code>DB_LOG_PI_SCRN</code> because it has no effect in this case.</td>
+</tr>
+<tr>
+<td scope="row">0x0d44</td>
+<td>Useful for testing the kernel core dump facility. This generates a kernel core dump if either a panic occurs or the user triggers NMI. <code>DB_LOG_PI_SCRN</code> is set so that you can see progress for the kernel core dump transmission.</td>
+</tr>
+</table>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="SECTESTING"></a><h2>Testing Your Configuration</h2>
+<p>Once you have enabled the server and configured the client, it's time to test things to make sure they're working as expected. To test the system you need to trigger a kernel panic on the client system. Two methods are presented here. </p>
+<ol>
+<li><p>You can <a href="#DTRACEPANICTRIGGER">trigger a panic using DTrace</a> on client systems running Mac OS X 10.5 or greater.</p></li>
+<li><p>You can <a href="#INSTANTPANICALT">trigger a panic using the InstantPanic kernel extension</a> which works for all releases of Mac OS X.</p></li>
+</ol>
+<a name="DTRACEPANICTRIGGER"></a><h3>Triggering a Kernel Panic with DTrace</h3>
+<p>For Mac OS X 10.5 or later, use <code>dtrace</code> in a Terminal window as shown in <a href="#DTRACELOAD">Listing 13</a> to trigger a kernel panic on the client system.</p>
+<a name="DTRACELOAD"></a><p class="caption"><strong>Listing 13: </strong>Using DTrace to trigger a panic on the client system</p>
+<pre class="sourcecodebox">client$ sudo dtrace -w -n "BEGIN{ panic();}"</pre>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="INSTANTPANICALT"></a><h3>Triggering a Kernel Panic with the Instant Panic Kernel Extension</h3>
+<p>For all versions of Mac OS X, this technical note includes a simple kernel extension, InstantPanic, that panics the kernel as soon as you load it. You can get the source and binary for this kernel extension from the <a href="#SECDOWNLOADABLES">Downloadables</a> section.</p>
+<p>Start by downloading and unarchiving the kernel extension on your desktop. Load the kernel extension using the commands shown in <a href="#LISTLOAD">Listing 14</a>.</p>
+<a name="LISTLOAD"></a><p class="caption"><strong>Listing 14: </strong>Triggering a panic by loading the 'InstantPanic' kernel extension</p>
+<pre class="sourcecodebox">client$ cd ~/Desktop/InstantPanic/build/
+client$ sudo cp -r InstantPanic.kext /
+Password: ********
+client$ sudo kextload /InstantPanic.kext</pre>
+<div class="notebox"><p><strong>Note: </strong>In <a href="#LISTLOAD">Listing 14</a> we make a copy of the kernel extension as root (using <code>sudo</code>) in order to guarantee that it has the right file permissions. You cannot load a kernel extensions with the <a href="http://developer.apple.com/documentation/Darwin/Conceptual/KEXTConcept/KEXTConceptPackaging/packaging_kext.html">wrong file permissions</a>. If <code>kextload</code> prints a message saying that the KEXT is not authentic, you can fix the permissions using <code>sudo chown -R root:wheel /InstantPanic.kext</code>.</p></div>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="COREDUMPOCCURS"></a><h3>The Kernel Panic Core Dump File</h3>
+<p>Once a panic occurs, if all goes well, the client will transmit a kernel core dump to the server. You can see the transmission progress on the screen of the client (assuming that you set the <code>DB_LOG_PI_SCRN</code> debug flag).</p>
+<p>When the transfer is complete you can list the <code>/PanicDumps</code> directory on the server to see the new panic dump file.</p>
+<p class="caption"><strong>Listing 15: </strong>An example kernel core dump</p>
+<pre class="sourcecodebox">server$ ls -l /PanicDumps
+total 216872
+-rw-rw---- 1 nobody  wheel  300245144 Sep 19 12:51 paniclog-xnu-1228.5.20-10.0.40.7-3a061187</pre>
+<p>The name of this file includes the kernel version—as displayed by <code>uname -a</code>, in this case 1228.5.20-and the client's IP address (10.0.40.7), along with a unique timestamp.</p>
+<div class="notebox"><p><strong>Note: </strong>For Mac OS X 10.4.6 and earlier, the core dump file name does not include the kernel's minor version. </p></div>
+<p>The section <a href="#SECDEBUG">Debugging with Kernel Core Dumps</a> explains how you can debug a kernel panic using the core dump file. Alternatively, if you had set the <code>DB_PANICLOG_DUMP</code> flag, the <code>/PanicDumps</code> directory will contain a panic log file, much like the file you'd get in <code>/Library/Logs</code> after a panic. <a href="#LISTPANICLOGDIR">Listing 16</a> shows an example of this.</p>
+<a name="LISTPANICLOGDIR"></a><p class="caption"><strong>Listing 16: </strong>An example panic log file</p>
+<pre class="sourcecodebox">server$ ls -l /PanicDumps
+total 216872
+-rw-rw---- 1 nobody  wheel       300245144 Sep 19 12:51 paniclog-xnu-1228.5.20-10.0.40.7-3a061187
+server$ sudo cat /PanicDumps/paniclog-xnu-1228.5.20-10.0.40.7-3a061187 
+panic(cpu 0 caller 0x21058018): InstantPanic: Just add water!
+Backtrace, Format - Frame : Return Address (4 potential args on stack) 
+0x1b38fc18 : 0x12b0fa (0x4592a4 0x1b38fc4c 0x133243 0x0) 
+0x1b38fc68 : 0x21058018 (0x21058053 0x0 0x2a57e38 0x2e4f4a0) 
+0x1b38fc88 : 0x18f24d (0x21058080 0x0 0x0 0x0) 
+0x1b38fcc8 : 0x18f51e (0x6f 0x1 0x2e4f4a4 0x2e4f4c0) 
+0x1b38fd68 : 0x147c60 (0x53b8e0 0x6f 0x1 0x2e4f4a4) 
+0x1b38fdb8 : 0x12d17e (0x2e4f488 0x3300790 0x1b38fdf8 0x11ee14) 
+0x1b38fdf8 : 0x126257 (0x2e4f400 0x2a50844 0x3338e88 0x0) 
+0x1b38ff08 : 0x1973dd (0x1b38ff44 0x0 0x0 0x0) 
+0x1b38ffc8 : 0x19f3b3 (0x33cfc34 0x0 0x1a20b5 0x2f73790) 
+No mapping exists for frame pointer
+Backtrace terminated-invalid frame pointer 0xbffff458
+      Kernel loadable modules in backtrace (with dependencies):
+         com.apple.dts.kext.InstantPanic(1.0)@0x21057000-&gt;0x21058fff
+
+BSD process name corresponding to current thread: kextload
+
+Mac OS version:
+9E17
+
+Kernel version:
+Darwin Kernel Version 9.4.0: Mon Jun  9 19:30:53 PDT 2008; root:xnu-1228.5.20~1/RELEASE_I386
+System model name: iMac4,1 (Mac-F42787C8)</pre>
+<p>For more information about kernel panic logs, see <a href="http://developer.apple.com/technotes/tn2002/tn2063.html">Technical Note TN2063: Understanding and Debugging Kernel Panics</a>.</p>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="SECDEBUG"></a><h2>Debugging with Kernel Core Dumps</h2>
+<p>If you're a kernel programmer, you can use kernel core dumps to debug kernel panics and hangs. Before you start, you should collect together the following helpful resources.</p>
+<ul>
+<li>
+<p>The Kernel Debug Kit for the kernel that panicked. You can get Kernel Debug Kits from the <a href="http://developer.apple.com/sdk/">Apple developer web site</a>.</p>
+<p>The rest of this section assumes that you have mounted the correct Kernel Debug Kit disk image on your machine.</p>
+</li>
+<li>
+<p>The Darwin source code for the kernel that panicked. You can get Darwin source code from the <a href="http://www.opensource.apple.com/darwinsource/">Darwin Releases page</a> on the Apple developer site. The source for the kernel is held in the <code>xnu</code> project.</p>
+<p>The Darwin kernel source is virtually identical to the source used to build the Mac OS X kernel. In almost all cases you can use the Darwin source to do meaningful source-level debugging of the Mac OS X kernel.</p>
+<p>The rest of this section assumes that the machine that panicked is running Mac OS X 10.5.4, which corresponds to <code>xnu-1228.5.20</code>. Furthermore, it assumes that you have downloaded the <code>xnu-1228.5.20</code> source and that you unarchived it to a folder on your desktop named <code>xnu-1228.5.20</code>.</p>
+</li>
+</ul>
+<div class="notebox"><p><strong>IMPORTANT: </strong>You must download the resources (Kernel Debug kit, Darwin xnu source code, and other pertinent driver source code) that correspond to the kernel version on the client machine (the machine that panicked).</p></div>
+<p>The first step to debugging with a kernel core file is to open that file in GDB using the <code>-c</code> option. <a href="#LISTGDBCORE">Listing 17</a> shows an example of this. Once you've opened the core file in GDB, you can inspect the state of the kernel using standard GDB commands. This example uses <code>bt</code> to display a backtrace of the stack.</p>
+<div class="notebox"><p><strong>IMPORTANT: </strong>If the system you use to analyze the kernel panic core dump uses a different machine architecture than that of the client system which generated the panic, you must include the <code>-arch</code> argument when using GDB. By default GDB will interpret the core dump to be using the same machine architecture as the system which you are using GDB on. If the client system which generated the panic was an Intel-based Macintosh system, and you use a PowerPC-based Macintosh system to analyze the core dump, you must include the <code>-arch i386</code> argument to GDB. Conversely, if the client system which generated the panic was a PowerPC-based Macintosh system, and you use an Intel-based Macintosh system to analyze the core dump, you must include the <code>-arch ppc</code> argument to GDB.</p></div>
+<a name="LISTGDBCORE"></a><p class="caption"><strong>Listing 17: </strong>Opening a kernel core file in GDB</p>
+<pre class="sourcecodebox">server$ sudo gdb -c /PanicDumps/core-xnu-1228.5.20-10.0.40.7-10499ce2 
+Password: ********
+GNU gdb 6.3.50-20050815 (Apple version gdb-768) (Tue Oct  2 04:07:49 UTC 2007)
+Copyright 2004 Free Software Foundation, Inc.
+GDB is free software, covered by the GNU General Public License, and you are
+welcome to change it and/or distribute copies of it under certain conditions.
+Type "show copying" to see the conditions.
+There is absolutely no warranty for GDB. Type "show warranty" for details.
+This GDB was configured as "i386-apple-darwin".
+#0  0x001ae4cd in ?? ()</pre>
+<div class="notebox"><p><strong>Note: </strong>In Xcode 1.2 and earlier, GDB does not allow you to have spaces in the pathname that you supply to the <code>-c</code> argument. This bug is fixed in Xcode 1.5 and later.</p></div>
+<p>As you can see, this backtrace contains no symbolic information. You can fix this by loading kernel symbols from the Kernel Debug Kit. <a href="#LISTGDBADDSYM">Listing 18</a> shows an example of this. Once you load the kernel symbols, the backtrace is now much more helpful.</p>
+<a name="LISTGDBADDSYM"></a><p class="caption"><strong>Listing 18: </strong>Loading kernel symbols</p>
+<pre class="sourcecodebox">(gdb) add-symbol-file /Volumes/KernelDebugKit/mach_kernel
+add symbol table from file "/Volumes/KernelDebugKit/mach_kernel"? (y or n) y
+Reading symbols from /Volumes/KernelDebugKit/mach_kernel...Reading symbols from /Volumes/KernelDebugKit/mach_kernel.dSYM/Contents/Resources/DWARF/mach_kernel...done.
+done.
+(gdb) bt
+#0  Debugger (message=0x4592a4 "panic") at /SourceCache/xnu/xnu-1228.5.20/osfmk/i386/AT386/model_dep.c:786
+#1  0x0012b0fa in panic (str=0x210c7053 "InstantPanic: Just add water!") at /SourceCache/xnu/xnu-1228.5.20/osfmk/kern/debug.c:274
+#2  0x210c7018 in ?? ()</pre>
+<p>Now that you have symbols, you're only a short step away from source-level debugging. As you can see from frame 1 of the backtrace, GDB expects to find the kernel source in the directory <code>/SourceCache/xnu/xnu-1228.5.20</code>. You can meet that expectation by virtue of a well-placed symbolic link. <a href="#LISTSYMLINK">Listing 19</a> shows how to create this link.</p>
+<a name="LISTSYMLINK"></a><p class="caption"><strong>Listing 19: </strong>Creating a symlink so that GDB can find the source</p>
+<pre class="sourcecodebox">server$ mkdir -p /SourceCache/xnu
+server$ ln -s ~/Desktop/xnu-1228.5.20 /SourceCache/xnu</pre>
+<p>Now you can look back up the stack (using the <code>frame</code> command) and get actual source code listings (using the <code>list</code> command). <a href="#LISTGDBFRAME">Listing 20</a> shows an example of this.</p>
+<a name="LISTGDBFRAME"></a><p class="caption"><strong>Listing 20: </strong>Source-level debugging</p>
+<pre class="sourcecodebox">(gdb) frame 0
+#0  Debugger (message=0x4592a4 "panic") at /SourceCache/xnu/xnu-1228.5.20/osfmk/i386/AT386/model_dep.c:786
+warning: Source file is more recent than executable.
+786		hw_atomic_sub(&amp;debug_mode, 1); 
+(gdb) frame 1
+#1  0x0012b0fa in panic (str=0x210c7053 "InstantPanic: Just add water!") at /SourceCache/xnu/xnu-1228.5.20/osfmk/kern/debug.c:274
+warning: Source file is more recent than executable.
+274		Debugger("panic");</pre>
+<p>Last, but certainly not least, you can use the kernel debugging macros on a kernel core dump in the same way you would on a live kernel. <a href="#LISTKGM">Listing 21</a> shows how to load up the kernel debugging macros and execute two of the most useful macros.</p>
+<ul>
+<li><p><code>paniclog</code> prints the standard panic information</p></li>
+<li><p><code>showallstacks</code> prints a backtrace for everything thread running within the kernel</p></li>
+</ul>
+<a name="LISTKGM"></a><p class="caption"><strong>Listing 21: </strong>Kernel debugging macros in action</p>
+<pre class="sourcecodebox">(gdb) source /Volumes/KernelDebugKit/kgmacros 
+Loading Kernel GDB Macros package. Type "help kgm" for more info.
+(gdb) paniclog
+panic(cpu 0 caller 0x21114018): InstantPanic: Just add water!
+Backtrace, Format - Frame : Return Address (4 potential args on stack) 
+0x20ed7c18 : 0x12b0fa (0x4592a4 0x20ed7c4c 0x133243 0x0) 
+0x20ed7c68 : 0x21114018 (0x21114053 0x0 0x2a57e38 0x538eca0) 
+0x20ed7c88 : 0x18f24d (0x21114080 0x0 0x0 0x0) 
+0x20ed7cc8 : 0x18f51e (0x72 0x1 0x538eca4 0x538ecc0) 
+0x20ed7d68 : 0x147c60 (0x53b8e0 0x72 0x1 0x538eca4) 
+0x20ed7db8 : 0x12d17e (0x538ec88 0x5399590 0x20ed7df8 0x11ee14) 
+0x20ed7df8 : 0x126257 (0x538ec00 0x2a50508 0x39cf5a0 0x0) 
+0x20ed7f08 : 0x1973dd (0x20ed7f44 0x0 0x0 0x0) 
+0x20ed7fc8 : 0x19f3b3 (0x40c5e8c 0x19ecd7 0x8 0x40c5e8c) 
+No mapping exists for frame pointer
+Backtrace terminated-invalid frame pointer 0xbffff458
+      Kernel loadable modules in backtrace (with dependencies):
+         com.apple.dts.kext.InstantPanic(1.0)@0x21113000-&gt;0x21114fff
+
+BSD process name corresponding to current thread: kextload
+
+Mac OS version:
+9E17
+
+Kernel version:
+Darwin Kernel Version 9.4.0: Mon Jun  9 19:30:53 PDT 2008; root:xnu-1228.5.20~1/RELEASE_I386
+System model name: iMac4,1 (Mac-F42787C8)
+
+(gdb) showallstacks
+[...]
+task        vm_map      ipc_space  #acts   pid  proc        command
+0x0345182c  0x039cf5a0  0x02a50508    1    576  0x0333b4a0  kextload
+            thread      processor   pri  state  wait_queue  wait_event
+            0x05358a78  0x0053b0c0   31  R
+        kernel_stack=0x20ed4000
+        stacktop=0x20ed7c18
+        0x20ed7c18  0x12b0fa &lt;panic+422&gt;
+        0x20ed7c68  0x21114018 &lt;com.apple.dts.kext.InstantPanic + 0x1018&gt;
+        0x20ed7c88  0x18f24d &lt;kmod_start_or_stop+213&gt;
+        0x20ed7cc8  0x18f51e &lt;kmod_control+112&gt;
+        0x20ed7d68  0x147c60 &lt;_Xkmod_control+240&gt;
+        0x20ed7db8  0x12d17e &lt;ipc_kobject_server+247&gt;
+        0x20ed7df8  0x126257 &lt;mach_msg_overwrite_trap+752&gt;
+        0x20ed7f08  0x1973dd &lt;mach_call_munger+529&gt;
+        0x20ed7fc8  0x19f3b3 &lt;lo_mach_scall+227&gt;
+        stackbottom=0x20ed7fc8</pre>
+<p>You can learn more about the kernel debugging macros in the <a href="http://developer.apple.com/documentation/DeviceDrivers/Conceptual/WritingDeviceDriver/DebuggingDrivers/chapter_8_section_4.html">I/O Kit documentation</a>.</p>
+<div class="notebox">
+<p><strong>Note: </strong>With kernel coredumps, when examining threads other than the thread interrupted for debugger entry, you must use the <code>switchtocorethread</code> and <code>resetcorectx</code> macros in lieu of the <code>switchtoact</code> and <code>resetctx</code> macros (which apply only to live kernel debugger sessions).</p>
+<p>With GDB under Mac OS X 10.4, if the target corefile was generated by a PowerPC-based Macintosh system, you must issue the following command before issuing the <code>switchtocorethread</code> command.</p>
+<p><code>set $lr = 0</code></p>
+</div>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="DUMPOPTIONS"></a><h2>Kernel Core Dump Options</h2>
+<p>The information above is sufficient for the needs of most developers to obtain kernel panic core dumps. However, there are options to address some networking issues. </p>
+<ul>
+<li><p>If a client or server system has an existing network process which uses UDP port 1069, it is possible in some situations to alter the UDP port assignment for the client and server system. Read the section <a href="#CONFIGPORT">Configuring the Client and Server UDP Port Assignment</a> for customizing the core dump port assignment use.</p></li>
+<li><p>A client system may connected to a local area network where there is more than one router through which the client can send the core dump traffic to  the core dump server. it can be useful in this network topology to specify that the client system use a specific router to send the core dump packets to the server. Read the section <a href="#CONFIGROUTER">Configuring the Client Router Usage</a> to set the client to use a specific router.</p></li>
+<li><p>By default, the client system will use the built-in Ethernet interface <code>en0</code> for kernel debugging, including kernel core dumps. On some machines like the Mac OS X Server system, and those desktop Macintosh system which have two built-in Ethernet ports, you might want the kernel core dump to be sent out the Ethernet interface <code>en1</code>. Read the section <a href="#SECCHOOSEYOURINTERFACE">Specifying the Ethernet Interface</a> to set the client to use a specific built-in Ethernet interface.</p></li>
+</ul>
+<div class="notebox"><p><strong>IMPORTANT: </strong>To use any of these options, you must modify the firmware <code>boot-args</code> variable, then restart the system. You want to be aware that the <code>boot-args</code> NVRAM variable may be reset whenever you install new system software, including software updates, and whenever you change the startup disk using System Preferences.</p></div>
+<a name="CONFIGPORT"></a><h3>Configuring the Client and Server UDP Port Assignment</h3>
+<p>The kernel dump protocol uses UDP on port 1069 by default. The port assignment is configurable for all Mac OS X releases on the kernel dump server side. On the client side, for the Intel-based Macintosh systems you must have Mac OS X 10.4.7 or greater to configure a custom port assignment. For a PowerPC-based Macintosh system, you must have Mac OS X 10.5 or greater to configure a custom port assignment. If you want the core dump server to collect core dumps from PowerPC clients running Mac OS X 10.4 or earlier, or from Intel-based client running Mac OS X 10.4.6, you must leave the server port assignment set to the default value of 1069.</p>
+<a name="CONFIGCLIENTPORT"></a><h4>Configuring the Client UDP Port Assignment</h4>
+<p>To customize the client port assignment to 12345, add <code>_panicd_port=12345</code> as a <code>boot-args</code> argument. <a href="#LISTNVRAM_PORT">Listing 22</a> shows an example of setting the <code>boot-args</code> to include the custom <code> _panicd_port </code>setting.</p>
+<a name="LISTNVRAM_PORT"></a><p class="caption"><strong>Listing 22: </strong>Setting the client boot-args firmware variable to include the port assignment</p>
+<pre class="sourcecodebox">client$ sudo nvram boot-args="debug=0xd44 _panicd_ip=10.0.40.2 _panicd_port=12345"
+Password: ********</pre>
+<p>You must restart to enable this setting.</p>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="CONFIGSERVERPORT"></a><h4>Configuring the Server UDP Port Assignment</h4>
+<p>For Mac OS X 10.5 or greater, to customize the server port assignment, edit the <code>/System/Library/LaunchDaemon/com.apple.kdump.plist</code> launchd property list file. Change the <code> SockServiceName </code>string property from 1069 to the desired port assignment. Restart the system for the change to take effect.</p>
+<div class="notebox"><p><strong>IMPORTANT: </strong>Ensure that the file ownership and file permissions of the <code>/System/Library/LaunchDaemon/com.apple.kdump.plist</code> launchd property list file is maintained across the editing process. If the file permissions or file ownership settings are incorrect, launchd may not be able to start up the core dump server process.</p></div>
+<p>For a core dump server running under Mac OS X 10.4.x, to modify the port assignment refer to <a href="#TIGERKDUMPPLIST">Listing 4</a> and modify the<code> SockServiceName </code>string property from 1069 to the desired port assignment.</p>
+<p>For a core dump server running under Mac OS X 10.3.x, to modify the port assignment refer to <a href="#LISTFILEINSTALL">Listing 7</a> and modify the<code> port </code> value from 1069 to the desired port assignment.</p>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="CONFIGROUTER"></a><h3>Configuring the Client Router Usage</h3>
+<p>There are some situations where you want to force the core dump client to communicate to the core dump server using a specific router. This option exists for Intel-based clients systems with Mac OS X 10.4.7 or greater present, and for PowerPC-based clients with Mac OS X 10.5 or greater present. To customize the client router address assignment to 10.0.40.1, add <code>_router_ip=10.0.40.1</code> as a <code>boot-args</code> argument. <a href="#LISTROUTER">Listing 23</a> shows an example of setting the <code>boot-args</code> to include the custom <code> _router_ip </code>setting.</p>
+<a name="LISTROUTER"></a><p class="caption"><strong>Listing 23: </strong>Setting the client boot-args firmware variable to include the router address assignment</p>
+<pre class="sourcecodebox">client$ sudo nvram boot-args="debug=0xd44 _panicd_ip=10.0.40.2 _router_ip=10.0.40.1"
+Password: ********</pre>
+<p>You must restart to enable this setting.</p>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="SECCHOOSEYOURINTERFACE"></a><h3>Specifying the Ethernet Interface</h3>
+<p>You can force the system to use a particular port by setting the <code>kdp_match_name</code> boot argument. For example, to set the system to always use "en1" for kernel debugging, add <code>kdp_match_name=en1</code> to your <code>boot-args</code> setting. Refer to <a href="#SET_KDP_MATCH_NAME">Listing 24</a> for an example of setting the firmware <code>kdp_match_name=en1</code> property.</p>
+<a name="SET_KDP_MATCH_NAME"></a><p class="caption"><strong>Listing 24: </strong>Setting the boot-args firmware variable to include the kdp_match_name assignment</p>
+<pre class="sourcecodebox">client$ sudo nvram boot-args="debug=0xd44 _panicd_ip=10.0.40.2 kdp_match_name=en1"
+Password: ********</pre>
+<p>You must restart to enable this setting.</p>
+<div class="notebox"><p><strong>Note: </strong>The kernel dump client can only be configured to transmit on a built-in hard-wired Ethernet port. There is no support for transmitting core dumps across the AirPort interface, nor across third-party Ethernet interfaces. This is an issue for the MacBook Air which has no built-in hard-wired Ethernet interface.</p></div>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="SECCONCLUSION"></a><h2>Conclusion</h2>
+<p>The kernel core dump facility is a useful debugging tool for both kernel extension developers and users with large or complex Macintosh installations. Using this facility, you can capture information about kernel panics (and kernel hangs) where it's not possible to use the two-machine kernel debugger.</p>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="SECFURTHERREF"></a><h2>Further Reading</h2>
+<ul>
+<li><p><a href="http://developer.apple.com/documentation/Darwin/Conceptual/KEXTConcept/KEXTConceptDebugger/hello_debugger.html">Hello Debugger: Debugging a Device Driver With GDB</a></p></li>
+<li><p><a href="http://developer.apple.com/documentation/Darwin/Conceptual/KernelProgramming/index.html">Kernel Programming</a>, especially the <a href="http://developer.apple.com/documentation/Darwin/Conceptual/KernelProgramming/build/chapter_18_section_5.html">When Things Go Wrong: Debugging the Kernel</a>section</p></li>
+<li><p><a href="http://developer.apple.com/documentation/Darwin/Conceptual/KEXTConcept/KEXTConceptPackaging/packaging_kext.html">Packaging Your KEXT for Distribution and Installation</a></p></li>
+<li><p><a href="http://developer.apple.com/hardwaredrivers/download/">Mac OS X Hardware &amp; Drivers download page</a></p></li>
+<li><p><a href="http://developer.apple.com/hardwaredrivers/download/kerneldebugkits.html">Kernel Debug Kits</a></p></li>
+<li><p><a href="http://developer.apple.com/technotes/tn2002/tn2063.html">Technical Note TN2063: Understanding and Debugging Kernel Panics</a></p></li>
+<li><p><a href="http://developer.apple.com/technotes/tn2006/tn2163.html">Technical Note TN2163: Building Universal I/O Kit Drivers</a></p></li>
+<li><p><a href="http://developer.apple.com/qa/qa2001/qa1264.html">Technical Q&amp;A QA1264: Generating a Non-Maskable Interrupt (NMI)</a></p></li>
+<li><p><a href="x-man-page://8/kdumpd">kdumpd man page</a></p></li>
+<li><p><a href="http://developer.apple.com/opensource/">Darwin source code</a>, especially the kernel source (module <code>xnu</code>) and the <code>kdumpd</code> source (module <code>network_cmds</code>)</p></li>
+<li><p><a href="x-man-page://8/xinetd">xinetd man page</a> only present on Mac OS X 10.4 and earlier.</p></li>
+<li><p><a href="x-man-page://8/watchdogtimerd"><code>watchdogtimerd</code> man page</a> only present on Mac OS X Server systems.</p></li>
+</ul>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="SECDOWNLOADABLES"></a><h2>Downloadables</h2>
+<ul><li><p><a href="downloads/tn2118_InstantPanic.zip">A kernel extension that will panic your system.</a> ("tn2118_InstantPanic.zip", 24.1K)
+
+</p></li></ul>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="document_revision_summary"></a><h2>Document Revision History</h2>
+<table cellspacing="0" class="graybox" width="680">
+<tr>
+<th width="100">Date</th>
+<th width="580">Notes</th>
+</tr>
+<tr>
+<td scope="row">2008-11-12</td>
+<td>Revised content for Mac OS X 10.5.  Added optional configurations section - port assignment, router use, and interface use. Added reference to FireWire SDK.  </td>
+</tr>
+<tr>
+<td scope="row">2007-09-18</td>
+<td>Added information about minimum Mac OS X support for Intel Based Macintosh systems - 10.4.7.  Improved server disk setup instructions so dump files are writable by all users.</td>
+</tr>
+<tr>
+<td scope="row">2007-08-29</td>
+<td>Caught a missing element in the chown command prior to publication. </td>
+</tr>
+<tr>
+<td scope="row">2006-02-17</td>
+<td>Discussed permissions of /PanicDumps. Documented switchtocorethread macro and kdp_match_name boot argument. Corrected some broken links.</td>
+</tr>
+<tr>
+<td scope="row">2004-11-12</td>
+<td>Use mkdir -p to create the SourceCache path in one command. Mention the paniclog kernel debugging macro.  Put the working copy of macosxkdump in /tmp.  Note that changing startup disk also resets boot-args. Reference Q&amp;A 1264 in the table entry describing DB_NMI.</td>
+</tr>
+<tr>
+<td scope="row">2004-08-19</td>
+<td>Explains how to gather and use remote kernel core dumps.</td>
+</tr>
+</table>
+<p><b>Posted: </b>2008-11-12</p>
+<!-- END CONTENTS -->
+</td></tr></table>
+<!-- END WIDE COLUMN --><!-- END MAIN CONTENT --><!-- START BOTTOM APPLE NAVIGATION -->	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/technotes/tn2004/tn2118.html%3Fid%3DDTS10003352-2.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/technotes/tn2004/tn2118.html%3Fid%3DDTS10003352-2.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/technotes/tn2004/tn2118.html%3Fid%3DDTS10003352-2.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+<!--#include virtual="/includes/footer" --><!-- END BOTTOM APPLE NAVIGATION --><!-- START CENTER CLOSE -->
+</center>
+<!-- END CENTER CLOSE -->
+</body>
+</html>

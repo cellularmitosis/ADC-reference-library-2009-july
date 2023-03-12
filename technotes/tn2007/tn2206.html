@@ -1,0 +1,545 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<!-- BEGIN META TAG INFO --><link rel="home" href="http://developer.apple.com/">
+<link rel="find" href="http://developer.apple.com/search/">
+<link rel="stylesheet" type="text/css" href="../../documentation/css/adcstyle.css" title="fonts">
+<script language="JavaScript" type="text/javascript" src="../../documentation/js/busnav.js"></script><script language="JavaScript" src="../../documentation/js/adc.js" type="text/javascript"></script><!-- END META TAG INFO --><!-- BEGIN TITLE --><title>Technical Note TN2206: Mac OS X Code Signing In Depth</title>
+<!-- END TITLE -->
+</head>
+<!-- BEGIN BODY OPEN --><body bgcolor="#ffffff"><a name="//apple_ref/doc/uid/DTS40007919" title="Mac OS X Code Signing In Depth"></a>
+<!-- END BODY OPEN --><!-- START CENTER OPEN --><center>
+<!-- END CENTER OPEN --><a name="top"></a><!-- BEGIN LOGO AND SEARCH --><!--#include virtual="/includes/adcnavbar" --><!-- END LOGO AND SEARCH --><!-- START BREADCRUMB --><div id="breadcrumb"><table width="680" border="0" cellpadding="0" cellspacing="0">
+<tr>
+<td scope="row"><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+<td><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+</tr>
+<tr valign="middle"><td align="left" colspan="2">
+<a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../technicalnotes/index.html">Technical Notes</a> &gt; <a href="../../technicalnotes/Security/index.html">Security</a> &gt; <a href="../../technicalnotes/Security/idxCryptography-date.html">Cryptography</a> &gt; </td></tr>
+<tr><td colspan="2" scope="row"><img width="680" height="35" src="images/1dot.gif" alt=""></td></tr>
+</table></div>
+<!-- END BREADCRUMB --><!-- START MAIN CONTENT --><!-- START TITLE GRAPHIC AND INTRO --><table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td><h1>
+<div id="pagehead">Technical Note TN2206</div>
+<div id="pageheadsub">Mac OS X Code Signing In Depth</div>
+</h1></td></tr></table>
+<!-- END TITLE GRAPHIC AND INTRO --><!-- BEGIN WIDE COLUMN --><table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td align="left" width="680">
+<!-- BEGIN CONTENTS --><table width="680" border="0" cellpadding="0" cellspacing="0">
+<tr align="left" valign="top"><td>
+<p>The purpose of this technote is to provide a more in depth view of code signing. It is intended to expand upon the information given in the <a href="http://developer.apple.com/documentation/Security/Conceptual/CodeSigningGuide/index.html">Code Signing Guide</a> by supplying a more detailed analysis of the technology. The target audience for this document is Mac OS X developers who have read and presumably understand the information given in the <a href="http://developer.apple.com/documentation/Security/Conceptual/CodeSigningGuide/index.html">Code Signing Guide</a> but want to learn a bit more.</p>
+<p>This document is not meant to be applied to code signing on the iPhone OS, however, viewing the iPhone OS documentation will give a clue as to the similarities.</p>
+</td></tr>
+<tr><td scope="row">
+<img width="680" height="10" src="images/1dot.gif" alt=""><br><img width="680" height="1" src="images/1dot_919699.gif" alt=""><br><img width="680" height="20" src="images/1dot.gif" alt="">
+</td></tr>
+</table>
+<table width="680" border="0" cellpadding="0" cellspacing="0">
+<tr align="left" valign="top"><td width="680"><ul>
+<li><a href="#TNTAG1">Code Signing Recap</a></li>
+<ul>
+<li><a href="#TNTAG2">Trust and Code Signing</a></li>
+<li><a href="#TNTAG4">Code Requirements</a></li>
+<li><a href="#TNTAG6">Code Designated Requirement</a></li>
+<li><a href="#TNTAG7">Certificate Validity</a></li>
+</ul>
+<li><a href="#TNTAG8">Self-signed Identities and Self-created Certificate Authorities</a></li>
+<li><a href="#TNTAG10">Creating a Self-signed Code Signing Certificate using OpenSSL</a></li>
+<li><a href="#TNTAG11">Troubleshooting</a></li>
+<ul>
+<li><a href="#TNTAG12">Signing Modifies the Executable</a></li>
+<li><a href="#TNTAG13">Signing Frameworks</a></li>
+<li><a href="#TNTAG14">Omitting Files from the Bundle's Seal</a></li>
+<li><a href="#TNTAG16">Extended Key Usage</a></li>
+<li><a href="#TNTAG17">Shipping your Signed Code</a></li>
+<li><a href="#TNTAG18">Mac OS X 10.5 Parental Controls, MCX, and Application Firewall</a></li>
+<li><a href="#TNTAG19">Helper tools and other executable extras</a></li>
+</ul>
+<li><a href="#document_revision_summary">Document Revision History</a></li>
+</ul></td></tr>
+<tr><td colspan="3" scope="row">
+<img width="680" height="10" src="images/1dot.gif" alt=""><br><img width="680" height="1" src="images/1dot_919699.gif" alt=""><br><img width="680" height="20" src="images/1dot.gif" alt="">
+</td></tr>
+</table>
+<a name="TNTAG1"></a><h2>Code Signing Recap</h2>
+<p>Code signing is a facility by which developers can assign a digital identity to their programs. Starting with Mac OS X 10.5 Leopard, Apple has provided you with the tools necessary to sign your programs (see the <a href="x-man-page://1/codesign">codesign</a> manual pages). The code signing solution on Mac OS X is intended to be completely managed by you. This means that it is up to you to create, or purchase, your code signing certificates (preferably using the certificate assistant found in the Keychain Access Application menu). You are also responsible for maintaining your signing certificates. Normal maintenance issues range from provisioning the certificates, i.e., the policy around supplying them, to updating proper revocation lists. Of course generating conventional policy requirements (see <a href="#TNTAG4">Code Requirements</a>) and coordinating the actual process of signing your code is left up to you.</p>
+<p>In short, code signing is a technology that allows you to dictate how validating mechanisms will interpret your code. Code signing does implement policy checks. Policy is set by the specific subsystem carrying out validation, however, any policy decisions are left up to you and your end users in how you interoperate between a specific set of subsystems.</p>
+<a name="TNTAG2"></a><h3>Trust and Code Signing</h3>
+<p>Trust is determined by policy. A security trust policy determines whether a particular code identity, which is essentially the <a href="#TNTAG4">designated requirement</a> (DR) for the code, should be accepted for allowing something to happen on the system, e.g., access to a resource or service, after testing for validity. Each Mac OS X subsystem has its own policy, and makes this determination separately. Thus, it makes no sense to ask whether code signing trusts a particular signature. You have to ask based on the subsystem, and it is more meaningful to ask whether a specific subsystem trusts your signature. </p>
+<p>In general, most subsystems do not care that your identity certificate chain leads to a trusted anchor, however, some do. Additionally, some subsystems track identities and some don't. Subsystem tracking alludes to how the subsystem verifies an identity <strong>after</strong> the initial policy decision has been acted upon. For a concrete example, below is a list of current subsystems that verify code signatures:</p>
+<p class="smalltext"><strong>Table 1 : </strong>Mac OS X subsystems that verify the validity of code.</p>
+<table cellspacing="0" class="graybox">
+<tr>
+<th>Subsystem</th>
+<th>Function</th>
+<th>Initial Policy</th>
+<th>Tracking Policy</th>
+</tr>
+<tr>
+<td scope="row">Leopard Application Firewall</td>
+<td>Restrict inbound network access by applications.</td>
+<td>Allow if a trusted anchor check succeeds; otherwise prompt the user.</td>
+<td>Initial policy decision is verified against the application's DR.</td>
+</tr>
+<tr>
+<td scope="row">Parental Controls (MCX)</td>
+<td>Restrict what applications a managed user can run.</td>
+<td>Explicit administrator decision (no code signing involved in the initial decision).</td>
+<td>Initial policy decision is verified against the application's DR.</td>
+</tr>
+<tr>
+<td scope="row">Keychain Access Controls</td>
+<td>Controls what applications can do with specific keychain items.</td>
+<td>The creating application is automatically trusted with its item, and determines the access policy using code signing requirements.</td>
+<td>Free access to the keychain item by the creating application and tracked with its DR (No automatic tracking for custom ACLs).</td>
+</tr>
+<tr>
+<td scope="row">Developer Tools Access (DTA)</td>
+<td>Restrict what programs are allowed to call DTA APIs (task_for_pid, etc.)</td>
+<td>A hard-coded trusted anchor check.</td>
+<td>None (each request is evaluated by policy).</td>
+</tr>
+</table>
+<p>The above examples also further emphasize the fact that all policy decisions are determined by a specific subsystem and not by code signing itself. In addition, it highlights the diversity in how code signing can be used by a specific subsystem to carry out policy. For instance:</p>
+<ul>
+<li><p>DTA doesn't even have a tracking policy. It simply applies a set requirement to every requester without needing to retain any information.</p></li>
+<li><p>Parental controls show that you don't have to even use code signing at all in order to craft a usable policy. </p></li>
+<li><p>Leopard Application Firewall uses code signing for both its initial and tracking policy decisions.</p></li>
+<li><p>The keychain acts on the tracking policy by default but it can also allow arbitrary requirement-bearing ACLs to be added to express arbitrary policies determined by the owner of a specific keychain item.</p></li>
+</ul>
+<div class="notebox"><p><strong>Note: </strong>The keychain access controls can allow you to associate arbitrary code signing requirements with keychain items. This means that trusted anchor requirements can be attached to keychain items, either with explicit API calls, or by creating an item with an application whose designated requirement has been explicitly set to require a trusted anchor. However, this does not happen by default.</p></div>
+<p>Many parts of Mac OS X do not care about the identity of the signer. They care only whether the program is <strong>validly signed and stable</strong>. Stability is determined through the <a href="#TNTAG6">designated requirement (DR)</a> mechanism, and does not depend on the nature of the certificate authority used. The keychain system and parental controls are examples of such usage. Self-signed identities and homemade certificate authorities (CA) work by default for this case.</p>
+<p>Other parts of Mac OS X constrain acceptable signatures to only those drawn from certificate authorities that are trusted on the system performing the validation. For those checks, the nature of the identity certificate used does matter. The <a href="#TNTAG2">Leopard Application Firewall</a> is one example of this usage. Self-signed identities and self-created CA will not be verified as being valid for this check unless the verifying system has been told to trust them for Leopard Application Firewall purposes.</p>
+<div class="notebox">
+<p><strong>Note: </strong>In order for a new identity certificate to be designated as being a trusted anchor for a particular subsystem, the user must take action to accept this policy addition. For a system-wide trust entry higher privileges are needed, therefore, an administrator user is required to accept the policy addition.</p>
+<p>Please keep in mind that using a signing identity that is system-wide trusted doesn't automatically mean that it's:</p>
+<ul>
+<li><p>a requirement for a signature to be valid.</p></li>
+<li><p>going to be ignored by the majority of subsystems.</p></li>
+<li><p>going to matter only to particular checks within particular subsystems.</p></li>
+</ul>
+</div>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="TNTAG4"></a><h3>Code Requirements</h3>
+<p>A code requirement is a statement that expresses constraints on a validly signed application. Code signature validation can accept a requirement as input which will then be used to check whether the code is validly signed and satisfies the constraints of the requirement. When signing code, it is not usually necessary to concern yourself with code requirements. They will be managed implicitly. However, you have the ability to explicitly override the default settings to achieve particular effects.</p>
+<p>To explicitly test whether a program satisfies a particular requirement, use the -R option to the <code>codesign</code> command; for example:</p>
+<pre class="sourcecodebox">$admin&gt; # Make a copy of the md5 tool.
+$admin&gt; cp /sbin/md5 .
+$admin&gt; # The copy still satisifies its DR.
+$admin&gt; codesign -vvvv ./md5
+./md5: valid on disk
+./md5: satisfies its Designated Requirement
+$admin&gt; # And we can check that it's signed by Apple.
+$admin&gt; codesign -vvvv -R="anchor apple" ./md5
+./md5: valid on disk
+./md5: satisfies its Designated Requirement
+./md5: explicit requirement satisfied
+$admin&gt; # Modify the binary.
+$admin&gt; chmod u+w ./md5
+$admin&gt; dd if=/dev/zero bs=1 count=1 seek=8192 conv=notrunc of=./md5
+1+0 records in
+1+0 records out
+1 bytes transferred in 0.000036 secs (27777 bytes/sec)
+$admin&gt; # The modified program no longer satisfies its DR.
+$admin&gt; codesign -vvvv ./md5
+./md5: code or signature modified
+$admin&gt; # But we can resign the modified program with our signature.
+$admin&gt; codesign -s my-signing-identity -f ./md5
+./md5: replacing existing signature
+$admin&gt; # And the modified program now satisfies its DR.
+$admin&gt; codesign -vvvv ./md5
+./md5: valid on disk
+./md5: satisfies its Designated Requirement
+$admin&gt; # But not our supplement requirement.
+$admin&gt; codesign -vvvv -R="anchor apple" ./md5
+./md5: valid on disk
+./md5: satisfies its Designated Requirement
+test-requirement: failed to satisfy code requirement(s)
+$admin&gt;</pre>
+<p>The requirement language is a set of rules that can be chained together using logical operators ("and", "or", "not", and parentheses to denote precedence) to form a requirement expression. Below is the current list of supported rules and their usage:</p>
+<p class="smalltext"><strong>Table 2 : </strong>The requirement language syntax.</p>
+<table cellspacing="0" class="graybox">
+<tr>
+<th>Rule Syntax Usage</th>
+<th>Description</th>
+</tr>
+<tr>
+<td scope="row">identifier &lt;string&gt;</td>
+<td>The signing identifier is exactly the string given</td>
+</tr>
+<tr>
+<td scope="row">certificate &lt;slot&gt; = &lt;hash&gt;</td>
+<td>The certificate in the certificate chain has a SHA-1 hash as given</td>
+</tr>
+<tr>
+<td scope="row">certificate &lt;slot&gt; trusted</td>
+<td>The certificate is trusted as per Trust Settings API for code signing</td>
+</tr>
+<tr>
+<td scope="row">certificate &lt;slot&gt; [&lt;key&gt;] = &lt;value&gt;</td>
+<td>Some part of the certificate has the given value</td>
+</tr>
+<tr>
+<td scope="row">info [&lt;key&gt;] = &lt;value&gt;</td>
+<td>The Info.plist has a key with the given value</td>
+</tr>
+<tr>
+<td scope="row">cdhash &lt;hash&gt;</td>
+<td>The CodeDirectory's SHA-1 hash is the given value</td>
+</tr>
+<tr>
+<td scope="row">anchor &lt;string&gt;</td>
+<td>The root certificate given by its path</td>
+</tr>
+<tr>
+<td scope="row">anchor trusted</td>
+<td>The certificate chain must lead to a trusted root</td>
+</tr>
+<tr>
+<td scope="row">anchor apple</td>
+<td>The certificate chain must lead to an Apple root</td>
+</tr>
+</table>
+<p>Some important things to keep in mind:</p>
+<ul>
+<li><p>When you pass a path of a certificate to set as an anchor in the <a href="#TNTAG6">designated requirement (DR)</a> the DR will automatically be transformed to store only the SHA-1 hash of that certificate. When the policy engine then evaluates the validity of the signed program it uses the stored hash value found in the DR to compare to the actual anchor. </p></li>
+<li><p>The signing identifier is also embedded in the DR and will default to the <code>CFBundleIdentifier</code> found in the Info.plist for convenience if one is not supplied explicitly. The identifier has no meaning as far as code signing is concerned, other than as a means to make DRs unique.</p></li>
+<li><p>You may pass in negative integers as an index into the certificate chain array if you want the searching origin to start with the root certificate rather than the leaf as the origin; the value for the leaf certificate and root certificate are 0 and -1, respectively. The distance for the leaf origin (positive integer) is measured by the absolute value of the integer value passed in. Whereas, the distance for the root origin (negative integer) is measured by the absolute value of <code>1 +</code> the integer value passed in.</p></li>
+<li><p>To manipulate or experiment with requirements, use the <a href="x-man-page://1/csreq">csreq</a> command.</p></li>
+</ul>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="TNTAG6"></a><h3>Code Designated Requirement</h3>
+<p>All signed code has a designated requirement (DR). This requirement states, from the perspective of the developer of the program, what constraints a program needs to satisfy in order to be considered an instance of this program. Obviously, every program should satisfy its own DR, e.g., <code>codesign -vv</code> checks for this. More interestingly, a program's DR should also be satisfied by updates, i.e., new versions of that code, and by nothing else. This is how the Mac OS X code signing policy engine recognizes updates and upgrades.</p>
+<p>By default, the system synthesizes a suitable DR for your code when you sign your program. This will work fine in most cases. However, you may specify an explicit DR when signing your program, and there are situations where you should do so.</p>
+<p>To see what DR a program has:</p>
+<pre class="sourcecodebox">$admin&gt; codesign -d -r- /sbin/md5 
+Executable=/sbin/md5
+
+# designated =&gt; identifier "com.apple.md5" and anchor apple
+$admin&gt;</pre>
+<p>Look for the line starting with "designated =&gt;". If it is commented out (starts with a "#" mark), it is implicitly generated. If not, it is explicit.</p>
+<p>Use the -r option to the codesign command to explicitly specify a DR when signing; for example:</p>
+<pre class="sourcecodebox">$admin&gt; codesign -vvvv -s my-signing-identity -r="designated =&gt; anchor trusted" ~/Desktop/CodesignTest
+/Users/admin/Desktop/CodesignTest: signed Mach-O thin (i386) [CodesignTest]
+$admin&gt;</pre>
+<p>If you do create a DR, you are responsible for crafting a suitable requirement to use. For example below is a DR for specifying to the policy engine that it should check that the signer of  the program leads to a trusted anchor on the calling system and that the program's identifier matches the supplied parameter string.</p>
+<pre class="sourcecodebox">$admin&gt; codesign -vvvv -s my-signing-identity -r="designated =&gt; anchor trusted and \
+identifier com.foo.bar" ~/Desktop/CodesignTest
+/Users/admin/Desktop/CodesignTest: signed Mach-O thin (i386) [CodesignTest]
+$admin&gt;</pre>
+<div class="notebox"><p><strong>Note: </strong>If you're creating a CA for generating code signatures, then the organization (O) element of the subject distinguished name (DN) from the certificate should be kept consistent throughout your chain of certificates.</p></div>
+<div class="notebox"><p><strong>IMPORTANT: </strong>If you're using a certificate from a CA, they may require that you place certain criteria in your DR. Consult with your CA on this matter.</p></div>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="TNTAG7"></a><h3>Certificate Validity</h3>
+<p>By default, the code signing and validation engines accept signatures made with expired certificates. This means that your signed code will not become invalid when your certificate expires. In simple applications, you can continue signing with an expired certificate and Mac OS X will continue to accept this. Code signing will reject signatures made with identities that have been revoked according to standard X.509 processing rules (See <a href="http://www.faqs.org/rfcs/rfc3280.html">RFC 32809</a> for an example). Revocation check instructions have to be embedded in the certificates you want checked. Revocation checking is a per-user preference found in Keychain Access that is not enabled by default. When revocation checking is configured and enabled the system may still be unable to ascertain revocation status if it is disconnected from the network in which case the validation might succeed instead of fail, i.e., if certificate revocation Keychain Access preferences are set as "Best Attempt" instead of "Require if Cert Indicates".</p>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="TNTAG8"></a><h2>Self-signed Identities and Self-created Certificate Authorities</h2>
+<p>Depending on the policy used by the subsystem in question, a self-signed identity can usually be used (your program will reap all the benefits of being signed by it) as long as that identity is set following the respective policy. Obviously, one big downside in using a self-signed identity is that you will never be able to revoke it, however, it may be sufficient for your organization's certificate policy requirements or if you just want to test out the code signing machinery.</p>
+<p>If you decide to create your own CA then you specify an explicit DR naming your own anchor certificate:</p>
+<p class="caption"><strong>Listing 1: </strong>Creating a DR</p>
+<pre class="sourcecodebox">$admin&gt; codesign -vvvv -s my-signing-identity -r="designated =&gt; anchor rootCert and identifier com.foo.bar" \
+~/Desktop/CodesignTest
+/Users/admin/Desktop/CodesignTest: signed Mach-O thin (i386) [CodesignTest]
+$admin&gt;</pre>
+<p>By using your own CA you gain the ability to issue new identities at will, since any signing identities issued from your CA will now satisfy the check. You can do this by selecting "Create a Certificate for Someone Else as a Certificate Authority" as option for the Certificate Assistant in Keychain Access. You can also do this with <a href="x-man-page://1/openssl">openssl</a>:</p>
+<pre class="sourcecodebox">$admin&gt; openssl ca -out cert.rsa -config ./openssl.cnf -infiles request.csr</pre>
+<p>Just as in a custom created CA, if you buy a signing certificate from a commercial CA you'll want to craft a DR that expresses the CA vendor's issuance policies. For instance, every time your CA reissues you a new certificate your identities will change which is something that your DR should take care to handle.</p>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="TNTAG10"></a><h2>Creating a Self-signed Code Signing Certificate using OpenSSL</h2>
+<p>If you already have an SSL identity, i.e., a public and private key pair generated through OpenSSL, and you want to use it for code signing then you will need to use something other than the Certificate Assistant. This is because converting an existing OpenSSL digital identity for use with code signing is currently unsupported by the Certificate Assistant. However, you can solve this problem using <code>openssl</code>. The steps that you need to take are:</p>
+<ul>
+<li>
+<p>First, create a certificate signing request (CSR) using <a href="x-man-page://1/openssl">openssl</a>:</p>
+<pre class="sourcecodebox">$admin&gt; openssl req -new -key ./key.rsa -out ./key.csr -config ./openssl.cnf</pre>
+</li>
+<li>
+<p>Second, create a certificate using <a href="x-man-page://1/openssl">openssl</a>:</p>
+<pre class="sourcecodebox">$admin&gt; openssl x509 -req -days 10 -in ./key.csr -signkey ./key.rsa -out ./key.crt -extfile ./openssl.cnf 
+-extensions codesign</pre>
+</li>
+<li>
+<p>Third, create a keychain and import your private key using <a href="x-man-page://1/certtool">certtool</a>:</p>
+<pre class="sourcecodebox">$admin&gt; certtool i ./key.crt k="`pwd`/key.keychain" r=./key.rsa c p=moof</pre>
+</li>
+<li>
+<p>Lastly, pass that keychain in for use with <a href="x-man-page://1/codesign">codesign</a>:</p>
+<pre class="sourcecodebox">$admin&gt; codesign -s my-signing-identity --keychain key.keychain ~/Desktop/CodesignTest</pre>
+</li>
+</ul>
+<div class="notebox">
+<p><strong>IMPORTANT: </strong>If you are generating a code signing identity from scratch, Apple strongly recommends you use the Certificate Assistant component of Keychain Access, which is equivalent to the OpenSSL approach but in addition it:</p>
+<ul>
+<li><p>has a GUI</p></li>
+<li><p>directly deposits the identity certificate into a keychain</p></li>
+<li><p>as the ability to form genuine CAs and issue invitations and certificates to other users</p></li>
+</ul>
+</div>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="TNTAG11"></a><h2>Troubleshooting</h2>
+<a name="TNTAG12"></a><h3>Signing Modifies the Executable</h3>
+<p>Signing a program will modify its main executable file. There are some situations where this will cause you trouble:</p>
+<ul>
+<li><p>If your program has a self-verification mode that detects a change, your code may refuse to run.</p></li>
+<li><p>If you append data to your executable, such appended data may be removed during signing (Mach-O), or may no longer be in the same place relative to the file's end (CFM).</p></li>
+</ul>
+<p>The obvious solution to these problems is to not meddle with your signed program after you've signed it with <code>codesign</code>. If you're modifying the executable or bundle in any way then the code signing validation engine will obviously pick up on that change and act appropriately with the set policy. If you've set your program to do self-integrity checking then it is possible that your preconceived notion of what constitutes "your program" is likely to have changed due to code signing. More specifically, whether you're checking the entire contents of the Mach-O file or just the aggregation of certain pieces of the file it's highly likely that code signing will break what you believe integrity checking is. For example:</p>
+<pre class="sourcecodebox">$admin&gt; # Let's see what the Mach-O file looks like pre-signing:
+$admin&gt; otool -l ~/Desktop/CodesignTest 
+CodesignTest:
+Load command 0
+      cmd LC_SEGMENT
+  cmdsize 56
+  segname __PAGEZERO
+   vmaddr 0x00000000
+   vmsize 0x00001000
+  fileoff 0
+ filesize 0
+  maxprot 0x00000000
+ initprot 0x00000000
+   nsects 0
+    flags 0x0
+[...]
+Load command 11
+          cmd LC_LOAD_DYLIB
+      cmdsize 52
+         name /usr/lib/libSystem.B.dylib (offset 24)
+   time stamp 2 Wed Dec 31 16:00:02 1969
+      current version 111.0.0
+compatibility version 1.0.0
+$admin&gt; # Now let's see what it looks like after signing:
+$admin&gt; codesign -vvvv -s my-signing-identity ~/Desktop/CodesignTest
+CodesignTest: signed Mach-O thin (i386) [CodesignTest]
+$admin&gt; otool -l CodesignTest 
+CodesignTest:
+Load command 0
+      cmd LC_SEGMENT
+  cmdsize 56
+  segname __PAGEZERO
+   vmaddr 0x00000000
+   vmsize 0x00001000
+  fileoff 0
+ filesize 0
+  maxprot 0x00000000
+ initprot 0x00000000
+   nsects 0
+    flags 0x0
+[...]
+Load command 11
+          cmd LC_LOAD_DYLIB
+      cmdsize 52
+         name /usr/lib/libSystem.B.dylib (offset 24)
+   time stamp 2 Wed Dec 31 16:00:02 1969
+      current version 111.0.0
+compatibility version 1.0.0
+Load command 12
+      cmd LC_CODE_SIGNATURE
+  cmdsize 16
+ dataoff  12816
+ datasize 5232
+$admin&gt; # Notice the extra load command LC_CODE_SIGNATURE at number 12!
+$admin&gt; # Let's check it out even further with pagestuff:
+$admin&gt; pagestuff CodesignTest -a
+File Page 0 contains Mach-O headers
+[...]
+File Page 3 contains local of code signature
+File Page 4 contains local of code signature
+$admin&gt;</pre>
+<div class="notebox"><p><strong>IMPORTANT: </strong>Even if you're not intending to sign your program but still thinking about rolling your own integrity checking you need to be mindful of the policies enforced by <a href="#TNTAG18">Mac OS X 10.5 Leopard Parental Controls, MCX, and Application Firewall</a>.</p></div>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="TNTAG13"></a><h3>Signing Frameworks</h3>
+<p>Seeing as frameworks are bundles it would seem logical to conclude that you can sign a framework directly. However, this is not the case. To avoid problems when signing frameworks make sure that you sign a specific version as opposed to the whole framework:</p>
+<pre class="sourcecodebox">$admin&gt; # This is the wrong way:
+$admin&gt; codesign -s my-signing-identity ../FooBarBaz.framework
+$admin&gt; # This is the right way:
+$admin&gt; codesign -s my-signing-identity ../FooBarBaz.framework/Versions/A</pre>
+<p>Frameworks are "versioned bundles", and each contained version should be signed and validated separately.</p>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="TNTAG14"></a><h3>Omitting Files from the Bundle's Seal</h3>
+<p>Your bundle's seal is the <code>CodeResources</code> file that gets generated as part of the code signing process. This file contains a listing of all the files found within your bundle coupled with their respective hash values and a set of rule definitions. </p>
+<p>When you sign your program and do not pass in any explicit set of rules then <code>codesign</code> will generate a default set. These default rules, coupled with the hash values, help define what precisely encompasses the seal of your program. In order to tell what exactly got sealed from your program then you can simply check out the <code>CodeResources</code> file:</p>
+<pre class="sourcecodebox">$admin&gt; cat /Applications/TextEdit.app/Contents/CodeResources
+cat /Applications/TextEdit.app/Contents/CodeResources 
+&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"&gt;
+&lt;plist version="1.0"&gt;
+&lt;dict&gt;
+    &lt;key&gt;files&lt;/key&gt;
+    &lt;dict&gt;
+        &lt;key&gt;Resources/DocumentWindow.nib/classes.nib&lt;/key&gt;
+        &lt;dict&gt;
+            &lt;key&gt;hash&lt;/key&gt;
+            &lt;data&gt;
+            hw0UoNj0U+XUhBMOhS5Tr5l1PqM=
+            &lt;/data&gt;
+            &lt;key&gt;optional&lt;/key&gt;
+            &lt;true/&gt;
+        &lt;/dict&gt;
+        [...]
+    &lt;/dict&gt;
+    &lt;key&gt;rules&lt;/key&gt;
+    &lt;dict&gt;
+        &lt;key&gt;^Resources/&lt;/key&gt;
+        &lt;true/&gt;
+        &lt;key&gt;^Resources/.*\.lproj/&lt;/key&gt;
+        &lt;dict&gt;
+            &lt;key&gt;omit&lt;/key&gt;
+            &lt;true/&gt;
+            &lt;key&gt;weight&lt;/key&gt;
+            &lt;real&gt;10&lt;/real&gt;
+        &lt;/dict&gt;
+        [...]
+    &lt;/dict&gt;
+&lt;/dict&gt;
+&lt;/plist&gt;
+$admin&gt;</pre>
+<p>It's entirely possible that you may not find your default seal that was generated to be sufficient. Therefore, if you want to omit or add some files from your bundle's seal you'll want to check out the <code>--resource-rules</code> argument to <a href="x-man-page://1/codesign">codesign</a>.</p>
+<p>The format of the property list file that you pass by path into the <code>--resource-rules</code> argument is a single dictionary with the key of <code>rules</code>. That single dictionary contains all the rules associated with a specific file inside the bundle of a signed application. Each of these rules is also a dictionary with the key being a standard <a href="http://en.wikipedia.org/wiki/Regular_expression#POSIX_Basic_Regular_Expressions">POSIX basic regular expressions</a> (you may use ^ and/or $ to anchor the match) that is matched against the relative path of a resource file starting at the <code>Contents</code> directory of the bundle.</p>
+<p>Currently there are three keys that can be used for the rule definitions:</p>
+<ul>
+<li><p><code>weight</code> (real): Rules are matched against a file in descending order of weight; weights are non-negative and the default weight is zero. The "heaviest", i.e., the largest matching rule applies and if no rules match then the file is not sealed.</p></li>
+<li><p><code>optional</code> (boolean): If true, the file may be missing and that's fine. However, if it is present it must still be exactly as it was during signing. This key is mutually incompatible with the <code>omit key</code>.</p></li>
+<li><p><code>omit</code> (boolean): If true, the file is excluded from the seal. (mutually incompatible with <code>optional</code>)</p></li>
+</ul>
+<p>There is a shorthand way of specifying rules: instead of specifying a dictionary as a rule's value, a simple Boolean can be given instead. True means include and false means exclude from the seal.</p>
+<div class="notebox"><p><strong>IMPORTANT: </strong>Any rule property definition not mentioned above is reserved for future use. Any resource rule key that doesn't fit this pattern may be interpreted differently now or in the future.</p></div>
+<p>An example rule definition property list is given below:</p>
+<p class="caption"><strong>Listing 2: </strong>An example rule definition</p>
+<pre class="sourcecodebox">&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"&gt;
+&lt;plist version="1.0"&gt;
+&lt;dict&gt;
+          &lt;key&gt;rules&lt;/key&gt;
+          &lt;dict&gt;
+                    &lt;key&gt;^Resources/&lt;/key&gt;
+                    &lt;true/&gt;
+                    &lt;key&gt;^Resources/.*\.lproj/&lt;/key&gt;
+                    &lt;dict&gt;
+                              &lt;key&gt;omit&lt;/key&gt;
+                              &lt;true/&gt;
+                              &lt;key&gt;weight&lt;/key&gt;
+                              &lt;real&gt;10&lt;/real&gt;
+                    &lt;/dict&gt;
+                    &lt;key&gt;^Plugins/&lt;/key&gt;
+                    &lt;dict&gt;
+                               &lt;key&gt;optional&lt;/key&gt;
+                               &lt;true/&gt;
+                               &lt;key&gt;weight&lt;/key&gt;
+                               &lt;real&gt;30&lt;/real&gt;
+                    &lt;dict&gt;
+                    &lt;key&gt;^version.plist$&lt;/key&gt;
+                    &lt;true/&gt;
+          &lt;/dict&gt;
+&lt;/dict&gt;
+&lt;/plist&gt;</pre>
+<p>The above example illustrates how you would:</p>
+<ul>
+<li><p>include the Resources folder of your bundle in the seal.</p></li>
+<li><p>omit the localization bundles from your <code>Resources</code> folder from being added to the seal.</p></li>
+<li><p>allow the Plugins folder to be optional for validation but still included in the seal.</p></li>
+<li><p>include the version property list of your bundle in the seal.</p></li>
+</ul>
+<p>If you're not familiar with <a href="x-man-page://7/re_format">regular expressions</a>, the following might be helpful:</p>
+<ul>
+<li><p><code>^</code> means to look only at the start of the target string, e.g., <strong>^Moof</strong> will not find <strong>Moof</strong> in "I Moof!" but will find it in "Moof lives!". The <code>^</code> character inside a bracket expression, <code>[ ^&lt;expression&gt; ]</code>, takes on a different meaning, i.e., to exclude the set representing the expression immediately following it.</p></li>
+<li><p><code>$</code> means to look only at the end of the target string, e.g., <strong>Moof$</strong> will not find <strong>Moof</strong> in "Moof lives!" but will find it in "I Moof".</p></li>
+<li><p><code>.</code> means allow any character(s) in this position, e.g., <strong>Moof.</strong> will not match "Moof" but will with "Mooff" and "Moof!".</p></li>
+<li><p><code>*</code> means match the preceding element zero or more times, e.g., <strong>Moo*f</strong> will not match "Moaaaf" but will with "Moooooof" and "Mof".</p></li>
+<li><p><code>+</code> means match the preceding element one or more times, e.g., <strong>Moo+f</strong> will not match "Moaaaf" but will with "Moooooof" and "Mooof".</p></li>
+</ul>
+<p>One thing to keep in mind is that the <code>/</code> character is not special when matching resource paths against regular expressions. So "Moof.*ing" will match "Moofaling" but also "Moof/confusing" and "Moof/more/than/confusing". To express one directory element only, say <code>[^/]+</code> (a sequence of non-slash characters). The rule "Moof[^/]*ing" would match "Moofaling" but not "Moof/confusing".</p>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="TNTAG16"></a><h3>Extended Key Usage</h3>
+<p>Standard X.509 certificates (<a href="http://www.ietf.org/rfc/rfc2459.txt">RFC 2459</a>) contain object identifiers (OID) which form key usage extensions to define what the public and private key can and cannot be used for. Extended key usages just further refine the key usage extensions. An extension is either critical or non-critical. If the extension is critical than the identity must only be used for indicated purpose(s).</p>
+<p>The X.509 certificates and their code signing extended key usage is obviously required for an identity to be used for code signing on Mac OS X. However, the code signing extended key usage should also be the <strong>only</strong> extended key usage for a certificate (this code signing extended usage is critical) in order to be valid to the Mac OS X code signing subsystem. It is not possible to create one certificate that can be used for both code signing and other purposes. </p>
+<p>You can check your certificate to find out whether the code signing extended key usage attribute is present by viewing the certificate in Keychain Access or by using any other X.509 compliant certificate parser. Dumping all the available information about a certificate can also show if the certificate has other usages which will cause it to be an invalid identity for use with code signing on Mac OS X. For example:</p>
+<pre class="sourcecodebox">$admin&gt; # On Mac OS X 10.5 you can use security and certtool
+$admin&gt; security find-certificate -a -e clarus@apple.com -p &gt; cert.pem
+$admin&gt; certtool d cert.pem
+Serial Number : 01 
+Issuer Name :
+   Common Name : Testing Code Signing
+   Org : Apple Inc.
+   OrgUnit : DTS
+   State : CA
+   Country : US
+   Locality : Cupertino
+   Email addrs : clarus@apple.com
+Subject Name :
+   Common Name : Testing Code Signing
+   Org : Apple Inc.
+   OrgUnit : DTS
+   State : CA
+   Country : US
+   Locality : Cupertino
+   Email addrs : clarus@apple.com
+Cert Sig Algorithm : OID : &lt; 06 09 2A 86 48 86 F7 0D 01 01 05 &gt;
+   alg params : 05 00 
+Not Before : 19:27:16 Nov 14, 2007
+Not After : 19:27:16 Nov 13, 2008
+Pub Key Algorithm : OID : &lt; 06 09 2A 86 48 86 F7 0D 01 01 01 &gt;
+   alg params : 05 00 
+Pub key Bytes : Length 270 bytes : 00 00 00 00 00 00 00 00 ...
+CSSM Key :
+   Algorithm : RSA
+   Key Size : 2048 bits
+   Key Use : CSSM_KEYUSE_VERIFY 
+Signature : 256 bytes : FF FF FF FF FF FF FF FF ...
+Other field: : OID : &lt; 06 0C 60 86 48 01 86 F8 4D 02 01 01 01 17 &gt;
+Other field: : OID : &lt; 06 0C 60 86 48 01 86 F8 4D 02 01 01 01 16 &gt;
+Extension struct : OID : &lt; 06 03 55 1D 0F &gt;
+   Critical : TRUE
+   usage : DigitalSignature 
+Extension struct : OID : &lt; 06 03 55 1D 25 &gt;
+   Critical : TRUE
+   purpose  0 : OID : &lt; 06 08 2B 06 01 05 05 07 03 03 &gt;
+$admin&gt;</pre>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="TNTAG17"></a><h3>Shipping your Signed Code</h3>
+<p>Code signing uses <a href="x-man-page://2/listxattr">extended attributes</a>. If the extended attributes are lost then the program's identity will be break. Thus, when you ship your program, you must use a mechanism that preserves extended attributes.</p>
+<p>One way to guarantee preservation of extended attributes is by packing up your signed code in a read-write disk image (DMG) file before signing and then, after signing, converting to read-only. You should also be careful to not move your application from a system later than Mac OS X 10.3 to a system at or earlier than Mac OS X 10.3 and then back to a system later than MAc OS 10.3 again as it will drop the extended attributes following that transport pattern. You probably don't need to use a disk image until the final package stage so another less heavy-handed method would be to use ZIP files.</p>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="TNTAG18"></a><h3>Mac OS X 10.5 Parental Controls, MCX, and Application Firewall</h3>
+<p>The Parental Controls, MCX, and Application Firewall subsystems in Leopard, when encountering an unsigned program, will ad hoc sign the program in order to track its identity from launch to launch. This will usually modify the program on disk, and can happen without apparent user input, e.g., when the Application Firewall first notices that your program is trying to accept an inbound network connection. If your program can be damaged by signing, it is imperative that you ship a signed version as soon as practical. Programs signed by their manufacturer are not modified in this way.</p>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="TNTAG19"></a><h3>Helper tools and other executable extras</h3>
+<p>If you have bundles that contain helper code, e.g., privileged tools, scripts, plug-ins, libraries, etc., do not put them into the Resources folder of the bundle. Files in the Resource folder are directly sealed to the main executable. Helper tools and libraries should be stored in <code>Contents/MacOS</code> and <code>Contents/Libraries</code>, respectively. Plug-ins should <strong>not</strong> be stored in the parent bundle's seal. As a result, helper tools, libraries, and plug-ins are <strong>all</strong> meant to be signed independently. </p>
+<p>A suitable place for a helper bundle is the support directory <code>Contents</code>. Use the <a href="http://developer.apple.com/documentation/CoreFoundation/Reference/CFBundleRef/Reference/reference.html">CFBundleCopyAuxiliaryExecutableURL API</a> function to find code in any of these places.</p>
+<a name="document_revision_summary"></a><h2>Document Revision History</h2>
+<table cellspacing="0" class="graybox" width="680">
+<tr>
+<th width="100">Date</th>
+<th width="580">Notes</th>
+</tr>
+<tr>
+<td scope="row">2008-08-06</td>
+<td>First Version</td>
+</tr>
+</table>
+<p><b>Posted: </b>2008-08-06</p>
+<!-- END CONTENTS -->
+</td></tr></table>
+<!-- END WIDE COLUMN --><!-- END MAIN CONTENT --><!-- START BOTTOM APPLE NAVIGATION -->	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/technotes/tn2007/tn2206.html%3Fid%3DDTS40007919-1.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/technotes/tn2007/tn2206.html%3Fid%3DDTS40007919-1.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/technotes/tn2007/tn2206.html%3Fid%3DDTS40007919-1.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+<!--#include virtual="/includes/footer" --><!-- END BOTTOM APPLE NAVIGATION --><!-- START CENTER CLOSE -->
+</center>
+<!-- END CENTER CLOSE -->
+</body>
+</html>

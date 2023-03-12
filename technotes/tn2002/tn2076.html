@@ -1,0 +1,167 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<!-- BEGIN META TAG INFO --><link rel="home" href="http://developer.apple.com/">
+<link rel="find" href="http://developer.apple.com/search/">
+<link rel="stylesheet" type="text/css" href="../../documentation/css/adcstyle.css" title="fonts">
+<script language="JavaScript" type="text/javascript" src="../../documentation/js/busnav.js"></script><script language="JavaScript" src="../../documentation/js/adc.js" type="text/javascript"></script><!-- END META TAG INFO --><!-- BEGIN TITLE --><title>Technical Note TN2076: I/O Kit Power Controller</title>
+<!-- END TITLE -->
+</head>
+<!-- BEGIN BODY OPEN --><body bgcolor="#ffffff"><a name="//apple_ref/doc/uid/DTS10003104" title="I/O Kit Power Controller"></a>
+<!-- END BODY OPEN --><!-- START CENTER OPEN --><center>
+<!-- END CENTER OPEN --><a name="top"></a><!-- BEGIN LOGO AND SEARCH --><!--#include virtual="/includes/adcnavbar" --><!-- END LOGO AND SEARCH --><!-- START BREADCRUMB --><div id="breadcrumb"><table width="680" border="0" cellpadding="0" cellspacing="0">
+<tr>
+<td scope="row"><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+<td><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+</tr>
+<tr valign="middle"><td align="left" colspan="2">
+<a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../technicalnotes/index.html">Technical Notes</a> &gt; <a href="../../technicalnotes/HardwareDrivers/index.html">Hardware &amp; Drivers</a> &gt; <a href="../../technicalnotes/HardwareDrivers/idxPCIandPCCard-date.html">PCI and PC Card</a> &gt; </td></tr>
+<tr><td colspan="2" scope="row"><img width="680" height="35" src="images/1dot.gif" alt=""></td></tr>
+</table></div>
+<!-- END BREADCRUMB --><!-- START MAIN CONTENT --><!-- START TITLE GRAPHIC AND INTRO --><table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td><h1>
+<div id="pagehead">Technical Note TN2076</div>
+<div id="pageheadsub">I/O Kit Power Controller</div>
+</h1></td></tr></table>
+<!-- END TITLE GRAPHIC AND INTRO --><!-- BEGIN WIDE COLUMN --><table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td align="left" width="680">
+<!-- BEGIN CONTENTS --><table width="680" border="0" cellpadding="0" cellspacing="0">
+<tr align="left" valign="top"><td>
+<p>This technical note provides a terse description of an I/O Kit KEXT which supports power management.</p>
+<p>If you haven't the time to learn about power management, this technote will quickly guide you through the steps needed to add power management to your KEXT.</p>
+<p>If you're in a hurry download the Project Builder KEXT below, open the system log, and build the kernel extension. You can observe your KEXT being loaded, registering for power events, and responding to sleep events. You can then copy and paste the code (not a large amount) into your driver.</p>
+<p>Finally there is a section that points to additional power management documentation, samples, DDK, etc. so that you can learn everything concerning power management on Mac OS X given you have more time.</p>
+</td></tr>
+<tr><td scope="row">
+<img width="680" height="10" src="images/1dot.gif" alt=""><br><img width="680" height="1" src="images/1dot_919699.gif" alt=""><br><img width="680" height="20" src="images/1dot.gif" alt="">
+</td></tr>
+</table>
+<table width="680" border="0" cellpadding="0" cellspacing="0">
+<tr align="left" valign="top"><td width="680"><ul>
+<li><a href="#TAN4">An I/O Kit power controller: A quick look</a></li>
+<li><a href="#TAN10">The power-state array</a></li>
+<li><a href="#TAN19">The registration process</a></li>
+<li><a href="#TAN29">Responding to power events</a></li>
+<li><a href="#TAN41">The project</a></li>
+<li><a href="#TAN45">Other sources</a></li>
+<li><a href="#TAN53">Downloads</a></li>
+<li><a href="#document_revision_summary">Document Revision History</a></li>
+</ul></td></tr>
+<tr><td colspan="3" scope="row">
+<img width="680" height="10" src="images/1dot.gif" alt=""><br><img width="680" height="1" src="images/1dot_919699.gif" alt=""><br><img width="680" height="20" src="images/1dot.gif" alt="">
+</td></tr>
+</table>
+<a name="TAN4"></a><h2>An I/O Kit power controller: A quick look</h2>
+<p>An I/O Kit power controller is an entity that controls the voltage (V<sub>cc</sub> ) and current (i) to an I/O device usually via a driver (KEXT).</p>
+<p>To make your KEXT a power controller, you must:.</p>
+<p>Create a power-state array. This array defines your power parameters or needs such as current rise and settle times, steady state current, etc.</p>
+<p>Register your KEXT with I/O Kit. This step places your device into the IOPower plane of the I/O Registry.</p>
+<p>Override your provider's setPowerState method. Your setPowerState method will receive power on and off messages. Your KEXT must do what is needed to remove and restore power to your device, including any stes information that may be needed by your KEXT.</p>
+<p>These three steps are described in more detail below.</p>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="TAN10"></a><h2>The power-state array</h2>
+<p>The power state array, contained in the Developer SDK, is located at this path.</p>
+<p>/System/Library/Frameworks/Kernel.framework/Versions/A/Headers/IOKit/pwr_mgt/IOPMpowerState.h</p>
+<p>The example shown in <a href="#TAN16">Listing 1</a> has a two state power-state array, whose states are "on" and "off". Two-state arrays (on/off) are common and provide a simple way to add power-management code to your KEXT. See Chapter 10 of I/O Kit Fundamentals and the header file in the HelloIOKitWithPowerManagement project <a href="#TAN53">Downloads</a> for more details.</p>
+<p>Look at the header file in the enclosed project and Chapter 10 of I/O Kit Fundamentals for details.</p>
+<p>This completes the first step. Now you will need to register your power-state array.</p>
+<a name="TAN16"></a><p class="caption"><strong>Listing 1: </strong>power-state enum &amp; array</p>
+<pre class="sourcecodebox">enum {
+    kDTSOffState = 0,
+    kDTSOnState = 1,
+    kNumDTSStates = 2
+    };
+static const IOPMPowerState ourPowerStates[kNumDTSStates] = {
+    {kIOPMPowerStateVersion1,0,0,0,0,0,0,0,0,0,0,0},
+    {kIOPMPowerStateVersion1,kIOPMDeviceUsable,
+    IOPMPowerOn,IOPMPowerOn,0,0,0,0,0,0,0,0}
+    };</pre>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="TAN19"></a><h2>The registration process</h2>
+<p>There are three functions you must call to complete the power management registration process, as shown in <a href="#TAN26">Listing 2</a> .</p>
+<p>First, call PMinit to allocate and initialize the power management instance variables. Be sure to call PMinit before you attempt to access those variables or the power management methods.</p>
+<p>Second, call your parent class method registerPowerDriver to volunteer to control your device and don't forget to check for a success.</p>
+<p>Finally you must call your parent class method to join the IOPower plane of the I/O Registry.</p>
+<div class="notebox"><p><strong>WARNING: </strong>joinPMtree is a virtual method. Do not override this method. Do not call joinPMtree or super::joinPMtree as they will compile, but not place your object into the right part of the I/O Registry IOPower plane.</p></div>
+<a name="TAN26"></a><p class="caption"><strong>Listing 2: </strong>Registering as a power controller</p>
+<pre class="sourcecodebox">IOLog("PowerManagement is Starting\n");
+// initialize superclass variables from IOService.h
+        PMinit();
+// register as controlling driver from IOService.h
+        myValue = registerPowerDriver( this,
+ (IOPMPowerState *) ourPowerStates, kNumDTSStates );
+        if (myValue != kIOReturnSuccess) {
+        IOLog("%s: Failed to registerPowerDriver.\n", getName());
+        }
+        // join the tree from IOService.h
+        provider-&gt;joinPMtree( this);</pre>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="TAN29"></a><h2>Responding to power events</h2>
+<p>The final step is to implement (override) your IOService parent's setPowerState method. Your driver is the only entity that understands how to power up and power down your device. Place the declaration shown in <a href="#TAN37">Listing 4</a> into your header file:</p>
+<p class="caption"><strong>Listing 3: </strong>setPowerState Declaration</p>
+<pre class="sourcecodebox">virtual IOReturn setPowerState(unsigned long, IOService *);</pre>
+<p>This trivial implementation will suffice for this technical note. You can learn the details of this implementation in Chapter 10 of I/O Kit Fundamentals.</p>
+<p>However, if you put your computer to sleep, via the Apple Menu, this implementation will log its entry in the IOLog.</p>
+<a name="TAN37"></a><p class="caption"><strong>Listing 4: </strong>setPowerState Implementation</p>
+<pre class="sourcecodebox">IOReturn com_DTS_iokit_HelloIOKit::setPowerState(
+unsigned long whatState, IOService* dontCare){
+    IOLog("Setting power state:%lu\n", whatState);
+    // turn your device on/off here
+    return IOPMAckImplied;
+}</pre>
+<p>That's all you need to do to have a simple on/off power-aware driver. Now let's look at these three steps as they appear in a complete I/O Kit KEXT.</p>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="TAN41"></a><h2>The project</h2>
+<p>The enclosed Project Builder project is derived from the <a href="http://developer.apple.com/documentation/Darwin/howto/kext_tutorials/hello_iokit/hello_iokit.html">Hello I/O Kit tutorial</a> .</p>
+<p>If you are new to Apple development you might want to run this tutorial first. If not, just download the project. This project includes the three power management steps described above and is ready to run. You'll need to know how to load a KEXT into the Extensions folder. If you don't know how to do this, see the "Test the Device Driver" section of the tutorial.</p>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="TAN45"></a><h2>Other sources</h2>
+<p>Finally, if you have the time, you can get more information about power management from the following sources:</p>
+<p>The <a href="http://developer.apple.com/sdk/index.html#PowerManager">Power Manager DDK</a> contains samples, tools, etc.</p>
+<p>The document called <a href="http://developer.apple.com/documentation/Darwin/#IOKit">I/O Kit Fundamentals</a> Chapter 10, "Managing Power and Device Removal" also has current information. </p>
+<p>A companion technical note to this one, <a href="http://developer.apple.com/technotes/tn2002/tn2075.html">TN 2075</a> PowerManagement for Macintosh;getting started, describes all links to various power management data.</p>
+<p>Good luck with your development effort. DTS Engineering</p>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="TAN53"></a><h2>Downloads</h2>
+<ul><li><p><a href="downloads/tn2076.sit">theProject</a> ("tn2076.sit", 6.9K)
+
+</p></li></ul>
+<a name="document_revision_summary"></a><h2>Document Revision History</h2>
+<table cellspacing="0" class="graybox" width="680">
+<tr>
+<th width="100">Date</th>
+<th width="580">Notes</th>
+</tr>
+<tr>
+<td scope="row">2003-06-20</td>
+<td>Describes code to include in a KEXT in order to register for power management events.</td>
+</tr>
+</table>
+<p><b>Posted: </b>2003-06-20</p>
+<!-- END CONTENTS -->
+</td></tr></table>
+<!-- END WIDE COLUMN --><!-- END MAIN CONTENT --><!-- START BOTTOM APPLE NAVIGATION -->	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/technotes/tn2002/tn2076.html%3Fid%3DDTS10003104-1.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/technotes/tn2002/tn2076.html%3Fid%3DDTS10003104-1.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/technotes/tn2002/tn2076.html%3Fid%3DDTS10003104-1.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+<!--#include virtual="/includes/footer" --><!-- END BOTTOM APPLE NAVIGATION --><!-- START CENTER CLOSE -->
+</center>
+<!-- END CENTER CLOSE -->
+</body>
+</html>

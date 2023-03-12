@@ -1,0 +1,99 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/1999/REC-html401-19991224/loose.dtd">
+<html><head>
+<!-- BEGIN META TAG INFO -->
+<link rel="home" href="http://developer.apple.com/">
+<link rel="find" href="http://developer.apple.com/search/">
+<link rel="stylesheet" type="text/css" href="../../documentation/css/adcstyle.css" title="fonts">
+<script language="JavaScript" type="text/javascript" src="../../documentation/js/busnav.js"></script>
+<script language="JavaScript" src="../../documentation/js/adc.js" type="text/javascript"></script>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<!-- END META TAG INFO -->
+<!-- BEGIN TITLE -->
+<title>Technical Note TN2133: Coalesced Updates</title>
+<!-- END TITLE -->
+</head>
+<!-- BEGIN BODY OPEN -->
+<body bgcolor="#ffffff"><a name="//apple_ref/doc/uid/DTS10003496" title="Coalesced Updates"></a>
+<!--END BODY OPEN -->
+<!-- START CENTER OPEN -->
+<center>
+<!-- END CENTER OPEN -->
+<a name="top"></a>
+<!-- BEGIN LOGO AND SEARCH -->
+<!--#include virtual="/includes/adcnavbar"-->
+<!-- END LOGO AND SEARCH -->
+<!-- START BREADCRUMB -->
+<div id="breadcrumb"><table width="680" border="0" cellpadding="0" cellspacing="0"><tr>
+<td scope="row"><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+<td><img width="340" height="10" src="images/1dot.gif" alt=""></td></tr><tr valign="middle"><td align="left" colspan="2">
+<a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../technicalnotes/index.html">Technical Notes</a> &gt; <a href="../../technicalnotes/Performance/index.html">Performance</a> &gt; <a href="../../technicalnotes/Performance/idxGraphicsImaging-date.html">Graphics & Imaging</a> &gt; 
+</td></tr><tr><td colspan="2" scope="row"><img width="680" height="35" src="images/1dot.gif" alt=""></td></tr></table></div>
+<!-- END BREADCRUMB -->
+
+<!-- START MAIN CONTENT -->
+<!-- START TITLE GRAPHIC AND INTRO-->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top">
+<td><h1>
+<div id="pagehead">Technical Note TN2133</div>
+<div id="pageheadsub">Coalesced Updates</div>
+</h1></td></tr></table>
+<!-- END TITLE GRAPHIC AND INTRO -->
+<!-- BEGIN WIDE COLUMN -->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td align="left" width="680">
+<!-- BEGIN CONTENTS -->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td><p>Working with the GPU</p></td></tr><tr><td scope="row"><img width="680" height="10" src="images/1dot.gif" alt=""><br><img height="1" width="680" src="images/1dot_919699.gif" alt=""><br><img width="680" height="20" src="images/1dot.gif" alt=""></td></tr></table><table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td width="680"><ul><li><a href="#TNTAG1">Coalesced Updates</a></li><li><a href="#TNTAG2">How does this affect applications?</a></li><li><a href="#TNTAG4">What tools can I use to tell if an application is being affected by coalesced updates?</a><ul><li><a href="#TNTAG6">Quartz Debug</a></li><li><a href="#TNTAG5">Shark</a></li></ul></li><li><a href="#TNTAG3">Recommendations</a><ul><li><a href="#TNTAG8">General recommendations</a></li><li><a href="#TNTAG10">Best Practices</a></li><li><a href="#TNTAG9">A last resort</a></li></ul></li><li><a href="#TNT_HISTORY_TAG">Document Revision History</a></li></ul></td></tr><tr><td colspan="3" scope="row"><img width="680" height="10" src="images/1dot.gif" alt=""><br><img height="1" width="680" src="images/1dot_919699.gif" alt=""><br><img width="680" height="20" src="images/1dot.gif" alt=""></td></tr></table><A NAME="TNTAG1"></A><H2>Coalesced Updates</H2><p>Mac OS X 10.4 introduces a new behavior of coalescing updates that enables Quartz to more efficiently update the frame buffer during each display refresh.  In addition to increasing system efficiency, Coalescing updates improved visual consistency and eliminates &quot;tearing&quot; during scrolling and animation.  To coalesce updates, the Quartz window server composites all window buffers into a single offscreen frame buffer before flushing it to the screen. When your application issues a command to flush, the system doesn't actually flush that content until the next available display refresh. This allows all updates for multiple applications to happen at the same time. Window server operations (window resize or move, for example) are handled in the same manner&mdash;coalesced into a system-wide screen update.</p><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG2"></A><H2>How does this affect applications?</H2><p>The majority of applications gain the benefit of coalesced updates, however, there are some situations where it can cause performance regressions. Regressions tend to fall into two categories:</p><ul><li><p>Over-flushing: Applications which draw and flush much faster than the display refresh are throttled down to the refresh rate. Ideally, applications should not draw faster than the display refresh as it would be wasting time drawing pixels the user won't see on the display.  Once a window has been drawn into and flushed the buffer needs to be locked in preparation for window server access, so an application can do anything it likes until that flush makes it to the screen except draw into the buffer again.  If an application tries to draw immediately after a flush it will block until that flush actually completes, so if the application just misses a frame sync it has to wait around until the next one, and won't be able to start drawing the next frame in the meantime.</p></li><li><p>Extended Drawing Interval: If an animation spends more time in its drawing routine than it takes for the screen to refresh, then it will become throttled to some factor of the refresh rate. So, if the refresh rate was 60 fps and the animation can run at at most 55 fps, it will be throttled down to 30 fps.</p></li></ul><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG4"></A><H2>What tools can I use to tell if an application is being affected by coalesced updates?</H2><p>If an application that has been built and linked on 10.4 is spending more time drawing than the same application built and linked on a previous system, then it is probably being affected by coalesced updates.  Their are two tools that can be used to verify if an application is or isn't being affected by coalesced updates, Quartz Debug and Shark.</p><A NAME="TNTAG6"></A><H3>Quartz Debug</H3><p>Quartz Debug is a debugging tool for the Quartz graphics system with several powerful features to help you identify a number of graphics display and performance problems. Once the Mac OS X developer tools have been installed, the Quartz Debug application is located in: /Developer/Applications/Performance Tools/.  To see the affect of effects of coalesced updates on applications, including CFM applications and applications linked on systems previous to 10.4, enable forced beam synchronization in Quartz Debug.  An application that is being affected by coalesced updates will have a lowered frame rate when beam synchronization is enabled then when beam synchronization is disabled, and often will have increased CPU usage.  To learn more about using Quartz Debug to see the effect of coalesced updates see <A HREF="../../qa/qa2001/qa1236.html">Q&amp;A 1234, Debugging Graphics with QuartzDebug</A>.</p><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG5"></A><H3>Shark</H3><p>Shark is a profiling tool included with the Mac OS X developer tools distribution.  Shark can be used to profile an application and see if too much time is being spent in drawing operations, signaling that an application is having its updates coalesced.  Once the Mac OS X developer tools have been installed, the Shark profiling tool is located on the system at: /Developer/Applications/Performance Tools/.  If needed use Quartz Debug to force beam synchronization, then in Shark, sample your application using the &quot;Time Profile (All Thread States)&quot; mode.  If you see time more time spent in the <code>CGContext</code> drawing operations then you do with beam synchronization disabled then your application is having it's updates coalesced.</p><p>To learn more about using Shark for profiling please see Apple Developer Connections performance page at <A HREF="../../performance/">http://developer.apple.com/performance/</A>.</p><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG3"></A><H2>Recommendations</H2><p>To applications, this doesn't really change what they should be doing; it just enforces what has been recomended in the past.</p><A NAME="TNTAG8"></A><H3>General recommendations</H3><ul><li><p>Flush once per update event.</p></li><li><p>Consider periodic updates when live resizing and scrolling, and if needed draw lower quality results.</p></li><li><p>While an application can get the current screen's refresh rate, the recommendation is to assume a refresh rate of 60 fps.</p></li><li><p>Applications in general shouldn't draw or flush faster then the user can see.  Most animations only need a refresh rate of 30 fps, if an animation needs to update more often, then a timer should be used to limit animation rates to the refresh rate or less.</p></li><li><p>Avoid, if possible, the functions that request an immediate flush to the screen.  Applications drawing with Quartz should use <code>CGContextSynchronize</code> rather then <code>CGContextFlush</code>.</p></li><li><p>In Cocoa use <code>NSView</code>'s <code>setNeedsDisplay:</code> to request an update for a view instead of the more immediate <code>display:</code>, and in Carbon's HIToolBox use <code>HIViewSetNeedsDisplay</code> or <code>HIViewSetNeedsDisplayInRegion</code> instead of the immediate <code>HIWindowFlush</code>.</p></li></ul><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG10"></A><H3>Best Practices</H3><ul><li><p>In drawing routines, do all calculations then draw, minimizing the amount of time between first touching the context and being done with it.  In windows that have complex drawing routines, this will minimize the time waiting for a context that is being flushed to be released for more drawing.</p></li><li><p>It is a good idea for animations and screen updates to be time based and frame-limited in order to work best with coalesced updates. That is, they must make a fixed amount of progress per unit of time, rather than per frame, and they must not attempt to run at a rate greater than the refresh rate.</p></li><li><p>Applications that are displaying more than a single animation at a time in one window need to arrange for all animations in a window to run off of the same timer, updating in the same round in the runloop, and flushing together.</p></li><li><p>Decouple your visualization engine from your data engine so that neither engine will impede the other. Avoid network or disk access that would block the UI.</p></li></ul><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG9"></A><H3>A last resort</H3><p>If your application cannot adopt any of the above solutions,  it is possible to disable coalesced updates for your application.  To disable coalesced updates for your application, set the the key <code>CGDisableCoalescedUpdates</code> to the CFBoolean value of true in your Info.plist dictionary as shown in <A HREF="#TNTAG7">Listing 1</A>.  This key will only disable coalesced updates for applications running on Mac OS X 10.4.4 or later.  Note: Disabling coalesced updates is recommended only as a solution of last resort.  The system will still, on an as needed basis, force update coalescing on your application should the need arise.  Additionally, by  disabling coalesced updates your application can suffer from issues ranging from visual correctness to tearing during window updates.</p><A NAME="TNTAG7"></A><p class="smalltext"><strong>Listing 1:</strong> Using CGDisableCoalescedUpdates, in an applications Info.plist, to disable coalesced updates on 10.4.4 and later.</p><pre class="sourcecodebox">&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;
+&lt;!DOCTYPE plist PUBLIC &quot;-//Apple Computer//DTD PLIST 1.0//EN&quot;
+       &quot;http://www.apple.com/DTDs/PropertyList-1.0.dtd&quot;&gt;
+&lt;plist version=&quot;1.0&quot;&gt;
+&lt;dict&gt;
+  &lt;key&gt;CFBundleExecutable&lt;/key&gt;
+  &lt;string&gt;GraphicsApp&lt;/string&gt;
+  &lt;key&gt;CFBundleName&lt;/key&gt;
+  &lt;string&gt;GraphicsApp&lt;/string&gt;
+         ...
+         &lt;key&gt;CGDisableCoalescedUpdates&lt;/key&gt;
+         &lt;true/&gt;
+         ...
+  &lt;key&gt;CFBundlePackageType&lt;/key&gt;
+  &lt;string&gt;APPL&lt;/string&gt;
+  &lt;key&gt;CFBundleSignature&lt;/key&gt;
+  &lt;string&gt;grap&lt;/string&gt;
+  &lt;key&gt;CFBundleVersion&lt;/key&gt;
+  &lt;string&gt;1.0&lt;/string&gt;
+&lt;/dict&gt;
+&lt;/plist&gt;
+</pre><div class="notebox"><p><strong>IMPORTANT:</strong> In order to maximize compatibility, all applications linked on systems before 10.4 (including all CFM apps, even if linked on 10.4) will not have their flush operations forced into a coalesced update cycle if that flush would only go out by itself.  All accelerated surface flushes that go through the window server will be done via a coalesced update cycle. If an older application or one that disables coalesced updates in its Info.plist issues a flush and a coalesced update is already in progress though, then that flush will become part of the current coalesced update. This means that newer apps that want visual correctness will take precedence over older apps that are potentially trying to flush too quickly.</p></div><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNT_HISTORY_TAG"></A><H2>Document Revision History</H2><table cellspacing="0" class="graybox" width="680"><tr><th width="100">Date</th><th width="580">Notes</th></tr><tr><td scope="row">2006-01-20</td><td>Changed the CGDisableCoalescedUpdates key's value in the Info.plist listing to a CFBoolean true.</td></tr><tr><td scope="row">2006-01-12</td><td>How to achieve the maxium frame rate in your Mac OS X application</td></tr></table><p><b>Posted:</b> 2006-01-20</p>
+<!-- END CONTENTS -->
+</td></tr></table>
+<!-- END WIDE COLUMN -->
+<!-- END MAIN CONTENT -->
+	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/technotes/tn2005/tn2133.html%3Fid%3DDTS10003496-1.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/technotes/tn2005/tn2133.html%3Fid%3DDTS10003496-1.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/technotes/tn2005/tn2133.html%3Fid%3DDTS10003496-1.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+
+<!-- START BOTTOM APPLE NAVIGATION -->
+<!--#include virtual="/includes/footer"-->
+<!-- END BOTTOM APPLE NAVIGATION -->
+<!-- START CENTER CLOSE -->
+</center>
+<!-- END CENTER CLOSE -->
+</body></html>

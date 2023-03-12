@@ -1,0 +1,380 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/1999/REC-html401-19991224/loose.dtd">
+<html><head>
+<!-- BEGIN META TAG INFO -->
+<link rel="home" href="http://developer.apple.com/">
+<link rel="find" href="http://developer.apple.com/search/">
+<link rel="stylesheet" type="text/css" href="../../documentation/css/adcstyle.css" title="fonts">
+<script language="JavaScript" type="text/javascript" src="../../documentation/js/busnav.js"></script>
+<script language="JavaScript" src="../../documentation/js/adc.js" type="text/javascript"></script>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<!-- END META TAG INFO -->
+<!-- BEGIN TITLE -->
+<title>Technical Note TN2112: Using the 3DMixer Audio Unit</title>
+<!-- END TITLE -->
+</head>
+<!-- BEGIN BODY OPEN -->
+<body bgcolor="#ffffff"><a name="//apple_ref/doc/uid/DTS10003282" title="Using the 3DMixer Audio Unit"></a>
+<!--END BODY OPEN -->
+<!-- START CENTER OPEN -->
+<center>
+<!-- END CENTER OPEN -->
+<a name="top"></a>
+<!-- BEGIN LOGO AND SEARCH -->
+<!--#include virtual="/includes/adcnavbar"-->
+<!-- END LOGO AND SEARCH -->
+<!-- START BREADCRUMB -->
+<div id="breadcrumb"><table width="680" border="0" cellpadding="0" cellspacing="0"><tr>
+<td scope="row"><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+<td><img width="340" height="10" src="images/1dot.gif" alt=""></td></tr><tr valign="middle"><td align="left" colspan="2">
+<a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../technicalnotes/index.html">Technical Notes</a> &gt; <a href="../../technicalnotes/MusicAudio/index.html">Audio</a> &gt; <a href="../../technicalnotes/MusicAudio/idxCarbon-date.html">Carbon</a> &gt; 
+</td></tr><tr><td colspan="2" scope="row"><img width="680" height="35" src="images/1dot.gif" alt=""></td></tr></table></div>
+<!-- END BREADCRUMB -->
+
+<!-- START MAIN CONTENT -->
+<!-- START TITLE GRAPHIC AND INTRO-->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top">
+<td><h1>
+<div id="pagehead">Technical Note TN2112</div>
+<div id="pageheadsub">Using the 3DMixer Audio Unit</div>
+</h1></td></tr></table>
+<!-- END TITLE GRAPHIC AND INTRO -->
+<!-- BEGIN WIDE COLUMN -->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td align="left" width="680">
+<!-- BEGIN CONTENTS -->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td><p>This technote illustrates the usage of Core Audio's 3DMixer Audio Unit version 2.0.</p><p>The 3DMixer Audio Unit can mix audio from several different sources and then localize the sound in 3D space.  This is very useful in games and in many other interactive applications that need to manage several audio sources simply and efficiently.  This technote is intended for present and new users of the v2.0 3DMixer Audio Unit.</p></td></tr><tr><td scope="row"><img width="680" height="10" src="images/1dot.gif" alt=""><br><img height="1" width="680" src="images/1dot_919699.gif" alt=""><br><img width="680" height="20" src="images/1dot.gif" alt=""></td></tr></table><table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td width="680"><ul><li><a href="#CREATING">Creating an AUGraph for the 3DMixer</a></li><li><a href="#BUSCOUNT">Setting the Bus count</a></li><li><a href="#INTERNALREVERB">Using the Internal Reverb</a></li><li><a href="#SPEAKER">Speaker Configurations</a></li><li><a href="#3">Localizing sound in 3D space</a></li><li><a href="#SPAT">Spatialization Rendering Algorithims</a></li><li><a href="#VOLUME">Setting the volume</a></li><li><a href="#BUSSTREAM">Bus Stream Formats and the FormatConverterAU</a></li><li><a href="#ININT">Connecting, Initializing & Starting the AUGraph</a></li><li><a href="#DISPOSING">Disposing of the AUGraph</a></li><li><a href="#CONCLUSION">Conclusion</a></li><li><a href="#REFERENCES">References and Notes</a></li><li><a href="#TNT_HISTORY_TAG">Document Revision History</a></li></ul></td></tr><tr><td colspan="3" scope="row"><img width="680" height="10" src="images/1dot.gif" alt=""><br><img height="1" width="680" src="images/1dot_919699.gif" alt=""><br><img width="680" height="20" src="images/1dot.gif" alt=""></td></tr></table><p>The v2.0 3DMixer Audio Unit has the ability to localize sound in 3-dimensional space, that is, position multiple sound sources by distance, elevation, and azimuth around a listener. The 3DMixer can render to multiple channel layouts (discussed below in the Speaker Configuration section). In addition, the quality of sound rendered during playback can be adjusted to meet CPU performance demands.</p><A NAME="CREATING"></A><H2>Creating an AUGraph for the 3DMixer</H2><p class="caption"><strong>Figure 1:</strong> The 3D Mixer</p><p><img  src="images/tn2112_3Dmixer.jpg" width="300" height="300" alt="Figure 1, The 3D Mixer"></p><p>3DMixers are typically inserted into an Audio Unit Graph (<code>AUGraph</code>) to help manage data flow.  An <code>AUGraph</code> is a high-level representation of a set of AudioUnits, along with the connections between them. You can use the <code>AUGraph</code> APIs to construct arbitrary signal paths through which audio may be processed, i.e., a modular routing system. The APIs deal with large numbers of AudioUnits and their relationships.</p><p>The head of a graph is always an output unit, which may save the processed audio stream to disk, into memory, or as sound out. Starting a graph entails 'pulling' on the head audio unit (where data will exit the graph), which will, in turn, pull data from the connected audio units in the graph.  For this technote, we will use default output audio unit as the head of the graph.  The default output unit will represent the output device (speakers, in most cases) selected by the user in Audio MIDI Setup application or the System Prefrences Output Panel. For more information about using Audio Unit Graphs, please read <A HREF="../../documentation/MusicAudio/Reference/CoreAudio/audio_toolbox/chapter_4_section_3.html">Using the Audio Toolbox</A>.</p><p>To begin setting up our graph, we must add nodes for the 3DMixer and a Default Output <code>AudioUnit</code> with the method <code>AUGraphNewNode()</code>. After creating the nodes, we can open the graph and obtain the <code>AudioUnit</code> instances from the nodes within the graph by using the method <code>AUGraphGetNodeInfo()</code>.</p><p class="smalltext"><strong>Listing 1:</strong> Creating an AUGraph and adding nodes</p><pre class="sourcecodebox">
+void MyCreateAUGraph(  AUGraph  mAUGraph,AudioUnit mOutputUnit,
+ AudioUnit mMixerUnit)
+{
+    AUNode mMixerNode, mOutputNode;
+
+    NewAUGraph(&amp;mAUGraph);
+
+    ComponentDescription    mixerCD;
+
+    mixerCD.componentFlags = 0;
+    mixerCD.componentFlagsMask = 0;
+    mixerCD.componentType = kAudioUnitType_Mixer;
+    mixerCD.componentSubType = kAudioUnitSubType_3DMixer;
+    mixerCD.componentManufacturer = kAudioUnitManufacturer_Apple;
+
+    AUGraphNewNode (mAUGraph, &amp;mixerCD, 0, NULL, &amp;mMixerNode);
+
+    ComponentDescription    cd;
+    cd.componentFlags = 0;
+    cd.componentFlagsMask = 0;
+
+    cd.componentType = kAudioUnitType_Output;
+    cd.componentSubType = kAudioUnitSubType_DefaultOutput;
+    cd.componentManufacturer = kAudioUnitManufacturer_Apple;
+
+    AUGraphNewNode (mAUGraph, &amp;cd, 0, NULL, &amp;mOutputNode);
+
+      //Open the Graph
+     AUGraphOpen (mAUGraph);
+
+     //Get Audio Units from graph
+    AUGraphGetNodeInfo (mAUGraph, mMixerNode, 0, 0, 0, &amp;mMixerUnit);
+    AUGraphGetNodeInfo (mAUGraph, mOutputNode, 0, 0, 0, &amp;mOutputUnit);
+
+}
+</pre><p>Now that the graph has been created we must setup the 3DMixer appprioprately before initializing and starting the graph.</p><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="BUSCOUNT"></A><H2>Setting the Bus count</H2><p>The number of inputs (or busses) of the 3Dmixer is a settable property.  By default, the 3DMixer has 64  busses. Since busses incur memory usage, the bus count should not be set higher than necessary for the application's needs. Setting this property should be done prior to initializing the mixer unit.</p><p class="smalltext"><strong>Listing 2:</strong> Setting the mixer bus count</p><pre class="sourcecodebox">
+OSStatus    SetMixerBusCount (UInt32    inBusCount)
+{
+
+        UInt32  size        = sizeof(UInt32);
+        UInt32  busCount    = inBusCount;
+
+        return (AudioUnitSetProperty (    mMixerUnit,
+                            kAudioUnitProperty_BusCount,
+                            kAudioUnitScope_Input,
+                            0,
+                            &amp;busCount,
+                            size));
+
+}
+</pre><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="INTERNALREVERB"></A><H2>Using the Internal Reverb</H2><p>The 3Dmixer has a built-in reverb.  Once turned on, reverb is applied on a per input bus basis (as described below).  Reverb is off by default and can be turned on with the <code>AudioUnitSetProperty()</code> method and the <code>kAudioUnitProperty_UsesInternalReverb</code> property, before initializing the graph.</p><p class="smalltext"><strong>Listing 3:</strong> Enabling the internal reverb</p><pre class="sourcecodebox">
+    UInt32        reverbSetting    = 1 // turn it on;
+    result = AudioUnitSetProperty(mMixerUnit,
+                          kAudioUnitProperty_UsesInternalReverb,
+                          kAudioUnitScope_Global,
+                          0,
+                          &amp;reverbSetting,
+                          sizeof(reverbSetting));
+</pre><p>Now that reverb has been turned ON for the 3DMixer, reverb can be enabled per bus by setting the <code>k3DMixerRenderingFlags_DistanceDiffusion</code> flag. Use the method <code>AudioUnitSetProperty()</code> and the <code>kAudioUnitProperty_3DMixerRenderingFlags</code> property to set the flag. This property can be set at anytime.</p><p class="smalltext"><strong>Listing 4:</strong> Turning reverb on for a bus</p><pre class="sourcecodebox">
+    UInt32    render_flags_3d;
+    UInt32    outSize = sizeof(render_flags_3d);
+
+    // get the current render flags for this bus
+    result = AudioUnitGetProperty (mMixerUnit,
+            kAudioUnitProperty_3DMixerRenderingFlags,
+            kAudioUnitScope_Input,
+            busIndex,
+            &amp;render_flags_3d,
+            &amp;outSize);
+
+    // turn on this render flag and then set the bus
+    render_flags_3d |= k3DMixerRenderingFlags_DistanceDiffusion;
+    result = AudioUnitSetProperty(    mMixerUnit,
+             kAudioUnitProperty_3DMixerRenderingFlags,
+             kAudioUnitScope_Input, busIndex,
+             &amp;render_flags_3d,
+             sizeof(render_flags_3d));
+
+</pre><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="SPEAKER"></A><H2>Speaker Configurations</H2><p>The v2.0 3DMixer can render audio to stereo, quad, and 5.0 channel layouts.  Although the v2.0 3DMixer appropriately sets its channel layout when the output stream format is set, it is recommended that the channel layout be explicitly set. Therefore no changes are required to your code, should a future version of the mixer be released that supports multiple channel layouts that use the same number of channels (i.e. 5.1 and 6.0).  When explicitly setting the channel layout be sure to pick a layout that matches the channel count of the stream format or an error will be returned (setting the channel layout to quad for example, if the stream format has 5 channels will return an error).  In order to take full advantage of the mixer's ability to render to multiple channel layouts, it is necessary to determine what the user has set for the Speaker Configuration in the Audio MIDI Setup application (see example below) by querying the current device for it's output channel layout.</p><p>By querying the output unit of the graph, the following code determines an appropriate channel count to be used when setting the stream format (output scope) of the mixer.</p><div class="notebox"><p><strong>Note:</strong> Be aware that there could also be a situation when a Speaker Configuration (channel layout) has been set by the user in Audio MIDI Setup for a multi-channel hardware device. However, there may not be speakers connected to all the hardware channels (i.e. 2 speakers connected to an 8 channel device). In this case, it may be desirable to let the user specify stereo rendering, allowing the application to clamp to stereo to prevent audio data being rendered to a device channel with no speaker connected.</p></div><p class="smalltext"><strong>Listing 5:</strong> Determining the correct number of channels to render to</p><pre class="sourcecodebox">
+UInt32 GetDesiredRenderChannelCount ()
+{
+    OSStatus result = noErr;
+
+    // get the HAL device id form the output AU
+    AudioDeviceID    deviceID;
+    UInt32    returnValue = 2;    // return stereo by default
+
+    UInt32 outSize =  sizeof(deviceID);
+
+    //get the current device
+    AudioUnitGetProperty(mOutputUnit,
+                        kAudioOutputUnitProperty_CurrentDevice,
+                        kAudioUnitScope_Output,
+                        1,
+                        &amp;deviceID,
+                        &amp;outSize);
+
+    //Get the users speaker configuration
+    result = AudioDeviceGetPropertyInfo(deviceID,
+                        0,
+                        false,
+                        kAudioDevicePropertyPreferredChannelLayout,
+                        &amp;outSize,
+                        NULL);
+
+    if (result != noErr)
+        return (returnValue);   // return default (stereo)
+
+    AudioChannelLayout    *layout = NULL;
+    layout = (AudioChannelLayout *) calloc(1, outSize);
+    if (layout != NULL)
+    {
+        result = AudioDeviceGetProperty(deviceID,
+                       0,
+                       false,
+                       kAudioDevicePropertyPreferredChannelLayout,
+                       &amp;outSize,
+                       layout);
+        if (layout-&gt;mChannelLayoutTag
+                       == kAudioChannelLayoutTag_UseChannelDescriptions)
+        {
+        // no channel layout tag is returned,
+                //so walk through the channel descriptions and count
+                // the channels that are associated with a speaker
+        if (layout-&gt;mNumberChannelDescriptions == 2)
+        {
+                returnValue = 2;    // there is no channel info for stereo
+        }
+        else
+        {
+            returnValue = 0;
+            for (UInt32 i = 0; i &lt; layout-&gt;mNumberChannelDescriptions; i++)
+            {
+                if (layout-&gt;mChannelDescriptions[i].mChannelLabel !=
+                                             kAudioChannelLabel_Unknown)
+                    returnValue++;
+                }
+            }
+        }
+        else
+        {
+            switch (layout-&gt;mChannelLayoutTag)
+            {
+                case kAudioChannelLayoutTag_AudioUnit_5_0:
+                case kAudioChannelLayoutTag_AudioUnit_5_1:
+                case kAudioChannelLayoutTag_AudioUnit_6:
+                    returnValue = 5;
+                    break;
+                case kAudioChannelLayoutTag_AudioUnit_4:
+                    returnValue = 4;
+                default:
+                    returnValue = 2;
+            }
+        }
+
+        free(layout);
+    }
+  return returnValue;
+}
+</pre><div class="notebox"><p><strong>IMPORTANT:</strong> The mixer's output stream format must be set before connecting it to the output unit. After connecting the mixer to the output unit, the channel layout must be explicitly set to match the input scope layout of the output unit.</p></div><p class="smalltext"><strong>Listing 6:</strong> Configuring the AUGraph For Channel Layout</p><pre class="sourcecodebox">
+void ConfigureGraphForChannelLayout()
+{
+    OSStatus    result = noErr;
+
+    // get the channel count that should be set
+        // for the mixer's output stream format
+    mCurrentMixerChannelCount = GetDesiredRenderChannelCount();
+
+    // set the stream format
+    CAStreamBasicDescription format; //CoreAudio SDK class
+    UInt32 outSize = sizeof(format);
+    result = AudioUnitGetProperty(mOutputUnit,
+                               kAudioUnitProperty_StreamFormat,
+                               kAudioUnitScope_Output,
+                               0,
+                               &amp;format,
+                               &amp;outSize);
+
+        // not interleaved
+    format.SetCanonical (mCurrentMixerChannelCount, false);
+    format.mSampleRate = mMixerOutputRate;
+    outSize = sizeof(format);
+    result = AudioUnitSetProperty (mOutputUnit,
+                               kAudioUnitProperty_StreamFormat,
+                               kAudioUnitScope_Input,
+                               0,
+                               &amp;format,
+                               outSize);
+
+    result = AudioUnitSetProperty (mMixerUnit,
+                               kAudioUnitProperty_StreamFormat,
+                               kAudioUnitScope_Output,
+                               0,
+                               &amp;format,
+                               outSize);
+
+    return;
+}
+</pre><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="3"></A><H2>Localizing sound in 3D space</H2><p>Setting the distance, elevation and azimuth of a bus causes the listener to perceive the audio from a specific point in a 3-dimensional space.</p><p>The pitch and gain of the audio sources can be changed per bus within the 3DMixer.   The pitch can be changed by modifying the value of the parameter <code>k3DMixerParam_PlaybackRate</code>.  The gain can be changed by modifying the value of the parameter <code>k3DMixerParam_Gain</code> (example shown in &quot;Setting the Volume&quot;).</p><div class="notebox"><p><strong>Note:</strong> The gain referred to here is for scaling the volume of the actual audio data. All spatial attenuation of the audio is done by setting the distance parameter on the mixer bus.</p></div><p class="smalltext"><strong>Table 1:</strong> 3-Dimensional Parameters (Location)</p><table cellspacing="0" class="graybox"><tr><th>Direction</th><th>Unit</th><th>Range</th></tr><tr><td scope="row">Azimuth</td><td>Degrees</td><td>-180 to 180</td></tr><tr><td scope="row">Elevation</td><td>Degrees</td><td>-90 to 90</td></tr><tr><td scope="row">Distance</td><td>Meters</td><td>0 to 10000</td></tr></table><p class="smalltext"><strong>Table 2:</strong> 3-Dimensional Parameters ( Volume and Pitch)</p><table cellspacing="0" class="graybox"><tr><th>Direction</th><th>Unit</th><th>Range</th></tr><tr><td scope="row">Gain</td><td>dB</td><td>-120 to 20</td></tr><tr><td scope="row">Playback Rate (Pitch)</td><td>rate</td><td>0.5 to 4.0</td></tr></table><p class="smalltext"><strong>Listing 7:</strong> Setting the distance and azimuth</p><pre class="sourcecodebox">
+void    SetObjectCoordinates(UInt32     inMixerInputBus, Float32,
+inAzimuth, Float32 inDistance)
+{
+    AudioUnitSetParameter(mMixerUnit,
+                                            k3DMixerParam_Azimuth,
+                                            kAudioUnitScope_Input,
+                                            inMixerInputBus,
+                                            inAzimuth,
+                                            0);
+
+    AudioUnitSetParameter(mMixerUnit,
+                                            k3DMixerParam_Distance,
+                                            kAudioUnitScope_Input,
+                                            inMixerInputBus,
+                                            inDistance,
+                                            0);
+}
+</pre><p>Starting with the v2.0 3DMixer, it is possible to have the mixer do all the work necessary to clamp the bus volume based on specified ReferenceDistance, MaximumDistance and Attenuation settings. This feature allows an application to specify how close/far away an object in 3D space can actually get to/from the listener. The following method demonstrates how to properly set/get a mixer bus's DistanceParams with the <code>AudioUnitSetProperty()</code> method and the <code>kAudioUnitProperty_3DMixerDistanceParams</code> property.</p><p class="smalltext"><strong>Listing 8:</strong> Mixer Distance Parameters struct defined in AudioUnitProperties.h</p><pre class="sourcecodebox">
+
+typedef struct MixerDistanceParams {
+    Float32            mReferenceDistance;
+    Float32            mMaxDistance;
+    Float32            mMaxAttenuation;    // in decibels
+} MixerDistanceParams;
+</pre><p class="caption"><strong>Figure 2:</strong> Distance Parameters Graph</p><p><img  src="images/tn2112_AttenuationGraph.jpg" width="567" height="363" alt="Figure 2, Distance Parameters Graph"></p><p class="smalltext"><strong>Listing 9:</strong> Setting the Distance Parameters for a bus</p><pre class="sourcecodebox">
+void    SetDistanceParamsForBus (UInt32     inMixerInputBus)
+{
+         MixerDistanceParams    distanceParams;
+
+    // Get the desired minimum distance an object
+    // can get to the listener (float value in meters)
+    // The mixer will play audio on the bus with 0db
+    // of attenuation (no attenuation) for all distance coordinates
+    // between 0.0 and this reference distance. This
+    //value must be less than the maximum distance setting.
+    distanceParams.mReferenceDistance = GetMyMinimumDistance();
+
+    // Get the desired maximum distance an object
+    // can get from the listener (float value in meters)
+    // The mixer will stop attenuating audio on the bus
+    // for all distance coordinates at this maximum
+    // distance or greater. This value must be greater
+    // than the reference distance setting.
+    distanceParams.mMaxDistance = GetMyMaximumDistance();
+
+    // Get desired attenuation (in db) for an object when it's
+    // coordinates are at or beyond the maximum distance
+    // (positive float value in dB).
+    // The mixer will not attenuate the audio further than
+    // this db setting when the distance coordinates are beyond the
+    // maximum distance setting.
+
+    distanceParams.mMaxAttenuation = GetMyMinimumAttenuation();
+
+    OSStatus result = AudioUnitSetProperty(mMixerUnit,
+                                kAudioUnitProperty_3DMixerDistanceParams,
+                                kAudioUnitScope_Input,
+                                inMixerInputBus,
+                                &amp;distanceParams,
+                                sizeof(distanceParams));
+
+
+}
+</pre><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="SPAT"></A><H2>Spatialization Rendering Algorithims</H2><p>Spatialization settings are on a per bus (mixer input) basis and set with <code>AudioUnitSetProperty()</code> method and the <code>kAudioUnitProperty_SpatializationAlgorithm</code> constant. The type of the spatialization rendering used is determined by factors such as source audio channels (mono/stereo), output hardware channels (stereo, multichannel), and cpu capability. Setting a bus spatialization algorithm may also change some of the bus rendering flags (<code>kAudioUnitProperty_3DMixerRenderingFlags</code>) so it is recommended to reset any desired render flags after setting the spatialization algorithm.</p><p class="smalltext"><strong>Table 3:</strong> Spatailization Algorithims appropriate for Stereo Output (from AudioUnitProperies.h)</p><table cellspacing="0" class="graybox"><tr><th>Algorithims</th><th>Description</th><th>Output</th></tr><tr><td scope="row">kSpatializationAlgorithm_StereoPassThrough</td><td>StereoPassThrough should be used when no localization is desired for stereo source data. Setting this algorithm tells the mixer to take stereo input and pass it directly to channels 1 &amp; 2 (Front L/R if rendering is for multichannel) without localization.</td><td>Stereo , Multi-Channel</td></tr><tr><td scope="row">kSpatializationAlgorithm_EqualPowerPanning</td><td>EqualPowerPanning merely pans the data of the mixer bus into a stereo field. This algorithm is analogous to the pan knob found on a mixing board channel strip. When this algorithm is used while the mixer is rendering to multichannel hardware audio data will only be rendered to channels 1 &amp; 2 (Front L/R).</td><td>Stereo</td></tr><tr><td scope="row">kSpatializationAlgorithm_HRTF</td><td>HRTF (Head Related Transfer Function) is a high quality algorithm using filtering to emulate 3 dimensional space in headphones or stereo speakers. If turned on while rendering to multi channel hardware, HRTF will render the input data only to channels 1 &amp; 2 (Front L/R). HRTF is a cpu intensive algorithm.</td><td>Stereo</td></tr><tr><td scope="row">kSpatializationAlgorithm_SphericalHead</td><td>Like HRTF, the SpericalHead algorithm is designed to emulate 3 dimensional space in headphones or stereo speakers. Using simplified algorithms, SpericalHead provides a lesser quality rendering experience than HRTF and is slightly less cpu intensive.</td><td>Stereo</td></tr><tr><td scope="row">kSpatializationAlgorithm_VectorBasedPanning</td><td>VectorBasedPanning pans data from the bus, based on it's location in 3 dimensional space, between two channels of the multichannel rendering (i.e. between channels 3 &amp; 4 for a quad rendering if the location of the data was directly behind the listener). When this algorithm is used while the mixer is rendering to stereo hardware, it effectively becomes EqualPowerPanning (see EqualPowerPanning for more info.) This algorithm does not pan moving sources as smoothly as the Sound Field (kSpatializationAlgorithm_SoundField) algorithm and is better suited for localizing fixed sources.</td><td>Multi-Channel</td></tr><tr><td scope="row">kSpatializationAlgorithm_SoundField (Ambisonics)</td><td>SoundField is designed for rendering to multi channel hardware. The mixer takes data being rendered with SoundField and distributes it amongst all the output channels with a weighting toward the location in which the sound derives. It is very effective for ambient sounds, which may derive from a specific location in space, yet should be heard through the listener's entire space.</td><td>Multi-Channel</td></tr></table><p class="smalltext"><strong>Listing 10:</strong> Setting the 3DMixer to a Spatialization Algorithims</p><pre class="sourcecodebox">
+SetSpatializationAlgorithm( UInt32 BusNumber)
+{
+          UInt32 spatialSetting = GetMySpatializationSetting();
+
+          result = AudioUnitSetProperty(mMixerUnit,
+                             kAudioUnitProperty_SpatializationAlgorithm,
+                             kAudioUnitScope_Input,
+                             BusNumber,
+                             &amp;spatialSetting,
+                             sizeof(spatialSetting));
+}
+</pre><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="VOLUME"></A><H2>Setting the volume</H2><p>The volume can be explicitly set for each bus on the input scope of the 3DMixer, providing a gain before the sound is mixed. Use the <code>k3DMixerParam_Gain</code> constant and <code>AudioUnitSetParameter()</code> method to set the volume of each mixer bus (input scope). The parameter is a float value representing dB (see below).</p><p class="smalltext"><strong>Listing 11:</strong> Setting the volume on input</p><pre class="sourcecodebox">
+// busGain represents a range of 0.0 to 1.0 (full volume)
+SetInputBusGain(UInt32 mCurrentPlayBus, Float32 busGain)
+{
+   Float32    db = 20.0 * log10(busGain);     // convert to db
+   if (db &lt; -120.0)
+      db = -120.0;  // clamp minimum audible level at -120db
+
+   AudioUnitSetParameter(mMixerUnit,
+                                       k3DMixerParam_Gain,
+                                       kAudioUnitScope_Input,
+                                       mCurrentPlayBus,
+                                       db,
+                                       0);
+}
+</pre><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="BUSSTREAM"></A><H2>Bus Stream Formats and the FormatConverterAU</H2><p>If a <code>FormatConverterAU</code> is supplying the data to the mixer bus, then the stream format on the input scope of the mixer is automatically set when the nodes are connected.  However, if the data is being supplied to the mixer directly in the render proc of the bus, it is necessary to properly set the stream format on the input scope of a mixer's bus before 'pulling' for data.</p><div class="notebox"><p><strong>Note:</strong> When setting the stream format of a mixer's bus, remember that the mixer expects to receive stereo data as de-interleaved.</p></div><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="ININT"></A><H2>Connecting, Initializing & Starting the AUGraph</H2><p>Setup is now complete and we can connect the 3DMixer to the default output audio unit.  When all connections are made and nodes are setup up correctly, you must initialize the <code>AUGraph</code>.  The graph is now complete and the 3Dmixer is ready for use. A call to <code>AUGraphStart</code> will start processing the audio data.</p><p class="smalltext"><strong>Listing 12:</strong> Connecting, Initializing &amp; Starting the AUGraph</p><pre class="sourcecodebox">
+
+       AUGraphConnectNodeInput (mAUGraph, mMixerNode, 0, mOutputNode, 0);
+
+       AUGraphInitialize (mAUGraph);
+       AUGraphStart(mAUGraph);
+
+</pre><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="DISPOSING"></A><H2>Disposing of the AUGraph</H2><p>The method <code>AUGraphStop</code> will stop all rendering throughout a graph.  <code>DisposeAUGraph</code> will deallocate the graph.</p><p class="smalltext"><strong>Listing 13:</strong> Stopping and disposing the graph</p><pre class="sourcecodebox">
+        AUGraphStop (mAUGraph);
+
+        DisposeAUGraph (mAUGraph);
+        mAUGraph = 0;
+    </pre><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="CONCLUSION"></A><H2>Conclusion</H2><p>CoreAudio's 3DMixer is very a useful audio tool.  The mixers ability to handle audio from multiple sources and localize the sounds in 3D space is a necessity in games and can be amazing in countless other applications.</p><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="REFERENCES"></A><H2>References and Notes</H2><p><A HREF="../../documentation/MusicAudio/Reference/CoreAudio/index.html">Core Audio Preliminary doc</A></p><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNT_HISTORY_TAG"></A><H2>Document Revision History</H2><table cellspacing="0" class="graybox" width="680"><tr><th width="100">Date</th><th width="580">Notes</th></tr><tr><td scope="row">2004-06-14</td><td>Updated Reference Library Location</td></tr><tr><td scope="row">2004-05-26</td><td>Discusses how to use Core Audio's 3DMixer version 2.0</td></tr></table><p><b>Posted:</b> 2004-06-14</p>
+<!-- END CONTENTS -->
+</td></tr></table>
+<!-- END WIDE COLUMN -->
+<!-- END MAIN CONTENT -->
+	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/technotes/tn2004/tn2112.html%3Fid%3DDTS10003282-1.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/technotes/tn2004/tn2112.html%3Fid%3DDTS10003282-1.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/technotes/tn2004/tn2112.html%3Fid%3DDTS10003282-1.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+
+<!-- START BOTTOM APPLE NAVIGATION -->
+<!--#include virtual="/includes/footer"-->
+<!-- END BOTTOM APPLE NAVIGATION -->
+<!-- START CENTER CLOSE -->
+</center>
+<!-- END CENTER CLOSE -->
+</body></html>

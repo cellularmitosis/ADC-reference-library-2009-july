@@ -1,0 +1,413 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/1999/REC-html401-19991224/loose.dtd">
+<html><head>
+<!-- BEGIN META TAG INFO -->
+<link rel="home" href="http://developer.apple.com/">
+<link rel="find" href="http://developer.apple.com/search/">
+<link rel="stylesheet" type="text/css" href="../../documentation/css/adcstyle.css" title="fonts">
+<script language="JavaScript" type="text/javascript" src="../../documentation/js/busnav.js"></script>
+<script language="JavaScript" src="../../documentation/js/adc.js" type="text/javascript"></script>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<!-- END META TAG INFO -->
+<!-- BEGIN TITLE -->
+<title>Technical Note TN2111: Idling Movie Importers</title>
+<!-- END TITLE -->
+</head>
+<!-- BEGIN BODY OPEN -->
+<body bgcolor="#ffffff"><a name="//apple_ref/doc/uid/DTS10003421" title="Idling Movie Importers"></a>
+<!--END BODY OPEN -->
+<!-- START CENTER OPEN -->
+<center>
+<!-- END CENTER OPEN -->
+<a name="top"></a>
+<!-- BEGIN LOGO AND SEARCH -->
+<!--#include virtual="/includes/adcnavbar"-->
+<!-- END LOGO AND SEARCH -->
+<!-- START BREADCRUMB -->
+<div id="breadcrumb"><table width="680" border="0" cellpadding="0" cellspacing="0"><tr>
+<td scope="row"><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+<td><img width="340" height="10" src="images/1dot.gif" alt=""></td></tr><tr valign="middle"><td align="left" colspan="2">
+<a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../technicalnotes/index.html">Technical Notes</a> &gt; <a href="../../technicalnotes/QuickTime/index.html">QuickTime</a> &gt; <a href="../../technicalnotes/QuickTime/idxImportExport-date.html">Import & Export</a> &gt; 
+</td></tr><tr><td colspan="2" scope="row"><img width="680" height="35" src="images/1dot.gif" alt=""></td></tr></table></div>
+<!-- END BREADCRUMB -->
+
+<!-- START MAIN CONTENT -->
+<!-- START TITLE GRAPHIC AND INTRO-->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top">
+<td><h1>
+<div id="pagehead">Technical Note TN2111</div>
+<div id="pageheadsub">Idling Movie Importers</div>
+</h1></td></tr></table>
+<!-- END TITLE GRAPHIC AND INTRO -->
+<!-- BEGIN WIDE COLUMN -->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td align="left" width="680">
+<!-- BEGIN CONTENTS -->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td><p>This technical note discusses how to write an idling movie importer component. Idling movie importers differ from regular movie importers because they implement a special routine <code>MovieImportIdle</code> which is called periodically to process the movie data during the import operation.</p></td></tr><tr><td scope="row"><img width="680" height="10" src="images/1dot.gif" alt=""><br><img height="1" width="680" src="images/1dot_919699.gif" alt=""><br><img width="680" height="20" src="images/1dot.gif" alt=""></td></tr></table><table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td width="680"><ul><li><a href="#TNTAG1">What is an Idling Movie Importer?</a></li><li><a href="#TNTAG2">Designating your Importer as an Idling Importer</a></li><li><a href="#TNTAG13">MovieImportIdle</a></li><li><a href="#TNTAG14">Notifying the Movie Controller that the Movie has changed</a></li><li><a href="#TNTAG3">MovieImportSetIdleManager</a></li><li><a href="#TNTAG5">MovieImportDataRef/MovieImportFile/MovieImportHandle Special Considerations</a></li><li><a href="#TNTAG6">MovieImportDataRef</a></li><li><a href="#TNTAG8">MovieImportGetLoadState</a></li><li><a href="#TNTAG10">Idling Importers & Movie Controllers</a></li><li><a href="#TNTAG12">Summary</a></li><li><a href="#TNT_HISTORY_TAG">Document Revision History</a></li></ul></td></tr><tr><td colspan="3" scope="row"><img width="680" height="10" src="images/1dot.gif" alt=""><br><img height="1" width="680" src="images/1dot_919699.gif" alt=""><br><img width="680" height="20" src="images/1dot.gif" alt=""></td></tr></table><A NAME="TNTAG1"></A><H2>What is an Idling Movie Importer?</H2><p>As described in the <A HREF="../../documentation/QuickTime/RM/ImportExport/DataExchange/index.html">Movie Data Exchange Components</A> documentation, movie import components import data from non-movie sources into QuickTime movies. For example, a CD audio track can be imported into a QuickTime movie. In general, this is accomplished by a single call to one of the importer's <code>MovieImportFile</code>, <code>MovieImportHandle</code> or <code>MovieImportDataRef</code> routines, at which time the importer component will download all the movie data, process it,  then return the imported movie data to the calling program (see the <A HREF="../../samplecode/ElectricImageComponent/ElectricImageComponent.html">ElectricImage sample code</A> for an example of an actual movie importer component).</p><p>Idling movie importer components differ from non-idling importer components in that they implement a special routine <code>MovieImportIdle</code> (see <A HREF="#TNTAG13">MovieImportIdle</A>) which is called periodically to allow the importer to process the movie data during the import operation. This means the import operation is usually not completed in a single call to one of the importer's <code>MovieImportFile</code>, <code>MovieImportHandle</code> or <code>MovieImportDataRef</code> routines. Instead, the importer\x92s <code>MovieImportFile</code>, <code>MovieImportHandle</code> or <code>MovieImportDataRef</code> routine will return the value <code>movieImportResultNeedIdles</code> to indicate it needs to be idled (see <A HREF="#TNTAG6">MovieImportDataRef</A>), after which the importer\x92s <code>MovieImportIdle</code> routine is called periodically until processing of the movie data is complete.</p><p>Because they are called at periodic intervals, idling movie importers are given the opportunity to display the movie data as it is downloaded, similar to how fast-start movies are displayed, rather than after the data has been completely downloaded.</p><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG2"></A><H2>Designating your Importer as an Idling Importer</H2><p>You must identify your movie importer as an idling movie importer in order for your <code>MovieImportIdle</code> function to be called. You designate your movie importer as an idling importer by specifying the <code>canMovieImportWithIdle</code> component flag (see QuickTimeComponents.h) in the <code>componentFlags</code> field of your component's <code>ComponentDescription</code> structure:</p><p class="smalltext"><strong>Listing 1:</strong> canMovieImportWithIdle component flag.</p><pre class="sourcecodebox">
+canMovieImportWithIdle        = 1L &lt;&lt; 20
+</pre><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG13"></A><H2>MovieImportIdle</H2><p>Here's a description of the new <code>MovieImportIdle</code> function for idling importers. QuickTime will call this routine periodically to allow you to process the movie data for the movie import:</p><p class="smalltext"><strong>Listing 2:</strong> MovieImportIdle</p><pre class="sourcecodebox">
+MovieImportIdle
+
+
+Call the movie data import component to handle periodic tasks.
+
+ComponentResult MovieImportIdle (                               // IV-2677
+    MovieImportComponent    ci,                                 // IV-2677
+    long                    inFlags,
+    long                    *outFlags );
+
+ci
+
+A movie data import component instance. Your software obtains this reference
+from OpenComponent or OpenDefaultComponent.
+
+inFlags
+
+Flags (see below) that specify control information governing the import operation.
+
+outFlags
+
+Flags (see below) that identify a field that is to receive status information about
+the import operation. Your component sets the appropriate flags in this field
+when the operation is complete.
+
+Function Result:  Returns noErr if there is no error.
+
+inFlags Constants
+
+Currently not used. Set to 0.
+
+outFlags Constants
+
+movieImportResultComplete
+
+Indicates whether or not your component has completed importing the data. Set
+this flag to 1 if your component is finished importing the data.
+
+
+VERSION NOTES
+
+Introduced in QuickTime 4.
+
+
+PROGRAMMING INFO
+
+C interface file: QuickTimeComponents.h
+Availability:
+    Non-Carbon CFM: in QuickTimeLib 4.0 and later
+    CarbonLib:          in CarbonLib 1.0.2 and later
+    Mac OS X:           in version 10.0 or later
+    Windows:            in qtmlClient.lib 4.0 and later
+</pre><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG14"></A><H2>Notifying the Movie Controller that the Movie has changed</H2><p>After idling importers append newly processed media to a movie (usually via calls to <code>AddMediaSampleReferences64</code> and <code>InsertMediaIntoTrack</code>), they must notify the movie controller so the duration and state of the movie can be updated and all the media can become playable. This is accomplished by executing the wired action <code>kActionMovieChanged</code> for the movie with the <code>MovieExecuteWiredActions</code> function using code similar to the following:</p><p class="smalltext"><strong>Listing 3:</strong> Notify the movie controller that the movie has changed.</p><pre class="sourcecodebox">
+QTAtomContainer container;
+Movie           theMovie;
+
+// We must notify the movie controller that the movie has changed,
+// so we'll send it the kActionMovieChanged wired action
+
+if (QTNewAtomContainer(&amp;container) == noErr)
+{
+    QTAtom anAction;
+    OSType whichAction = EndianU32_NtoB(kActionMovieChanged);
+
+    OSErr err = QTInsertChild(container, kParentAtomIsContainer,
+                            kAction, 1, 0, 0, NULL, &amp;anAction);
+    if (err == noErr)
+    {
+        err = QTInsertChild(container, anAction, kWhichAction, 1, 0,
+                                sizeof (whichAction), &amp;whichAction, NULL);
+    }
+
+    if (err == noErr)
+    {
+        err = MovieExecuteWiredActions(theMovie, 0, container);
+    }
+
+    err = QTDisposeAtomContainer(container);
+}
+</pre><div class="notebox"><p><strong>Note:</strong> Do not execute this action more frequently than two or three times per second. Concurrent playback may become choppy if a movie's state is reset via this action too frequently.</p></div><p>Here's a description of the <code>MovieExecuteWiredActions</code> function:</p><p class="smalltext"><strong>Listing 4:</strong> MovieExecuteWiredActions function.</p><pre class="sourcecodebox">
+MovieExecuteWiredActions
+
+Execute the specified wired actions for the movie
+
+OSErr MovieExecuteWiredActions (
+   Movie              theMovie,
+   long               flags,
+   QTAtomContainer    actions );
+
+
+Parameter Descriptions
+
+theMovie
+
+A movie identifier. Your application obtains this identifier from such
+functions as NewMovie, NewMovieFromFile, and NewMovieFromHandle.
+
+
+flags
+
+Flags (see below) that specify control information for the wired action
+to be performed
+
+
+actions
+
+An atom container with the wired action(s) to execute
+
+function result
+
+You can access Movie Toolbox error returns through GetMoviesError and GetMoviesStickyError,
+as well as in the function result. See Error Codes.
+
+flags Constant
+
+movieExecuteWiredActionDontExecute
+
+Any wired action callback procedures shouldn't execute the actions,
+but may want to look at them. The AddMovieExecuteWiredActionsProc
+function lets you add a callback to a movie to execute wired actions.
+The RemoveMovieExecuteWiredActionsProc lets you remove the callback.
+
+
+
+Version Notes
+
+Introduced in QuickTime 4.
+
+Programming Info
+
+C interface file: Movies.h
+Carbon status: Supported
+
+Related Java Methods
+
+quicktime.std.movies.Movie.executeWiredActions()
+
+</pre><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG3"></A><H2>MovieImportSetIdleManager</H2><p>QuickTime 6 introduces a number of new Idle Manager APIs. These are discussed in the <A HREF="../../documentation/QuickTime/QT6WhatsNew/index.html">What\x92s New in QuickTime 6</A> documentation. Among them is the <code>MovieImportSetIdleManager</code> API. Movie Importers written for QuickTime 6 may implement this function and tell the Idle Manager when they would like to be idled next. Refer to the documentation for additional information.</p><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG5"></A><H2>MovieImportDataRef/MovieImportFile/MovieImportHandle Special Considerations</H2><p>Movie Importer components may of course choose to implement the <code>MovieImportDataRef</code>, <code>MovieImportFile</code> and <code>MovieImportHandle</code> functions. Importers indicate support for  these routines by specifying the appropriate flag (<code>canMovieImportDataReferences</code>, <code>canMovieImportFiles</code> and <code>canMovieImportHandles</code>) in the component\x92s <code>componentFlags</code> field in the <code>ComponentDescription</code> structure.</p><p>Idling movie importers which support any of the above routines should return <code>movieImportResultNeedIdles</code> in the <code>outFlags</code> parameter to indicate they would like to have their <code>MovieImportIdle</code> routine called periodically to process the movie data, or return <code>movieImportResultComplete</code> to indicate the import is complete.</p><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG6"></A><H2>MovieImportDataRef</H2><p>Import components (in general) should implement <code>MovieImportDataRef</code> if they are able to accept a data reference (such as a handle) as the source for an import operation.</p><p>An import component indicates it supports <code>MovieImportDataRef</code> by specifying the <code>canMovieImportDataReferences</code> flag in the <code>componentFlags</code> field of their component's <code>ComponentDescription</code> structure.</p><p>Here's a description of the <code>MovieImportDataRef</code> function:</p><p class="smalltext"><strong>Listing 5:</strong> the MovieImportDataRef function.</p><pre class="sourcecodebox">
+MovieImportDataRef
+
+Import movie data from a data reference.
+
+ComponentResult MovieImportDataRef (                      // IV-2677
+    MovieImportComponent    ci,                           // IV-2677
+    Handle                  dataRef,                      // IV-2683
+    OSType                  dataRefType,                  // IV-2695
+    Movie                   theMovie,                     // IV-2685
+    Track                   targetTrack,                  // IV-2685
+    Track                   *usedTrack,                   // IV-2685
+    TimeValue               atTime,                       // IV-2697
+    TimeValue               *addedDuration,               // IV-2697
+    long                    inFlags,
+    long                    *outFlags );
+
+ci
+A movie import component instance. Your software obtains this
+reference from OpenComponent (II-1161) or OpenDefaultComponent (II-1163).
+
+dataRef
+The data reference to the data to be imported.
+
+dataRefType
+The type of data reference in the dataRef parameter.
+
+theMovie
+A movie identifier. Your application obtains this identifier from such
+functions as NewMovie (II-1098), NewMovieFromFile (II-1110), and NewMovieFromHandle (II-1113).
+
+targetTrack
+The track that is to receive the imported data. This track identifier is supplied by the Movie Toolbox
+and is valid only if the movieImportMustUseTrack flag in the inFlags parameter is set to 1.
+
+usedTrack
+A pointer to the track that received the imported data. Your component
+returns this track identifier to the Movie Toolbox. Your component needs
+to set this parameter only if you operate on a single track or if you
+create a new track. If you modify more than one track, leave the field
+referred to by this parameter unchanged.
+
+atTime
+The time corresponding to the location where your component is to place
+the imported data. This time value is expressed in the movie's time
+coordinate system.
+
+addedDuration
+A pointer to the duration of the data that your component added to
+the movie. Your component must specify this value in the movie's
+time coordinate system.
+
+inFlags
+Flags (see below) that control the behavior of this function.
+
+outFlags
+Flags (see below) that this function sets on return.
+
+
+Function Result: See &quot;Error Codes&quot; (IV-2718). Returns noErr if there
+is no error.
+
+
+inFlags Constants
+
+movieImportCreateTrack
+Indicates that your component should create a new track to receive
+the imported data. You must create a track whose type value corresponds
+to the media type that you have specified in your component's
+manufacturer code. You should return the track identifier of this new
+track in the field referred to by the usedTrack parameter, unless you
+create more than one track. If you create more than one track, be sure
+to set the movieImportResultUsedMultipleTracks flag in the field referred
+to by the outFlags parameter to 1. If the movieImportCreateTrack flag is
+set to 1, then the movieImportMustUseTrack flag is set to 0.
+
+movieImportMustUseTrack
+Indicates that your component must use an existing track. That track is identified
+by the targetTrack parameter. If you create more than one
+track, be sure to set the movieImportResultUsedMultipleTracks flag in the
+field referred to by the outFlags parameter to 1. If the
+movieImportMustUseTrack flag is set to 1, then the movieImportCreateTrack
+flag is set to 0. If both the movieImportCreateTrack and
+movieImportMustUseTrack flags are set to 0, then you are free to use any existing
+tracks in the movie or to create a new track (or tracks) as
+needed.
+
+movieImportInParallel
+Indicates whether you are to perform an insert operation or a paste
+operation. If this flag is set to 0, then you should insert the
+imported data into the target track. If this flag is set to 1, then
+you should add the imported data to the track, overwriting preexisting
+open space currently in the track. Note that an application may use
+MovieImportSetDuration (II-982) to control the amount of data you paste
+into a movie. If the movieImportMustUseTrack flag is set to 1, then
+you should use the track specified by the targetTrack parameter. If
+this is not possible, return an appropriate Movie Toolbox result code.
+
+
+movieImportWithIdle
+Indicates you should perform the import operation as an idling importer. Set the
+movieImportResultNeedIdles flag in the outFlags parameter to 1, and your
+MovieImportIdle routine will get called periodically to process the movie data.
+
+
+outFlags Constants
+
+movieImportResultUsedMultipleTracks
+Indicates that your component modified more than one track in the movie.
+Set this flag to 1 if your component places imported data into more than
+one track. In this case, you do not need to update the field referred to
+by the usedTrack parameter.
+
+movieImportResultNeedIdles
+Indicates your component would like it\x92s MovieImportIdle routine to be
+called periodically to process the movie data.
+
+movieImportResultComplete
+Indicates your component is finished processing the movie data.
+
+VERSION NOTES
+
+Introduced in QuickTime 3 or earlier.
+
+
+PROGRAMMING INFO
+
+C interface file: QuickTimeComponents.h
+Carbon status: Supported
+
+
+RELATED JAVA METHODS
+
+quicktime.std.movies.Track.fromMovieImporterDataRef(), quicktime.std.qtcomponents.MovieImporter.fromDataRef()
+</pre><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG8"></A><H2>MovieImportGetLoadState</H2><p>Idling importers may choose to implement the movie importer <code>MovieImportGetLoadState</code> function. The <code>MovieImportGetLoadState</code> function returns a value that indicates the state of the asynchronous loading process for a movie.</p><p>Documentation for the asynchronous movie loading process (and the high-level function <code>GetMovieLoadState</code>) can be found in the <A HREF="../../documentation/QuickTime/REF/QT41_HTML/QT41WhatsNew.html">What's New in QuickTime 4.1</A> pdf document. Additional load states can be found in the <A HREF="../../documentation/QuickTime/WhatsNewQT5/index.html">What's New in QuickTime 5</A> pdf document.</p><p>Here\x92s a brief description of the <code>MovieImportGetLoadState</code> function:</p><p class="smalltext"><strong>Listing 6:</strong> MovieImportGetLoadState.</p><pre class="sourcecodebox">
+Returns the asynchronous load state for a movie.
+
+ComponentResult
+MovieImportGetLoadState(
+  MovieImportComponent   ci,
+  long *                 importerLoadState)
+
+ci
+A movie import component instance.
+
+importerLoadState
+A pointer that is to receive the current load state for the movie.
+Values for loading process are as follows:
+
+kMovieLoadStateLoading
+Indicates the importer is searching for the movie resource
+
+kMovieLoadStatePlayable
+Indicates the movie is fully formed, fast-start would work
+
+kmovieLoadStatePlaythroughOK
+Indicates that the download would complete before the playback
+would complete. This value will be returned after the movie has
+become playable
+
+kMovieLoadStateComplete
+Indicates all media data is available
+
+Function Result: See &quot;Error Codes&quot; (IV-2718). Returns noErr if
+there is no error.
+
+
+DISCUSSION
+
+Your component can implement this function if it supports
+asynchronous movie loading over slow connections. Use it to
+report the current load state of the movie.
+
+
+VERSION NOTES
+
+Availability:
+     Non-Carbon CFM:   in QuickTimeLib 4.1 and later
+     CarbonLib:         in CarbonLib 1.1 and later
+     Mac OS X:         in version 10.0 or later
+     Windows:          in qtmlClient.lib 4.1 and later
+
+
+PROGRAMMING INFO
+
+C interface file: QuickTimeComponents.h
+Programming summary: &quot;Importing Movie Data&quot; (V-2910)
+Carbon status: Supported
+</pre><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG10"></A><H2>Idling Importers & Movie Controllers</H2><p>Idling importers may wish to supply a hint regarding the type of movie controller to use for the imported movie. For example, if the importer implements a still image format it might want to make sure the movie does not display any controller. This is accomplished by specifying the no-interface movie controller (also referred to as the none movie controller) as the desired movie controller for the movie. The no-interface movie controller operates just like the standard movie controller except that no controller bar is displayed and no keyboard events are passed to it.</p><p>When an application calls <code>NewMovieController</code> to attach a movie controller to a movie, <code>NewMovieController</code> first looks for a movie user data item of type <code>kUserDataMovieControllerType</code> and, if it finds one, tries to open an instance of a movie controller component having the subtype specified by that item's data. This occurs transparently to the application.</p><p>Importers can specify the suggested controller for the movie by calling the <code>SetUserDataItem</code> function, passing the desired controller type in the data parameter and <code>kUserDataMovieControllerType</code> for the udType parameter as follows:</p><p class="smalltext"><strong>Listing 7:</strong> Specifying the no-interface movie controller hint.</p><pre class="sourcecodebox">
+OSErr err;
+OSType  noneType = FOUR_CHAR_CODE('none');
+
+/* set the &quot;none&quot; controller for this movie */
+err = SetUserDataItem(GetMovieUserData(theMovie), &amp;noneType, sizeof(noneType),
+          kUserDataMovieControllerType, 1);
+</pre><p>You should call <code>SetUserDataItem</code> in your importer's <code>MovieImportDataRef</code> routine to supply a movie controller hint for the movie.</p><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG12"></A><H2>Summary</H2><p>Idling movie importer components are just like regular movie import components except they implement a special routine <code>MovieImportIdle</code> which is called at periodic intervals to process the movie data. You designate a movie import component as an idling movie import component by specifying the <code>canMovieImportWithIdle</code> component flag (see QuickTimeComponents.h) in the <code>componentFlags</code> field of your component's <code>ComponentDescription</code> structure. Idling movie import components must implement the <code>MovieImportIdle</code> routine in order to get called periodically to process the movie data. Idling movie importers can also specify an appropriate movie controller hint for the movie by adding a <code>kUserDataMovieControllerType</code> user data item to the movie via the <code>SetUserDataItem</code> function.</p><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNT_HISTORY_TAG"></A><H2>Document Revision History</H2><table cellspacing="0" class="graybox" width="680"><tr><th width="100">Date</th><th width="580">Notes</th></tr><tr><td scope="row">2004-11-12</td><td>discusses how to write an idling movie importer component</td></tr></table><p><b>Posted:</b> 2004-11-12</p>
+<!-- END CONTENTS -->
+</td></tr></table>
+<!-- END WIDE COLUMN -->
+<!-- END MAIN CONTENT -->
+	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/technotes/tn2004/tn2111.html%3Fid%3DDTS10003421-1.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/technotes/tn2004/tn2111.html%3Fid%3DDTS10003421-1.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/technotes/tn2004/tn2111.html%3Fid%3DDTS10003421-1.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+
+<!-- START BOTTOM APPLE NAVIGATION -->
+<!--#include virtual="/includes/footer"-->
+<!-- END BOTTOM APPLE NAVIGATION -->
+<!-- START CENTER CLOSE -->
+</center>
+<!-- END CENTER CLOSE -->
+</body></html>

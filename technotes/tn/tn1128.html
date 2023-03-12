@@ -1,0 +1,2049 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN"
+			"http://www.w3.org/TR/REC-html40/loose.dtd">
+
+<HTML>
+<!-- Template 01-05-01 -->
+<head>
+
+<LINK REL="stylesheet" HREF="../../adcstyle.css" TYPE="text/css">
+<LINK REL="stylesheet" HREF="../../style.css" TYPE="text/css">
+
+    <title>Technical Note TN1128: Understanding Open Transport Memory Management</title>
+
+     <meta name="keywords" content="Mac OS 8 Open Transport Memory 
+management kernel pools OTSetMemoryLimits">
+     <meta name="Description" content="Technical Note TN1128: This Technical Note describes  
+how
+Open Transport's interrupt-safe memory management system
+works,  
+and 
+how you can use it for best effect in your
+software. This note  
+includes a discussion of memory pools,
+how OT routines use their  
+pools, how to examine memory
+pools in MacsBugs and how OT can set  
+limits on memory.">
+
+
+<meta name="categories" content="Networking">
+
+
+<meta name="week-posted" content="Jan 8, 2001 - Jan 12, 2001">
+
+<LINK REL="stylesheet" HREF="../../css/adcstyle.css" TYPE="text/css"><script language="JavaScript" type="text/javascript" src="../../js/adc.js"></script></HEAD>
+
+<BODY BGCOLOR="#FFFFFF"><a name="//apple_ref/doc/uid/DTS10002968" title="Understanding Open Transport Memory Management"></a>
+<A NAME="top"></A>
+<!-- begin_header_information --><!--#include virtual="/adcnavbar" --><p><a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../technicalnotes/index.html">Technical Notes</a> &gt; <a href="../../technicalnotes/LegacyTechnologies/index.html">Legacy Documents</a> &gt; <a href="../../technicalnotes/LegacyTechnologies/idxNetworking-date.html">Networking</a> &gt; </p><div style="width:100%; position:fixed;"><div align="center" id="watermark" style="position: relative; margin-left:auto; margin-right:auto; z-index:20; width:500px;"><div class="legacybox"><h1>Legacy Document<span class=closebutton><a href="javascript:closeWatermark()"><img src="../../images/closebutton.png" width="14" height="14" border="0"  alt="close button"></a></span></h1>
+
+<p><strong>Important: </strong>This document is part of the Legacy section of the ADC Reference Library. This information should not be used for new development.</p>
+
+<div class="reflibtopic">
+	<p>Current information on this Reference Library topic can be found here:</p>
+	<ul>
+				<li><a href="http://developer.apple.com/referencelibrary/Networking/index.html" target="_blank">Reference Library > Networking</a></li>
+	</ul>
+</div>
+
+
+
+
+</div></div></div><!-- end_header_information -->
+<!-- bottom_of_header_marker_comment -->
+<!-- top_of_titles_marker_comment --><CENTER><table width="600" cellpadding="0" cellspacing="0" border="0">
+<tr><td align="left" scope="row">
+<h1>
+<div id="pagehead">Technical Note TN1128</div>
+<div id="pageheadsub">Understanding Open Transport Memory Management</div>
+</h1>
+</td></tr></table></CENTER><!-- bottom_of_titles_marker_comment -->
+
+<center><table width="600" cellpadding="0" cellspacing="0" 
+border="0"> <tr> <td align="left" scope="row">
+
+<!-- begin_header_box -->
+<table width="600" cellpadding="0" cellspacing="0" border="0">
+     <tr>
+         <td width=300 valign="top" align=left>
+             <table border="0" width="300" cellpadding="0" cellspacing="0">
+                 <tr>
+
+             <td width=300 align=left> <img src="images/tnmenutop.gif" alt="" align="bottom" width=300 height=7></td>
+                 </tr>
+                 <tr bgcolor="#e6e6e6">
+                     <td background="images/tnmenubody.gif" width=300 align=left>
+                         <span id="menutitle">
+                             CONTENTS
+                             <br>
+                             <br>
+                         </span>
+                     </td>
+                 </tr>
+                 <tr bgcolor="#e6e6e6">
+                     <td background="images/tnmenubody.gif" width=300 align=left>
+                         <!-- begin_toc -->
+                         <p id="menutext">
+                   <A HREF="#IntroducingOTMemoryManagement">Introducing
+                   OT Memory Management</A><BR><BR>
+
+                   <A HREF="#UsingOTMemoryEffectively">Using
+                   OT Memory
+                   Effectively</A><BR><BR>
+
+                   <A HREF="#AdvancedTopics">Advanced
+                   Topics</A><BR><BR>
+
+                   <A HREF="#Summary">Summary</A><BR><BR>
+
+                   <A HREF="#References">References</A><BR><BR>
+
+                   <A HREF="#Changes">Change
+                   History</A><BR><BR>
+
+                   <A HREF="#Downloads">Downloadables</A></P>
+                    <!-- end_toc -->
+                  </td>
+                 </tr>
+
+                 <tr>
+                     <td width=300 align=left scope="row">
+                         <img src="images/tnmenubottom.gif" alt="" width=300 height=16>
+                     </td>
+                 </tr>
+             </table>
+         </td>
+         <td width=300 valign="top" align=left>
+
+
+             <!-- begin_intro_text --><p id="introtext">This
+                   Technote describes how Open Transport's
+                   interrupt-safe memory management system works, and
+                   how you can use it for best effect in your
+                   software.</P>
+
+                    <p id="introtext">This Technote is directed at advanced
+                   programmers writing Open Transport client or kernel
+                   code.</P>
+<!-- end_intro_text -->
+<!-- begin_date -->
+<h3>&nbsp;Updated: [Jan 09 2001]</h3>
+<!-- end_date -->
+                </TD>
+             </TR>
+          </TABLE>
+ <!-- end_header_box -->
+<BR><BR>
+<hr width=500 align=center>
+<BR><BR>
+          <!-- begin_content -->
+                   <P><A NAME=IntroducingOTMemoryManagement></A></P>
+
+                   <H2>Introducing OT Memory
+                   Management</H2>
+
+                   <P>Open Transport provides many different
+                   interrupt-safe memory allocation routines. These
+                   include <CODE>OTAllocMem</CODE>,
+                   <CODE>OTAllocMemInContext</CODE>,
+                   <CODE>OTAlloc</CODE>,
+                   <CODE>OTAllocInContext</CODE>,
+                   <CODE>OTAllocSharedClientMem</CODE> and
+                   <CODE>OTAllocPortMem</CODE>. In order to know which
+                   routines to use in which circumstances -- and how
+                   using these routines affects the memory available
+                   to Open Transport and the rest of Mac OS -- you
+                   need to understand the OT memory management
+                   system.</P>
+
+                   <H3>Pools of
+                   Power</H3>
+
+                   <P>OT memory management is layered on top of four
+                   classes of <STRONG>memory pools</STRONG>:</P>
+
+                   <OL>
+                      <LI>A <STRONG>client pool</STRONG> is allocated
+                      for each program that calls
+                      <CODE>InitOpenTransport</CODE> (or
+                      <CODE>InitOpenTransportUtilities</CODE>). It is
+                      used to satisfy OT memory allocations for that
+                      program and it is destroyed when that program
+                      calls <CODE>CloseOpenTransport</CODE> (either
+                      explicitly or by an application quitting).</LI>
+
+                      <LI>The <STRONG>shared client</STRONG> pool
+                      (also known as the <STRONG>native pool</STRONG>)
+                      is allocated when the first program calls
+                      <CODE>InitOpenTransport</CODE> (typically this
+                      is the AppleTalk protocol stack, early in the
+                      boot sequence). This pool is used by the OT
+                      client-side libraries for the bulk of their
+                      allocation.</LI>
+
+                      <LI>The <STRONG>kernel pool</STRONG> is
+                      allocated the first time the OT kernel is
+                      loaded. It is used by the OT kernel and its
+                      plug-ins (for example, STREAMS modules and
+                      drivers).</LI>
+
+                      <LI>The <STRONG>port pool</STRONG> is allocated
+                      the first time a program calls
+                      <CODE>InitOpenTransport</CODE> or
+                      <CODE>InitOpenTransportUtilities</CODE>. The
+                      pool is used to hold information about ports. It
+                      is distinct from the kernel pool, because port
+                      scanners can run without loading the kernel,
+                      hence without creating the kernel pool.</LI>
+                   </OL>
+
+                   <P>Open Transport memory pools are
+                   currently implemented
+                   by the Apple Shared Library Manager (ASLM)
+                   <CODE>TStandardPool</CODE> class and inherit some
+                   attributes from that class:</P>
+
+                   <OL>
+                      <LI>A pool is always allocated within a Mac OS
+                      Memory Manager zone.</LI>
+
+                      <LI>Each pool starts with an initial size.</LI>
+
+                      <LI>Memory pools are interrupt-safe. You can
+                      allocate memory from the OT memory pools at any
+                      time. However, the pool can only grow at system
+                      task time. If you allocate memory at interrupt
+                      time, the allocation may fail even though there
+                      is enough memory in the zone to grow the pool to
+                      meet the request.</LI>
+
+                      <LI>When the pool runs low on memory, the pool
+                      expands by allocating memory from the Mac OS
+                      Memory Manager at system task time. The pool
+                      grows by a percentage factor, known as the
+                      <STRONG>grow by</STRONG> factor. The amount
+                      grown is bounded below by the <STRONG>minimum
+                      grow</STRONG> amount.</LI>
+
+                      <LI>The pool starts to grow when the amount of
+                      free space in the pool drops below the
+                      <STRONG>low mark</STRONG>. There is also a
+                      <STRONG>high mark</STRONG>, which defines when
+                      the pool should start to shrink. This feature is
+                      used only by the kernel pool.</LI>
+                   </OL>
+
+                     <BR>
+                    <BR>
+					<CENTER><TABLE BORDER=0 WIDTH=550>
+                      <TR>
+                         <td bgcolor="#E6E6E6" align=left>
+                            <P><B>IMPORTANT:</B><BR>
+                            Open Transport's use of ASLM memory pools
+                            is an implementation detail. In the future
+                            OT will not use ASLM at all; as a result,
+                            OT memory pools will be implemented by OT
+                            itself.</P>
+                         </TD>
+                      </TR>
+                   </TABLE></CENTER>
+
+                     <BR>
+                    <BR>
+                   <CENTER><TABLE BORDER=0 WIDTH=550>
+                      <TR>
+                         <td bgcolor="#E6E6E6" align=left>
+                            <P><B>Note:</B><BR>
+                            You can read more about the ASLM memory
+                            pool classes in the ASLM Developer's
+                            Guide, available as
+                            part of the <a href="http://developer.apple.com/sdk/">ASLM
+                            SDK</A>.</P>
+                         </TD>
+                      </TR>
+                   </TABLE></CENTER>
+                     <BR>
+                    <BR>
+
+                   <H3><A NAME=PoolParameters></A>Pool
+                   Parameters</H3>
+
+                   <P>The following tables gives the basic parameters
+                   of the various Open Transport memory pools.</P>
+
+                   <TABLE BORDER=1>
+                      <TR>
+                         <td width=72 align=left>
+                            <P><B>Pool Type</B></P>
+                         </TD>
+                         <td width=57 align=left>
+                            <P><B>Zone</B></P>
+                         </TD>
+                         <td width=63 align=left>
+                            <P><B>Initial</B></P>
+                         </TD>
+                         <td align="left">
+                            <P><B>Grow By</B></P>
+                         </TD>
+                         <td align="left">
+                            <P><B>Min Grow</B></P>
+                         </TD>
+                         <td align="left">
+                            <P><B>Low Mark</B></P>
+                         </TD>
+                         <td align="left">
+                            <P><B>High Mark</B></P>
+                         </TD>
+                      </TR>
+                      <TR>
+                         <td width=72 align=left>
+                            <P>Client [1]</P>
+                         </TD>
+                         <td width=57 align=left>
+                            <P>Appl</P>
+                         </TD>
+                         <td width=63 align=left>
+                            <P>2K</P>
+                         </TD>
+                         <td align="left">
+                            <P>20%</P>
+                         </TD>
+                         <td align="left">
+                            <P>2K</P>
+                         </TD>
+                         <td align="left">
+                            <P>1K</P>
+                         </TD>
+                         <td align="left">
+                            <P>infinite</P>
+                         </TD>
+                      </TR>
+                      <TR>
+                         <td width=72 align=left>
+                            <P>Client [2]</P>
+                         </TD>
+                         <td width=57 align=left>
+                            <P>System</P>
+                         </TD>
+                         <td width=63 align=left>
+                            <P>1K</P>
+                         </TD>
+                         <td align="left">
+                            <P>20%</P>
+                         </TD>
+                         <td align="left">
+                            <P>2K</P>
+                         </TD>
+                         <td align="left">
+                            <P>512</P>
+                         </TD>
+                         <td align="left">
+                            <P>infinite</P>
+                         </TD>
+                      </TR>
+                      <TR>
+                         <td width=72 align=left>
+                            <P>Shared
+                            [3]</P>
+                         </TD>
+                         <td width=57 align=left>
+                            <P>System</P>
+                         </TD>
+                         <td width=63 align=left>
+                            <P>2K</P>
+                         </TD>
+                         <td align="left">
+                            <P>20%</P>
+                         </TD>
+                         <td align="left">
+                            <P>4K</P>
+                         </TD>
+                         <td align="left">
+                            <P>2K+1</P>
+                         </TD>
+                         <td align="left">
+                            <P>infinite</P>
+                         </TD>
+                      </TR>
+                      <TR>
+                         <td width=72 align=left>
+                            <P>Shared
+                            [4]</P>
+                         </TD>
+                         <td width=57 align=left>
+                            <P>System</P>
+                         </TD>
+                         <td width=63 align=left>
+                            <P>3K</P>
+                         </TD>
+                         <td align="left">
+                            <P>20%</P>
+                         </TD>
+                         <td align="left">
+                            <P>4K</P>
+                         </TD>
+                         <td align="left">
+                            <P>3K+1</P>
+                         </TD>
+                         <td align="left">
+                            <P>infinite</P>
+                         </TD>
+                      </TR>
+                      <TR>
+                         <td width=72 align=left>
+                            <P>Kernel
+                            [6]</P>
+                         </TD>
+                         <td width=57 align=left>
+                            <P>System [9]</P>
+                         </TD>
+                         <td width=63 align=left>
+                            <P>4K
+                            [5]</P>
+                         </TD>
+                         <td align="left">
+                            <P>20%</P>
+                         </TD>
+                         <td align="left">
+                            <P>34K</P>
+                         </TD>
+                         <td align="left">
+                            <P>34K+1</P>
+                         </TD>
+                         <td align="left">
+                            <P>[10]</P>
+                         </TD>
+                      </TR>
+                      <TR>
+                         <td width=72 align=left>
+                            <P>Kernel
+                            [7]</P>
+                         </TD>
+                         <td width=57 align=left>
+                            <P>System [9]</P>
+                         </TD>
+                         <td width=63 align=left>
+                            <P>250K</P>
+                         </TD>
+                         <td align="left">
+                            <P>20%</P>
+                         </TD>
+                         <td align="left">
+                            <P>34K</P>
+                         </TD>
+                         <td align="left">
+                            <P>34K+1</P>
+                         </TD>
+                         <td align="left">
+                            <P>[10]</P>
+                         </TD>
+                      </TR>
+                      <TR>
+                         <td width=72 align=left>
+                            <P>Kernel
+                            [8]</P>
+                         </TD>
+                         <td width=57 align=left>
+                            <P>System [9]</P>
+                         </TD>
+                         <td width=63 align=left>
+                            <P>16K
+                            [5]</P>
+                         </TD>
+                         <td align="left">
+                            <P>20%</P>
+                         </TD>
+                         <td align="left">
+                            <P>34K</P>
+                         </TD>
+                         <td align="left">
+                            <P>34K+1</P>
+                         </TD>
+                         <td align="left">
+                            <P>[10]</P>
+                         </TD>
+                      </TR>
+                      <TR>
+                         <td width=72 align=left>
+                            <P>Port</P>
+                         </TD>
+                         <td width=57 align=left>
+                            <P>System</P>
+                         </TD>
+                         <td width=63 align=left>
+                            <P>2K</P>
+                         </TD>
+                         <td align="left">
+                            <P>20%</P>
+                         </TD>
+                         <td align="left">
+                            <P>1K</P>
+                         </TD>
+                         <td align="left">
+                            <P>1K+1</P>
+                         </TD>
+                         <td align="left">
+                            <P>infinite</P>
+                         </TD>
+                      </TR>
+                   </TABLE>
+                   
+
+                   <H4>Notes:</H4>
+
+                   <OL>
+                      <LI>This row is for client programs that link
+                      with the OT application libraries (those whose
+                      names end with "App") and who have not called
+                      <CODE>InitLibraryManager</CODE>.</LI>
+
+                      <LI>This row is for client programs that link
+                      with the OT extension libraries (those whose
+                      names end with "Extn") and who have not called
+                      <CODE>InitLibraryManager</CODE>.</LI>
+
+                      <LI>Open Transport 1.3 and
+                      earlier.</LI>
+
+                      <LI>Open Transport 2.0 and
+                      later.</LI>
+
+                      <LI>This is discussed in
+                      more detail in <A HREF="#KernelPool96">below</A>.</LI>
+
+                      <LI>Open Transport 1.3 and
+                      earlier.</LI>
+
+                      <LI>Open Transport 2.0
+                      through 2.5.</LI>
+
+                      <LI>Open Transport 2.6 and
+                      later.</LI>
+
+                      <LI>OT explicitly holds (in the virtual memory
+                      sense) the memory in the kernel pool. OT does
+                      not guarantee to hold the memory in the other
+                      pools.</LI>
+
+                      <LI>The OT kernel pool shrinks and grows
+                      depending on a number of factors, which are
+                      <A HREF="#AdvancedTopics">described
+                      below</A>.</LI>
+                   </OL>
+
+                   <BR><BR>
+                   <CENTER><TABLE BORDER=0 WIDTH=550>
+                      <TR>
+                         <td bgcolor="#E6E6E6" align=left>
+                            <P><B>IMPORTANT:</B><BR>
+                            As you can see by the long list of notes
+                            above, the various pool parameters are
+                            subject to change. You should try to avoid
+                            dependencies on these values.</P>
+                         </TD>
+                      </TR>
+                   </TABLE></CENTER>
+ <BR><P><A HREF="#top">Back to top</A></P>
+
+                   <P><A NAME=UsingOTMemoryEffectively></A></P>
+
+                   <H2>Using OT Memory
+                   Effectively</H2>
+
+                   <P>This section describes various hints and tips
+                   for using the OT memory management system
+                   effectively.</P>
+
+                   <H3>OT Routines and their
+                   Pool Usage</H3>
+
+                   <P>The following table is a summary of the common
+                   OT routines that allocate memory, the amount of
+                   memory they allocate, and the pool from which they
+                   allocate.</P>
+
+                   <TABLE BORDER=1>
+                      <TR>
+                         <td width=171 align=left>
+                            <P><B>Routine</B></P>
+                         </TD>
+                         <td width=56 align=left>
+                            <P><B>Pool</B></P>
+                         </TD>
+                         <td align="left">
+                            <P><B>Approximate Amount</B></P>
+                         </TD>
+                      </TR>
+                      <TR>
+                         <td width=171 align=left>
+                            <P><CODE>OTAllocMem</CODE>
+                            [1],
+                            <CODE>OTAllocMemInContext</CODE></P>
+                         </TD>
+                         <td width=56 align=left>
+                            <P>Client</P>
+                         </TD>
+                         <td align="left">
+                            <P>depends on <CODE>size</CODE>
+                            parameter</P>
+                         </TD>
+                      </TR>
+                      <TR>
+                         <td width=171 align=left>
+                            <P><CODE>OTAllocMem</CODE> [1]</P>
+                         </TD>
+                         <td width=56 align=left>
+                            <P>Kernel</P>
+                         </TD>
+                         <td align="left">
+                            <P>depends on <CODE>size</CODE>
+                            parameter</P>
+                         </TD>
+                      </TR>
+                      <TR>
+                         <td width=171 align=left>
+                            <P><CODE>OTAlloc</CODE></P>
+                         </TD>
+                         <td width=56 align=left>
+                            <P>Client</P>
+                         </TD>
+                         <td align="left">
+                            <P>depends on <CODE>ref</CODE> and
+                            <CODE>fields</CODE> parameters</P>
+                         </TD>
+                      </TR>
+                      <TR>
+                         <td width=171 align=left>
+                            <P><CODE>OTAllocSharedClientMem</CODE></P>
+                         </TD>
+                         <td width=56 align=left>
+                            <P>Shared</P>
+                         </TD>
+                         <td align="left">
+                            <P>depends on <CODE>size</CODE>
+                            parameter</P>
+                         </TD>
+                      </TR>
+                      <TR>
+                         <td width=171 align=left>
+                            <P><CODE>OTAllocPortMem</CODE></P>
+                         </TD>
+                         <td width=56 align=left>
+                            <P>Port</P>
+                         </TD>
+                         <td align="left">
+                            <P>depends on <CODE>size</CODE>
+                            parameter</P>
+                         </TD>
+                      </TR>
+                      <TR>
+                         <td width=171 align=left>
+                            <P><CODE>OTOpenEndpoint</CODE></P>
+                         </TD>
+                         <td width=56 align=left>
+                            <P>Client<BR>
+                            Shared<BR>
+                            Port</P>
+                         </TD>
+                         <td align="left">
+                            <P>16 bytes<BR>
+                            150 bytes<BR>
+                            1 KB</P>
+                         </TD>
+                      </TR>
+                      <TR>
+                         <td width=171 align=left>
+                            <P><CODE>OTStreamOpen</CODE></P>
+                         </TD>
+                         <td width=56 align=left>
+                            <P>Shared<BR>
+                            Kernel</P>
+                         </TD>
+                         <td align="left">
+                            <P>40 bytes<BR>
+                            1 KB</P>
+                         </TD>
+                      </TR>
+                      <TR>
+                         <td width=171 align=left>
+                            <P><CODE>OTCreateConfiguration</CODE></P>
+                         </TD>
+                         <td width=56 align=left>
+                            <P>Shared</P>
+                         </TD>
+                         <td align="left">
+                            <P>100 bytes [2]</P>
+                         </TD>
+                      </TR>
+                      <TR>
+                         <td width=171 align=left>
+                            <P><CODE>OTSnd</CODE></P>
+                         </TD>
+                         <td width=56 align=left>
+                            <P>Kernel</P>
+                         </TD>
+                         <td align="left">
+                            <P><CODE>nbytes</CODE> [3]</P>
+                         </TD>
+                      </TR>
+                   </TABLE>
+
+                   <BR><BR><CENTER><TABLE BORDER=0 WIDTH=550>
+                      <TR>
+                         <td bgcolor="#E6E6E6" align=left>
+                            <P><B>IMPORTANT:</B><BR>
+                            These amount are approximate. The values
+                            vary depending on the relative complexity
+                            of the protocol being used and between
+                            versions of Open Transport. <B>These
+                            values are only meant as a guide for
+                            analyzing your program's memory
+                            needs.</B></P>
+                         </TD>
+                      </TR>
+                   </TABLE></CENTER>
+                  <BR><BR>
+
+                   <H4>Notes:</H4>
+
+                   <OL>
+                      <LI><CODE>OTAllocMem</CODE> behaves differently
+                      depending on the libraries with which you link.
+                      If you link with the OT client libraries (for
+                      example, <CODE>OpenTransportLib</CODE>),
+                      <CODE>OTAllocMem</CODE> allocates memory from
+                      the client pool. If you link with the OT kernel
+                      libraries (for example,
+                      <CODE>OpenTptModuleLib</CODE>),
+                      <CODE>OTAllocMem</CODE> allocates memory from
+                      the kernel pool. The
+                      "InContext" OT routines, for example
+                      <CODE>OTAllocMemInContext</CODE>, help to
+                      eliminate this confusion. See DTS Technote 1173
+                      <a href="tn1173.html">Understanding
+                      Open Transport Asset
+                      Tracking</A> for
+                      more details.</LI>
+
+                      <LI>The exact size depends on the complexity of
+                      the configuration. This value is a lower bound,
+                      based on a simple call to
+                      <CODE>OTCreateConfiguration("serial")</CODE>.</LI>
+
+                      <LI>This memory is consumed only if the endpoint
+                      is copying sent data (ack
+                      sends is off), which is the default
+                      setting. If no-copy sends are enabled, the
+                      routine allocates a much smaller amount of
+                      housekeeping memory.</LI>
+                   </OL>
+
+                   <H3>Examining Memory Pools in
+                   MacsBug</H3>
+
+                   <P>The above analysis was done empirically, by
+                   calling each routine repeatedly while recording the
+                   effect on each memory pool. While OT provides no
+                   programming interface for measuring the usage of
+                   its memory pools, you can easily find the pools in
+                   MacsBug.</P>
+
+                   <P>First, you will need to find the debug version
+                   of Open Transport -- available via links on the
+                   <a href="http://developer.apple.com/dev/opentransport/">OT web page</A> --
+                   and extract the "OT Debugger Prefs" file, included
+                   as part of the install package.</P>
+
+                   <pre>  Open Tpt Debug Installer
+
+
+
+     Open Transport Installer
+
+
+
+       Open Transport Files
+
+
+
+         OT Debugger Prefs</pre>
+
+                   <P>You should copy the "OT Debugger Prefs" file to
+                   your MacsBug Preferences folder, then restart your
+                   machine.</P>
+
+                   <BR><BR><CENTER><TABLE BORDER=0 WIDTH=550>
+<TR><td bgcolor="#E6E6E6" align=left>
+<P><B>IMPORTANT:</B><BR>
+It is vital that you use the "OT Debugger
+                            Prefs" file from a debug install of OT
+                            whose version number matches the version
+                            of OT you have installed. The "OT Debugger
+                            Prefs" file contains MacsBug templates
+                            that are automatically generated by the OT
+                            build system to match the layout of the
+                            fields in the OT data structures. This
+                            layout changes from version to version of
+                            OT. If you have the wrong version of the
+                            "OT Debugger Prefs", you will not get
+                            accurate results in MacsBug.</P>
+</TD></TR></TABLE></CENTER><BR><BR>
+
+
+
+                   <P>Once you have the "OT Debugger Prefs" file
+                   installed, you can use it to find and display the
+                   various OT memory pools. The first step is to dump
+                   the OT globals. This is done differently on 68K and
+                   PowerPC, and is explained in the following
+                   sections.</P>
+
+                   <H4>Dumping OT Globals on PowerPC</H4>
+
+                   <P>On PowerPC, you can dump the OT globals using
+                   the following command:</P>
+
+                  <BR><BR><CENTER><TABLE BORDER=0 WIDTH=550>
+<TR><td bgcolor="#E6E6E6" align=left>
+<pre>
+
+
+
+&gt;&gt;&gt; dm __gOTGlobal OTGlobal
+
+
+
+  Displaying OTGlobal at 0006BDA0
+
+
+
+   0006BDA0  fGestaltValue      0000003F
+
+
+
+   0006BDA4  f68KDeferredProc   00000000
+
+
+
+   0006BDA8  fVersion           01308000
+
+
+
+   <I>[... other stuff deleted ...]
+
+
+
+                            </I>  0006BF04  fClientGlobal
+
+
+
+   0006BF04    fClientList
+
+
+
+   0006BF04      fHead          005F1714
+
+
+
+   <I>[... other stuff deleted ...]
+
+
+
+                            </I>  0006BF30    fNativePool      00095320
+
+
+
+   <I>[... other stuff deleted ...]
+
+
+
+                            </I>  0006BF8C  fKernelGlobal
+
+
+
+   0006BF8C    fKernelPool      0039A4A0
+
+
+
+   0006BF90    fKernelPoolMaxSize  #13421772
+
+
+
+   <I>[... other stuff deleted ...]
+
+
+
+                            </I>  0006BFD4    fPortPool        0037AA90
+
+
+
+   <I>[... other stuff deleted ...]</I></pre>
+</TD></TR></TABLE></CENTER><BR><BR>
+
+
+                   <P>OT exports the address of the OT globals as a
+                   CFM symbol, <CODE>__gOTGlobal</CODE>. The above
+                   command dumps that address using the
+                   <CODE>OTGlobal</CODE> template from the "OT
+                   Debugger Prefs" file. As far as memory usage is
+                   concerned, there are three fields of interest:</P>
+
+                   <OL>
+                      <LI><CODE>fNativePool</CODE> -- This is the
+                      address of the shared client pool.</LI>
+
+                      <LI><CODE>fKernelPool</CODE> -- This is the
+                      address of the kernel pool.</LI>
+
+                      <LI><CODE>fClientList.fHead</CODE> -- This is
+                      the head of the OT client list. You can dump out
+                      the first client using the
+                      command:
+                      <BR><BR><CENTER><TABLE BORDER=0 WIDTH=550>
+<TR><td bgcolor="#E6E6E6" align=left>
+<pre>
+
+
+
+&gt;&gt;&gt; dm 5f1714 RegisteredClient
+
+
+
+  Displaying RegisteredClient at 005F1714
+
+
+
+   005F1714  fLink
+
+
+
+   005F1714    fNext            005F15BC
+
+
+
+   005F1718  fProviders
+
+
+
+   005F1718    fHead            005F13D0
+
+
+
+   005F171C  fStreams
+
+
+
+   005F171C    fHead            00000000
+
+
+
+   005F1720  fWhoAmI            070A7134
+
+
+
+   <I>[... other stuff deleted ...]</I></pre>
+</TD></TR></TABLE></CENTER><BR><BR>
+
+                       You can examine the next client by following
+                      the <CODE>fLink.fNext</CODE> field. Your
+                      application will be the one whose
+                      <CODE>fWhoAmI</CODE> field points into your
+                      application heap. One you've found your
+                      application, you can display its connection to
+                      ASLM by dumping its <CODE>fWhoAmI</CODE> pointer
+                      using the <CODE>TLibraryManager</CODE> template,
+                      as shown below:
+
+                      <BR><BR><CENTER><TABLE BORDER=0 WIDTH=550>
+<TR><td bgcolor="#E6E6E6" align=left>
+<pre>
+
+
+
+&gt;&gt;&gt; dm 70a7134 TLibraryManager
+
+
+
+  Displaying TLibraryManager at 070A7134
+
+
+
+   070A7134  __vptr             003873B0
+
+
+
+   070A7138  fPool              070A6780
+
+
+
+   070A713C  fLibraryFile       00000000
+
+
+
+   070A7140  fDefaultPool       070A6780
+
+
+
+   <I>[... other stuff deleted ...]</I></pre>
+</TD></TR></TABLE></CENTER><BR><BR>
+
+
+
+                       The address of your client pool is held in the
+                      <CODE>fDefaultPool</CODE> field.</LI>
+                   </OL>
+
+                   <P>Given the address of a pool, you can do a number
+                   of things with it:</P>
+
+                   <UL>
+                      <LI>The following MacsBug command will display
+                      some basic information about the
+                      pool:
+
+
+                      <BR><BR><CENTER><TABLE BORDER=0 WIDTH=550>
+<TR><td bgcolor="#E6E6E6" align=left>
+<pre>
+
+
+
+&gt;&gt;&gt; dm 70a6780 TMemoryPool
+
+
+
+  Displaying TMemoryPool at 070A6780
+
+
+
+   070A6780  __vptr             00386F40
+
+
+
+   070A6784  fMemList           070A6770
+
+
+
+   070A6788  fSize              #2408
+
+
+
+   070A678C  fLowMark           #1797
+
+
+
+   070A6790  fHighMark          #4294967295
+
+
+
+   070A6794  fMaxUsed           #352
+
+
+
+   070A6798  fCurFree           #2056
+
+
+
+   070A679C  fZone              06F7CF00
+
+
+
+   070A67A0  fMemType           #1
+
+
+
+   <I>[... other stuff deleted ...]</i></pre>
+</TD></TR></TABLE></CENTER><BR><BR>
+
+
+
+
+                       The <CODE>fSize</CODE> field is the total
+                      amount of memory in the pool. The
+                      <CODE>fCurFree</CODE> field is the amount of
+                      free memory left in the pool.<BR>
+                      <BR>
+                      </LI>
+
+                      <LI>The <CODE>dumppool</CODE> dcmd will display
+                      the list of memory blocks in the pool, for
+                      example:
+
+                      <BR><BR><CENTER><TABLE BORDER=0 WIDTH=550>
+<TR><td bgcolor="#E6E6E6" align=left>
+<pre>
+
+
+
+&gt;&gt;&gt; dumppool 70a6780
+
+
+
+  Allocated Memory
+
+
+
+   ----------------
+
+
+
+     70a7000(  #16)   70a7010(  #16)   70a7020( #168)
+
+
+
+     70a70c8(  #64) "!$plnt"
+
+
+
+     70a7108(  #40) "!$slst"
+
+
+
+     70a7130(  #48) "!$lmgr"
+
+
+
+   Free Memory
+
+
+
+   -----------
+
+
+
+     70a67f8(#2056)</pre>
+</TD></TR></TABLE></CENTER><BR><BR>
+
+
+
+                      <BR>
+                      <BR>
+                      </LI>
+
+                      <LI>The <CODE>dumprawpool</CODE> dcmd will
+                      display a more detailed list, for
+                      example:
+
+
+                      <BR><BR><CENTER><TABLE BORDER=0 WIDTH=550>
+<TR><td bgcolor="#E6E6E6" align=left>
+<pre>
+
+
+
+&gt;&gt;&gt; dumprawpool 70a6780
+
+
+
+  Allocated Memory
+
+
+
+   ----------------
+
+
+
+   F:   70a67f8(#2056)
+
+
+
+   A:   70a7000(  #16)   70a7010(  #16)   70a7020( #168)
+
+
+
+   A:   70a70c8(  #64) "!$plnt"
+
+
+
+   A:   70a7108(  #40) "!$slst"
+
+
+
+   A:   70a7130(  #48) "!$lmgr"</pre>
+</TD></TR></TABLE></CENTER><BR><BR>
+
+
+
+
+
+                      </LI>
+                   </UL>
+
+                   <H4>Dumping OT Globals on 68K</H4>
+
+                   <P>On 68K, the procedure is slightly more complex.
+                   The first step is to find the address of the OT
+                   global. You do this using the following MacsBug
+                   command:</P>
+
+                   <BR><BR><CENTER><TABLE BORDER=0 WIDTH=550>
+<TR><td bgcolor="#E6E6E6" align=left>
+<P><B>IMPORTANT:</B><BR>
+For this to work you will need to install
+                            the debug version of OT so that MacsBug
+                            can find the <CODE>FetchOTGlobal</CODE>
+                            symbol.</P>
+</TD></TR></TABLE></CENTER>
+
+<CENTER><TABLE BORDER=0 WIDTH=550>
+<TR><td bgcolor="#E6E6E6" align=left>
+<pre>
+
+
+
+&gt;&gt;&gt; hx 2800
+
+
+
+  The target heap is the System heap at 00002800
+
+
+
+&gt;&gt;&gt; il FetchOTGlobal
+
+
+
+  Disassembling from FetchOTGlobal
+
+
+
+   FetchOTGlobal
+
+
+
+      +00000 0015D5E2   LINK       A6,#$0000        | 4E56 0000
+
+
+
+      +00004 0015D5E6   MOVE.L     $00092434,D0        | 2039 0009 2434
+
+
+
+      +0000A 0015D5EC   UNLK       A6            | 4E5E
+
+
+
+      +0000C 0015D5EE   RTS                         | 4E75
+
+
+
+      <I>[... other stuff deleted ...]</i></pre>
+</TD></TR></TABLE></CENTER><BR><BR>
+
+
+                   <P>The first command switches the current MacsBug
+                   target zone to the system heap. The next command
+                   disassembles a function that returns the address of
+                   the OT globals. The line at <CODE>FetchOTGlobal +
+                   4</CODE> moves the address of the OT globals into
+                   register D0. In this case, the address of the OT
+                   globals is stored in memory location $00092434. You
+                   can dump the globals using the following MacsBug
+                   command:</P>
+
+                   <BR><BR><CENTER><TABLE BORDER=0 WIDTH=550>
+<TR><td bgcolor="#E6E6E6" align=left>
+<pre>
+
+
+
+&gt;&gt;&gt; dm 92434^ OTGlobal
+
+
+
+  Displaying OTGlobal at 000B5050
+
+
+
+   000B5050  fGestaltValue      0000000F
+
+
+
+   000B5054  f68KDeferredProc   00238164
+
+
+
+   000B5058  fVersion           01306007
+
+
+
+   <I>[... other stuff deleted ...]</i></pre>
+</TD></TR></TABLE></CENTER><BR><BR>
+
+
+                   <P>After dumping the OT globals, you can proceed as
+                   in the PowerPC case.</P>
+
+                   <H3><A NAME=ControllingClientPoolParameters></A>Controlling
+                   Client Pool Parameters</H3>
+
+                   <P>As <A HREF="#PoolParameters">described
+                   above</A>, the OT client pool for an application is
+                   allocated in the application heap when you call
+                   <CODE>InitOpenTransport</CODE>. The pool starts
+                   very small and grows on demand. However, this
+                   behavior is not always optimal. Specifically, if
+                   you want to exclusively use the OT memory allocator
+                   in your application, you should dedicate your
+                   entire application heap to its use. Having the
+                   allocator consume your application heap piecemeal
+                   is much less efficient than giving it to them in
+                   one big chunk. Moreover, if
+                   you regularly allocate memory at 'interrupt time',
+                   you will find that the OT allocator often fails at
+                   inopportune times; if the client pool is exhausted
+                   OT can not grow it at interrupt time.</P>
+
+                   <P>You can get more control
+                   over your client pool by</P>
+
+                   <UL>
+                      <LI>using an OT memory
+                      reserve, or</LI>
+
+                      <LI>manipulating the pool
+                      directly via ASLM APIs.</LI>
+                   </UL>
+
+                   <P>These techniques are
+                   described in the following sections.</P>
+
+                   <BR><BR><CENTER><TABLE BORDER=0 WIDTH=550>
+<TR><td bgcolor="#E6E6E6" align=left>
+<P><B>IMPORTANT:</B><BR>
+Apple strongly recommends that you use the
+                            first technique. While OT currently uses
+                            the ASLM client pool as its client pool,
+                            this will not always be true. Furthermore,
+                            as OT moves away from ASLM in general,
+                            there's no guarantee that ASLM will be
+                            installed on the system.</P>
+</TD></TR></TABLE></CENTER><BR><BR>
+
+
+                   <H4><A NAME=OTMemoryReserve></A>Using
+                   an OT Memory Reserve</H4>
+
+                   <P>The most compatible way to
+                   use your entire application zone for OT memory
+                   allocations is to use an OT memory reserve. When
+                   your applications starts up you create the memory
+                   reserve by allocating a number of large chunks of
+                   memory. When you need memory, first try to allocate
+                   the memory from OT. If that fails, free one of the
+                   chunks in the memory reserve and try
+                   again.</P>
+
+                   <P>This technique is
+                   implemented by the OTMemoryReserve module of the
+                   <a href="http://developer.apple.com/samplecode/Sample_Code/Networking/OTStreamLogViewer.htm">OTStreamLogViewer</A>
+                   sample code (version 1.0.1b1 and later). You can
+                   easily borrow the code and reuse it in your
+                   application.</P>
+
+
+
+                  <BR><BR><CENTER><TABLE BORDER=0 WIDTH=550>
+<TR><td bgcolor="#E6E6E6" align=left>
+<P><B>Note:</B><BR>
+One approach that does not work is to
+                            preflight the OT memory pool by allocating
+                            a large amount of memory and then freeing
+                            it immediately. This does not work because
+                            the OT memory allocator is too smart; if
+                            freeing a block of memory creates a large
+                            unused chunk in the pool, OT will return
+                            that chunk back to the Mac OS Memory
+                            Manager.</P>
+</TD></TR></TABLE></CENTER><BR><BR>
+
+
+<H4>Controlling Client Pool Parameters via ASLM</H4>
+
+                   <BR><BR><CENTER><TABLE BORDER=0 WIDTH=550>
+<TR><td bgcolor="#E6E6E6" align=left>
+<P><B>IMPORTANT:</B><BR>
+If you use the technique described in this
+                            section your application will be dependent
+                            on ASLM, and on the fact that OT uses the
+                            ASLM client pool as its client pool. This
+                            is not recommended.</P>
+</TD></TR></TABLE></CENTER>
+
+<CENTER><TABLE BORDER=0 WIDTH=550>
+<TR><td bgcolor="#E6E6E6" align=left>
+<P><B>IMPORTANT:</B><BR>
+If you use
+                            <CODE>InitOpenTransportInContext</CODE>
+                            (implemented by either Carbon or the
+                            <a href="http://developer.apple.com/samplecode/Sample_Code/Networking/OTClassicContext.htm">OTClassicContext</A>
+                            sample code), you can not use this
+                            technique to control your OT client pool
+                            parameters.</P>
+</TD></TR></TABLE></CENTER><BR><BR>
+
+
+                   <P>You can obtain more control over your client
+                   pool by using the ASLM programming interface. If
+                   you have already initialized a connection to ASLM,
+                   <CODE>InitOpenTransport</CODE> will use it (and its
+                   client pool) instead of creating its own. You can
+                   use this to control how large your client pool is,
+                   where it is allocated, and how it grows.</P>
+
+                   <BR><BR><CENTER><TABLE BORDER=0 WIDTH=550>
+<TR><td bgcolor="#E6E6E6" align=left>
+<P><B>Note:</B><BR>
+To program with ASLM, you need the ASLM
+                            SDK from the Mac OS SDK CDs.</P>
+</TD></TR></TABLE></CENTER>
+
+
+                    <BR><BR><CENTER><TABLE BORDER=0 WIDTH=550>
+<TR><td bgcolor="#E6E6E6" align=left>
+<P><B>IMPORTANT:</B><BR>
+To call ASLM from 68K C or C++ code, you
+                            must be building with the 4-byte
+                            integers.</P>
+</TD></TR></TABLE></CENTER><BR><BR>
+
+
+                   <P>To use this technique, you must call
+                   <CODE>InitLibraryManager</CODE> before calling
+                   <CODE>InitOpenTransport</CODE>. In addition, you
+                   must call <CODE>CleanupLibraryManager</CODE> after
+                   calling <CODE>CloseOpenTransport</CODE>. The
+                   prototypes for these routines are defined in
+                   "LibraryManager.h", but they are given below for
+                   your convenience.</P>
+
+                   <BR><BR><CENTER><TABLE BORDER=0 WIDTH=550>
+<TR><td bgcolor="#E6E6E6" align=left>
+<pre>
+
+
+
+OSErr InitLibraryManager(size_t poolsize, int zoneType, int memType);
+
+
+
+void  CleanupLibraryManager(void);</pre>
+</TD></TR></TABLE></CENTER><BR><BR>
+
+
+                   <P>The additional parameters to
+                   <CODE>InitLibraryManager</CODE> allow you to
+                   specify the initial size for your client pool (in
+                   bytes), the location of the client pool (typically
+                   <CODE>kSystemZone</CODE>, <CODE>kApplicZone</CODE>,
+                   or <CODE>kCurrentZone</CODE> ), and the type of
+                   memory for the client pool (typically
+                   <CODE>kNormalMemory</CODE>; however, if you access
+                   the memory when paging is unsafe,
+                   <CODE>kHoldMemory</CODE> may be useful).</P>
+
+                   <P>The following code snippet demonstrates this
+                   technique. It first creates a subsidiary zone
+                   within the application heap (whose size is
+                   calculated to consume the entire heap, minus some
+                   memory for use by the toolbox). It then calls
+                   <CODE>InitLibraryManager</CODE> to connect to ASLM
+                   (and establish the client pool in the subsidiary
+                   zone) before calling
+                   <CODE>InitOpenTransport</CODE>.</P>
+
+
+
+
+                  <BR><BR><CENTER><TABLE BORDER=0 WIDTH=550>
+<TR><td bgcolor="#E6E6E6" align=left>
+<pre>
+
+
+
+// IMPORTANT:
+
+
+
+// If you use this code you will take a hard dependency
+
+
+
+// on the presence of ASLM. See the text for reasons why
+
+
+
+// this is bad.
+
+
+
+
+
+
+
+                            static OSStatus
+
+
+
+InitOpenTransportWithMemoryLimit(void)
+
+
+
+{
+
+
+
+     OSStatus err;
+
+
+
+     SInt32 junkTotalFree;
+
+
+
+     SInt32 contigFree;
+
+
+
+     SInt32 zoneSize;
+
+
+
+     Ptr subsidiaryZone;
+
+
+
+     THz oldZone;
+
+
+
+&nbsp;
+
+
+
+     // First call the system Memory Manager to determine the largest
+
+
+
+     // contiguous block in the heap.
+
+
+
+
+
+
+
+     PurgeSpace(&amp;junkTotalFree, &amp;contigFree);
+
+
+
+
+
+
+
+     zoneSize = contigFree - kBytesReservedForToolboxInApplicationZone;
+
+
+
+
+
+
+
+     // Allocate the memory for our zone and create a zone in that
+
+
+
+     // block.  Then init ASLM, telling it to create a pool that
+
+
+
+     // takes up the entire zone (minus the ASLM overhead factor)
+
+
+
+     // in the current zone, i.e., the zone we just created.  Finally,
+
+
+
+     // initialize OT.  OT will see that we've inited ASLM and use
+
+
+
+     // the pool that ASLM created (in the zone we created) for
+
+
+
+     // satisfying OTAllocMem requests.
+
+
+
+
+
+
+
+     subsidiaryZone = NewPtr(zoneSize);
+
+
+
+     oldZone = GetZone();
+
+
+
+&nbsp;
+
+
+
+     // InitZone sets the current zone to the newly created zone,
+
+
+
+     // so I don't have to do it myself.
+
+
+
+
+
+
+
+     InitZone(nil, 16, subsidiaryZone + zoneSize, subsidiaryZone);
+
+
+
+     err = InitLibraryManager(zoneSize - 2048, kCurrentZone, kNormalMemory);
+
+
+
+     if (err == noErr) {
+
+
+
+         err = InitOpenTransport();
+
+
+
+         if (err != noErr) {
+
+
+
+             CleanupLibraryManager();
+
+
+
+         }
+
+
+
+     }
+
+
+
+     SetZone(oldZone);
+
+
+
+&nbsp;
+
+
+
+     return err;
+
+
+
+}</pre>
+</TD></TR></TABLE></CENTER>
+
+
+
+                  <BR><BR><CENTER><TABLE BORDER=0 WIDTH=550>
+<TR><td bgcolor="#E6E6E6" align=left>
+<P><B>IMPORTANT:</B><BR>
+This code is a simplified version (less
+                            error checking) of the code
+                            used by an older
+                            version of the OTStreamLogViewer sample
+                            code. Current versions of <a href="http://developer.apple.com/samplecode/Sample_Code/Networking/OTStreamLogViewer.htm">OTStreamLogViewer</A>
+                            have been updated to use an OT memory
+                            reserve, as described <A 
+HREF="#OTMemoryReserve">above</A>.</P>
+</TD></TR></TABLE></CENTER>
+
+                 <BR><BR><CENTER><TABLE BORDER=0 WIDTH=550>
+<TR><td bgcolor="#E6E6E6" align=left>
+<P><B>Note:</B><BR>
+The above technique is by no means the
+                            only one available to you using the ASLM
+                            API. You should read the <I>ASLM
+                            Developer's Guide</I> for more
+                            information.</P>
+</TD></TR></TABLE></CENTER><BR><BR>
+
+ <BR><P><A HREF="#top">Back to top</A></P>
+                   <P><A NAME=AdvancedTopics></A></P>
+
+                   <H2>Advanced
+                   Topics</H2>
+
+                   <P>This section describes some of the more advanced
+                   issues in the realm of OT memory management.
+                   Specifically, the section describes how the OT
+                   shared client and kernel pools grow and shrink over
+                   time. Before tackling this, you need to learn about
+                   another API call you can make to alter the behavior
+                   of the OT memory system.</P>
+
+                   <BR><BR><CENTER><TABLE BORDER=0 WIDTH=550>
+<TR><td bgcolor="#E6E6E6" align=left>
+<P><B>Note:</B><BR>
+This section of the note is intended for
+                            those with an intimate knowledge of the
+                            Open Transport architecture. Do not be
+                            alarmed if you do not understand it!</P>
+</TD></TR></TABLE></CENTER><BR><BR>
+
+
+                   <H3><CODE>OTSetMemoryLimits</CODE></H3>
+
+                   <P>The <CODE>OTSetMemoryLimits</CODE> routine
+                   allows software to directly affect the behavior of
+                   the OT memory pools. The prototype for the routine
+                   is:</P>
+
+                   <BR><BR><CENTER><TABLE BORDER=0 WIDTH=550>
+<TR><td bgcolor="#E6E6E6" align=left>
+<pre>
+
+
+
+#ifdef __cplusplus
+
+
+
+extern "C" {
+
+
+
+#endif
+
+
+
+&nbsp;
+
+
+
+extern OSStatus OTSetMemoryLimits(size_t growSize, size_t maxSize);
+
+
+
+&nbsp;
+
+
+
+#ifdef __cplusplus
+
+
+
+}
+
+
+
+#endif</pre>
+</TD></TR></TABLE></CENTER><BR><BR>
+
+
+                   <P>The <CODE>growSize</CODE> parameter is the
+                   amount by which OT should grow the kernel pool
+                   right now. When you call the routine, OT
+                   immediately tries to grow the kernel pool by this
+                   amount. The <CODE>maxSize</CODE> parameter is the
+                   new maximum size of the kernel pool. OT will never
+                   grow the kernel pool larger than this amount.</P>
+
+                   <P><CODE>OTSetMemoryLimits</CODE> also implicitly
+                   sets an internal Open Transport variable called
+                   <CODE>fServerMode</CODE>. If you call
+                   <CODE>OTSetMemoryLimits</CODE> with a positive
+                   <CODE>growSize</CODE> value,
+                   <CODE>fServerMode</CODE> is incremented. If you
+                   call it with a zero value, <CODE>fServerMode</CODE>
+                   is decremented. If <CODE>fServerMode</CODE> is
+                   non-zero, OT will never downsize the shared client
+                   or kernel pools. To be a good citizen, server
+                   software should call <CODE>OTSetMemoryLimits</CODE>
+                   with a positive <CODE>growSize</CODE> when it
+                   starts up, and a zero <CODE>growSize</CODE> when it
+                   shuts down.</P>
+
+                   <P>Finally, if you grow the kernel pool by more
+                   than 20 KB, <CODE>OTSetMemoryLimits</CODE> will
+                   also grow the shared client pool by 10% of the
+                   <CODE>growSize</CODE> value.</P>
+
+                   <P><CODE>OTSetMemoryLimits</CODE> is only of use to
+                   server software which must handle extremely
+                   'bursty' connection patterns or many connections in
+                   parallel. By increasing the maximum size of the
+                   kernel pool, the server can handle more connections
+                   in parallel. By growing the kernel pool immediately
+                   (rather than as each connection is created), the
+                   server can handle these parallel connections as
+                   soon as it's started, rather than waiting for the
+                   kernel pool to grow through usage. By never
+                   downsizing the kernel pool, the server can handle
+                   many connections simultaneously even after a long
+                   period of inactivity.</P>
+
+                   <P><CODE>OTSetMemoryLimits</CODE> must be called at
+                   system task time and returns an error result if it
+                   can't grow the kernel pool by the specified
+                   amount.</P>
+
+
+
+                   <BR><BR><CENTER><TABLE BORDER=0 WIDTH=550>
+<TR><td bgcolor="#E6E6E6" align=left>
+<P><B>IMPORTANT:</B><BR>
+Using <CODE>OTSetMemoryLimits</CODE> will
+                            never increase the performance of a single
+                            connection. It is only useful for software
+                            with dozens of parallel connections. DTS
+                            strongly recommends that client software
+                            never call
+                            <CODE>OTSetMemoryLimits</CODE>.</P>
+</TD></TR></TABLE></CENTER>
+
+                   <BR><BR><CENTER><TABLE BORDER=0 WIDTH=550>
+<TR><td bgcolor="#E6E6E6" align=left>
+<P><B>Note:</B><BR>
+The <CODE>OTSetMemoryLimits</CODE> routine
+                            does not appear in any Open Transport
+                            header files. If you use the routine, you
+                            must declare the prototype yourself. This
+                            is a consequence of the above policy --
+                            general application programs should not
+                            call this routine.</P>
+</TD></TR></TABLE></CENTER>
+
+
+                   <BR><BR><CENTER><TABLE BORDER=0 WIDTH=550>
+<TR><td bgcolor="#E6E6E6" align=left>
+<P><B>Note:</B><BR>
+There is an earlier incarnation of
+                            <CODE>OTSetMemoryLimits</CODE>, called
+                            <CODE>OTSetServerMode</CODE>. This routine
+                            has been completely subsumed by
+                            <CODE>OTSetMemoryLimits</CODE>.</P>
+</TD></TR></TABLE></CENTER><BR><BR>
+
+
+                   <H3>Growing OT Memory
+                   Pools</H3>
+
+                   <P>When OT attempts to grow a pool, it uses a
+                   binary back-off algorithm to do so. It starts by
+                   attempting to grow the pool by getting one big
+                   block of memory from the Mac OS Memory Manager. If
+                   a block of that size is not available, it halves
+                   the size requested and tries again. This process
+                   terminates when either OT has grown the pool the
+                   requested amount, or the block size shrinks below
+                   10 KB.</P>
+
+                   <H3>Shrinking OT Memory
+                   Pools</H3>
+
+                   <P>OT memory pools
+                   have the ability to shrink. A memory pool is made
+                   up of a number of discontiguous memory blocks that
+                   have been allocated from the Mac OS Memory Manager.
+                   When a pool is <STRONG>downsized</STRONG>, each Mac
+                   OS memory block is examined to see if it is empty.
+                   If it is, that memory block is released back to the
+                   Mac OS Memory Manager.</P>
+
+                   <P>OT memory pools are downsized at the following
+                   points:</P>
+
+                   <UL>
+                      <LI>Whenever a client dies (it calls
+                      <CODE>CloseOpenTransport</CODE> or an
+                      application quits without calling
+                      <CODE>CloseOpenTransport</CODE>) <B>and</B> OT
+                      is not in server mode, OT downsizes the shared
+                      client and kernel pools.</LI>
+
+                      <LI>Whenever OT unloads the client libraries, it
+                      downsizes the shared client pool.</LI>
+
+                      <LI>Whenever OT unloads the kernel (which
+                      happens when there are no remaining clients who
+                      called <CODE>InitOpenTransport</CODE>), it
+                      downsizes the kernel pool if OT is not in server
+                      mode.</LI>
+
+                      <LI>Whenever OT unloads the kernel utilities
+                      library (which happens when there are no
+                      remaining clients who called
+                      <CODE>InitOpenTransportUtilities</CODE>), OT
+                      downsizes the port pool.</LI>
+
+                      <LI>OT downsizes the port pool after it runs
+                      port scanners.</LI>
+
+                      <LI>OT downsizes the shared client pool
+                      immediately after it runs through the list of
+                      configurators calling their
+                      <CODE>OTSetupConfigurator</CODE> or
+                      <CODE>OTStartupConfigurator</CODE> entry
+                      points.</LI>
+                   </UL>
+
+                   <H3>More Kernel Pool
+                   Trivia</H3>
+
+                   <P>OT maintains a hard limit on the upper bound of
+                   the size of the kernel pool. Clients can set this
+                   limit using the <CODE>OTSetMemoryLimits</CODE>
+                   routine. This poses the question: What is the
+                   initial value for this limit? Out of the box, OT
+                   sets this limit to 10% of the physical memory on
+                   the machine (as returned by
+                   <CODE>gestaltPhysicalRAMSize</CODE>). This strikes
+                   a balance between providing enough buffer space for
+                   networking while preventing OT from consuming all
+                   the user's memory.</P>
+
+                   <P><A NAME=KernelPool96></A>The
+                   initial size of the kernel pool is specified by two
+                   parameters. The first parameter is the required
+                   initial pool size (described <A 
+HREF="#PoolParameters">above</A>).
+                   If OT cannot allocate a kernel pool of this size it
+                   will fail to load. Additionally, OT will try to
+                   grow the kernel pool to at least 96K every time it
+                   loads the kernel (including the first time);
+                   however, it does not require that this memory be
+                   available for the kernel to load. This
+                   mechanism allows the kernel pool to be small while
+                   the kernel is unloaded, but grow quickly when the
+                   kernel loads.</P>
+  
+ <BR><P><A HREF="#top">Back to top</A></P>
+
+<A NAME=Summary></A>
+
+                   <H2>Summary</H2>
+
+                   <P>Open Transport provides a reliable, flexible,
+                   and interrupt-safe memory management system. By
+                   understanding how it works, you can avoid some
+                   common pitfalls and still write code that allocates
+                   memory at interrupt time. <EM>Finally.</EM></P>
+ <BR><P><A HREF="#top">Back to top</A></P>
+
+<A NAME=References></A><H2>References</H2>
+
+<p><a href="http://developer.apple.com/documentation/mac/NetworkingOT/NetworkingWOT-2.html">Inside
+                      Macintosh: Networking With Open
+                      Transport</A></p>
+
+                      <p><a href="http://developer.apple.com/documentation/mac/Memory/Memory-2.html">Inside
+                      Macintosh: Memory</A></p>
+
+                      <p>Apple Shared Library Manager Developer's
+                      Guide</p>
+
+                      <p>DTS Technote 1173
+                      <a href="tn1173.html">Understanding
+                      Open Transport Asset Tracking</A></p>
+
+                      <p><a href="http://developer.apple.com/samplecode/Sample_Code/Networking/OTStreamLogViewer.htm">OTStreamLogViewer</A>
+                      sample code</p>
+
+                      <p><a href="http://developer.apple.com/samplecode/Sample_Code/Networking/OTClassicContext.htm">OTClassicContext</A>
+                      sample code</p>
+
+                      <p><a href="http://developer.apple.com/dev/opentransport/">Open Transport
+                      Web Page</A></p>
+
+ <BR><P><A HREF="#top">Back to top</A></P>
+
+<A NAME="Changes"></A>
+          <H2><A NAME=Changes></A>Change History</H2>
+
+
+<TABLE BORDER=0 CELLPADDING=3 WIDTH=544>
+            <TR>
+               <td width=100 align=left>
+                  <P ALIGN=center>11-May-1998</P>
+               </TD>
+               <td align="left">
+                  <P>First released.</P>
+               </TD>
+            </TR>
+
+             <TR>
+                <td width=100 align=left>
+                   <P ALIGN=center>09-Jan-2001</p>
+                </TD>
+                <td align="left">
+                   <P>Updated to warn about the
+                   dangers of depending on ASLM and to
+                   <A HREF="#ControllingClientPoolParameters">offer
+                   an alternative</A>.
+                   Also updated the <A HREF="#PoolParameters">pool
+                   parameters</A> section
+                   to account for OT releases since 1998.</P>
+                </TD>
+             </TR>
+          </TABLE>
+           
+
+     <BR><P><A HREF="#top">Back to top</A></P>
+
+        <A NAME="Downloads"></A> 
+        <h2>Downloadables</h2>
+
+        <center><TABLE BORDER=0 CELLPADDING=3 WIDTH="600">
+          <TR> 
+            <td width=50 align=left> 
+              <P ALIGN=center><img src="images/acrobatsmall.gif" align=middle alt="Acrobat" width=22 height=23></P>
+            </TD>
+            <td align="left"> 
+              <p>Acrobat version of this Note (88K).</P>
+            </TD>
+            <td width=60 align=left> 
+              <p><A HREF="pdf/tn1128.pdf">Download</A></P>
+            </TD>
+          </TR>
+        </TABLE></center><BR><BR>
+         
+         <BR><P><A HREF="#top">Back to top</A></P>
+</TD></TR></TABLE></CENTER>
+
+<!-- end_content -->
+<!-- begin_footer_information -->	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/technotes/tn/tn1128.html%3Fid%3DDTS10002968-1.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/technotes/tn/tn1128.html%3Fid%3DDTS10002968-1.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/technotes/tn/tn1128.html%3Fid%3DDTS10002968-1.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+<!--#include virtual="/includes/footer"--><!-- end_footer_information -->
+
+
+</BODY>
+</HTML>

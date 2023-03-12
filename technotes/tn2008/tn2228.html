@@ -1,0 +1,636 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<!-- BEGIN META TAG INFO --><link rel="home" href="http://developer.apple.com/">
+<link rel="find" href="http://developer.apple.com/search/">
+<link rel="stylesheet" type="text/css" href="../../documentation/css/adcstyle.css" title="fonts">
+<script language="JavaScript" type="text/javascript" src="../../documentation/js/busnav.js"></script><script language="JavaScript" src="../../documentation/js/adc.js" type="text/javascript"></script><!-- END META TAG INFO --><!-- BEGIN TITLE --><title>Technical Note TN2228: Running At Login</title>
+<!-- END TITLE --><style>
+			.sourcecodebox {
+				white-space: pre-wrap;
+				white-space: -moz-pre-wrap !important;
+				white-space: -pre-wrap;
+				white-space: -o-pre-wrap;
+				word-wrap: break-word;
+			}
+			</style>
+</head>
+<!-- BEGIN BODY OPEN --><body bgcolor="#ffffff"><a name="//apple_ref/doc/uid/DTS40007991" title="Running At Login"></a>
+<!-- END BODY OPEN --><!-- START CENTER OPEN --><center>
+<!-- END CENTER OPEN --><a name="top"></a><!-- BEGIN LOGO AND SEARCH --><!--#include virtual="/includes/adcnavbar" --><!-- END LOGO AND SEARCH --><!-- START BREADCRUMB --><div id="breadcrumb"><table width="680" border="0" cellpadding="0" cellspacing="0">
+<tr>
+<td scope="row"><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+<td><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+</tr>
+<tr valign="middle"><td align="left" colspan="2">
+<a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../technicalnotes/index.html">Technical Notes</a> &gt; <a href="../../technicalnotes/Security/index.html">Security</a> &gt; <a href="../../technicalnotes/Security/idxAuthorization-date.html">Authorization</a> &gt; </td></tr>
+<tr><td colspan="2" scope="row"><img width="680" height="35" src="images/1dot.gif" alt=""></td></tr>
+</table></div>
+<!-- END BREADCRUMB --><!-- START MAIN CONTENT --><!-- START TITLE GRAPHIC AND INTRO --><table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td><h1>
+<div id="pagehead">Technical Note TN2228</div>
+<div id="pageheadsub">Running At Login</div>
+</h1></td></tr></table>
+<!-- END TITLE GRAPHIC AND INTRO --><!-- BEGIN WIDE COLUMN --><table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td align="left" width="680">
+<!-- BEGIN CONTENTS --><table width="680" border="0" cellpadding="0" cellspacing="0">
+<tr align="left" valign="top"><td>
+<p>This technote explains how you can write code that is coordinated with the login process. This is useful in a number of circumstances. For example, if you're developing a product for managed installations that resets the user's preferences to some known state, you want your code to run after the user's home directory is mounted but before any user processes have run. Historically such products might have used the login hook, but the technique described in this technote (an authorization plug-in) has a number of important advantages over the login hook.</p>
+<p>This technote is targeted at Mac OS X developers whose products must be coordinated with the GUI login process.</p>
+</td></tr>
+<tr><td scope="row">
+<img width="680" height="10" src="images/1dot.gif" alt=""><br><img width="680" height="1" src="images/1dot_919699.gif" alt=""><br><img width="680" height="20" src="images/1dot.gif" alt="">
+</td></tr>
+</table>
+<table width="680" border="0" cellpadding="0" cellspacing="0">
+<tr align="left" valign="top"><td width="680"><ul>
+<li><a href="#SECINTRODUCTION">Introduction</a></li>
+<li><a href="#SECCLOSEBUTNOCIGAR">Close But No Cigar</a></li>
+<ul>
+<li><a href="#SECLOGINHOOK">Login Hook</a></li>
+<li><a href="#SECDAEMONS">Daemon</a></li>
+<li><a href="#SECAGENTS">Agent</a></li>
+</ul>
+<li><a href="#SECDOTHERIGHTTHING">Do The Right Thing</a></li>
+<ul>
+<li><a href="#SECGETTINGSTARTED">Getting Started</a></li>
+<li><a href="#SECSCRATCHMONKEY">Always Mount A Scratch Monkey</a></li>
+<li><a href="#SECFUS">Fast User Switching</a></li>
+<li><a href="#SECDEBUGGING">Debugging</a></li>
+<li><a href="#SECINSTALLING">Installing Your Plug-in</a></li>
+<li><a href="#SECCONTEXTISSUES">Context Issues</a></li>
+<li><a href="#SECAUTHENV">Authorization Auxiliary Information</a></li>
+</ul>
+<li><a href="#SECDANGERWILLROBINSON">Danger Will Robinson</a></li>
+<ul>
+<li><a href="#SECHOMEDIRECTORY">Allowing Home Directory Access</a></li>
+<li><a href="#SECNOHOMEDIRECTORY">Preventing Home Directory Access</a></li>
+<li><a href="#SECBOOTSTRAPNAMESPACE">Mach Bootstrap Namespace Issues</a></li>
+<li><a href="#SECBENICETOHOST">Be Nice To Your Host</a></li>
+<li><a href="#SECHOSTDEATH">Host Death Issues</a></li>
+</ul>
+<li><a href="#SECFURTHERREADING">Further Reading</a></li>
+<li><a href="#document_revision_summary">Document Revision History</a></li>
+</ul></td></tr>
+<tr><td colspan="3" scope="row">
+<img width="680" height="10" src="images/1dot.gif" alt=""><br><img width="680" height="1" src="images/1dot_919699.gif" alt=""><br><img width="680" height="20" src="images/1dot.gif" alt="">
+</td></tr>
+</table>
+<a name="SECINTRODUCTION"></a><h2>Introduction</h2>
+<p>In some circumstances it is necessary to run code as the user logs in, and to guarantee that the code runs to completion before the login can continue. For example, if you're developing an administrative product that wants to reset the user's preferences to a particular state, you have to do that after the home directory is mounted (otherwise, your product wouldn't work for FileVault users or for users with network home directories) but before any applications have had a chance to run and read those preferences.</p>
+<p>This technote describes the recommended approach for running code that's coordinated with the login process. It starts with an overview of the techniques that have been used for this in the past, but which are fundamentally flawed (<a href="#SECCLOSEBUTNOCIGAR">Close But No Cigar</a>). It then describes the recommended technique, namely, creating an authorization plug-in (<a href="#SECDOTHERIGHTTHING">Do The Right Thing</a>). Finally, it concludes with a discussion of some of the gotchas associated with this technique (<a href="#SECDANGERWILLROBINSON">Danger Will Robinson</a>).</p>
+<div class="notebox"><p><strong>IMPORTANT: </strong>Formal support for authorization plug-ins was added in Mac OS X 10.4. If you need to do this sort of thing on earlier systems, please contact <a href="mailto:dts.apple.com">Developer Technical Support</a>.</p></div>
+<div class="notebox"><p><strong>IMPORTANT: </strong>This technote only covers GUI logins; it does not cover other types of logins (for example, SSH logins or AppleShare logins).</p></div>
+<div class="notebox"><p><strong>Note: </strong>This technote only discusses login; it does not cover issues related to logout. Specifically, while the <a href="#SECDOTHERIGHTTHING">authorization plug-in technique</a> described in this technote is a good alternative for the login hook, there is currently no equivalent replacement for the logout hook 
+			(r. <a href="rdar://problem/4905756">4905756</a>)
+		.</p></div>
+<p>It's important to understand when an authorization plug-in is not appropriate. Two common cases are:</p>
+<ul>
+<li><p>If you wish to present a user interface that runs asynchronously with respect to the login process (for example, you're developing assistive technology for Mac OS X and you want to provide assistance at login time), you should investigate creating a pre-login launchd agent, as illustrated by <a href="/samplecode/PreLoginAgents/index.html">Sample Code 'PreLoginAgents'</a>.</p></li>
+<li><p>If you wish to present a login user interface that supplants the standard user interface displayed at login time (for example, you want to display the user interface for a fingerprint reader), you should investigate <code>SFAuthorizationPluginView</code>. <a href="/samplecode/NameAndPassword/index.html">Sample Code 'NameAndPassword'</a> shows an example of how to do this.</p></li>
+</ul>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="SECCLOSEBUTNOCIGAR"></a><h2>Close But No Cigar</h2>
+<p>Historically developers have used a number of techniques for running code at login time, and most of them are inadequate for various reasons. This section describes those techniques and their problems.</p>
+<a name="SECLOGINHOOK"></a><h3>Login Hook</h3>
+<p>The login hook is documented in <a href="http://developer.apple.com/documentation/MacOSX/Conceptual/BPSystemStartup/Articles/CustomLogin.html#//apple_ref/doc/uid/20002134">System Startup Programming Topics</a>. It has a number of drawbacks and is generally considered to be deprecated. Specifically:</p>
+<ul>
+<li><p>There is only one login hook, which means that it's not suitable for shrink wrap developers because you can't be guaranteed that the user hasn't already installed some other software that's using it. In general, you should consider the login hook to be reserved for use by site administrators.</p></li>
+<li><p>The login hook is run at one specific time during the login process (after the home directory has been mounted), which is not flexible enough to cover all circumstances.</p></li>
+</ul>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="SECDAEMONS"></a><h3>Daemon</h3>
+<p>Various developers have tried to do this sort of thing from a daemon (a launchd daemon or a startup item). There are a number of problems with using a daemon for this sort of thing.</p>
+<ul>
+<li><p>It is subject to race conditions. Mac OS X's startup is highly asynchronous. Thus it's possible (albeit somewhat unlikely) that the user might log in before your daemon has even been started.</p></li>
+<li><p>There's no guarantee that a daemon can access the home directory (especially for FileVault and network home directory users), which makes them unsuitable for certain tasks.</p></li>
+</ul>
+<p>See <a href="/technotes/tn2005/tn2083.html">Technical Note TN2083, 'Daemons and Agents'</a> for more information about daemons.</p>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="SECAGENTS"></a><h3>Agent</h3>
+<p>Various developers have tried to use an agent (a launchd agent, a login item, or global login item) to do this sort of thing. This technique is unsuitable for a number of reasons.</p>
+<ul>
+<li><p>It is subject to race conditions. Agents are launched after login in parallel with other items of their class. Thus, there's no way to be sure that the changes made by an agent will affect its peers.</p></li>
+<li><p>Agents always run after the home directory has been mounted, which makes them unsuitable for certain tasks.</p></li>
+</ul>
+<p>See <a href="/technotes/tn2005/tn2083.html">Technical Note TN2083, 'Daemons and Agents'</a> for more information about agents.</p>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="SECDOTHERIGHTTHING"></a><h2>Do The Right Thing</h2>
+<p>The recommended approach for running code that's coordinated with the login process is to create an <strong>authorization plug-in</strong>.</p>
+<div class="notebox"><p><strong>IMPORTANT: </strong>To understand the rest of this section you will need a basic understanding of Authorization Services. If you've not used Authorization Services before, I suggest you read the <a href="http://developer.apple.com/documentation/Security/Conceptual/authorization_concepts/02authconcepts/chapter_2_section_1.html#//apple_ref/doc/uid/TP30000995-CH205-TP9">Authorization Concepts</a> chapter of <a href="http://developer.apple.com/documentation/Security/Conceptual/authorization_concepts/01introduction/chapter_1_section_1.html">Performing Privileged Operations With Authorization Services</a>.</p></div>
+<p>When the user logs in, <code>loginwindow</code> tries to acquire the <code>system.login.console</code> authorization right. If you look at the right definition in the authorization database (currently <code>/etc/authorization</code>), you'll see something like <a href="#LISTAUTHORISATIONRIGHT">Listing 1</a>. Specifically, the <code>mechanisms</code> array contains a list of mechanism strings associated with this authorization right.</p>
+<a name="LISTAUTHORISATIONRIGHT"></a><p class="caption"><strong>Listing 1: </strong>The console login authorization right on Mac OS X 10.5</p>
+<pre class="sourcecodebox">&lt;key&gt;system.login.console&lt;/key&gt;
+&lt;dict&gt;
+    &lt;key&gt;class&lt;/key&gt;
+    &lt;string&gt;evaluate-mechanisms&lt;/string&gt;
+    &lt;key&gt;comment&lt;/key&gt;
+    &lt;string&gt;Login mechanism based rule. Not for general use, yet.&lt;/string&gt;
+    &lt;key&gt;mechanisms&lt;/key&gt;
+    &lt;array&gt;
+        &lt;string&gt;builtin:smartcard-sniffer,privileged&lt;/string&gt;
+        &lt;string&gt;loginwindow:login&lt;/string&gt;
+        &lt;string&gt;builtin:reset-password,privileged&lt;/string&gt;
+        &lt;string&gt;builtin:auto-login,privileged&lt;/string&gt;
+        &lt;string&gt;builtin:authenticate,privileged&lt;/string&gt;
+        &lt;string&gt;HomeDirMechanism:login,privileged&lt;/string&gt;
+        &lt;string&gt;HomeDirMechanism:status&lt;/string&gt;
+        &lt;string&gt;MCXMechanism:login&lt;/string&gt;
+        &lt;string&gt;loginwindow:success&lt;/string&gt;
+        &lt;string&gt;loginwindow:done&lt;/string&gt;
+    &lt;/array&gt;
+&lt;/dict&gt;</pre>
+<div class="notebox"><p><strong>WARNING: </strong>The location of the authorization database is subject to change. To ensure long-term binary compatibility you must access the database using the <a href="#SECINSTALLING">authorization database API</a>.</p></div>
+<div class="notebox"><p><strong>Note: </strong>The exact definition of the <code>system.login.console</code> authorization right varies over time. The techniques described in this technote are carefully crafted to avoid too much dependency on the exact right definition and will be supported for the foreseeable future.</p></div>
+<p>When <code>loginwindow</code> tries to acquire the <code>system.login.console</code> right, Authorization Services runs each of the mechanisms described by the strings in the array, in turn. Each string includes the name of the authorization plug-in (before the colon) and the name of the mechanism implemented by that plug-in (after the colon). It optionally ends with ",privileged", to indicate that the mechanism should be run as root (more about this in <a href="#SECCONTEXTISSUES">Context Issues</a>).</p>
+<p>It's possible to write an authorization plug-in that implements a custom mechanism, and then add the name of that mechanism to this array and have it called at login time. This happens for both manual and automatic logins.</p>
+<p>The position of your mechanism in the array determines when it will be run. The default right specification for <code>system.login.console</code> lists one mechanism (<code>loginwindow:login</code>) that presents the login window user interface and another (<code>HomeDirMechanism:login,privileged</code>) that mounts the user's home directory (if, say, it's a network home directory, or on a FileVault disk image). When you install a custom mechanism, you should place it so that it runs at the appropriate point relative to these standard mechanisms. The position you choose depends on the nature of your product. For example:</p>
+<ul>
+<li><p>In some circumstances you might want to run before the user's home directory is mounted. For example, you might be implementing a network file system and you want to set up the user's credentials so that the home directory mounting process works properly. In that case you should install your mechanism before any instance of <code>HomeDirMechanism</code> in the array.</p></li>
+<li><p>In some circumstances you might want to run after the user's home directory is mounted. For example, you might be writing a tool for managed installations that sets up certain preferences in certain ways, and you can't access the user's preferences folder until their home directory is mounted. In that case you should install your mechanism after all instances of <code>HomeDirMechanism</code> in the array.</p></li>
+</ul>
+<div class="notebox"><p><strong>WARNING: </strong>Regardless of the position of your mechanism in this array, your code will run in an unusual environment, with numerous gotchas. <a href="#SECDANGERWILLROBINSON">Danger Will Robinson</a> describes these gotchas in more detail.</p></div>
+<a name="SECGETTINGSTARTED"></a><h3>Getting Started</h3>
+<p>The best place to start when developing an authorization plug-in is <a href="/samplecode/NullAuthPlugin/index.html">Sample Code 'NullAuthPlugin'</a>. Grab the sample and start customizing!</p>
+<p>The remainder of this section describes some of the issues that you might encounter while creating your plug-in.</p>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="SECSCRATCHMONKEY"></a><h3>Always Mount A Scratch Monkey</h3>
+<div class="notebox"><p><strong>WARNING: </strong>If your authorization plug-in is not found, or the mechanism it implements fails, you will not be able to log in to the system via the GUI.</p></div>
+<p>The easiest way to avoid being bitten by this is to enable SSH logins on your machine (Remote Login in the Sharing panel of System Preferences). That way, if anything goes wrong, you can log in via SSH to debug and correct it.</p>
+<p>If you run into problems and you haven't enabled SSH (or you don't have access to another machine to use as the SSH client), you can fix things by booting the machine in <a href="http://support.apple.com/kb/HT1492">single user mode</a>.</p>
+<p>Regardless, I strongly recommend that you make a backup of your authorization database before doing any work with authorization plug-ins. <a href="#LISTBACKUPANDRESTORE">Listing 2</a> shows how to do this on current systems.</p>
+<a name="LISTBACKUPANDRESTORE"></a><p class="caption"><strong>Listing 2: </strong>Backing up and restoring the authorization database</p>
+<pre class="sourcecodebox">$ # Backup the authorization database
+$ sudo cp /etc/authorization /etc/authorization-orig
+$ # Restore from the backup
+$ sudo cp /etc/authorization-orig /etc/authorization</pre>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="SECFUS"></a><h3>Fast User Switching</h3>
+<p>In many cases you do not need to restart the machine to test your authorization plug-in. Instead, you can enable fast user switching (in the Account panel of System Preferences) and switch directly to the login window. From there, log in as a different user. Your authorization plug-in's mechanisms will be invoked in much the same way as they would be at startup time.</p>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="SECDEBUGGING"></a><h3>Debugging</h3>
+<p>The mechanics of debugging an authorization plug-in can be challenging. For example:</p>
+<ul>
+<li><p>You will definitely need two machines because the authorization plug-in runs at login time, which means there's no way to use the debugger on the machine running the plug-in.</p></li>
+<li><p>It is possible to use Xcode's two-machine debugging facility to debug your plug-in in the Xcode IDE. See <a href="/technotes/tn2008/tn2108.html">Technical Note TN2108, 'Debugging An Authorization Plug-In With Xcode'</a> for instructions on how to do this.</p></li>
+<li><p>In many cases, however, it's easier to simply SSH into the machine and run command line GDB.</p></li>
+<li><p>Remember that your code is a plug-in that's hosted in a system process (see <a href="#SECCONTEXTISSUES">Context Issues</a> for details), and thus you will need to run GDB as root (typically using <a href="x-man-page://8/sudo">sudo</a>).</p></li>
+</ul>
+<p>You can also add copious logging to your plug-in and debug it by trolling through the logs. <a href="/samplecode/NullAuthPlugin/index.html">Sample Code 'NullAuthPlugin'</a> shows how to do that using <a href="x-man-page://3/syslog">syslog</a>; a more modern example would use <a href="&lt;x-man-page://3/asl&gt;">ASL</a>. For an example of how to use ASL, see <a href="/samplecode/SampleD/index.html">Sample Code 'SampleD'</a>.</p>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="SECINSTALLING"></a><h3>Installing Your Plug-in</h3>
+<p>On Mac OS X 10.5 and later, third party authorization plug-ins should be installed in <code>/Library/Security/SecurityAgentPlugins</code>. On earlier systems, they must be installed in <code>/System/Library/CoreServices/SecurityAgentPlugins</code>. The files and directories that make up the plug-in must be owned by <code>root</code> with an owning group of <code>wheel</code>, and they must not be writable by anyone other than root.</p>
+<p>Once you have installed your plug-in, you must activate it by modifying the authorization database. During development you can do this by editing the authorization database file (currently <code>/etc/authorization</code>) directly. However, for wide scale deployment you must modify the database using the APIs provided by the Security framework (<code>&lt;Security/AuthorizationDB.h&gt;</code>).</p>
+<p><a href="#LISTACTIVATION">Listing 3</a> shows an example of how to do this. The top-level routine, <code>AddMechanismToConsoleLoginRight</code>, will add a mechanism to the <code>mechanisms</code> array of the <code>system.login.console</code> authorization right, either before or after <code>HomeDirMechanism</code>.</p>
+<a name="LISTACTIVATION"></a><p class="caption"><strong>Listing 3: </strong>Activating an authorization plug-in</p>
+<pre class="sourcecodebox">#include &lt;assert.h&gt;
+#include &lt;CoreServices/CoreServices.h&gt;
+#include &lt;Security/Security.h&gt;
+
+static void InsertMechanismRelativeToHomeDirMechanism(
+    CFMutableArrayRef   mechanisms,
+    CFStringRef         mechanismStr,
+    Boolean             beforeHomeDirMechanism
+)
+    // Adds the mechanism specified mechanismStr to the mechanisms array. 
+    // If beforeHomeDirMechanism is true, mechanismStr is added immediately 
+    // before the first instance of "HomeDirMechanism"; otherwise it is added 
+    // after the last instance.
+{
+    CFIndex         mechanismCount;
+    CFIndex         mechanismIndex;
+    CFIndex         insertionIndex;
+    Boolean         isHomeDirMechanism;
+    CFStringRef     mechanism;
+
+    assert(mechanisms != NULL);
+    assert(mechanismStr != NULL);
+
+    mechanismCount = CFArrayGetCount(mechanisms);
+    insertionIndex = mechanismCount; // add after last entry by default
+    for (mechanismIndex = 0; mechanismIndex &lt; mechanismCount; mechanismIndex++) {
+        mechanism = CFArrayGetValueAtIndex(mechanisms, mechanismIndex);
+        isHomeDirMechanism = (
+               (mechanism != NULL) 
+            &amp;&amp; (CFGetTypeID(mechanism) == CFStringGetTypeID()) 
+            &amp;&amp; CFStringHasPrefix(mechanism, CFSTR("HomeDirMechanism:"))
+        );
+        if (isHomeDirMechanism) {
+            if (beforeHomeDirMechanism) {
+                insertionIndex = mechanismIndex;
+                break;
+            } else {
+                insertionIndex = mechanismIndex + 1;
+            }
+        }
+    }
+    CFArrayInsertValueAtIndex(mechanisms, insertionIndex, mechanismStr);
+}
+
+static OSStatus AddMechanismToConsoleLoginRight(
+    AuthorizationRef    authRef,
+    CFStringRef         authPluginName,
+    CFStringRef         mechanismID,
+    Boolean             privileged,
+    Boolean             beforeHomeDirMechanism
+)
+    // Adds the mechanism specified authPluginName and mechanismID to the 
+    // "mechanisms" array of the "system.login.console" right definition. 
+    // If privileged is true, the mechanism runs as root. If 
+    // beforeHomeDirMechanism is true, mechanismStr is added immediately 
+    // before the first instance of "HomeDirMechanism"; otherwise it is added 
+    // after the last instance.
+{
+    OSStatus                err;
+    CFStringRef             mechanismStr;
+    CFDictionaryRef         rightDict;
+    CFStringRef             authClass;
+    CFArrayRef              authMechanisms;
+    CFMutableArrayRef       newMechanisms;
+    CFMutableDictionaryRef  newRightDict;
+    static const char *     kConsoleLoginRightName = "system.login.console";
+
+    assert(authRef != NULL);
+    assert(authPluginName != NULL);
+    assert(mechanismID != NULL);
+
+    mechanismStr = NULL;
+    rightDict = NULL;
+    newRightDict = NULL;
+    newMechanisms = NULL;
+
+    // Construct a correctly formatted mechanism string.
+
+    err = noErr;
+    mechanismStr = CFStringCreateWithFormat(
+        NULL, 
+        NULL, 
+        CFSTR("%@:%@%@"), 
+        authPluginName, 
+        mechanismID, 
+        (privileged ? CFSTR(",privileged") : CFSTR(""))
+    );
+    if (mechanismStr == NULL) {
+        err = coreFoundationUnknownErr;
+    }
+
+    // Get the right definition and check the class is "evaluate-mechanisms".
+
+    if (err == noErr) {
+        err = AuthorizationRightGet(kConsoleLoginRightName, &amp;rightDict);
+    }
+    if (err == noErr) {
+        authClass = (CFStringRef) CFDictionaryGetValue(rightDict, CFSTR("class"));
+        if ( (authClass == NULL) 
+          || (CFGetTypeID(authClass) != CFStringGetTypeID()) ) {
+            err = coreFoundationUnknownErr;
+        } else if ( ! CFEqual(authClass, CFSTR("evaluate-mechanisms")) ) {
+            err = errAuthorizationInternal;
+        }
+    }
+
+    // Get the mechanisms array and check whether our mechanism is already present.
+
+    if (err == noErr) {
+        authMechanisms = (CFArrayRef) CFDictionaryGetValue(
+            rightDict, 
+            CFSTR("mechanisms")
+        );
+        if ( (authMechanisms == NULL) 
+          || (CFGetTypeID(authMechanisms) != CFArrayGetTypeID()) ) {
+            err = coreFoundationUnknownErr;
+        }
+    }
+    if ( (err == noErr) 
+      &amp;&amp; ! CFArrayContainsValue(
+               authMechanisms, 
+               CFRangeMake(0, CFArrayGetCount(authMechanisms)), 
+               mechanismStr
+           ) ) {
+
+        // If it's not, add our mechanism and write back the right definition.
+
+        newMechanisms = CFArrayCreateMutableCopy(NULL, 0, authMechanisms);
+        if (newMechanisms == NULL) {
+            err = coreFoundationUnknownErr;
+        }
+        if (err == noErr) {
+            InsertMechanismRelativeToHomeDirMechanism(
+                newMechanisms, 
+                mechanismStr, 
+                beforeHomeDirMechanism
+            );
+
+            newRightDict = CFDictionaryCreateMutableCopy(NULL, 0, rightDict);
+            if (newRightDict == NULL) {
+                err = coreFoundationUnknownErr;
+            }
+            if (err == noErr) {
+                CFDictionarySetValue(
+                    newRightDict, 
+                    CFSTR("mechanisms"), 
+                    newMechanisms
+                );
+
+                err = AuthorizationRightSet(
+                    authRef, 
+                    kConsoleLoginRightName, 
+                    newRightDict, 
+                    NULL, 
+                    NULL, 
+                    NULL
+                );
+            }
+        }
+    }
+
+    // Clean up.
+
+    if (newRightDict != NULL) {
+        CFRelease(newRightDict);
+    }
+    if (newMechanisms != NULL) {
+        CFRelease(newMechanisms);
+    }
+    if (rightDict != NULL) {
+        CFRelease(rightDict);
+    }
+    if (mechanismStr != NULL) {
+        CFRelease(mechanismStr);
+    }
+
+    return err;
+}</pre>
+<p>You do not need to restart the system for it to recognize the new authorization plug-in or your changes to the authorization database.</p>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="SECCONTEXTISSUES"></a><h3>Context Issues</h3>
+<p>Authorization mechanisms run in a very unusual context, the specific values of which depend on whether you install your mechanisms as privileged or not. <a href="#TABCONTEXT">Table 1</a> is a brief summary of the context inherited by each type of authorization mechanism.</p>
+<div class="notebox"><p><strong>Note: </strong>For more information about the context issues covered by this table, see <a href="/technotes/tn2005/tn2083.html">Technical Note TN2083, 'Daemons and Agents'</a>.</p></div>
+<a name="TABCONTEXT"></a><p class="smalltext"><strong>Table 1 : </strong>Authorization mechanism context</p>
+<table cellspacing="0" class="graybox">
+<tr>
+<th><strong>Privileged</strong></th>
+<th><strong>UI OK?</strong></th>
+<th>
+<strong>EUID / RUID</strong> [1]</th>
+<th><strong>Bootstrap Namespace</strong></th>
+<th>
+<strong>Process</strong> [2]</th>
+</tr>
+<tr>
+<td scope="row">yes</td>
+<td>no</td>
+<td>0 / 0</td>
+<td>see below [3]</td>
+<td><code>authorizationhost</code></td>
+</tr>
+<tr>
+<td scope="row">no</td>
+<td>yes</td>
+<td>92 / 92</td>
+<td>see below [3]</td>
+<td><code>SecurityAgent</code></td>
+</tr>
+</table>
+<p><strong>Notes:</strong></p>
+<ol>
+<li><p>Effective user ID and real user ID, respectively.</p></li>
+<li><p>This information is provided for debugging purposes only. The actual process used to run authorization mechanisms should not be considered part of the authorization plug-in API.</p></li>
+<li><p>Authorization mechanisms have to be very careful when dealing with Mach bootstrap namespaces. This is discussed in more detail in <a href="#SECBOOTSTRAPNAMESPACE">Mach Bootstrap Namespace Issues</a>.</p></li>
+<li><p>UID 92 is <code>_securityagent</code>. It is a special user ID used to run the <code>SecurityAgent</code> process, and thus the login window user interface.</p></li>
+</ol>
+<p>In many cases it may be necessary for your plug-in to implement a pair of cooperating authorization mechanisms, one that runs privileged and one that runs non-privileged. For example, if you're writing an authorization plug-in that completely resets the user's home directory on login, you may need two mechanisms:</p>
+<ul>
+<li><p>A privileged mechanism to actually modify the user's home directory.</p></li>
+<li><p>A non-privileged mechanism to display progress information.</p></li>
+</ul>
+<p>This is because a privileged mechanism can't display UI and a non-privileged mechanism runs as UID 92, and thus can't modify the user's home directory.</p>
+<p>If you need to create two or more authorization mechanisms, you can use <a href="#SECAUTHENV">authorization auxiliary information</a> to communicate between them, as described in the next section.</p>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="SECAUTHENV"></a><h3>Authorization Auxiliary Information</h3>
+<p>Authorization Services maintains two dictionaries of <strong>auxiliary information</strong> that it passes from one plug-in to the next. These are the <strong>context</strong> and the <strong>hints</strong> discussed in detail in the <a href="http://developer.apple.com/documentation/Security/Reference/AuthorizationPluginRef/Reference/reference.html">Authorization Plug-in Reference</a>.</p>
+<p>There are two common uses for this auxiliary information:</p>
+<ol>
+<li><p>If you've created two cooperating mechanisms, you can pass information between them by way of the authorization hints. That is, the first mechanism that runs can deposit information in the hints to be picked up by the second mechanism.</p></li>
+<li><p>If you need information about the user that is currently logging in, you can get it from the authorization context.</p></li>
+</ol>
+<p>As an example of point 2, if you're developing an authorization plug-in that resets the user's preferences, you will need to know the user ID of the user who is logging in (so you can <a href="#SECBENICETOHOST">switch to that user</a> when writing to the file system) and the path to their home directory. You can get these from the "uid" and "home" context values, respectively. <a href="#LISTCONTEXTVALUE">Listing 4</a> shows how you can get the "uid" value from the authorization context.</p>
+<a name="LISTCONTEXTVALUE"></a><p class="caption"><strong>Listing 4: </strong>Accessing the 'uid' context value</p>
+<pre class="sourcecodebox">static uid_t GetUIDFromContext(
+    const AuthorizationCallbacks *  authServerFuncs, 
+    AuthorizationEngineRef          engine
+)
+    // Returns the "uid" value from the authorization context, or 
+    // -2 (nobody) if the value is not present or can't be fetched. 
+    // authServerFuncs is the value passed to your plug-in's 
+    // AuthorizationPluginCreate routine. engine is the value 
+    // passed to your MechanismCreate routine.
+{
+    OSStatus                    err;
+    uid_t                       result;
+    AuthorizationContextFlags   junkFlags;
+    const AuthorizationValue *  value;
+
+    assert(authServerFuncs != NULL);
+    assert(engine != NULL);
+
+    result = (uid_t) -2;
+    err = authServerFuncs-&gt;GetContextValue(engine, "uid", &amp;junkFlags, &amp;value);
+    if ( (err == noErr) &amp;&amp; (value-&gt;length == sizeof(uid_t)) ) {
+        result = * (const uid_t *) value-&gt;data;
+    } else {
+        // [... log the failure ...]
+    }
+
+    return result;
+}</pre>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="SECDANGERWILLROBINSON"></a><h2>Danger Will Robinson</h2>
+<p>The following sections describe a number of non-obvious pitfalls associated with creating an authorization plug-in.</p>
+<a name="SECHOMEDIRECTORY"></a><h3>Allowing Home Directory Access</h3>
+<p>If you're writing an authorization mechanism that wants to access the user's home directory, you must consider file system permissions. Specifically, non-privileged authorization mechanisms run as effective user ID (EUID) 92 (<code>_securityagent</code>). Standard permissions checking will typically prevent them from accessing the user's home directory.</p>
+<p>On the other hand privileged authorization mechanisms run as EUID 0 (<code>root</code>). Thus, you might think that such mechanisms can always access the user's home directory (assuming they run after <code>HomeDirMechanism</code>), however, that's not the case. Most network file systems treat root accesses as if they were accesses by the user <code>nobody</code>. Thus, if the user has a network home directory, a privileged authorization mechanism will have to set its EUID to that of the user logging in before being able to access the user's home directory.</p>
+<p>You can get the user ID of the user logging in from the authorization context (see <a href="#SECAUTHENV">Authorization Auxiliary Information</a>). You can change the EUID using <code>pthread_setugid_np</code> as discussed in <a href="#SECBENICETOHOST">Be Nice To Your Host</a>.</p>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="SECNOHOMEDIRECTORY"></a><h3>Preventing Home Directory Access</h3>
+<p>If you're writing an authorization mechanism that runs before <code>HomeDirMechanism</code> (that is, before the user's home directory is guaranteed to be mounted), you must be careful not to try and access their home directory. This can be tricky, especially in situations where you have to switch the EUID to the UID of the logging in user, because some common frameworks access the home directory in non-obvious ways.</p>
+<p>The framework that causes most problems in this respect is Core Foundation. Core Foundation tries to access the user's home directory to determine their default text encoding (stored in the file <code>~/.CFUserTextEncoding</code>). If you switch the EUID to the UID of the logging in user and then call CF, you may have problems when Core Foundation accesses this file. You can prevent this access by setting an environment variable that tells Core Foundation the default text encoding to use. The environment variable name is <code>__CF_USER_TEXT_ENCODING</code>. Its value should be constructed with the format string "0x%X:0:0", where %X is replaced by the UID of the logging in user.</p>
+<div class="notebox">
+<p><strong>IMPORTANT: </strong>Setting <code>__CF_USER_TEXT_ENCODING</code> may be necessary but not sufficient to ensure that your code runs correctly in this context. Mac OS X's many and various frameworks are littered with references to the user's home directory, and there's no list of what routines are safe to call in this context. Ultimately you will just have to try things and see what works.</p>
+<p>To maximize your chance of ongoing binary compatibility, you should try to limit yourself to low-level frameworks. Specifically, frameworks that are daemon-safe should be more-or-less safe in the context. On the other hand frameworks that are not daemon-safe are almost certainly going to cause problems.</p>
+<p>See <a href="/technotes/tn2005/tn2083.html">Technical Note TN2083, 'Daemons and Agents'</a> for a list of daemon-safe frameworks.</p>
+</div>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="SECBOOTSTRAPNAMESPACE"></a><h3>Mach Bootstrap Namespace Issues</h3>
+<p>Your authorization mechanism inherits a very unusual Mach bootstrap namespace. The namespace is ultimately destined to become the GUI per-session bootstrap namespace for the user logging in. However, while the login is in progress, the availability of Mach-based services can vary in non-obvious ways.</p>
+<div class="notebox"><p><strong>WARNING: </strong>Your authorization plug-in must not register services in its bootstrap namespace, nor hold a reference to the namespace that persists beyond the execution of your authorization mechanisms. Both of these activities will yield unspecified results.</p></div>
+<div class="notebox"><p><strong>Note: </strong>For detailed information about Mach bootstrap namespaces, see <a href="/technotes/tn2005/tn2083.html">Technical Note TN2083, 'Daemons and Agents'</a>.</p></div>
+<p><a href="#TABMACHSERVICEACCESS">Table 2</a> shows how you can access Mach services registered in specific namespaces on Mac OS X 10.5 and later.</p>
+<a name="TABMACHSERVICEACCESS"></a><p class="smalltext"><strong>Table 2 : </strong>Accessing Mach services from an authorization mechanism on Mac OS X 10.5</p>
+<table cellspacing="0" class="graybox">
+<tr>
+<th><strong>Mach Bootstrap Namespace</strong></th>
+<th><strong>How To Access</strong></th>
+</tr>
+<tr>
+<td scope="row">global</td>
+<td>always accessible</td>
+</tr>
+<tr>
+<td scope="row">per-user</td>
+<td>see [1] below</td>
+</tr>
+<tr>
+<td scope="row">pre-login</td>
+<td>always accessible</td>
+</tr>
+<tr>
+<td scope="row">GUI per-session</td>
+<td>never accessible</td>
+</tr>
+<tr>
+<td scope="row">non-GUI per-session</td>
+<td>never accessible</td>
+</tr>
+</table>
+<p><strong>Notes:</strong></p>
+<ol><li>
+<p>To access per-user services (like the Kerberos credentials cache, <code>edu.mit.Kerberos.CCacheServer</code>) you must switch your EUID to that of the UID of the logging in user. This has a number of important consequences.</p>
+<ul>
+<li><p>Your mechanism must run <a href="#SECCONTEXTISSUES">privileged</a>, otherwise it will run as EUID 92 (<code>_securityagent</code>) and be unable to switch its EUID.</p></li>
+<li><p>Your mechanism must run after the "uid" context value has been set up (see <a href="#SECAUTHENV">Authorization Auxiliary Information</a>). On current systems this means it must run after the <code>builtin:authenticate,privileged</code> mechanism. This won't be a problem if you run immediately before or immediately after <code>HomeDirMechanism</code>.</p></li>
+</ul>
+</li></ol>
+<p><a href="#TABMACHSERVICEACCESS104">Table 3</a> shows the same information for Mac OS X 10.4.x.</p>
+<a name="TABMACHSERVICEACCESS104"></a><p class="smalltext"><strong>Table 3 : </strong>Accessing Mach services from an authorization mechanism on Mac OS X 10.4.x</p>
+<table cellspacing="0" class="graybox">
+<tr>
+<th><strong>Mach Bootstrap Namespace [1]</strong></th>
+<th><strong>How To Access</strong></th>
+</tr>
+<tr>
+<td scope="row">global</td>
+<td>always accessible</td>
+</tr>
+<tr>
+<td scope="row">pre-login / GUI per-session</td>
+<td>see [2] below</td>
+</tr>
+<tr>
+<td scope="row">non-GUI per-session</td>
+<td>never accessible</td>
+</tr>
+</table>
+<p><strong>Notes:</strong></p>
+<ol>
+<li><p>Mac OS X 10.4.x does not support per-user or non-GUI per-session namespaces.</p></li>
+<li><p>On Mac OS X 10.4.x there is no clear transition between the pre-login context and the GUI per-session context. Your authorization mechanism inherits a reference to a namespace that is initially the pre-login namespace and then, once login is complete, becomes the GUI per-session namespace. However, most GUI per-session services are not registered until after authorization is complete (and thus, aren't available to your mechanism).</p></li>
+</ol>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="SECBENICETOHOST"></a><h3>Be Nice To Your Host</h3>
+<p>Your authorization plug-in is loaded and executed within a system process (see <a href="#SECCONTEXTISSUES">Context Issues</a> for the details). You should attempt to be as nice to your host process as possible. Specifically:</p>
+<ul>
+<li><p>Try to avoid changing process-wide values. For example, if you change the current working directory you could cause problems for other threads running within the same process. If there is a per-thread alternative available, use it!</p></li>
+<li><p>As a corollary to above, try to avoid relying on any process-wide values.</p></li>
+<li><p>If you must change a process-wide value, change it back when you're done. Also try to limit the amount of code that executes while the value is changed.</p></li>
+<li><p>Do not use excessive resources. For example, don't allocate so much memory that the host process runs out of virtual address space.</p></li>
+<li><p>If your plug-in uses Objective-C, add a prefix to your class names to avoid conflicts with classes used by the host process (and by other plug-ins). <a href="http://developer.apple.com/documentation/Cocoa/Conceptual/CodingGuidelines/index.html">Coding Guidelines for Cocoa</a> has some useful advice on this topic.</p></li>
+</ul>
+<p>One process-wide value that deserves special attention is the effective user ID (EUID). There are circumstances where your authorization plug-in should switch the EUID to that of the user logging in. In these circumstances you should avoid using <code>seteuid</code>, because it modifies the EUID for the entire process. Rather, you should use the per-thread alternative, <code>pthread_setugid_np</code>; <a href="#LISTPERTHREADEUID">Listing 5</a> shows an example of how to use this routine.</p>
+<a name="LISTPERTHREADEUID"></a><p class="caption"><strong>Listing 5: </strong>Creating a file as a specific user</p>
+<pre class="sourcecodebox">#include &lt;assert.h&gt;
+#include &lt;errno.h&gt;
+#include &lt;fcntl.h&gt;
+#include &lt;pthread.h&gt;
+#include &lt;unistd.h&gt;
+#include &lt;sys/stat.h&gt;
+#include &lt;sys/kauth.h&gt;
+
+static int CreateFileAsUserGroup(const char *path, uid_t uid, gid_t gid)
+    // Creates a file and returns the file descriptor. On error, returns 
+    // -1 and errno is set to an error value.
+{
+    int     err;
+    int     fd;
+    int     junk;
+
+    fd = -1;
+
+    err = pthread_setugid_np(uid, gid);
+    if (err == 0) {
+        fd = open(path, O_CREAT | O_EXCL | O_RDWR, S_IRWXU);
+
+        err = errno; // preserve errno across the pthread_setugid_np
+        junk = pthread_setugid_np(KAUTH_UID_NONE, KAUTH_GID_NONE);
+        assert(junk == 0);
+        errno = err;
+    }
+    return fd;
+}</pre>
+<div class="notebox"><p><strong>Note: </strong>While <code>pthread_setugid_np</code> is not currently documented 
+			(r. <a href="rdar://problem/4738641">4738641</a>)
+		 it is fully supported on all systems that support authorization plug-ins.</p></div>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="SECHOSTDEATH"></a><h3>Host Death Issues</h3>
+<p>The system process that hosts your authorization plug-in will typically terminate at the end of the login process, which means that your authorization plug-in will not continue to execute during the login session. If you wish to maintain a presence during the login session, you should use some other mechanism (typically a GUI launchd agent or a global login item).</p>
+<div class="notebox"><p><strong>WARNING: </strong>Do not attempt to maintain a presence during the login session by forking from within your authorization plug-in. The resulting process will inherit an unusual execution context which is likely to lead to long-term binary compatibility problems.</p></div>
+<p>For more information about launchd agents and login items, see <a href="/technotes/tn2005/tn2083.html">Technical Note TN2083, 'Daemons and Agents'</a></p>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="SECFURTHERREADING"></a><h2>Further Reading</h2>
+<ul>
+<li><p><a href="http://developer.apple.com/referencelibrary/Security/idxAuthorization-date.html">ADC Reference Library &gt; Security &gt; Authorization</a></p></li>
+<li><p><a href="http://developer.apple.com/documentation/Security/Conceptual/authorization_concepts/01introduction/chapter_1_section_1.html">Performing Privileged Operations With Authorization Services</a></p></li>
+<li><p><a href="http://developer.apple.com/documentation/Security/Reference/AuthorizationPluginRef/Reference/reference.html">Authorization Plug-in Reference</a></p></li>
+<li><p><a href="http://developer.apple.com/documentation/Security/Conceptual/SecureCodingGuide/index.html%20">Secure Coding Guide</a></p></li>
+<li><p><a href="http://developer.apple.com/documentation/MacOSX/Conceptual/BPSystemStartup/Articles/CustomLogin.html#//apple_ref/doc/uid/20002134">System Startup Programming Topics</a></p></li>
+<li><p><a href="http://developer.apple.com/documentation/Cocoa/Conceptual/CodingGuidelines/index.html">Coding Guidelines for Cocoa</a></p></li>
+<li><p><a href="/technotes/tn2005/tn2083.html">Technical Note TN2083, 'Daemons and Agents'</a></p></li>
+<li><p><a href="/technotes/tn2008/tn2108.html">Technical Note TN2108, 'Debugging An Authorization Plug-In With Xcode'</a></p></li>
+<li><p><a href="/samplecode/NullAuthPlugin/index.html">Sample Code 'NullAuthPlugin'</a></p></li>
+<li><p><a href="/samplecode/NameAndPassword/index.html">Sample Code 'NameAndPassword'</a></p></li>
+<li><p><a href="/samplecode/PreLoginAgents/index.html">Sample Code 'PreLoginAgents'</a></p></li>
+<li><p><a href="/samplecode/SampleD/index.html">Sample Code 'SampleD'</a></p></li>
+<li><p><a href="x-man-page://2/seteuid">seteuid</a> man page</p></li>
+<li><p><a href="&lt;x-man-page://3/asl&gt;">ASL</a> man page</p></li>
+<li><p><a href="x-man-page://3/syslog">syslog</a> man page</p></li>
+<li><p><a href="http://support.apple.com/kb/HT1492">How to start up in single-user or verbose mode</a></p></li>
+</ul>
+<a name="document_revision_summary"></a><h2>Document Revision History</h2>
+<table cellspacing="0" class="graybox" width="680">
+<tr>
+<th width="100">Date</th>
+<th width="580">Notes</th>
+</tr>
+<tr>
+<td scope="row">2008-09-16</td>
+<td>First Version</td>
+</tr>
+</table>
+<p><b>Posted: </b>2008-09-16</p>
+<!-- END CONTENTS -->
+</td></tr></table>
+<!-- END WIDE COLUMN --><!-- END MAIN CONTENT --><!-- START BOTTOM APPLE NAVIGATION -->	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/technotes/tn2008/tn2228.html%3Fid%3DDTS40007991-1.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/technotes/tn2008/tn2228.html%3Fid%3DDTS40007991-1.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/technotes/tn2008/tn2228.html%3Fid%3DDTS40007991-1.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+<!--#include virtual="/includes/footer" --><!-- END BOTTOM APPLE NAVIGATION --><!-- START CENTER CLOSE -->
+</center>
+<!-- END CENTER CLOSE -->
+</body>
+</html>

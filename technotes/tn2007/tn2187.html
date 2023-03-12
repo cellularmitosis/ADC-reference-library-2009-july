@@ -1,0 +1,1078 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/1999/REC-html401-19991224/loose.dtd">
+<html><head>
+<!-- BEGIN META TAG INFO -->
+<link rel="home" href="http://developer.apple.com/">
+<link rel="find" href="http://developer.apple.com/search/">
+<link rel="stylesheet" type="text/css" href="../../documentation/css/adcstyle.css" title="fonts">
+<script language="JavaScript" type="text/javascript" src="../../documentation/js/busnav.js"></script>
+<script language="JavaScript" src="../../documentation/js/adc.js" type="text/javascript"></script>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<!-- END META TAG INFO -->
+<!-- BEGIN TITLE -->
+<title>Technical Note TN2187: New HID Manager APIs for Mac OS X version 10.5</title>
+<!-- END TITLE -->
+</head>
+<!-- BEGIN BODY OPEN -->
+<body bgcolor="#ffffff"><a name="//apple_ref/doc/uid/DTS10004224" title="New HID Manager APIs for Mac OS X version 10.5"></a>
+<!--END BODY OPEN -->
+<!-- START CENTER OPEN -->
+<center>
+<!-- END CENTER OPEN -->
+<a name="top"></a>
+<!-- BEGIN LOGO AND SEARCH -->
+<!--#include virtual="/includes/adcnavbar"-->
+<!-- END LOGO AND SEARCH -->
+<!-- START BREADCRUMB -->
+<div id="breadcrumb"><table width="680" border="0" cellpadding="0" cellspacing="0"><tr>
+<td scope="row"><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+<td><img width="340" height="10" src="images/1dot.gif" alt=""></td></tr><tr valign="middle"><td align="left" colspan="2">
+<a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../technicalnotes/index.html">Technical Notes</a> &gt; <a href="../../technicalnotes/Games/index.html">Games</a> &gt; <a href="../../technicalnotes/Games/idxHumanInterfaceDeviceForceFeedback-date.html">Human Interface Device & Force Feedback</a> &gt; 
+</td></tr><tr><td colspan="2" scope="row"><img width="680" height="35" src="images/1dot.gif" alt=""></td></tr></table></div>
+<!-- END BREADCRUMB -->
+
+<!-- START MAIN CONTENT -->
+<!-- START TITLE GRAPHIC AND INTRO-->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top">
+<td><h1>
+<div id="pagehead">Technical Note TN2187</div>
+<div id="pageheadsub">New HID Manager APIs for Mac OS X version 10.5</div>
+</h1></td></tr></table>
+<!-- END TITLE GRAPHIC AND INTRO -->
+<!-- BEGIN WIDE COLUMN -->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td align="left" width="680">
+<!-- BEGIN CONTENTS -->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td><p>Mac OS X version 10.5 (&quot;Leopard&quot;) introduces new APIs that abstract the current complexities of utilizing the I/O Kit to communicate with the HID Manager. New procedural APIs are provided to enumerate HID devices and elements, access their properties, register for notifications of HID device discovery and removal (hot plugging and unplugging), send and receive device reports, use queues to get notifications of HID element value changes and use transactions to talk to HID devices. Application developers that need to communicate with HID devices should read this document.</p><p>This documentation assumes a basic understanding of the material contained in <A HREF="../../documentation/DeviceDrivers/Conceptual/AccessingHardware/index.html">Accessing Hardware From Applications</A>. For definitions of I/O Kit terms used in this documentation (such as matching dictionaries) see the overview of I/O Kit terms and concepts in the <A HREF="../../documentation/DeviceDrivers/Conceptual/AccessingHardware/AH_Device_Access_IOKit/chapter_3_section_1.html#//apple_ref/doc/uid/TP30000378-BAJDAJDJ">Device Access and the I/O Kit</A> chapter.  A detailed description of the HID class specification is beyond the scope of this document. For more information, including the complete listing of HID usage tables, visit the USB website at <A HREF="http://www.usb.org/developers/hidpage/">http://www.usb.org/developers/hidpage/</A>.</p><div class="notebox"><p><strong>Note:</strong> For binary compatibility, HID code written for Mac OS X version 10.4 (&quot;Tiger&quot;) will continue to work for the lifetime of Mac OS X version 10.5 (&quot;Leopard&quot;). New development targeting Leopard should use the new HID Manager APIs.</p></div></td></tr><tr><td scope="row"><img width="680" height="10" src="images/1dot.gif" alt=""><br><img height="1" width="680" src="images/1dot_919699.gif" alt=""><br><img width="680" height="20" src="images/1dot.gif" alt=""></td></tr></table><table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td width="680"><ul><li><a href="#TNTAG1000">HID Manager Functions</a></li><li><a href="#TNTAG2000">HID Device Functions</a></li><li><a href="#TNTAG3000">HID Element Functions</a></li><li><a href="#TNTAG4000">HID Queue Functions</a></li><li><a href="#TNTAG5000">HID Transaction Functions</a></li><li><a href="#TNTAG6000">HID Value Functions</a></li><li><a href="#TNT_HISTORY_TAG">Document Revision History</a></li></ul></td></tr><tr><td colspan="3" scope="row"><img width="680" height="10" src="images/1dot.gif" alt=""><br><img height="1" width="680" src="images/1dot_919699.gif" alt=""><br><img width="680" height="20" src="images/1dot.gif" alt=""></td></tr></table><A NAME="TNTAG1000"></A><H2>HID Manager Functions</H2><p>HID Manager references are used to communicate with the IOHID subsystem. They are created by using the IOHIDManagerCreate function:</p><pre class="sourcecodebox">
+// Create HID Manager reference
+IOHIDManagerRef IOHIDManagerCreate(
+                    CFAllocatorRef  inCFAllocatorRef,   // Allocator to be used during creation
+                    IOOptionBits    inOptions );         // options Reserved for future use
+</pre><p>The first parameter ( allocator ) is a CFAllocator to be used when allocating the returned IOHIDManagerRef. The last parameter ( options ) is currently reserved for future use. Developers should pass kIOHIDOptionsTypeNone ( zero ) for this parameter.</p><p>There is no IOHIDManagerDestroy ( or release, free, etc. ); but since the HID Manager reference is a Core Foundation object reference then CFRelease should be used to dispose of it.</p><p>A CFTypeRef can be verified to be a HID Manager reference by comparing its Core Foundation type against IOHIDManagerGetTypeID:</p><p class="smalltext"><strong>Listing 1:</strong> Validating a HID Manager reference</p><pre class="sourcecodebox">
+    if ( CFGetTypeID( tCFTypeRef ) == IOHIDManagerGetTypeID( ) ) {
+        // this is a HID Manager reference!
+    }
+</pre><p>Once a HID Manager reference has been created, it has to be opened before it can be used to access the HID devices associated with it. To restrict the HID devices with which a HID Manager reference is associated set a matching dictionary ( single criteria ) or array ( multiple criteria ) of matching dictionaries. The functions are:</p><pre class="sourcecodebox">
+// Sets single matching criteria ( dictionary ) for device enumeration.
+void IOHIDManagerSetDeviceMatching(
+        IOHIDManagerRef inIOHIDManagerRef,  // HID Manager reference
+        CFDictionaryRef inMatchingDictRef ); // single dictionary containing device matching criteria.
+
+// Sets multiple matching criteria ( array of dictionaries ) for device enumeration.
+void IOHIDManagerSetDeviceMatchingMultiple(
+        IOHIDManagerRef inIOHIDManagerRef,    // HID Manager reference
+        CFArrayRef      inCFArrayRef );        // array of dictionaries containing device matching criteria.
+</pre><div class="notebox"><p><strong>Note:</strong> Ether one of the above APIs must be called before any devices will be matched.</p></div><p>The matching keys used in the dictionary entries are declared in &lt;IOKit/hid/IOHIDKeys.h&gt;:</p><A NAME="TNTAG1020"></A><p class="smalltext"><strong>Listing 2:</strong> HID device property keys</p><pre class="sourcecodebox">
+#include &lt;IOKit/hid/IOHIDKeys.h&gt;
+
+#define kIOHIDTransportKey                  &quot;Transport&quot;
+#define kIOHIDVendorIDKey                   &quot;VendorID&quot;
+#define kIOHIDVendorIDSourceKey             &quot;VendorIDSource&quot;
+#define kIOHIDProductIDKey                  &quot;ProductID&quot;
+#define kIOHIDVersionNumberKey              &quot;VersionNumber&quot;
+#define kIOHIDManufacturerKey               &quot;Manufacturer&quot;
+#define kIOHIDProductKey                    &quot;Product&quot;
+#define kIOHIDSerialNumberKey               &quot;SerialNumber&quot;
+#define kIOHIDCountryCodeKey                &quot;CountryCode&quot;
+#define kIOHIDLocationIDKey                 &quot;LocationID&quot;
+#define kIOHIDDeviceUsageKey                &quot;DeviceUsage&quot;
+#define kIOHIDDeviceUsagePageKey            &quot;DeviceUsagePage&quot;
+#define kIOHIDDeviceUsagePairsKey           &quot;DeviceUsagePairs&quot;
+#define kIOHIDPrimaryUsageKey               &quot;PrimaryUsage&quot;
+#define kIOHIDPrimaryUsagePageKey           &quot;PrimaryUsagePage&quot;
+#define kIOHIDMaxInputReportSizeKey         &quot;MaxInputReportSize&quot;
+#define kIOHIDMaxOutputReportSizeKey        &quot;MaxOutputReportSize&quot;
+#define kIOHIDMaxFeatureReportSizeKey       &quot;MaxFeatureReportSize&quot;
+#define kIOHIDReportIntervalKey             &quot;ReportInterval&quot;
+</pre><div class="notebox"><p><strong>Note:</strong> kIOHIDPrimaryUsageKey and kIOHIDPrimaryUsagePageKey are no longer rich enough to describe a HID device's capabilities.  For example, take a HID device that describes both a keyboard and a mouse in the same descriptor.  The previous behavior was to only describe the keyboard behavior with the primary usage and usage page.   Needless to say, this would sometimes cause a program interested in mice to skip this device when matching.  To resolve this issue three additional keys have been added:</p><ul><li><p>kIOHIDDeviceUsageKey</p></li><li><p>kIOHIDDeviceUsagePageKey</p></li><li><p>kIOHIDDeviceUsagePairsKey</p></li></ul><p>kIOHIDDeviceUsagePairsKey is used to represent an array of dictionaries containing key/value pairs referenced by kIOHIDDeviceUsageKey and kIOHIDDeviceUsagePageKey. These usage pairs describe all application type collections ( behaviors ) defined by the HID device.</p><p>An application interested in only matching on one criteria would only add the kIOHIDDeviceUsageKey and kIOHIDDeviceUsagePageKey keys to the matching dictionary. If it is interested in a HID device that has multiple behaviors, the application would instead add an array of dictionaries referenced by kIOHIDDeviceUsagePairsKey to their matching dictionary.</p><p>This is equivalent to passing an array of dictionaries each containing two entries with keys kIOHIDDeviceUsagePageKey and kIOHIDDeviceUsageKey to IOHIDManagerSetDeviceMatchingMultiple.</p></div><p>Passing a NULL dictionary will result in all devices being enumerated. Any subsequent calls will cause the HID Manager to release previously enumerated devices and restart the enumeration process using the revised criteria.</p><p class="smalltext"><strong>Listing 3:</strong> Matching against a single set ( a dictionary ) of properties</p><pre class="sourcecodebox">
+// function to create matching dictionary
+static CFMutableDictionaryRef hu_CreateDeviceMatchingDictionary( UInt32 inUsagePage, UInt32 inUsage )
+{
+    // create a dictionary to add usage page/usages to
+    CFMutableDictionaryRef result = CFDictionaryCreateMutable(
+        kCFAllocatorDefault, 0, &amp;kCFTypeDictionaryKeyCallBacks, &amp;kCFTypeDictionaryValueCallBacks );
+    if ( result ) {
+        if ( inUsagePage ) {
+            // Add key for device type to refine the matching dictionary.
+            CFNumberRef pageCFNumberRef = CFNumberCreate(
+                            kCFAllocatorDefault, kCFNumberIntType, &amp;inUsagePage );
+            if ( pageCFNumberRef ) {
+                CFDictionarySetValue( result,
+                        CFSTR( kIOHIDDeviceUsagePageKey ), pageCFNumberRef );
+                CFRelease( pageCFNumberRef );
+
+                // note: the usage is only valid if the usage page is also defined
+                if ( inUsage ) {
+                    CFNumberRef usageCFNumberRef = CFNumberCreate(
+                                    kCFAllocatorDefault, kCFNumberIntType, &amp;inUsage );
+                    if ( usageCFNumberRef ) {
+                        CFDictionarySetValue( result,
+                            CFSTR( kIOHIDDeviceUsageKey ), usageCFNumberRef );
+                        CFRelease( usageCFNumberRef );
+                    } else {
+                        fprintf( stderr, &quot;%s: CFNumberCreate( usage ) failed.&quot;, __PRETTY_FUNCTION__ );
+                    }
+                }
+            } else {
+                fprintf( stderr, &quot;%s: CFNumberCreate( usage page ) failed.&quot;, __PRETTY_FUNCTION__ );
+            }
+        }
+    } else {
+        fprintf( stderr, &quot;%s: CFDictionaryCreateMutable failed.&quot;, __PRETTY_FUNCTION__ );
+    }
+    return result;
+}   // hu_CreateDeviceMatchingDictionary
+
+// Create a matching dictionary
+CFDictionaryRef matchingCFDictRef =
+                    hu_CreateDeviceMatchingDictionary( kHIDPage_GenericDesktop, kHIDUsage_GD_Keyboard );
+if ( matchingCFDictRef ) {
+    // set the HID device matching dictionary
+    IOHIDManagerSetDeviceMatching( managerRef, matchingCFDictRef );
+} else {
+    fprintf( stderr, &quot;%s: hu_CreateDeviceMatchingDictionary failed.&quot;, __PRETTY_FUNCTION__ );
+}
+</pre><p class="smalltext"><strong>Listing 4:</strong> Matching against multiple sets ( an array of dictionaries ) of properties</p><pre class="sourcecodebox">
+// create an array of matching dictionaries
+CFArrayRef matchingCFArrayRef = CFArrayCreateMutable( kCFAllocatorDefault, 0, &amp;kCFTypeArrayCallBacks );
+if ( matchingCFArrayRef ) {
+    // create a device matching dictionary for joysticks
+    CFDictionaryRef matchingCFDictRef =
+                        hu_CreateDeviceMatchingDictionary( kHIDPage_GenericDesktop, kHIDUsage_GD_Joystick );
+    if ( matchingCFDictRef ) {
+        // add it to the matching array
+        CFArrayAppendValue( matchingCFArrayRef, matchingCFDictRef );
+        CFRelease( matchingCFDictRef ); // and release it
+    } else {
+        fprintf( stderr, &quot;%s: hu_CreateDeviceMatchingDictionary( joystick ) failed.&quot;, __PRETTY_FUNCTION__ );
+    }
+
+    // create a device matching dictionary for game pads
+    matchingCFDictRef = hu_CreateDeviceMatchingDictionary( kHIDPage_GenericDesktop, kHIDUsage_GD_GamePad );
+    if ( matchingCFDictRef ) {
+        // add it to the matching array
+        CFArrayAppendValue( matchingCFArrayRef, matchingCFDictRef );
+        CFRelease( matchingCFDictRef ); // and release it
+    } else {
+        fprintf( stderr, &quot;%s: hu_CreateDeviceMatchingDictionary( game pad ) failed.&quot;, __PRETTY_FUNCTION__ );
+    }
+} else {
+    fprintf( stderr, &quot;%s: CFArrayCreateMutable failed.&quot;, __PRETTY_FUNCTION__ );
+}
+
+-- EITHER --
+
+// create a dictionary for the kIOHIDDeviceUsagePairsKey entry
+matchingCFDictRef = CFDictionaryCreateMutable(
+    kCFAllocatorDefault, 0, &amp;kCFTypeDictionaryKeyCallBacks, &amp;kCFTypeDictionaryValueCallBacks );
+
+// add the matching array to it
+CFDictionarySetValue( matchingCFDictRef, CFSTR( kIOHIDDeviceUsagePairsKey ), matchingCFArrayRef );
+// release the matching array
+CFRelease( matchingCFArrayRef );
+
+// set the HID device matching dictionary
+IOHIDManagerSetDeviceMatching( managerRef, matchingCFDictRef );
+
+// and then release it
+CFRelease( matchingCFDictRef );
+
+-- OR --
+
+// set the HID device matching array
+IOHIDManagerSetDeviceMatchingMultiple( managerRef, matchingCFArrayRef );
+
+// and then release it
+CFRelease( matchingCFArrayRef );
+</pre><p>Before opening the HID Manager reference it may be desirable to register routines to be called when ( matching ) devices are connected or disconnected.</p><div class="notebox"><p><strong>Note:</strong> This matching routine will be called once for each currently connected ( and matching ) device when the HID Manager reference is opened.</p></div><pre class="sourcecodebox">
+// Register device matching callback routine
+// This routine will be called when a new ( matching ) device is connected.
+void IOHIDManagerRegisterDeviceMatchingCallback(
+        IOHIDManagerRef     inIOHIDManagerRef,      // HID Manager reference
+        IOHIDDeviceCallback inIOHIDDeviceCallback,  // Pointer to the callback routine
+        void *              inContext );            // Pointer to be passed to the callback
+
+// Registers a routine to be called when any currently enumerated device is removed.
+// This routine will be called when a ( matching ) device is disconnected.
+void IOHIDManagerRegisterDeviceRemovalCallback(
+        IOHIDManagerRef     inIOHIDManagerRef,      // HID Manager reference
+        IOHIDDeviceCallback inIOHIDDeviceCallback,  // Pointer to the callback routine
+        void *              inContext );            // Pointer to be passed to the callback
+</pre><div class="notebox"><p><strong>Note:</strong> There is no function to unregister IOHID callback routines. They are unregistered by calling the register function and passing NULL for the pointer to the callback routine.</p></div><div class="notebox"><p><strong>Note:</strong> All IOHID register callback routines include a context pointer that will be passed to it when it's called. These parameters are intended for developers use and are passed as-is to the callback routines.</p></div><p class="smalltext"><strong>Listing 5:</strong> Examples of HID device matching &amp; removal callback routines</p><pre class="sourcecodebox">
+// this will be called when the HID Manager matches a new ( hot plugged ) HID device
+static void Handle_DeviceMatchingCallback(
+            void *          inContext,       // context from IOHIDManagerRegisterDeviceMatchingCallback
+            IOReturn        inResult,        // the result of the matching operation
+            void *          inSender,        // the IOHIDManagerRef for the new device
+            IOHIDDeviceRef  inIOHIDDeviceRef // the new HID device
+ ) {
+    printf( &quot;%s( context: %p, result: %p, sender: %p, device: %p ).\n&quot;,
+        __PRETTY_FUNCTION__, inContext, ( void * ) inResult, inSender, ( void* ) inIOHIDDeviceRef );
+}   // Handle_DeviceMatchingCallback
+
+// this will be called when a HID device is removed ( unplugged )
+static void Handle_RemovalCallback(
+                void *         inContext,       // context from IOHIDManagerRegisterDeviceMatchingCallback
+                IOReturn       inResult,        // the result of the removing operation
+                void *         inSender,        // the IOHIDManagerRef for the device being removed
+                IOHIDDeviceRef inIOHIDDeviceRef // the removed HID device
+ ) {
+    printf( &quot;%s( context: %p, result: %p, sender: %p, device: %p ).\n&quot;,
+        __PRETTY_FUNCTION__, inContext, ( void * ) inResult, inSender, ( void* ) inIOHIDDeviceRef );
+}   // Handle_RemovalCallback
+</pre><div class="notebox"><p><strong>Note:</strong> For all callback routines that include an inResult parameter&mdash;this is the error result of the operation that is calling the callback. It should be checked for non-zero to determine the success or failure of the operation.</p></div><p>Before HID Manager callback routines can be dispatched the HID Manager reference must first be scheduled with a run loop:</p><pre class="sourcecodebox">
+// Schedule HID Manager with run loop
+void IOHIDManagerScheduleWithRunLoop(
+        IOHIDManagerRef inIOHIDManagerRef,  // HID Manager reference
+        CFRunLoopRef    inRunLoop,          // Run loop to be used when scheduling asynchronous activity
+        CFStringRef     inRunLoopMode );    // Run loop mode to be used when scheduling
+</pre><p>This formally associates the HID Manager with the client's run loop. This schedule will propagate to all HID devices that are currently enumerated and to new HID devices as they are matched by the HID Manager.</p><A NAME="TNTAG1060"></A><p class="smalltext"><strong>Listing 6:</strong> Scheduling a HID Manager with the current run loop</p><pre class="sourcecodebox">
+        IOHIDManagerScheduleWithRunLoop( inIOHIDManagerRef, CFRunLoopGetCurrent( ), kCFRunLoopDefaultMode );
+</pre><p>There is a corresponding function to unschedule a HID Manager reference from a run loop:</p><pre class="sourcecodebox">
+void IOHIDManagerUnscheduleFromRunLoop(
+        IOHIDManagerRef inIOHIDManagerRef,  // HID Manager reference
+        CFRunLoopRef    inRunLoop,          // Run loop to be used when unscheduling asynchronous activity
+        CFStringRef     inRunLoopMode );    // Run loop mode to be used when unscheduling
+</pre><p class="smalltext"><strong>Listing 7:</strong> Unscheduling a HID Manager from a run loop</p><pre class="sourcecodebox">
+IOHIDManagerUnscheduleFromRunLoop( managerRef, CFRunLoopGetCurrent( ), kCFRunLoopDefaultMode );
+</pre><p>Now we're ready to open the HID Manager reference.</p><pre class="sourcecodebox">
+// Open a HID Manager reference
+IOReturn IOHIDManagerOpen(
+            IOHIDManagerRef inIOHIDManagerRef,  // HID Manager reference
+            IOOptionBits    inOptions );        // Option bits
+</pre><p>This will open all matching HID devices. It returns kIOReturnSuccess if successful. Currently the only valid options ( second parameter ) are kIOHIDOptionsTypeNone or kIOHIDOptionsTypeSeizeDevice ( which will force exclusive access for all matching devices ).</p><div class="notebox"><p><strong>Note:</strong> As of Leopard, the kIOHIDOptionsTypeSeizeDevice option requires root privileges to be used with keyboard devices.</p></div><p>If there is a device matching callback routine registered when IOHIDManagerOpen is called then this routine will be called once for each HID device currently connected that matches the current matching criteria. This routine will also be called when new devices that match the current matching criteria are connected to the computer ( but only if the HID Manager reference is still open ).</p><p class="smalltext"><strong>Listing 8:</strong> Opening a HID Manager reference</p><pre class="sourcecodebox">
+// open it
+IOReturn tIOReturn = IOHIDManagerOpen( managerRef, kIOHIDOptionsTypeNone );
+</pre><p>Once a HID Manager reference has been opened it may be closed by using the IOHIDManagerClose function:</p><pre class="sourcecodebox">
+// Closes the IOHIDManager
+IOReturn IOHIDManagerClose( IOHIDManagerRef inIOHIDManagerRef,  // HID Manager reference
+                            IOOptionBits    inOptions );        // Option bits
+</pre><p>This will also close all devices that are currently enumerated. The options are propagated to the HID device close function.</p><p>Once a connection is open developers may register a routine to be called when input values change:</p><pre class="sourcecodebox">
+// Register a routine to be called when an input value changes
+void IOHIDManagerRegisterInputValueCallback(
+        IOHIDManagerRef     inIOHIDManagerRef,  // HID Manager reference
+        IOHIDValueCallback  inCallback,         // Pointer to the callback routine
+        void *              inContext );        // Pointer to be passed to the callback
+</pre><p>The registered callback routine will be called when the HID value of any element of type kIOHIDElementTypeInput changes for all matching HID devices.</p><div class="notebox"><p><strong>Note:</strong> To unregister pass NULL for the callback.</p></div><div class="notebox"><p><strong>Note:</strong> The HID Manager must be scheduled with a run loop for HID Manager callbacks to be dispatched.</p><p>( See <A HREF="#TNTAG1060">Listing 6</A> )</p></div><p class="smalltext"><strong>Listing 9:</strong> Registering for an input value callback</p><pre class="sourcecodebox">
+IOHIDManagerRegisterInputValueCallback( managerRef, Handle_IOHIDInputValueCallback, context );
+</pre><p>This routine will be called when an input value changes for any input element for all matching devices. If only notifications from specific devices are of interest then the IOHIDDeviceRegisterInputValueCallback function ( See <A HREF="#TNTAG2070">Listing 19</A> ) should be used; For value changes on specific HID element( s ) the HID queue functions ( See <A HREF="#TNTAG4000">HID Queue Functions</A> ) should be used. To receive notifications for when HID reports are received from a HID device the IOHIDDeviceGetReport[WithCallback] function may be used. ( Search forward for <A HREF="#TNTAG2150">IOHIDDeviceGetReport[WithCallback]</A> )</p><p class="smalltext"><strong>Listing 10:</strong> Example input value callback routine</p><pre class="sourcecodebox">
+static void Handle_IOHIDInputValueCallback(
+                void *          inContext,      // context from IOHIDManagerRegisterInputValueCallback
+                IOReturn        inResult,       // completion result for the input value operation
+                void *          inSender,       // the IOHIDManagerRef
+                IOHIDValueRef   inIOHIDValueRef // the new element value
+ ) {
+    printf( &quot;%s( context: %p, result: %p, sender: %p, value: %p ).\n&quot;,
+        __PRETTY_FUNCTION__, inContext, ( void * ) inResult, inSender, ( void* ) inIOHIDValueRef );
+}   // Handle_IOHIDInputValueCallback
+</pre><div class="notebox"><p><strong>Note:</strong> HID values are documented in the &quot;<A HREF="#TNTAG6000">HID Value Functions</A>&quot; section.</p></div><p>The IOHIDManagerGetProperty and IOHIDManagerSetProperty functions are available to access the HID Manager's properties:</p><pre class="sourcecodebox">
+// Obtains a property of a HIDManagerRef
+CFTypeRef IOHIDManagerGetProperty(
+            IOHIDManagerRef inIOHIDManagerRef,  // HID Manager reference
+            CFStringRef     inKeyCFStringRef );  // CFStringRef for the key
+
+// Sets a property for a HIDManagerRef
+void IOHIDManagerSetProperty(
+            IOHIDManagerRef inIOHIDManagerRef,  // HID Manager reference
+            CFStringRef     inKeyCFStringRef,   // CFStringRef for the key
+            CFTypeRef       inValueCFTypeRef ); // the HID value for the property
+</pre><p>Currently there are not any default HID Manager properties set by the system. However since HID Manager properties are propagated to all HID devices as they are enumerated ( matched ) this might be a convient way to set default HID device property values.</p><div class="notebox"><p><strong>Note:</strong> Currently all HID Manager, device and element properties are lost when the HID Manager reference that they are associated with is closed. Developers should save and restore any values that they want to persist outside that scope.</p></div><p class="smalltext"><strong>Listing 11:</strong> Accessing HID Manager properties</p><pre class="sourcecodebox">
+CFTypeRef tCFTypeRef = IOHIDManagerGetProperty( managerRef, key );
+IOHIDManagerSetProperty( managerRef, key, tCFTypeRef );
+</pre><p>To determine what devices match the current matching criteria use IOHIDManagerCopyDevices:</p><pre class="sourcecodebox">
+CFSetRef IOHIDManagerCopyDevices( IOHIDManagerRef inIOHIDManagerRef );    // HID Manager reference
+</pre><p>The parameter is a HID Manager reference and it returns a Core Foundation set ( CFSet ) of IOHIDDeviceRefs.</p><p class="smalltext"><strong>Listing 12:</strong> Getting the set of matching HID device references</p><pre class="sourcecodebox">
+CFSetRef tCFSetRef = IOHIDManagerCopyDevices( managerRef );
+</pre><p>The HID device references in the returned set can be obtained by using the CFSetGetValues function or or iterated over by using the CFSetApplyFunction function.</p><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG2000"></A><H2>HID Device Functions</H2><p>A CFTypeRef can be verified to be a HID device reference by comparing its Core Foundation type against IOHIDDeviceGetTypeID:</p><p class="smalltext"><strong>Listing 13:</strong> Validating a HID device reference</p><pre class="sourcecodebox">
+    if ( CFGetTypeID( tCFTypeRef ) == IOHIDDeviceGetTypeID( ) ) {
+        // this is a valid HID device reference
+    }
+</pre><p>Once you have a valid HID device reference the IOHIDDeviceGetProperty function can be used to access its properties ( manufacturer, vendor, product IDs, etc. ) using the HID device keys defined in &lt;IOKit/HID/IOHIDKeys.h&gt; ( see <A HREF="#TNTAG1020">Listing 2</A> )</p><p class="smalltext"><strong>Listing 14:</strong> Examples of getting HID device properties</p><pre class="sourcecodebox">
+// Get a HID device's transport ( string )
+CFStringRef IOHIDDevice_GetTransport( IOHIDDeviceRef inIOHIDDeviceRef )
+{
+    return IOHIDDeviceGetProperty( inIOHIDDeviceRef, CFSTR( kIOHIDTransportKey ) );
+}
+
+// function to get a long device property
+// returns FALSE if the property isn't found or can't be converted to a long
+static Boolean IOHIDDevice_GetLongProperty(
+    IOHIDDeviceRef inDeviceRef,     // the HID device reference
+    CFStringRef inKey,              // the kIOHIDDevice key ( as a CFString )
+    long * outValue )               // address where to return the output value
+{
+    Boolean result = FALSE;
+
+    CFTypeRef tCFTypeRef = IOHIDDeviceGetProperty( inDeviceRef, inKey );
+    if ( tCFTypeRef ) {
+        // if this is a number
+        if ( CFNumberGetTypeID( ) == CFGetTypeID( tCFTypeRef ) ) {
+            // get its value
+            result = CFNumberGetValue( ( CFNumberRef ) tCFTypeRef, kCFNumberSInt32Type, outValue );
+        }
+    }
+    return result;
+}   // IOHIDDevice_GetLongProperty
+
+// Get a HID device's vendor ID ( long )
+long IOHIDDevice_GetVendorID( IOHIDDeviceRef inIOHIDDeviceRef )
+{
+    long result = 0;
+    ( void ) IOHIDDevice_GetLongProperty( inIOHIDDeviceRef, CFSTR( kIOHIDVendorIDKey ), &amp;result );
+    return result;
+} // IOHIDDevice_GetVendorID
+
+// Get a HID device's product ID ( long )
+long IOHIDDevice_GetProductID( IOHIDDeviceRef inIOHIDDeviceRef )
+{
+    long result = 0;
+    ( void ) IOHIDDevice_GetLongProperty( inIOHIDDeviceRef, CFSTR( kIOHIDProductIDKey ), &amp;result );
+    return result;
+} // IOHIDDevice_GetProductID
+
+</pre><p>There is a convenience function that will scan a device's application collection elements to determine if it confirms to a specified usage page and usage:</p><pre class="sourcecodebox">
+Boolean IOHIDDeviceConformsTo( IOHIDDeviceRef   inIOHIDDeviceRef, // IOHIDDeviceRef for the HID device
+                                uint32_t        inUsagePage,      // the usage page to test conformance with
+                                uint32_t        inUsage );        // the usage to test conformance with
+</pre><p>Some examples of application collection usage pairs are:</p><ul><li><p>usagePage = kHIDPage_GenericDesktop, usage = kHIDUsage_GD_Mouse</p></li><li><p>usagePage = kHIDPage_GenericDesktop, usage = kHIDUsage_GD_Keyboard</p></li></ul><p>Before you can communicate with a HID device it has to be opened; Opened HID device references should be closed when communications are complete. Here are the functions to open and close a HID device reference:</p><pre class="sourcecodebox">
+IOReturn IOHIDDeviceOpen( IOHIDDeviceRef  inIOHIDDeviceRef, // IOHIDDeviceRef for the HID device
+                          IOOptionBits    inOptions );      // Option bits to be sent down to the HID device
+IOReturn IOHIDDeviceClose( IOHIDDeviceRef  IOHIDDeviceRef,  // IOHIDDeviceRef for the HID device
+                          IOOptionBits    inOptions );      // Option bits to be sent down to the HID device
+</pre><p>On the IOHIDDeviceOpen call developers may pass kIOHIDOptionsTypeNone or kIOHIDOptionsTypeSeizeDevice option to request exclusive access to the HID device. Both functions return kIOReturnSuccess if successful.</p><div class="notebox"><p><strong>Note:</strong> As of Leopard, the kIOHIDOptionsTypeSeizeDevice option requires root privileges to be used with keyboard devices.</p></div><p>Callbacks can be registered that will be called when a HID device is unplugged, when input values change, when input reports are received, or when asynchronous get and set value and report functions complete ( all these callbacks are documented below ). For these HID device callbacks to be dispatched the HID device must first be scheduled with a run loop.</p><div class="notebox"><p><strong>Note:</strong> By default when new devices are matched they are automatically scheduled with the same run loop as the HID Manager used to match the HID device ( if it is scheduled with a run loop ) in which case this additional step is unnecessary.</p></div><p class="smalltext"><strong>Listing 15:</strong> Scheduling a HID device with a run loop</p><pre class="sourcecodebox">
+    IOHIDDeviceScheduleWithRunLoop( inIOHIDDeviceRef, CFRunLoopGetCurrent( ), kCFRunLoopDefaultMode );
+</pre><p>There is a corresponding function to unschedule a HID device from a run loop:</p><p class="smalltext"><strong>Listing 16:</strong> Unscheduling a HID device from a run loop</p><pre class="sourcecodebox">
+IOHIDDeviceUnscheduleFromRunLoop( deviceRef, CFRunLoopGetCurrent( ), kCFRunLoopDefaultMode );
+</pre><p>To register a routine to be called when a HID device is removed:</p><p class="smalltext"><strong>Listing 17:</strong> Registering a HID device removal callback routine</p><pre class="sourcecodebox">
+IOHIDDeviceRegisterRemovalCallback( deviceRef, Handle_IOHIDDeviceRemovalCallback, context );
+</pre><div class="notebox"><p><strong>Note:</strong> To unregister pass NULL for the callback.</p></div><p class="smalltext"><strong>Listing 18:</strong> HID device removal callback routine</p><pre class="sourcecodebox">
+static void Handle_IOHIDDeviceRemovalCallback(
+                void *      inContext,  // context from IOHIDDeviceRegisterRemovalCallback
+                IOReturn    inResult,   // the result of the removal
+                void *      inSender    // IOHIDDeviceRef for the HID device being removed
+ ) {
+    printf( &quot;%s( context: %p, result: %p, sender: %p ).\n&quot;,
+        __PRETTY_FUNCTION__, inContext, ( void * ) inResult, inSender );
+}   // Handle_IOHIDDeviceRemovalCallback
+</pre><p>To register a routine to be called when an input value is changed by a HID device:</p><A NAME="TNTAG2070"></A><p class="smalltext"><strong>Listing 19:</strong> Registering a HID device input value callback routine</p><pre class="sourcecodebox">
+IOHIDDeviceRegisterInputValueCallback( deviceRef, Handle_IOHIDDeviceInputValueCallback, context );
+</pre><p>The first parameter is a HID device reference; the second is the callback routine and the third parameter is a user context parameter that is passed to the callback routine.</p><div class="notebox"><p><strong>Note:</strong> To unregister pass NULL for the callback.</p></div><p class="smalltext"><strong>Listing 20:</strong> HID device input value callback routine</p><pre class="sourcecodebox">
+static void Handle_IOHIDDeviceInputValueCallback(
+                void *          inContext,      // context from IOHIDDeviceRegisterInputValueCallback
+                IOReturn        inResult,       // completion result for the input value operation
+                void *          inSender,       // IOHIDDeviceRef of the device this element is from
+                IOHIDValueRef   inIOHIDValueRef // the new element value
+ ) {
+    printf( &quot;%s( context: %p, result: %p, sender: %p, value: %p ).\n&quot;,
+        __PRETTY_FUNCTION__, inContext, ( void * ) inResult, inSender, ( void* ) inIOHIDValueRef );
+}   // Handle_IOHIDDeviceInputValueCallback
+</pre><div class="notebox"><p><strong>Note:</strong> HID values are documented in the &quot;<A HREF="#TNTAG6000">HID Value Functions</A>&quot; section.</p></div><p>To register a routine to be called when an input report is issued by a HID device:</p><p class="smalltext"><strong>Listing 21:</strong> Registering a HID device input report callback routine</p><pre class="sourcecodebox">
+CFIndex reportSize = 64;    // note: this should be greater than or equal to the size of the report
+uint8_t report = malloc( reportSize );
+IOHIDDeviceRegisterInputReportCallback( deviceRef,          // IOHIDDeviceRef for the HID device
+                                        report,             // pointer to the report data ( uint8_t's )
+                                        reportSize,         // number of bytes in the report ( CFIndex )
+                                        Handle_IOHIDDeviceIOHIDReportCallback,   // the callback routine
+                                        context );          // context passed to callback
+</pre><p>The first parameter is a HID device reference; the second is the address where to store the input report, the third parameter is the address of the callback routine and the last parameter is a user context parameter that is passed to the callback routine.</p><div class="notebox"><p><strong>Note:</strong> To unregister pass NULL for the callback.</p></div><p>The report buffer should be large enough to store the largest report that can be expected to be received from the HID device. This size can be obtained by passing kIOHIDMaxInputReportSizeKey as the key to IOHIDDeviceGetProperty.</p><p class="smalltext"><strong>Listing 22:</strong> HID device input report callback routine</p><pre class="sourcecodebox">
+static void Handle_IOHIDDeviceIOHIDReportCallback(
+                void *          inContext,          // context from IOHIDDeviceRegisterInputValueCallback
+                IOReturn        inResult,           // completion result for the input report operation
+                void *          inSender,           // IOHIDDeviceRef of the device this report is from
+                IOHIDReportType inType,             // the report type
+                uint32_t        inReportID,         // the report ID
+                uint8_t *       inReport,           // pointer to the report data
+                CFIndex         InReportLength )    // the actual size of the input report
+{
+    printf( &quot;%s( context: %p, result: %p, sender: %p,&quot; \
+            &quot;type: %d, id: %p, report: %p, length: %d ).\n&quot;,
+        __PRETTY_FUNCTION__, inContext, ( void * ) inResult, inSender,
+        ( long ) inType, inReportID, inReport, inReportLength );
+}   // Handle_IOHIDDeviceIOHIDReportCallback
+</pre><div class="notebox"><p><strong>Note:</strong> The layout and the size of the report data is device specific and requires advanced knowledge of how elements are bundled into reports. While this knowledge is available by parsing HID device descriptors this also requires advanced knowledge. A higher level abstraction that doesn't require as much advanced knowledge is the HID transactions APIs described in the &quot;<A HREF="#TNTAG5000">HID Transaction Functions</A>&quot; section.</p></div><p>To set the HID value of a single output or feature type element the IOHIDDeviceSetValue ( synchronous ) or IOHIDDeviceSetValueWithCallback ( asynchronous ) functions may be used. ( to set multiple values consider using reports or transactions ):</p><pre class="sourcecodebox">
+// synchronous
+IOReturn  tIOReturn = IOHIDDeviceSetValue(
+                            deviceRef,      // IOHIDDeviceRef for the HID device
+                            elementRef,     // IOHIDElementRef for the HID element
+                            valueRef );     // IOHIDValueRef for the HID element's new value
+
+// asynchronous
+IOReturn  tIOReturn = IOHIDDeviceSetValueWithCallback(
+                            deviceRef,          // IOHIDDeviceRef for the HID device
+                            elementRef,         // IOHIDElementRef for the HID element
+                            valueRef,           // IOHIDValueRef for the HID element's new value
+                            tCFTimeInterval,    // timeout duration
+                            Handle_IOHIDDeviceSetValueCallback,  // the callback routine
+                            context );          // context passed to callback
+</pre><p>The first parameter is a HID device reference; the second is HID element reference and the third parameter is a HID value reference. For the asynchronous version the fourth parameter is a timeout, the fifth parameter is the callback routine and the last parameter is the context to pass to the callback routine:</p><p class="smalltext"><strong>Listing 23:</strong> HID device set value callback routine</p><pre class="sourcecodebox">
+static void Handle_IOHIDDeviceSetValueCallback(
+                void *          inContext,          // context from IOHIDDeviceSetValueWithCallback
+                IOReturn        inResult,           // completion result for the set value operation
+                void *          inSender,           // IOHIDDeviceRef of the device
+                IOHIDValueRef   inIOHIDValueRef )   // the HID element value
+{
+    printf( &quot;%s( context: %p, result: %p, sender: %p, value: %p ).\n&quot;,
+        __PRETTY_FUNCTION__, inContext, ( void * ) inResult, inSender, inIOHIDValueRef );
+}   // Handle_IOHIDDeviceSetValueCallback
+</pre><div class="notebox"><p><strong>Note:</strong> HID values are documented in the &quot;<A HREF="#TNTAG6000">HID Value Functions</A>&quot; section.</p></div><p>To get the HID value of a single element the IOHIDDeviceGetValue ( synchronous ) or IOHIDDeviceGetValueWithCallback ( asynchronous ) functions may be used. ( To get multiple values consider using reports or transactions. ) For input type elements the synchronous function returns immediately; for feature type elements it will block until the get value report has been issued to the HID device.</p><pre class="sourcecodebox">
+// synchronous
+IOReturn  tIOReturn = IOHIDDeviceGetValue(
+                            deviceRef,  // IOHIDDeviceRef for the HID device
+                            elementRef, // IOHIDElementRef for the HID element
+                            valueRef ); // IOHIDValueRef for the HID element's new value
+
+// asynchronous
+IOReturn  tIOReturn = IOHIDDeviceGetValueWithCallback(
+                            deviceRef,          // IOHIDDeviceRef for the HID device
+                            elementRef,         // IOHIDElementRef for the HID element
+                            valueRef,           // IOHIDValueRef for the HID element's new value
+                            tCFTimeInterval,    // timeout duration
+                            Handle_IOHIDDeviceGetValueCallback,  // the callback routine
+                            context );          // context passed to callback
+</pre><p>For both of these functions the first parameter is a HID device reference; the second is HID element reference and the third parameter is a HID value reference. For the asynchronous version the fourth parameter is a timeout, the fifth parameter is the callback routine and the last parameter is the context to pass to the callback routine:</p><p class="smalltext"><strong>Listing 24:</strong> HID device get value callback routine</p><pre class="sourcecodebox">
+static void Handle_IOHIDDeviceGetValueCallback(
+                void *          inContext,          // context from IOHIDDeviceGetValueWithCallback
+                IOReturn        inResult,           // completion result for the get value operation
+                void *          inSender,           // IOHIDDeviceRef of the device
+                IOHIDValueRef   inIOHIDValueRef )   // the HID element value
+{
+    printf( &quot;%s( context: %p, result: %p, sender: %p, value: %p ).\n&quot;,
+        __PRETTY_FUNCTION__, inContext, ( void * ) inResult, inSender, inIOHIDValueRef );
+}   // Handle_IOHIDDeviceGetValueCallback
+</pre><div class="notebox"><p><strong>Note:</strong> HID values are documented in the &quot;<A HREF="#TNTAG6000">HID Value Functions</A>&quot; section.</p></div><p>USB data is transferred to and from HID devices packetized into reports. These reports consist of one or more element fields usually contained in a hierarchy of collections. Developers that understand how elements are packaged into reports can use the IOHIDDeviceGetReport[WithCallback] or IOHIDDeviceSetReport[WithCallback] to talk directly with HID devices. ( Developers unfamiliar with how HID reports are constructed may use the HID transaction functions ( See <A HREF="#TNTAG5000">HID Transaction Functions</A> ). )</p><p>To send a report to a HID device the IOHIDDeviceSetReport ( synchronous ) or IOHIDDeviceSetReportWithCallback ( asynchronous ) functions should be used:</p><A NAME="TNTAG2130"></A><p class="smalltext"><strong>Listing 25:</strong> Sending a HID Report</p><pre class="sourcecodebox">
+CFIndex reportSize = 64;
+uint8_t report = malloc( reportSize );
+
+// synchronous
+IOReturn  tIOReturn = IOHIDDeviceSetReport(
+                            deviceRef,          // IOHIDDeviceRef for the HID device
+                            tIOHIDReportType,   // IOHIDReportType for the report
+                            reportID,           // CFIndex for the report ID
+                            report,             // address of report buffer
+                            reportLength );     // length of the report
+
+// asynchronous
+IOReturn  tIOReturn = IOHIDDeviceSetReportWithCallback(
+                            deviceRef,          // IOHIDDeviceRef for the HID device
+                            tIOHIDReportType,   // IOHIDReportType for the report
+                            reportID,           // CFIndex for the report ID
+                            report,             // address of report buffer
+                            reportLength,       // length of the report
+                            tCFTimeInterval,    // timeout duration
+                            Handle_IOHIDDeviceSetReportCallback,  // the callback routine
+                            context );          // context passed to callback
+</pre><p>For both of these functions the first parameter is a HID device reference. The second is a IOHIDReportType for the report; the third parameter is the report ID;  the fourth parameter is the address of the report buffer and the fifth parameter is the size of the report being sent. For the asynchronous version the sixth parameter is a timeout; the seventh parameter is the callback routine and the last parameter is the context to pass to the callback routine:</p><p class="smalltext"><strong>Listing 26:</strong> HID device set report callback routine</p><pre class="sourcecodebox">
+static void Handle_IOHIDDeviceSetReportCallback(
+                void *          inContext,          // context from IOHIDDeviceSetReportWithCallback
+                IOReturn        inResult,           // completion result for the set value operation
+                void *          inSender,           // IOHIDDeviceRef of the device this report is from
+                IOHIDReportType inIOHIDReportType,  // the report type
+                uint32_t        inReportID,         // the report ID
+                uint8_t*        inReport,           // the address of the report
+                CFIndex         inReportLength )    // the length of the report
+{
+    printf( &quot;%s( context: %p, result: %p, sender: %p, &quot;  \
+            &quot;type: %d, id: %d, report: %p, length: %p ).\n&quot;,
+        __PRETTY_FUNCTION__, inContext, ( void * ) inResult, inSender,
+        inIOHIDReportType, inReportID, inReport, inReportLength );
+}   // Handle_IOHIDDeviceSetReportCallback
+</pre><A NAME="TNTAG2150"></A><p>To request a report from a HID device the IOHIDDeviceGetReport ( synchronous ) or IOHIDDeviceGetReportWithCallback ( asynchronous ) functions should be used:</p><pre class="sourcecodebox">
+// synchronous
+IOReturn  tIOReturn = IOHIDDeviceGetReport(
+                            deviceRef,          // IOHIDDeviceRef for the HID device
+                            tIOHIDReportType,   // IOHIDReportType for the report
+                            reportID,           // CFIndex for the report ID
+                            report,             // address of report buffer
+                            &amp;reportSize );      // address of length of the report
+
+// asynchronous
+IOReturn  tIOReturn = IOHIDDeviceGetReportWithCallback(
+                            deviceRef,          // IOHIDDeviceRef for the HID device
+                            tIOHIDReportType,   // IOHIDReportType for the report
+                            reportID,           // CFIndex for the report ID
+                            report,             // address of report buffer
+                            &amp;reportSize,        // address of length of the report
+                            tCFTimeInterval,    // timeout duration
+                            Handle_IOHIDDeviceGetReportCallback,  // the callback routine
+                            context );          // context passed to callback
+</pre><p>For both of these functions the first parameter is a HID device reference. The second is a IOHIDReportType for the report; the third parameter is the report ID;  the fourth parameter is the address of the report buffer and the fifth parameter on input points to the size of the report being requested; After completion it's the size of the returned report.  For the asynchronous version the sixth parameter is a timeout; the seventh parameter is the callback routine and the last parameter is the context to pass to the callback routine:</p><p class="smalltext"><strong>Listing 27:</strong> HID device get report callback routine</p><pre class="sourcecodebox">
+static void Handle_IOHIDDeviceGetReportCallback(
+                void *          inContext,          // context from IOHIDDeviceGetReportWithCallback
+                IOReturn        inResult,           // completion result for the get report operation
+                void *          inSender,           // IOHIDDeviceRef of the device this report is from
+                IOHIDReportType inIOHIDReportType,  // the report type
+                uint32_t        inReportID,         // the report ID
+                uint8_t*        inReport,           // the address of the report
+                CFIndex         inReportLength )    // the length of the report
+{
+    printf( &quot;%s( context: %p, result: %p, sender: %p, &quot;  \
+            &quot;type: %d, id: %d, report: %p, length: %p ).\n&quot;,
+        __PRETTY_FUNCTION__, inContext, ( void * ) inResult, inSender,
+        inIOHIDReportType, inReportID, inReport, inReportLength );
+}   // Handle_IOHIDDeviceGetReportCallback
+</pre><p>To obtain the HID elements associated with a specific device use the IOHIDDeviceCopyMatchingElements function:</p><pre class="sourcecodebox">
+// return the HID elements that match the criteria contained in the matching dictionary
+CFArrayRef IOHIDDeviceCopyMatchingElements(
+                IOHIDDeviceRef  inIOHIDDeviceRef,       // IOHIDDeviceRef for the HID device
+                CFDictionaryRef inMatchingCFDictRef,    // the matching dictionary
+                IOOptionBits    inOptions );            // Option bits
+</pre><p>The first parameter is the HID Manager reference; the second parameter is a matching dictionary ( which may be NULL to return all elements ) and the third parameter are any option bits ( currently unused, pass kIOHIDOptionsTypeNone ). This API returns a CFArrayRef of IOHIDElementRefs. Developers may then use CFArrayGetValueAtIndex to retrieve a specific IOHIDElementRef, CFArrayGetValues to retrieve all IOHIDElementRefs or CFSetApplyFunction to iterate all IOHIDElementRefs from this array.</p><p>The matching keys for HID elements are prefixed by kIOHIDElement and declared in &lt;IOKit/hid/IOHIDKeys.h&gt; ( See <A HREF="#TNTAG3020">Listing 30</A> )</p><p class="smalltext"><strong>Listing 28:</strong> IOHIDDeviceCopyMatchingElements examples</p><pre class="sourcecodebox">
+// to return all elements for a device
+CFArrayRef elementCFArrayRef = IOHIDDeviceCopyMatchingElements( deviceRef, NULL, kIOHIDOptionsTypeNone );
+
+// to return all elements with usage page keyboard
+
+// create a dictionary to add element properties to
+CFMutableDictionaryRef tCFDictRef = CFDictionaryCreateMutable(
+    kCFAllocatorDefault, 0, &amp;kCFTypeDictionaryKeyCallBacks, &amp;kCFTypeDictionaryValueCallBacks );
+if ( tCFDictRef ) {
+    // Add key for element usage page to matching dictionary
+    int usagePage = kHIDUsage_GD_Keyboard;
+    CFNumberRef pageCFNumberRef = CFNumberCreate( kCFAllocatorDefault, kCFNumberIntType, &amp;usagePage );
+    if ( pageCFNumberRef ) {
+        CFDictionarySetValue( tCFDictRef, CFSTR( kIOHIDElementUsagePageKey ), pageCFNumberRef );
+        CFRelease( pageCFNumberRef );
+    } else {
+        fprintf( stderr, &quot;%s: CFNumberCreate( usage page ) failed.&quot;, __PRETTY_FUNCTION__ );
+    }
+} else {
+    fprintf( stderr, &quot;%s: CFDictionaryCreateMutable failed.&quot;, __PRETTY_FUNCTION__ );
+}
+
+if ( tCFDictRef ) {
+    CFArrayRef elementCFArrayRef = IOHIDDeviceCopyMatchingElements(
+        deviceRef, tCFDictRef, kIOHIDOptionsTypeNone );
+    CFRelease( tCFDictRef );
+}
+</pre><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG3000"></A><H2>HID Element Functions</H2><p>A CFTypeRef can be verified to be a HID element reference by comparing its Core Foundation type against IOHIDElementGetTypeID:</p><p class="smalltext"><strong>Listing 29:</strong> Validating a HID element reference</p><pre class="sourcecodebox">
+    if ( CFGetTypeID( tCFTypeRef ) == IOHIDElementGetTypeID( ) ) {
+        // this is a valid HID element reference
+    }
+</pre><p>Once a valid HID element reference is available the IOHIDElementGetProperty function may be used to access its properties ( type, usage page &amp; usage, etc. ) using the HID element keys defined in &lt;IOKit/HID/IOHIDKeys.h&gt;:</p><A NAME="TNTAG3020"></A><p class="smalltext"><strong>Listing 30:</strong> HID element keys</p><pre class="sourcecodebox">
+From &lt;IOKit/hid/IOHIDKeys.h&gt;:
+
+#define kIOHIDElementCookieKey                      &quot;ElementCookie&quot;
+#define kIOHIDElementTypeKey                        &quot;Type&quot;
+#define kIOHIDElementCollectionTypeKey              &quot;CollectionType&quot;
+#define kIOHIDElementUsageKey                       &quot;Usage&quot;
+#define kIOHIDElementUsagePageKey                   &quot;UsagePage&quot;
+#define kIOHIDElementMinKey                         &quot;Min&quot;
+#define kIOHIDElementMaxKey                         &quot;Max&quot;
+#define kIOHIDElementScaledMinKey                   &quot;ScaledMin&quot;
+#define kIOHIDElementScaledMaxKey                   &quot;ScaledMax&quot;
+#define kIOHIDElementSizeKey                        &quot;Size&quot;
+#define kIOHIDElementReportSizeKey                  &quot;ReportSize&quot;
+#define kIOHIDElementReportCountKey                 &quot;ReportCount&quot;
+#define kIOHIDElementReportIDKey                    &quot;ReportID&quot;
+#define kIOHIDElementIsArrayKey                     &quot;IsArray&quot;
+#define kIOHIDElementIsRelativeKey                  &quot;IsRelative&quot;
+#define kIOHIDElementIsWrappingKey                  &quot;IsWrapping&quot;
+#define kIOHIDElementIsNonLinearKey                 &quot;IsNonLinear&quot;
+#define kIOHIDElementHasPreferredStateKey           &quot;HasPreferredState&quot;
+#define kIOHIDElementHasNullStateKey                &quot;HasNullState&quot;
+#define kIOHIDElementFlagsKey                       &quot;Flags&quot;
+#define kIOHIDElementUnitKey                        &quot;Unit&quot;
+#define kIOHIDElementUnitExponentKey                &quot;UnitExponent&quot;
+#define kIOHIDElementNameKey                        &quot;Name&quot;
+#define kIOHIDElementValueLocationKey               &quot;ValueLocation&quot;
+#define kIOHIDElementDuplicateIndexKey              &quot;DuplicateIndex&quot;
+#define kIOHIDElementParentCollectionKey            &quot;ParentCollection&quot;
+#define kIOHIDElementVendorSpecificKey              &quot;VendorSpecific&quot;
+
+#define kIOHIDElementCalibrationMinKey              &quot;CalibrationMin&quot;
+#define kIOHIDElementCalibrationMaxKey              &quot;CalibrationMax&quot;
+#define kIOHIDElementCalibrationSaturationMinKey    &quot;CalibrationSaturationMin&quot;
+#define kIOHIDElementCalibrationSaturationMaxKey    &quot;CalibrationSaturationMax&quot;
+#define kIOHIDElementCalibrationDeadZoneMinKey      &quot;CalibrationDeadZoneMin&quot;
+#define kIOHIDElementCalibrationDeadZoneMaxKey      &quot;CalibrationDeadZoneMax&quot;
+#define kIOHIDElementCalibrationGranularityKey      &quot;CalibrationGranularity&quot;
+</pre><div class="notebox"><p><strong>Note:</strong> Use the CFSTR( ) macro to pass these keys to the get/set property functions as CFStringRefs:</p></div><div class="notebox"><p><strong>IMPORTANT:</strong> Convenience functions have been provided to allow developers to access many of these properties directly without having to use intermediary CFTypes ( See <A HREF="#TNTAG3050">Listing 33</A> ). Due to an unintentional implementation detail ( bug ) these element properties may or may not be accessible via the IOHIDElement[Get/Set]Property APIs. Please use the convenience APIs to access these properties.</p><p>All the kIOHIDElementCalibration***Key properties are accessible via the IOHIDElement[Get/Set]Property APIs.</p></div><p class="smalltext"><strong>Listing 31:</strong> Passing HID element keys to the Get/Set Property functions</p><pre class="sourcecodebox">
+IOHIDElementGetProperty( element, CFSTR( kIOHIDElementTypeKey ), &amp;tCFNumberRef );
+</pre><p>Here are two functions that can be used to get or set long properties:</p><p class="smalltext"><strong>Listing 32:</strong> Examples of how to get or set long HID element properties</p><pre class="sourcecodebox">
+static Boolean IOHIDElement_GetLongProperty(
+    IOHIDElementRef inElementRef,   // the HID element
+    CFStringRef inKey,              // the kIOHIDElement key ( as a CFString )
+    long * outValue )               // address where to return the output value
+{
+    Boolean result = FALSE;
+
+    CFTypeRef tCFTypeRef = IOHIDElementGetProperty( inElementRef, inKey );
+    if ( tCFTypeRef ) {
+        // if this is a number
+        if ( CFNumberGetTypeID( ) == CFGetTypeID( tCFTypeRef ) ) {
+            // get its value
+            result = CFNumberGetValue( ( CFNumberRef ) tCFTypeRef, kCFNumberSInt32Type, outValue );
+        }
+    }
+    return result;
+}
+
+static void IOHIDElement_SetLongProperty(
+    IOHIDElementRef inElementRef,   // the HID element
+    CFStringRef inKey,              // the kIOHIDElement key ( as a CFString )
+    long inValue )                  // the long value to be set
+{
+    CFNumberRef tCFNumberRef = CFNumberCreate( kCFAllocatorDefault, kCFNumberSInt32Type, &amp;inValue );
+    if ( tCFNumberRef ) {
+        IOHIDElementSetProperty( inElementRef, inKey, tCFNumberRef );
+        CFRelease( tCFNumberRef );
+    }
+}
+
+// access the kIOHIDElementVendorSpecificKey if it exists:
+long longValue;
+if ( IOHIDElement_GetLongProperty( elementRef, CFSTR( kIOHIDElementVendorSpecificKey ), &amp;longValue ) ) {
+    printf( &quot;Element 0x%08lX has a vendor specific key of value 0x%08lX.\n&quot;, elementRef, longValue );
+}
+
+</pre><p>There are convenience functions to retrieve many of these element properties directly:</p><A NAME="TNTAG3050"></A><p class="smalltext"><strong>Listing 33:</strong> HID element property functions</p><pre class="sourcecodebox">
+// IOHIDElementCookie represent a unique identifier for a HID element within a HID device.
+IOHIDElementCookie cookie = IOHIDElementGetCookie( elementRef );
+
+// return the collection type:
+//  kIOHIDElementTypeInput_Misc         = 1,
+//  kIOHIDElementTypeInput_Button       = 2,
+//  kIOHIDElementTypeInput_Axis         = 3,
+//  kIOHIDElementTypeInput_ScanCodes    = 4,
+//  kIOHIDElementTypeOutput             = 129,
+//  kIOHIDElementTypeFeature            = 257,
+//  kIOHIDElementTypeCollection         = 513
+IOHIDElementType tType = IOHIDElementGetType( elementRef );
+
+// If the HID element type is of type kIOHIDElementTypeCollection then
+// the collection type is one of:
+//  kIOHIDElementCollectionTypePhysical         = 0x00,
+//  kIOHIDElementCollectionTypeApplication      = 0x01,
+//  kIOHIDElementCollectionTypeLogical          = 0x02,
+//  kIOHIDElementCollectionTypeReport           = 0x03,
+//  kIOHIDElementCollectionTypeNamedArray       = 0x04,
+//  kIOHIDElementCollectionTypeUsageSwitch      = 0x05,
+//  kIOHIDElementCollectionTypeUsageModifier    = 0x06
+IOHIDElementCollectionType collectionType = IOHIDElementGetCollectionType( elementRef );
+
+// usage and usage pages are defined on the USB website at: &lt;http://www.usb.org&gt;
+uint32_t page = IOHIDElementGetUsagePage( elementRef );
+uint32_t usage = IOHIDElementGetUsage( elementRef );
+
+// Boolean properties
+Boolean isVirtual = IOHIDElementIsVirtual( elementRef );
+Boolean isRelative = IOHIDElementIsRelative( elementRef );
+Boolean isWrapping = IOHIDElementIsWrapping( elementRef );
+Boolean isArray = IOHIDElementIsArray( elementRef );
+Boolean isNonLinear = IOHIDElementIsNonLinear( elementRef );
+Boolean hasPreferred = IOHIDElementHasPreferredState( elementRef );
+Boolean hasNullState = IOHIDElementHasNullState( elementRef );
+
+// the HID element name
+CFStringRef name = IOHIDElementGetName( elementRef );
+
+// element report information
+uint32_t reportID = IOHIDElementGetReportID( elementRef );
+uint32_t reportSize = IOHIDElementGetReportSize( elementRef );
+uint32_t reportCount = IOHIDElementGetReportCount( elementRef );
+
+// element unit &amp; exponent
+uint32_t unit = IOHIDElementGetUnit( elementRef );
+uint32_t unitExp = IOHIDElementGetUnitExponent( elementRef );
+
+// logical &amp; physical minimums &amp; maximums
+CFIndex logicalMin = IOHIDElementGetLogicalMin( elementRef );
+CFIndex logicalMax = IOHIDElementGetLogicalMax( elementRef );
+CFIndex physicalMin = IOHIDElementGetPhysicalMin( elementRef );
+CFIndex physicalMax = IOHIDElementGetPhysicalMax( elementRef );
+</pre><p>There are also functions to determine the device, parent and child of a specified HID element:</p><p class="smalltext"><strong>Listing 34:</strong> HID element hierarchy functions</p><pre class="sourcecodebox">
+// return the HID device that a element belongs to
+IOHIDDeviceRef deviceRef = IOHIDElementGetDevice( elementRef );
+
+// return the collection element that a HID element belongs to ( if any )
+IOHIDElementRef elementRef = IOHIDElementGetParent( elementRef );
+
+// return the child elements of a collection element ( if any )
+CFArrayRef tCFArrayRef = IOHIDElementGetChildren( elementRef );
+</pre><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG4000"></A><H2>HID Queue Functions</H2><p>While developers can use the IOHIDDeviceGetValue to get the most recent value of a HID element, for some elements this is not sufficient. If it is necessary to keep track of all value changes of a HID element, rather than just the most recent one, developers can create a queue and add the HID elements of interest to it. Then all value change events involving those elements will be captured by the HID queue ( up to the depth of the HID queue ).</p><p>HID queue references ( IOHIDQueueRefs ) are used to communicate with the HID queues. They are created by using the IOHIDQueueCreate function:</p><pre class="sourcecodebox">
+// Create HID queue reference
+IOHIDQueueRef IOHIDQueueCreate(
+                    CFAllocatorRef  inCFAllocatorRef,   // Allocator to be used during creation
+                    IOHIDDeviceRef  inIOHIDDeviceRef,   // the HID device to be associated with this queue
+                    CFIndex         inDepth,            // the maximum number of values to queue
+                    IOOptionBits    inOptions )         // options ( currently reserved )
+</pre><p>The first parameter is a CFAllocator to be used when allocating the returned IOHIDQueueRef. The second parameter is the HID device to be associated with this queue. The third parameter is the maximum depth of the HID queue. The last parameter ( options ) is currently reserved for future use. Developers should pass kIOHIDOptionsTypeNone ( zero ) for this parameter.</p><p>There is no IOHIDQueueDestroy ( or release, free, etc. ); But since the HID queue reference is a Core Foundation object reference then CFRelease should be used to dispose of it.</p><p>A CFTypeRef can be verified to be a HID queue reference by comparing its Core Foundation type against IOHIDQueueGetTypeID:</p><p class="smalltext"><strong>Listing 35:</strong> Validating a HID queue reference</p><pre class="sourcecodebox">
+    if ( CFGetTypeID( tCFTypeRef ) == IOHIDQueueGetTypeID( ) ) {
+        // this is a valid HID queue reference!
+    }
+</pre><p>Once a HID queue reference has been created, it has to be started before it can be used to access the HID devices associated with it.</p><pre class="sourcecodebox">
+void IOHIDQueueStart( IOHIDQueueRef inIOHIDQueueRef );
+</pre><p>The corresponding function to stop a HID queue is:</p><pre class="sourcecodebox">
+void IOHIDQueueStop( IOHIDQueueRef inIOHIDQueueRef );
+</pre><div class="notebox"><p><strong>Note:</strong> HID queues have to be stopped before HID elements can be added or removed. Also HID elements can only be added to the HID queue for their device. You can't use a single HID queue for multiple devices.</p></div><p>To determine the HID device associated with a specific HID queue use the IOHIDQueueGetDevice function:</p><pre class="sourcecodebox">
+IOHIDDeviceRef IOHIDQueueGetDevice( IOHIDQueueRef inIOHIDQueueRef );
+</pre><p>There are accessor function to get and set the HID queue's depth:</p><pre class="sourcecodebox">
+CFIndex IOHIDQueueGetDepth( IOHIDQueueRef inIOHIDQueueRef );
+void IOHIDQueueSetDepth( IOHIDQueueRef inIOHIDQueueRef, CFIndex inDepth );
+</pre><p>HID elements can be added and removed by using these functions:</p><pre class="sourcecodebox">
+void IOHIDQueueAddElement( IOHIDQueueRef inIOHIDQueueRef, IOHIDElementRef inIOHIDElementRef );
+void IOHIDQueueRemoveElement( IOHIDQueueRef inIOHIDQueueRef, IOHIDElementRef inIOHIDElementRef );
+</pre><p>To determine if a HID element has been added to a HID queue use this function:</p><pre class="sourcecodebox">
+Boolean IOHIDQueueContainsElement( IOHIDQueueRef inIOHIDQueueRef, IOHIDElementRef inIOHIDElementRef );
+</pre><p>Once a HID queue has been created, HID elements added and then started then HID values can be dequeued by using one of these functions:</p><pre class="sourcecodebox">
+IOHIDValueRef IOHIDQueueCopyNextValue( IOHIDQueueRef inIOHIDQueueRef );
+IOHIDValueRef IOHIDQueueCopyNextValueWithTimeout( IOHIDQueueRef inIOHIDQueueRef, CFTimeInterval inTimeout );
+</pre><div class="notebox"><p><strong>Note:</strong> The first function is synchronous and will block until there is a HID value available. While this may be desirable when called from a secondary thread blocking as the main thread should always be avoided. So on the main thread developers will most likely want to use the the second function with a zero timeout. This is essentially a method for polling the HID queue without blocking.</p></div><div class="notebox"><p><strong>Note:</strong> Because the HID value is a retained copy, it is up to the caller to release the HID value ( using CFRelease ).</p></div><div class="notebox"><p><strong>Note:</strong> HID values are documented in the &quot;<A HREF="#TNTAG6000">HID Value Functions</A>&quot; section.</p></div><p>To avoid polling the HID queue for HID value changes developers can instead register a callback routine:</p><pre class="sourcecodebox">
+void IOHIDQueueRegisterValueAvailableCallback(
+                                IOHIDQueueRef inIOHIDQueueRef,   // reference to the HID queue
+                                IOHIDCallback inCallback,        // address of the callback routine
+                                void *        inContext );       // context passed to callback
+</pre><div class="notebox"><p><strong>Note:</strong> The HID queue must be scheduled with a run loop for this callback routine to be dispatched.</p></div><p>The functions to schedule and unschedule a HID queue from a run loop are:</p><pre class="sourcecodebox">
+// Schedule a HID queue with a runloop
+void IOHIDQueueScheduleWithRunLoop( IOHIDQueueRef       inIOHIDQueueRef,    // reference to the HID queue
+                                    CFRunLoopRef        inRunLoop,          // Run loop to be scheduled with
+                                    CFStringRef         inRunLoopMode );    // Run loop mode for scheduling
+
+// Unschedule a HID queue from a runloop
+void IOHIDQueueUnscheduleFromRunLoop(
+                        IOHIDQueueRef   inIOHIDQueueRef,    // reference to the HID queue
+                        CFRunLoopRef    inRunLoop,          // Run loop to be unscheduling from
+                        CFStringRef     inRunLoopMode );    // Run loop mode for unscheduling
+</pre><p class="smalltext"><strong>Listing 36:</strong> Scheduling a HID queue with a run loop</p><pre class="sourcecodebox">
+IOHIDQueueScheduleWithRunLoop( inIOHIDQueueRef, CFRunLoopGetCurrent( ), kCFRunLoopDefaultMode );
+</pre><p class="smalltext"><strong>Listing 37:</strong> HID queue value available callback routine</p><pre class="sourcecodebox">
+static void Handle_ValueAvailableCallback(
+                void *   inContext, // context from IOHIDQueueRegisterValueAvailableCallback
+                IOReturn inResult,  // the inResult
+                void *   inSender,  // IOHIDQueueRef of the queue
+ ) {
+    printf( &quot;%s( context: %p, result: %p, sender: %p ).\n&quot;,
+        __PRETTY_FUNCTION__, inContext, ( void * ) inResult, inSender );
+    do {
+        IOHIDValueRef valueRef = IOHIDQueueCopyNextValueWithTimeout( ( IOHIDQueueRef ) inSender, 0. );
+        if ( !valueRef ) break;
+        // process the HID value reference
+        .
+        .
+        .
+        CFRelease( valueRef );    // Don't forget to release our HID value reference
+    } while ( 1 ) ;
+}   // Handle_ValueAvailableCallback
+</pre><div class="notebox"><p><strong>Note:</strong> This routine is not called every time a new value is added to a queue; It is only called when the HID queue transitions to non-empty. For this reason the HID queue should be emptied ( by calling IOHIDQueueCopyNextValueWithTimeout until it returns NULL ) before expecting this routine to be called again.</p></div><div class="notebox"><p><strong>Note:</strong> HID values are documented in the &quot;<A HREF="#TNTAG6000">HID Value Functions</A>&quot; section.</p></div><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG5000"></A><H2>HID Transaction Functions</H2><p>HID transactions are an abstraction above using the IOHIDDeviceGetReport[WithCallback] ( See <A HREF="#TNTAG2150">IOHIDDeviceGetReport[WithCallback]</A> ) or IOHIDDeviceSetReport[WithCallback] ( See <A HREF="#TNTAG2130">Listing 25</A> ) functions. Those functions require knowing the details of how HID device descriptors are used to define the reports sent to and received from HID devices. Instead, HID transactions allow you to assemble a transaction, add the relevant values, set default values and then commit the transaction in order to actually force a report to be sent across the USB bus.</p><p>To build a transaction you first have to create a HID transaction reference by using the IOHIDTransactionCreate function:</p><pre class="sourcecodebox">
+IOHIDTransactionRef IOHIDTransactionCreate(
+                        CFAllocatorRef  inCFAllocatorRef,   // Allocator to be used during creation
+                        IOHIDDeviceRef  inIOHIDDeviceRef,   // the HID device for this transaction
+                        IOHIDTransactionDirectionType   inDirection,  // The direction: in or out
+                        IOOptionBits    inOptions );         // options ( currently reserved )
+</pre><p>The first parameter is a CFAllocator to be used when allocating the returned IOHIDTransactionRef. The second parameter is the HID device to be associated with this transaction. The third parameter is the direction for the transfer ( kIOHIDTransactionDirectionTypeInput or kIOHIDTransactionDirectionTypeOutput ) and the last parameter ( options ) is currently reserved for future use. Developers should pass kIOHIDOptionsTypeNone ( zero ) for this parameter.</p><div class="notebox"><p><strong>Note:</strong> HID Transaction references can be used to either send or receive multiple element values.  As such the direction used should represent they type of HID elements that will be added to the transaction.</p></div><p>There is no IOHIDTransactionDestroy ( or release, free, etc. ); But since the HID transaction reference is a Core Foundation object reference then CFRelease should be used to dispose of it.</p><p>A CFTypeRef can be verified to be a HID transaction reference by comparing its Core Foundation type against IOHIDTransactionGetTypeID:</p><p class="smalltext"><strong>Listing 38:</strong> Validating a HID transaction reference</p><pre class="sourcecodebox">
+    if ( CFGetTypeID( tCFTypeRef ) == IOHIDTransactionGetTypeID( ) ) {
+        // this is a valid HID transaction reference!
+    }
+</pre><p>There are convenience functions to get the HID device associated with a HID transaction and to get or set the direction for a HID transaction:</p><pre class="sourcecodebox">
+// Obtain the HID device associated with a transaction
+IOHIDDeviceRef IOHIDTransactionGetDevice(
+                                    IOHIDTransactionRef inIOHIDTransactionRef ); // HID transaction reference
+
+// Obtain the direction of the transaction.
+IOHIDTransactionDirectionType IOHIDTransactionGetDirection(
+                                    IOHIDTransactionRef IOHIDTransactionRef );   // HID transaction reference
+
+// Sets the direction of the transaction
+void IOHIDTransactionSetDirection( IOHIDTransactionRef IOHIDTransactionRef,     // HID transaction reference
+                                   IOHIDTransactionDirectionType direction );   // The direction: in or out
+</pre><div class="notebox"><p><strong>Note:</strong> The IOHIDTransactionSetDirection function is useful for manipulating bi-direction ( feature ) elements such that you can set or get element values without having to create an additional transaction object.</p></div><p>Once a HID transaction has been created then the HID elements associated with it may be added by using the IOHIDTransactionAddElement function:</p><pre class="sourcecodebox">
+void IOHIDTransactionAddElement(
+            IOHIDTransactionRef inIOHIDTransactionRef,  // HID transaction reference
+            IOHIDElementRef     inIOHIDElementRef );    // the HID element to associate with this transaction
+</pre><div class="notebox"><p><strong>IMPORTANT:</strong> To minimize device traffic only add HID elements that share a common report type and id.</p></div><p>HID Elements may be removed from a HID transaction by using the IOHIDTransactionRemoveElement function:</p><pre class="sourcecodebox">
+void IOHIDTransactionRemoveElement(
+            IOHIDTransactionRef inIOHIDTransactionRef,  // HID transaction reference
+            IOHIDElementRef     inIOHIDElementRef );    // the HID element to associate with this transaction
+</pre><p>To determine if a HID element is currently associated with a HID transaction the IOHIDTransactionContainsElement function may be used:</p><pre class="sourcecodebox">
+// Queries the transaction to determine if elemement has been added.
+Boolean IOHIDTransactionContainsElement(
+                    IOHIDTransactionRef inIOHIDTransactionRef, // HID transaction reference
+                    IOHIDElementRef     inIOHIDElementRef );   // the HID element to test for
+</pre><p>To set the HID values associated with the HID elements in a HID transaction use the IOHIDTransactionSetValue functions:</p><pre class="sourcecodebox">
+void IOHIDTransactionSetValue( IOHIDTransactionRef  inIOHIDTransactionRef,  // HID transaction reference
+                                IOHIDElementRef     inIOHIDElementRef,      // the HID element
+                                IOHIDValueRef       inIOHIDValueRef,        // the HID element value
+                                IOOptionBits        inOptions );            // options
+</pre><p>The HID value set is pended until the transaction is committed and is only used if the transaction direction is kIOHIDTransactionDirectionTypeOutput.  Use the kIOHIDTransactionOptionDefaultOutputValue option to set default element values.</p><p>To retrieve the HID values associated with the HID elements in a HID transaction developers may use the IOHIDTransactionGetValue function:</p><pre class="sourcecodebox">
+// Obtains the HID value for a transaction element.
+IOHIDValueRef IOHIDTransactionGetValue(
+                                IOHIDTransactionRef inIOHIDTransactionRef,  // HID transaction reference
+                                IOHIDElementRef     inIOHIDElementRef,      // the HID element
+                                IOOptionBits        inOptions );            // options
+
+</pre><p>If the HID transaction direction is kIOHIDTransactionDirectionTypeInput the HID value represents what was obtained from the HID device from the HID transaction.  Otherwise, if the transaction direction is kIOHIDTransactionDirectionTypeOutput the HID value represents the pending value to be sent to the HID device. Use the kIOHIDTransactionOptionDefaultOutputValue option to get the default HID value associated with the HID elements of a HID transaction.</p><p>The values for HID elements associated with a HID transaction can be reset to their default values by using the IOHIDTransactionClear function:</p><pre class="sourcecodebox">
+// Clears element transaction values.
+void IOHIDTransactionClear( IOHIDTransactionRef inIOHIDTransactionRef );  // HID transaction reference
+</pre><p>Once all the appropriate HID elements have been added to a HID transaction ( and values set for output transactions ) then in order to cause the actual bus transaction to occur they should be committed by using one of the two following functions:</p><pre class="sourcecodebox">
+// Synchronously commits element transaction to the HID device.
+IOReturn IOHIDTransactionCommit( IOHIDTransactionRef inIOHIDTransactionRef ); // HID transaction reference
+
+// Asynchronously commits element transaction to the HID device.
+IOReturn IOHIDTransactionCommitWithCallback(
+                        IOHIDTransactionRef inIOHIDTransactionRef,  // HID transaction reference
+                        CFTimeInterval      inTimeout,              // timeout duration
+                        IOHIDCallback       inCallback,             // address of the callback routine
+                        void *              inContext );            // Pointer to be passed to the callback
+</pre><p>For both functions the first parameter is the HID transaction reference to be committed. For the asynchronous function the second parameter is a timeout; the third parameter is the callback routine ( Pass NULL for synchronous behavior w/timeout ) and the last parameter is the context to pass to the callback routine.</p><div class="notebox"><p><strong>Note:</strong> In regards to kIOHIDTransactionDirectionTypeOutput direction, default element values will be used if element values are not set.  If neither are set, that element will be omitted from the commit. After a transaction is committed, transaction element values will be cleared and default values preserved.</p></div><div class="notebox"><p><strong>Note:</strong> It is possible for elements from different reports to be present in a given transaction causing a commit to transcend multiple reports. Keep this in mind when setting a appropriate timeout.</p></div><div class="notebox"><p><strong>Note:</strong> The HID transaction must be scheduled with a run loop In order for the callback routine to be dispatched.</p></div><p>The functions to schedule and unschedule a HID transaction from a run loop are:</p><pre class="sourcecodebox">
+// Schedule a HID transaction with a runloop
+void IOHIDTransactionScheduleWithRunLoop(
+        IOHIDTransactionRef inIOHIDTransactionRef,  // reference to the HID transaction
+        CFRunLoopRef        inRunLoop,              // Run loop to be scheduled with
+        CFStringRef         inRunLoopMode );        // Run loop mode for scheduling
+
+// Unschedule a HID transaction from a runloop
+void IOHIDTransactionUnscheduleFromRunLoop(
+        IOHIDTransactionRef inIOHIDTransactionRef,  // reference to the HID transaction
+        CFRunLoopRef        inRunLoop,              // Run loop to be unscheduling from
+        CFStringRef         inRunLoopMode );        // Run loop mode for unscheduling
+</pre><p class="smalltext"><strong>Listing 39:</strong> Scheduling a HID transaction with a run loop</p><pre class="sourcecodebox">
+IOHIDTransactionScheduleWithRunLoop( inIOHIDTransactionRef, CFRunLoopGetCurrent( ), kCFRunLoopDefaultMode );
+</pre><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG6000"></A><H2>HID Value Functions</H2><p>HID value references are used by the HID Manager and HID device input value callbacks, the HID device get and set value functions and callbacks and the HID queue copy value [with timeout] functions. Three functions are available to be used to create HID value references:</p><pre class="sourcecodebox">
+IOHIDValueRef IOHIDValueCreateWithIntegerValue(
+            CFAllocatorRef  inCFAllocatorRef,   // Allocator to be used during creation
+            IOHIDElementRef inIOHIDElementRef,  // the HID element to be associated with this value
+            uint64_t        inTimeStamp,        // OS AbsoluteTime
+            CFIndex         inValue );          // the integer ( 32-bit ) value used to create this HID value
+
+IOHIDValueRef IOHIDValueCreateWithBytes(
+            CFAllocatorRef  inCFAllocatorRef,   // Allocator to be used during creation
+            IOHIDElementRef inIOHIDElementRef,  // the HID element to be associated with this value
+            uint64_t        inTimeStamp,        // OS AbsoluteTime
+            const uint8_t * inBytes,            // a pointer to the data used to create this HID value
+            CFIndex         inLength );         // the length of the data used to create this HID value
+
+IOHIDValueRef IOHIDValueCreateWithBytesNoCopy(
+            CFAllocatorRef  inCFAllocatorRef,   // Allocator to be used during creation
+            IOHIDElementRef inIOHIDElementRef,  // the HID element to be associated with this value
+            uint64_t        inTimeStamp,        // OS AbsoluteTime
+            const uint8_t * inBytes,            // a pointer to the data used to create this HID value
+            CFIndex         inLength );         // the length of the data used to create this HID value
+</pre><p>For all three of these functions the first parameter is a CFAllocator to be used when allocating the returned IOHIDValueRef. The second parameter is the HID element to be associated with this value and the third parameter is a timestamp. For the IOHIDValueCreateWithIntegerValue function the last parameter is a CFIndex value. For the last two functions the fourth parameter is a pointer to the data and the last parameter is the length of the data.</p><div class="notebox"><p><strong>Note:</strong> For all three of these functions the timeStamp should represent an OS AbsoluteTime, not a CFAbsoluteTime. ( See &lt;mach/mach_time.h&gt; )</p></div><div class="notebox"><p><strong>Note:</strong> For the IOHIDValueCreateWithBytesNoCopy function the data is expected to exist until the HID value reference is released. Any attempt to access the data after it has been released may result in a crash.</p></div><p>A CFTypeRef can be verified to be a HID value reference by comparing its Core Foundation type against IOHIDValueGetTypeID:</p><p class="smalltext"><strong>Listing 40:</strong> Validating a HID value reference</p><pre class="sourcecodebox">
+    if ( CFGetTypeID( tCFTypeRef ) == IOHIDValueGetTypeID( ) ) {
+        // this is a valid HID value reference!
+    }
+</pre><p>Convenience functions are provided to access the HID element, time stamp and integer value for HID values:</p><pre class="sourcecodebox">
+// Returns the HID element value associated with this HID value reference.
+IOHIDElementRef IOHIDValueGetElement( IOHIDValueRef inIOHIDValueRef );
+
+// Returns the timestamp value associated with this HID value reference.
+uint64_t IOHIDValueGetTimeStamp( IOHIDValueRef inIOHIDValueRef );
+
+// Returns an integer representation for this HID value reference.
+CFIndex IOHIDValueGetIntegerValue( IOHIDValueRef inIOHIDValueRef );
+</pre><p>Additional functions are provided to access the data associated with a HID value and its length:</p><pre class="sourcecodebox">
+// Returns the size, in bytes, of the data associated with this HID value reference.
+CFIndex IOHIDValueGetLength( IOHIDValueRef inIOHIDValueRef );
+
+// Returns a byte pointer to the data associated with this HID value reference.
+const uint8_t * IOHIDValueGetBytePtr( IOHIDValueRef inIOHIDValueRef )
+</pre><p>One additional function exists to return a scaled representation of a HID value:</p><pre class="sourcecodebox">
+// return the scaled value of a HID value reference
+double_t IOHIDValueGetScaledValue( IOHIDValueRef inIOHIDValueRef, IOHIDValueScaleType inType );
+</pre><p>There are currently two types of scaling that can be applied:</p><ul><li><p>kIOHIDValueScaleTypePhysical: Scales values using the physical bounds of the HID element.</p></li><li><p>kIOHIDValueScaleTypeCalibrated: Scales values using the calibration properties of the HID element.</p></li></ul><div class="notebox"><p><strong>Note:</strong> Currently there are no calibration properties associated with HID elements by default. Developers are expected to set the appropriate calibration properties for all elements that they want to scale using the IOHIDValueGetScaledValue function with the kIOHIDValueScaleTypeCalibrated scale type.</p></div><p>The first two HID element calibration properties define the desired range of the returned scaled value:</p><pre class="sourcecodebox">
+kIOHIDElementCalibrationMinKey           - The minimum bounds for a calibrated value ( default = -1. )
+kIOHIDElementCalibrationMaxKey           - The maximum bounds for a calibrated value ( default = +1. )
+</pre><p>For example, where the logical min/max values of a HID element may be 0 and 255 the developer may want the scaled value to be returned between the values of +/- 32.0 in which case these properties should be set to -32.0 and +32.0 respectively.</p><p>The next two HID element calibration properties define the range of expected values:</p><pre class="sourcecodebox">
+kIOHIDElementCalibrationSaturationMinKey - The minimum value to be used when calibrating a HID value
+kIOHIDElementCalibrationSaturationMaxKey - The maximum value to be used when calibrating a HID value
+</pre><p>Some HID devices may have elements that aren't able to return the full range of values defined by their logical min/max value limits. For example, where the logical values for an element might be defined as ranging from 0 to 255 the actual device may actually only be able to return values in the range of 5 to 250. This may be caused by digitization errors or mechanical limits on an encoder, etc. If these calibration properties are set then logical values within this range will be scaled out to the full logical range for the HID device. For this example these two values would be set to 5 and 250 respectively.</p><p>The next two HID element calibration properties define the range of a dead zone ( if it exists ):</p><pre class="sourcecodebox">
+kIOHIDElementCalibrationDeadZoneMinKey   - The minimum bounds near the midpoint where values are ignored.
+kIOHIDElementCalibrationDeadZoneMaxKey   - The maximum bounds near the midpoint where values are ignored.
+</pre><p>Some HID devices ( such as joysticks ) have elements that have a mechanical return-to-center feature. Because of mechanical slop or drift or digitization noise these elements don't always return the exact same values when the HID element is returned to the center position. For example, an element with a logical range of 0 to 255 might return center values ranging from anywhere between 124 and 130. The dead zone properties allow developers to define a range of values that will be ignored and returned as the center scaled value instead. If these dead zone properties are set ( to 124 and 130 in this case ) then any value between these two numbers will be returned as the center value ( 127 in this case ).</p><p>The last HID element calibration property defines a granularity:</p><pre class="sourcecodebox">
+kIOHIDElementCalibrationGranularityKey   - The scale or level of detail returned in a calibrated element value
+</pre><p>For example, if the granularity property is set to 0.1, the returned values after calibration are exact multiples of 0.1: { 0.0, 0.1, 0.2, 0.3, 0.4, etc. }.</p><p class="smalltext"><strong>Listing 41:</strong> Setting HID element calibration properties</p><pre class="sourcecodebox">
+static void IOHIDElement_SetDoubleProperty(
+                                IOHIDElementRef inElementRef,   // the HID element
+                                CFStringRef     inKey,          // the kIOHIDElement key ( as a CFString )
+                                double          inValue )       // the double value to be set
+{
+    CFNumberRef tCFNumberRef = CFNumberCreate( kCFAllocatorDefault, kCFNumberDoubleType, &amp;inValue );
+    if ( tCFNumberRef ) {
+        IOHIDElementSetProperty( inElementRef, inKey, tCFNumberRef );
+        CFRelease( tCFNumberRef );
+    }
+}
+
+// These define the range of the returned scaled values
+IOHIDElement_SetDoubleProperty( elementRef, CFSTR( kIOHIDElementCalibrationMinKey ), -32. );
+IOHIDElement_SetDoubleProperty( elementRef, CFSTR( kIOHIDElementCalibrationMaxKey ), +32. );
+
+// these define the range of values expected from the device ( logical values )
+IOHIDElement_SetDoubleProperty( elementRef, CFSTR( kIOHIDElementCalibrationSaturationMinKey ), 5. );
+IOHIDElement_SetDoubleProperty( elementRef, CFSTR( kIOHIDElementCalibrationSaturationMaxKey ), 250. );
+
+// these define the range of the dead zone ( logical values )
+IOHIDElement_SetDoubleProperty( elementRef, CFSTR( kIOHIDElementCalibrationDeadZoneMinKey ), 124. );
+IOHIDElement_SetDoubleProperty( elementRef, CFSTR( kIOHIDElementCalibrationDeadZoneMaxKey ), 130. );
+
+// this defines the granularity of the returned scaled values
+IOHIDElement_SetDoubleProperty( elementRef, CFSTR( kIOHIDElementCalibrationGranularityKey ), 0.1 );
+</pre><p class="smalltext"><strong>Listing 42:</strong> Pseudo code for the IOHIDValueGetScaledValue function</p><pre class="sourcecodebox">
+// first a convenience function to access HID element properties stored as doubles:
+static Boolean IOHIDElement_GetDoubleProperty(
+    IOHIDElementRef inElementRef,   // the HID element
+    CFStringRef inKey,              // the kIOHIDElement key ( as a CFString )
+    double * outValue )               // address where to return the output value
+{
+    Boolean result = FALSE;
+
+    CFTypeRef tCFTypeRef = IOHIDElementGetProperty( inElementRef, inKey );
+    if ( tCFTypeRef ) {
+        // if this is a number
+        if ( CFNumberGetTypeID( ) == CFGetTypeID( tCFTypeRef ) ) {
+            // get its value
+            result = CFNumberGetValue( ( CFNumberRef ) tCFTypeRef, kCFNumberDoubleType, outValue );
+        }
+    }
+    return result;
+}
+
+double_t IOHIDValueGetScaledValue( IOHIDValueRef inValue, IOHIDValueScaleType inType )
+{
+    IOHIDElementRef element = IOHIDValueGetElement( inValue );
+
+    double_t logicalValue = IOHIDValueGetIntegerValue( inValue );
+
+    double_t logicalMin = IOHIDElementGetLogicalMin( element );
+    double_t logicalMax = IOHIDElementGetLogicalMax( element );
+
+    double_t scaledMin = 0;
+    double_t scaledMax = 0;
+
+    double_t granularity = 0.;
+
+    double_t returnValue = 0.;
+
+    switch ( inType ) {
+        case kIOHIDValueScaleTypeCalibrated: {
+
+            double_t calibrateMin = 0.;
+            ( void ) IOHIDElement_GetDoubleProperty( element,
+                        CFSTR( kIOHIDElementCalibrationMinKey ), &amp;calibrateMin );
+            double_t calibrateMax = 0.;
+            ( void ) IOHIDElement_GetDoubleProperty( element,
+                        CFSTR( kIOHIDElementCalibrationMaxKey ), &amp;calibrateMax );
+
+            // if there are calibration min/max values...
+            if ( calibrateMin != calibrateMax ) {
+                // ...use them...
+                scaledMin = calibrateMin;
+                scaledMax = calibrateMax;
+            } else {
+                // ...otherwise use +/- 1.0
+                scaledMin = -1.;
+                scaledMax = +1.;
+            }
+
+            double_t saturationMin = 0.;
+            ( void ) IOHIDElement_GetDoubleProperty( element,
+                        CFSTR( kIOHIDElementCalibrationSaturationMinKey ), &amp;saturationMin );
+            double_t saturationMax = 0.;
+            ( void ) IOHIDElement_GetDoubleProperty( element,
+                        CFSTR( kIOHIDElementCalibrationSaturationMaxKey ), &amp;saturationMax );
+
+            // if there are saturation min/max values...
+            if ( saturationMin != saturationMax ) {
+                // .. and the logical value is less than the minimum saturated value...
+                if ( logicalValue &lt;= saturationMin ) {
+                    // ...then return the minimum scaled value
+                    return scaledMin;
+                } else
+                // otherwise if the logical value is greater than the maximum saturated value...
+                if ( logicalValue &gt;= saturationMax ) {
+                    // ...return the maximum scaled value.
+                    return scaledMax;
+                } else
+                // otherwise use the min/max saturated values for the logical min/max
+                {
+                    logicalMin = saturationMin;
+                    logicalMax = saturationMax;
+                }
+            }
+
+            double_t deadzoneMin = 0.;
+            ( void ) IOHIDElement_GetDoubleProperty( element,
+                        CFSTR( kIOHIDElementCalibrationDeadZoneMinKey ), &amp;deadzoneMin );
+            double_t deadzoneMax = 0.;
+            ( void ) IOHIDElement_GetDoubleProperty( element,
+                        CFSTR( kIOHIDElementCalibrationDeadZoneMaxKey ), &amp;deadzoneMax );
+
+            // if there are deadzone min/max values...
+            if ( deadzoneMin != deadzoneMax ) {
+                    double_t scaledMid = ( scaledMin + scaledMax ) / 2.;
+
+                // if the logical value is less than the deadzone min...
+                if ( logicalValue &lt; deadzoneMin ) {
+                    // ...then use the deadzone min as our logical max...
+                    logicalMax = deadzoneMin;
+                    // ...and the middle of our scaled range as our scaled max.
+                    scaledMax = scaledMid;
+                } // otherwise if the logical value is greater than the deadzone max...
+                else if ( logicalValue &gt; deadzoneMax ) {
+                    // ...then use the deadzone max as our logical min...
+                    logicalMin = deadzoneMax;
+                    // ...and the middle of our scaled range as our scaled min.
+                    scaledMin = scaledMid;
+                } else {
+                    // otherwise return the middle of our scaled range
+                    return scaledMid;
+                }
+            }
+
+            ( void ) IOHIDElement_GetDoubleProperty( element,
+                        CFSTR( kIOHIDElementCalibrationGranularityKey ), &amp;granularity );
+            break;
+        }
+        case kIOHIDValueScaleTypePhysical: {
+            scaledMin = IOHIDElementGetPhysicalMin( element );
+            scaledMax = IOHIDElementGetPhysicalMax( element );
+            break;
+        }
+        default: {
+            return returnValue; // should be 0.0
+        }
+    }
+
+    double_t logicalRange = logicalMax - logicalMin;
+    double_t scaledRange = scaledMax - scaledMin;
+
+    returnValue = ( ( logicalValue - logicalMin ) * scaledRange / logicalRange ) + scaledMin;
+
+    if ( granularity ) {
+        returnValue = round( returnValue / granularity ) * granularity;
+    }
+    return returnValue;
+}
+</pre><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNT_HISTORY_TAG"></A><H2>Document Revision History</H2><table cellspacing="0" class="graybox" width="680"><tr><th width="100">Date</th><th width="580">Notes</th></tr><tr><td scope="row">2008-01-23</td><td>Fixed typo's, indentation and some (miss)parameterization. Run loop code now Carbon/Cocoa agnostic. </td></tr><tr><td scope="row">2007-12-18</td><td>Mac OS X version 10.5 introduces new APIs for the HID Manager.</td></tr></table><p><b>Posted:</b> 2008-01-23</p>
+<!-- END CONTENTS -->
+</td></tr></table>
+<!-- END WIDE COLUMN -->
+<!-- END MAIN CONTENT -->
+	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/technotes/tn2007/tn2187.html%3Fid%3DDTS10004224-1.1&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/technotes/tn2007/tn2187.html%3Fid%3DDTS10004224-1.1&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/technotes/tn2007/tn2187.html%3Fid%3DDTS10004224-1.1&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+
+<!-- START BOTTOM APPLE NAVIGATION -->
+<!--#include virtual="/includes/footer"-->
+<!-- END BOTTOM APPLE NAVIGATION -->
+<!-- START CENTER CLOSE -->
+</center>
+<!-- END CENTER CLOSE -->
+</body></html>

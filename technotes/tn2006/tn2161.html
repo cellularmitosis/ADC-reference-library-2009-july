@@ -1,0 +1,167 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/1999/REC-html401-19991224/loose.dtd">
+<html><head>
+<!-- BEGIN META TAG INFO -->
+<link rel="home" href="http://developer.apple.com/">
+<link rel="find" href="http://developer.apple.com/search/">
+<link rel="stylesheet" type="text/css" href="../../documentation/css/adcstyle.css" title="fonts">
+<script language="JavaScript" type="text/javascript" src="../../documentation/js/busnav.js"></script>
+<script language="JavaScript" src="../../documentation/js/adc.js" type="text/javascript"></script>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<!-- END META TAG INFO -->
+<!-- BEGIN TITLE -->
+<title>Technical Note TN2161: Nested Functions in Xcode</title>
+<!-- END TITLE -->
+</head>
+<!-- BEGIN BODY OPEN -->
+<body bgcolor="#ffffff"><a name="//apple_ref/doc/uid/DTS10003870" title="Nested Functions in Xcode"></a>
+<!--END BODY OPEN -->
+<!-- START CENTER OPEN -->
+<center>
+<!-- END CENTER OPEN -->
+<a name="top"></a>
+<!-- BEGIN LOGO AND SEARCH -->
+<!--#include virtual="/includes/adcnavbar"-->
+<!-- END LOGO AND SEARCH -->
+<!-- START BREADCRUMB -->
+<div id="breadcrumb"><table width="680" border="0" cellpadding="0" cellspacing="0"><tr>
+<td scope="row"><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+<td><img width="340" height="10" src="images/1dot.gif" alt=""></td></tr><tr valign="middle"><td align="left" colspan="2">
+<a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../technicalnotes/index.html">Technical Notes</a> &gt; <a href="../../technicalnotes/DeveloperTools/index.html">Tools</a> &gt; <a href="../../technicalnotes/DeveloperTools/idxXcode-date.html">Xcode</a> &gt; 
+</td></tr><tr><td colspan="2" scope="row"><img width="680" height="35" src="images/1dot.gif" alt=""></td></tr></table></div>
+<!-- END BREADCRUMB -->
+
+<!-- START MAIN CONTENT -->
+<!-- START TITLE GRAPHIC AND INTRO-->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top">
+<td><h1>
+<div id="pagehead">Technical Note TN2161</div>
+<div id="pageheadsub">Nested Functions in Xcode</div>
+</h1></td></tr></table>
+<!-- END TITLE GRAPHIC AND INTRO -->
+<!-- BEGIN WIDE COLUMN -->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td align="left" width="680">
+<!-- BEGIN CONTENTS -->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td><p>This technote explains how to port code which uses nested functions, a GCC extension to the C language.  Nested functions are not supported in Xcode 2.2.</p></td></tr><tr><td scope="row"><img width="680" height="10" src="images/1dot.gif" alt=""><br><img height="1" width="680" src="images/1dot_919699.gif" alt=""><br><img width="680" height="20" src="images/1dot.gif" alt=""></td></tr></table><table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td width="680"><ul><li><a href="#TNTAG1">Introduction</a></li><li><a href="#TNTAG2">About Nested Functions</a></li><li><a href="#TNTAG4">Modifying Your Application</a></li><li><a href="#TNTAG9">Another Example</a></li><li><a href="#TNTAG12">Nested Functions and GNU Autoconf</a></li><li><a href="#TNTAG15">Linker Support for Nested Functions</a></li><li><a href="#TNT_HISTORY_TAG">Document Revision History</a></li></ul></td></tr><tr><td colspan="3" scope="row"><img width="680" height="10" src="images/1dot.gif" alt=""><br><img height="1" width="680" src="images/1dot_919699.gif" alt=""><br><img width="680" height="20" src="images/1dot.gif" alt=""></td></tr></table><A NAME="TNTAG1"></A><H2>Introduction</H2><p>This technote explains how to port code which uses nested functions, a GCC extension to the C language which is not supported in Xcode 2.2. A future Xcode release will introduce a compiler switch, -fnested-functions, and a corresponding build setting to enable the feature for backwards compatibility. However, nested functions will continue to be disabled by default. Use of the backwards compatibility mode should be avoided, since it will prevent your application from taking advantage of a security feature in Mac OS X.</p><p>This technote is directed at application developers who have discovered that after installing Xcode 2.2, their application fails to build with the error &quot;nested functions are not supported on MacOSX&quot;. If you are not getting this error, your code does not use nested functions and you do not need to read this technote (unless your application uses GNU Autoconf; see &quot;Nested Functions and GNU Autoconf&quot; below.)</p><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG2"></A><H2>About Nested Functions</H2><p>Nested functions are a GCC extension to the C language which allows you to declare a function inside another function. For instance:</p><pre class="sourcecodebox">
+    void x(int a) {
+        int b;
+        ...
+        void y() {
+            ...
+        }
+        ...
+    }
+</pre><p>In the example above, the function y() can only be called from inside the function x. It can access any variables which are in scope in x, such as a and b.</p><p>Nested functions are not very widely used. In a survey of 2500 open-source applications taken from the Fink project, only 6 made use of the feature.</p><p>In order to support nested functions, the compiler needed to generate code in a form which could, in certain scenarios, impact the security of the system by using a technique called stack trampolines. Stack trampolines require stack pages to be executable; this increases an application's vulnerability to buffer overflow attacks. Because it was not feasible to securely provide support for nested functions, this support was removed from the compiler in Xcode 2.2. Furthermore, removing nested functions from your code will often lead to performance improvements.</p><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG4"></A><H2>Modifying Your Application</H2><p>Xcode will flag all nested functions with the nested function error message when you try to build your application. To unnest these functions, take any nested functions and move them outside and above the body of the function they're inside. You may need to change the names of some formerly nested functions to avoid conflicting with other functions in your application. For instance, change:</p><pre class="sourcecodebox">
+    void x() {
+        void y() { ... }
+    }
+
+</pre><p>to:</p><pre class="sourcecodebox">
+    void y() { ... }
+    void x() { ... }
+</pre><p>Now try building your application again. If it builds successfully, that's all you need to do. On the other hand, you may get error messages inside your formerly nested functions about variables being undeclared (for instance, &quot;error: 'foo' undeclared (first use in this function.&quot;) This will happen when the nested function accessed variables local to its parent function. In that case, add the variables as new parameters to the function. Because the function may modify the values, you'll need to pass them by reference, through pointers. For instance, change:</p><pre class="sourcecodebox">
+    void x(int a) {
+        int b;
+        void y(int c) { ... }
+        y(1);
+    }
+
+</pre><p>to:</p><pre class="sourcecodebox">
+
+    void y(int c, int *a, int *b) { ... }
+    void x(int a) {
+        int b;
+        y(1,  &amp;a, &amp;b);
+    }
+
+</pre><p>Make sure you update your formerly nested functions to take into account that a and b are now pointers to integers instead of simply integers!</p><p>If you know certain things about how the two functions act regarding the variables local to the original function which are now parameters of the new function, there are some optimizations you can make. If the outer function doesn't care about any changes in the value of one of these variables which take place within the nested function, it isn't necessary to pass it in to the new function by reference, so in the example above, a or b in y could be type int instead of int * if we knew this about them. If the inner function never modifies the value at all, you can add the const modifier, e.g. const int a.</p><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG9"></A><H2>Another Example</H2><p class="smalltext"><strong>Listing 1:</strong> Without nested functions</p><pre class="sourcecodebox">
+  int factorial(int num) {
+    int total = 1, b;
+
+    int multiply() {
+      return total * b;
+    }
+
+    int updateTotal() {
+      total = multiply();
+    }
+
+    for(b = 1; b &lt;= num; b++) {
+      updateTotal();
+    }
+
+    return total;
+  }
+
+</pre><p class="smalltext"><strong>Listing 2:</strong> With nested functions</p><pre class="sourcecodebox">
+  //multiply doesn't modify either total or b, so
+  //we don't need to pass them through pointers
+  //and we can make them const.
+  int multiply(const int total, const int b) {
+    return total * b;
+  }
+
+  //updateTotal doesn't modify b, but it does
+  //modify total.
+  int updateTotal(int *total, const int b) {
+    *total = multiply(*total, b);
+  }
+
+  int factorial(int num) {
+    int total = 1, b;
+
+    for(b = 1; b &lt;= num; b++) {
+      updateTotal(&amp;total, b);
+    }
+
+    return total;
+  }
+</pre><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG12"></A><H2>Nested Functions and GNU Autoconf</H2><p>Applications which use GNU Autoconf, primarily cross-platform UNIX applications, may have accidental usages of nested functions in their configure scripts which are harder to detect. These usages of nested functions may cause configure checks to silently fail, producing an application which builds in an incorrect manner.</p><p>If your application uses GNU Autoconf, you should run the configure script after installing Xcode 2.2 and search config.log for the string nested functions are not supported. If you see this string, you have improperly-written configure macros which you should adjust. Problematic macros look like:</p><pre class="sourcecodebox">
+    AC_TRY_COMPILE([
+        #include &lt;stdio.h&gt;
+    ], [
+        int main(int argc, char *argv[]) {
+            printf(&quot;Hello, world!\n&quot;);
+            return 0;
+        }
+    ], ...
+</pre><p>GNU Autoconf provides its own main function for configure tests, so you should rewrite the macro to look like:</p><pre class="sourcecodebox">
+    AC_TRY_COMPILE([
+        #include &lt;stdio.h&gt;
+    ], [
+        printf(&quot;Hello, world!\n&quot;);
+    ], ...
+</pre><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG15"></A><H2>Linker Support for Nested Functions</H2><p>The linker provides a switch, -allow_stack_execute, which forces execution of the stack segment to be enabled, even in configurations where it would otherwise default to being disabled. Compilers which understand -fnested-functions will supply -allow_stack_execute to the linker when -fnested-functions is given.</p><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNT_HISTORY_TAG"></A><H2>Document Revision History</H2><table cellspacing="0" class="graybox" width="680"><tr><th width="100">Date</th><th width="580">Notes</th></tr><tr><td scope="row">2006-01-10</td><td>This technote explains how to port code which uses nested functions in Xcode 2.2.</td></tr></table><p><b>Posted:</b> 2006-01-10</p>
+<!-- END CONTENTS -->
+</td></tr></table>
+<!-- END WIDE COLUMN -->
+<!-- END MAIN CONTENT -->
+	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/technotes/tn2006/tn2161.html%3Fid%3DDTS10003870-1.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/technotes/tn2006/tn2161.html%3Fid%3DDTS10003870-1.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/technotes/tn2006/tn2161.html%3Fid%3DDTS10003870-1.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+
+<!-- START BOTTOM APPLE NAVIGATION -->
+<!--#include virtual="/includes/footer"-->
+<!-- END BOTTOM APPLE NAVIGATION -->
+<!-- START CENTER CLOSE -->
+</center>
+<!-- END CENTER CLOSE -->
+</body></html>

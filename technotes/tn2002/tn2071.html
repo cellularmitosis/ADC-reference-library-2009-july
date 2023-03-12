@@ -1,0 +1,1420 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN"
+        "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<title>Technical Note TN2071: Porting Command Line Unix Tools to Mac OS X</title>
+<link rel="stylesheet" href="../../adcstyle.css" type="text/css">
+<link rel="stylesheet" href="../../style.css" type="text/css">
+<meta http-equiv="content-type" content="text/html; charset=iso-8859-1">
+<meta name="keywords" content="porting Mac OS X">
+<meta name="Description" content="a general guide for unix developers porting software to Mac OS X.">
+<LINK REL="stylesheet" HREF="../../css/adcstyle.css" TYPE="text/css"><script language="JavaScript" type="text/javascript" src="../../js/adc.js"></script></head>
+
+<body bgcolor="white"><a name="//apple_ref/doc/uid/DTS10003098" title="Porting Command Line Unix Tools to Mac OS X"></a>
+
+<!-- begin_header_information --><!--#include virtual="/adcnavbar" --><p><a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../technicalnotes/index.html">Technical Notes</a> &gt; <a href="../../technicalnotes/Darwin/index.html">Darwin</a> &gt; <a href="../../technicalnotes/Darwin/idxPorting-date.html">Porting</a> &gt; </p><!-- end_header_information -->
+
+<!-- begin_titles_information --><CENTER><table width="600" cellpadding="0" cellspacing="0" border="0">
+<tr><td align="left" scope="row">
+<h1>
+<div id="pagehead">Technical Note TN2071</div>
+<div id="pageheadsub">Porting Command Line Unix Tools to Mac OS X</div>
+</h1>
+</td></tr></table></CENTER><!-- end_titles_information -->
+
+<center>
+ <table border="0" cellspaceing="1" width="600">
+  <tr>
+   <td align="left" scope="row">
+   <!-- begin_header_box -->
+    <table width="600" cellpadding="0" cellspacing="0" border="0">
+     <tr>
+      <td width="300" valign="top" align="left">
+       <table border="0" width="300" cellpadding="0" cellspacing="0">
+        <tr>            
+         <td width="300" align="left">
+          <img src="images/tnmenutop.gif" alt="" align="bottom" width="300" height="7"></td>
+        </tr>
+        <tr bgcolor="#e6e6e6">
+         <td background="images/tnmenubody.gif" width="300" align="left">
+          <span id="menutitle">CONTENTS<br><br></span>
+         </td>
+        </tr>
+        <tr bgcolor="#e6e6e6">
+         <td background="images/tnmenubody.gif" width="300" align="left">
+         <!-- begin_toc -->            
+          <p id="menutext">
+           <a href="#Section1">Finding More Information</a><br/><br/>
+           <a href="#Section2">Evolution of Mac OS X</a><br/><br/>
+           <a href="#Section3">General Porting</a><br/><br/>
+           <a href="#Section4">Choosing a Compiler</a><br/><br/>
+           <a href="#Section5">Compiler Flags</a><br/><br/>
+           <a href="#Section6">Shared Libraries, Bundles and Linker</a><br/><br/>
+           <a href="#Section7">Two-Level and Flat Namespace</a><br/><br/>
+           <a href="#Section8">Multiply Defined Symbols</a><br/><br/>
+           <a href="#Section9">Header Files and Frameworks</a><br/><br/>
+           <a href="#Section10">Predefined Macros</a><br/><br/>
+           <a href="#Section11">Endian Issues</a><br/><br/>
+           <a href="#Section12">Thread Handling</a><br/><br/>
+           <a href="#Section13">Internationalization</a><br/><br/>
+           <a href="#Section14">Device Drivers<a><br/><br/>
+           <a href="#Section15">Audio<a><br/><br/>
+           <a href="#Section16">Video<a><br/><br/>
+           <a href="#Section17">Authorization Services<a><br/><br/>
+           <a href="#References">References</a><br/><br/>
+           </p>
+         <!-- end_toc --> 
+         </td>
+        </tr>
+        <tr>
+         <td width="300" align="left" scope="row">
+          <img src="images/tnmenubottom.gif" alt="" width="300" height="16">
+         </td>
+        </tr>
+       </table>
+      </td>
+      <td width="300" valign="top" align="left">
+        <!-- begin_intro_text -->
+        <center><p id="introtext">Introduction</p></center>
+        <p>This document offers insight into <a href="http://www.apple.com/macosx/">Mac OS X</a>[1]
+         or developers bringing command line <a href="http://www.unix.org/">UNIX</a>[2] based applications to Mac OS X.</p>
+        
+        <p>It is for developers who are comfortable with the details of
+        programming in traditional UNIX development environments. It
+        is not designed for UNIX users.</p>
+        
+        <p>It provides the background needed to understand the Mac OS X operating system.
+        It touches on some of the design decisions, and it provides a listing
+        and discussion of some of the main areas that you should investigate when 
+        bringing UNIX applications to Mac OS X. It also points out
+        some of the advanced features of Mac OS X not available in traditional
+        UNIX applications that you can add to your ported applications. This
+        document is an overview, not a tutorial. In many regards it is a
+        companion to the more extensive
+        <a href="http://developer.apple.com/documentation/macosx/Essentials/devessentials.html">
+        Inside Mac OS X: System Overview</a>[3],
+        but with a bias toward the UNIX developer.</p>
+        
+        <p>It will help answer questions about the platform as a whole, as well as
+        specific questions pertaining to bringing a UNIX applications to Mac
+        OS X 10.2.x.</p>
+        
+        <p>You will find a list of APIs that are not supported in Mac OS X,
+        along with suggested alternatives. This document also gives you
+        some tips that will make application porting process faster,
+        easier, and more efficient.</p>
+        
+        <!-- begin_date --><H4 ALIGN=center>[Sep 03, 2003]</H4><!-- end_date -->
+        
+        <!-- end_intro_text -->
+      </td>
+     </tr>
+    </table>
+    <br/>
+    <!-- end_table_box -->
+
+    <!-- document_begin_content -->
+
+    <center>
+     <table border="0" width="550" bgcolor="#E6E6E6">
+      <tr>
+      <td scope="row">
+<b>Note</b>: If you are considering porting an open-source application to Mac OS X,
+you should look at the <a href="http://www.opendarwin.org">OpenDarwin</a>[4] and
+<a href="http://fink.sourceforge.net">Fink</a>[5] sites to see if the application you are
+looking to port has already been ported. You should also coordinate your
+efforts with those teams so that there is a large repository of open
+source applications available for Mac OS X at a central location.
+       </td>
+      </tr>
+     </table>
+    </center>
+
+<a name="Section1"></a><h2>Finding More Information</h2>
+
+<p>Developer documentation can be found at <a href="http://developer.apple.com/techpubs">
+Apple's developer web site</a>[6].
+This site contains reference, conceptual, and tutorial material related
+to development on Mac OS X. The <a href="http://developer.apple.com/tools/macosxtools.html">Mac OS X Developer Tools</a>[7]
+ CD includes a snapshot of the documentation, which is installed in
+<code>/Developer/Documentation</code>. The manual pages are also included with
+the Mac OS X Developer Tools.</p>
+
+<p>Apple hosts an extensive array of mailing lists. These are available
+to public for subscription and searching at 
+<a href="http://lists.apple.com">lists.apple.com</a>. The
+<a href="http://lists.apple.com/mailman/listinfo/unix-porting"><code>unix-porting</code></a>[8]
+ list is highly recommended. The
+<a href="http://lists.apple.com/mailman/listinfo/darwin-development"><code>darwin-development</code></a>[9]
+ and <a href="http://lists.apple.com/mailman/listinfo/darwinos-users"><code>darwinos-users</code></a>[10] lists
+also offer much help but are less specific to the task of porting.
+<a href="http://search.lists.apple.com">Archives</a>[11] of these lists
+are available at the web site as well.</p>
+
+<p>In addition to Apple's own resources, many external resources exist. Two
+recommended web sites are <a href="http://www.macdevcenter.com/">O'Reilly's Mac DevCenter</a>[12], 
+and <a href="http://www.stepwise.com">Stepwise</a>[13].</p>
+
+<a name="Section2"></a><h2>Evolution of Mac OS X</h2>
+
+<h3>Berkeley Software Distribution (BSD)</h3>
+
+<p>Part of the history of Mac OS X goes back to <a href="http://www.bsd.org/">Berkeley Software
+Distributions (BSD)</a>[14] UNIX of the early seventies. Specifically, Mac OS X is
+based in part on BSD 4.4 Lite. On a system level, many of the design
+decisions are made to align with BSD-style UNIX systems. Most libraries
+and utilities are from <a href="http://www.freebsd.org">FreeBSD</a>[15], but some are
+derived from <a href="http://www.netbsd.org">NetBSD</a>[16]. For future development,
+Mac OS X has adopted FreeBSD as a reference code base for BSD
+technology. Work is ongoing to synchronize all BSD tools and libraries 
+more closely with the FreeBSD-stable branch.</p>
+
+<h3>Mach</h3>
+
+<p>Although Mac OS X must credit BSD for most of the underlying levels of
+the operating system, Mac OS X also owes a major debt to Mach. The
+kernel is heavily influenced in its design philosophy by 
+<a href="http://www-2.cs.cmu.edu/afs/cs.cmu.edu/project/mach/public/www/mach.html">Carnegie
+Mellon's Mach project</a>[17]. The kernel is not a pure micro-kernel
+implementation, since the address space is shared with the BSD portion
+of the kernel and the I/O Kit.</p>
+
+<h3>Mac OS X and Darwin</h3> 
+
+<p>The word <a href="http://developer.apple.com/darwin/">Darwin</a>[18] is often used
+to refer to Mac OS X. In fact, in some circles Mac OS X itself is rarely mentioned at all.
+It is important to understand the distinction between the two, how they are related
+and how they differ.</p>
+
+<p>Darwin is the core of the Mac OS X operating system. Although it can
+stand alone as an independent operating system, it includes only a
+subset of the features available in Mac OS X as a whole.</p>
+
+<h3>Great Extras</h3>
+In addition to basic UNIX goodies like network client tools and system
+services, Mac OS X offers developers easy access to an array of advanced
+technologies:
+<ul>
+    <li>
+        <a href="http://developer.apple.com/quartz/"><b>Quartz Extreme</b></a>[19] - Mac OS X's new 2D
+        drawing API is based on the Postscript/PDF drawing model and
+        provides full support for transparency and anti-aliasing,
+        multiple color spaces, import and export of PDF, plus built-in
+        ICC color management.
+    </li>
+    <li>
+        <a href="http://developer.apple.com/opengl/"><b>OpenGL</b></a>[20] - Mac OS X supports the
+        industry standard OpenGL 3D graphics architecture accelerated by
+        nVidia and ATI graphics adaptors.
+    </li>
+    <li>
+        <a href="http://developer.apple.com/quicktime/"><b>QuickTime</b></a>[21] - Through Mac OS X,
+        developers can access QuickTime's complete multimedia
+        architecture including Flash 4 Support, Cubic VR, RTP/RTSP video
+        streaming, MPEG support, and more.
+    </li>
+    <li>
+        <a href="http://developer.apple.com/intl/"><b>International Technologies</b></a>[22] - Developers can localize
+        their applications into double byte languages quickly and easily
+        using Mac OS X's support for Unicode.
+    </li>
+    <li>
+        <a href="http://developer.apple.com/printing/"><b>CUPS</b></a>[23] - The Common UNIX Printing
+        System ("CUPS") is a cross-platform Open Source printing
+        solution for UNIX environments, and will be used as a portable
+        printing layer for Darwin and Mac OS X. CUPS is based on the
+        Internet Printing Protocol and provides both System V and BSD
+        command-line printing services for PostScript and raster
+        printers.
+    </li>
+</ul>
+<a name="Section3"></a><h2>General Porting</h2>
+
+<p>Porting is a process of bringing software written for one platform to an other
+platform. It sometime requires rewriting portions of software and/or making
+slight modification to source code to make it run in the new environment.</p>
+
+<h3>Why Port?</h3>
+
+<p>A seasoned UNIX developer recognizes that no matter how similar two
+UNIX-based operating systems are, there are always details that sets
+one apart from another. There are many flavors of UNIX based systems available, and not all
+of them offer the same set of tools and architecture.</p>
+
+<p>This section highlights some of the key areas that you should be aware
+of when it comes to compiling your code base for Mac OS X. It notes important
+details about compiler flags, as well as
+giving you some insight into how to link different parts of your code
+in Mac OS X. Many of these topics are covered more extensively in other
+resources as noted.</p>
+
+<p>Before beginning the basic port of your code to Mac OS X, you
+need to make sure that you have the required tool set for the task. You
+also need to be aware of what is and is not available to you by
+default.</p>
+
+<a name="Section4"></a><h2>Choosing a Compiler</h2>
+
+<p>Mac OS X 10.2.x ships with two different compilers and their 
+corresponding tool chains. The default compiler is based on gcc 3.1.
+A secondary compiler based on gcc 2.95.2 is also provided.</p>
+
+<p>You should always try to compile your software using gcc 3.1, since
+future tool chains will be based on gcc version 3.1 or later.</p>
+
+<p>If you run into a problem that looks like a compiler issue, the 
+command <code>sudo gcc_select 2</code> will change the default compiler to gcc
+2.95.2. You can change it back at any time by typing <code>sudo
+gcc_select 3</code>. This should be treated as a last resort. If
+possible, you should try to get gcc 3.1 to compile your application
+by specifying different compiler flags.</p>
+
+    <center>
+     <table border="0" width="550" bgcolor="#E6E6E6">
+      <tr>
+      <td scope="row">
+<b>Note</b>: In some systems the default compiler is called <code>cc</code>,
+on Mac OS X <code>cc</code> and <code>gcc</code> are the same.
+       </td>
+      </tr>
+     </table>
+    </center>
+
+<p>Along with standard UNIX development tools, Apple also provides its own
+GUI development environment called <a href="http://developer.apple.com/tools/projectbuilder/">
+Project Builder (PB)</a>[24] and <a href="http://developer.apple.com/tools/interfacebuilder/">Interface
+Builder (IB)</a>[25]. These tools make development on Mac OS X easier so
+you can concentrate on your code rather then issues related to development
+tools. It is strongly recommended that you use these tools. These tools
+are free and part of Mac OS X.</p>
+
+    <center>
+     <table border="0" width="550" bgcolor="#E6E6E6">
+      <tr>
+      <td scope="row">
+<b>Note</b>: Development tools are not installed with the default Mac OS X install. They
+are supplied on a separate CDROM or disk image. You must install them explicitly. The
+disk image of the tools can also be downloaded from <a href="http://developer.apple.com/tools">
+Apple Development Tools</a>[26] web site.
+       </td>
+      </tr>
+     </table>
+    </center>
+
+<a name="Section5"></a><h2>Compiler Flags</h2>
+
+<p>Here is a list of some of the common compiler flags to be aware of.</p>
+
+<dt><code>-no-cpp-precomp</code></dt>
+    <dd>By default, Apple's GCC preprocesses C and Objective-C with a special
+    preprocessor called <code>cpp-precomp</code> that supports precompiled headers.
+    This preprocessor cannot always handle every construct that GCC supports.
+    You can turn the Mac OS X preprocessor off by using the <code>-no-cpp-precomp</code> flag,
+    which will give you the behavior of the GNU preprocessor. If you get error messages 
+    related to headers (precompiled or otherwise), this is a good place to start.
+
+    <center>
+     <table border="0" width="550" bgcolor="#E6E6E6">
+      <tr>
+      <td scope="row">
+<b>Note</b>: In previous versions of Mac OS X development tools, <code>-traditional-cpp</code> was suggested.
+Although this flag still works in the current version, the more
+accurate <code>-no-cpp-precomp</code> is recommended and should be used instead.
+       </td>
+      </tr>
+     </table>
+    </center>
+   </dd>
+
+<dl>
+    <dt><code>-ObjC, -ObjC++</code></dt>
+    <dd>These are similar in effect to <code>-x objective-c</code> and <code>-x objective-c++</code>, but
+    affect only the choice of compiler for files already identified as
+    source files.</dd>
+
+<dt><code>-faltivec</code></dt>
+    <dd>Enable the AltiVec language extensions, as defined in Motorola's AltiVec
+    PIM. This includes the recognition of <strong>vector</strong> and <strong>pixel</strong> as
+    (context-dependent) keywords, the definition of built-in functions
+    such as <strong>vec_add</strong>, and other extensions.</dd>
+    
+    <center>
+     <table border="0" width="550" bgcolor="#E6E6E6">
+      <tr>
+      <td scope="row">
+<b>Note</b>: Unlike the option
+    <code>-maltivec</code>, the extensions do not require the inclusion of any special
+    header files.
+       </td>
+      </tr>
+     </table>
+    </center>
+
+<dt><code>-fconstant-cfstrings</code></dt>
+    <dd>Enable the automatic creation of a CoreFoundation-type constant string
+    whenever a special built in <code>__builtin__CFStringMakeConstantString</code> is
+    called on a literal string.</dd>
+    
+<dt><code>-fpascal-strings</code></dt>
+    <dd>Allow Pascal-style string literals to be constructed.</dd>
+
+<dt><code>-fcoalesce</code></dt>
+    <dd>Coalesce duplicated functions and data. The linker will discard all
+    but one, saving space. Enabled by default.</dt>
+
+<dt><code>-fweak-coalesced</code></dt>
+    <dd>Use the new OS X <strong>weak_definitions</strong> section attribute for coalesced
+    items. A single <em>normal</em> definition will be chosen by the linker
+    over any number of weakly-coalesced ones.</dd>
+
+<dt><code>-fno-rtti</code></dt>
+    <dd>Disable generation of information about every class with virtual
+    functions for use by the C++ runtime type identification features
+    (<code>dynamic_cast</code> and <code>typeid</code>). If you don't use those parts of the
+    language, you can save some space by using this flag. Note that exception
+    handling uses the same information, but it will generate it as
+    needed.</dd>
+
+<dt><code>-shared</code></dt>
+    <dd>This option is not supported on Mac OS X. Instead use <code>-dynamic</code> option
+    for the linker.</dd>
+
+<dt><code>--dump-pch <em>name</em></code></dt>
+    <dd>Dump the state of the compiler into a directory named <code><em>name</em></code>, after
+    processing all the other arguments. This is useful for creating precompiled headers.</dd>
+
+<dt><code>--load-pch <em>name</em></code></dt>
+    <dd>Restore the state of the compiler from the directory <code><em>name</em></code> before
+    processing the other arguments. The net effect is similar to <code>-include</code>,
+    but it happens more quickly.<br/>
+
+    For instance if the file <code>myprefix.c</code> includes various headers that
+    are useful to all files in your program, you can do</dd>
+    
+    <center>
+     <table border="0" width="550" bgcolor="#E6E6E6">
+      <tr>
+      <td scope="row">
+       <pre>gcc --dump-pch foo -c myprefix.c
+gcc --load-pch foo myfile1.c
+gcc --load-pch foo myfile2.c
+gcc --load-pch foo myfile2.c
+...</pre>
+       </td>
+      </tr>
+     </table>
+    </center> 
+
+<dt><code>-findirect-virtual-calls</code></dt>
+    <dd>Do not make direct calls to virtual functions; instead, always go
+    through the vtable.</dd>
+
+<dt><code>-fapple-kext</code></dt>
+    <dd>Alter vtables, destructors, and other implementation details to more
+    closely resemble the GCC 2.95 ABI. This allows Darwin kernels built using
+    older compiler to load kernel extensions.</dd>
+
+<dt><code>-fcoalesce-templates</code></dt>
+    <dd>Mark instantiated templates as <em>coalesced</em>: the linker will discard all
+    but one, thus saving space.</dd>
+
+<dt><code>-Wpragma-once</code></dt>
+    <dd>Warn about the use of <code>#pragma once</code>.</dd>
+
+<dt><code>-Wextra-tokens</code></dt>
+    <dd>Warn about extra tokens at the end of preprocessor directives.</dd>
+
+<dt><code>-Wmost</code></dt>
+    <dd>This is equivalent to <code>-Wall -Wno-parentheses</code>.</dd>
+
+<dt><code>-Wnewline-eof</code></dt>
+    <dd>Warn about files missing a newline at the end of the file.</dd>
+
+<dt><code>-Wno-altivec-long-deprecated</code></dt>
+    <dd>Do not warn about the use of the deprecated <code>long</code> keyword in AltiVec
+    data types.</dd>
+
+<dt><code>-Wno-long-double</code></dt>
+    <dd>Inhibit warning if the long double type is used.</dd>
+
+<dt><code>-dependency-file</code></dt>
+    <dd>When used with <code>-M</code> or <code>-MM</code>, specifies a
+     file to write the dependencies to.  If no <code>-MF</code> switch
+     is given the preprocessor sends the rules to the same
+     place it would have sent preprocessed output.</dd>
+
+<dt><code>-no-c++filt</code></dt>
+    <dd>By default all linker diagnostic output is piped through <code>c++filt</code>. This
+    option suppresses that behavior.<br/><br/>
+
+    One of the standard libraries bypassed by <code>-nostdlib</code> and
+    <code>-nodefaultlibs</code> is <code>libgcc.a</code>, a library of internal subroutines that
+    GCC uses to overcome shortcomings of particular machines, or special
+    needs for some languages.<br/><br/>
+
+    In most cases, you need <code>libgcc.a</code> even when you want to avoid other
+    standard libraries. In other words, when you specify <code>-nostdlib</code> or
+    <code>-nodefaultlibs</code> you should usually specify <code>-lgcc</code> as well. This
+    ensures that you have no unresolved references to internal GCC
+    library subroutines. (For example, <code>__main</code>, used to ensure C++
+    constructors will be called.)</dd>
+
+<dt><code>-malign-mac68k, -malign-power, -malign-natural</code></dt>
+    <dd>The option <code>-malign-mac68k</code> causes structure fields to be aligned on
+    2-byte boundaries, in order to be compatible with m68k compiler
+    output. The option <code>-malign-power</code> is the standard alignment mode for
+    the PowerPC. The option <code>-malign-natural</code> is an extension of PowerPC
+    alignment that aligns larger data types such as doubles on their
+    natural boundaries.</dd>
+
+<dt><code>-mdynamic-no-pic</code></dt>
+    <dd>On Mac OS X systems, compile code so that it is not
+    re-locatable, but its external references are re-locatable. The
+    resulting code is suitable for applications, but not shared
+    libraries.</dd>
+
+<dt><code>-mlong-branch</code></dt>
+    <dd>On Mac OS X systems, compile calls to use a 32-bit
+    destination address. This is to support kernel extensions, which may
+    load anywhere within the kernel address space.</dd>
+</dl>
+
+<a name="Section6"></a><h2>Shared Libraries, Bundles and Linker</h2>
+
+Apple wrote their own linker to support extended feature of Mac OS X.
+
+    <center>
+     <table border="0" width="550" bgcolor="#E6E6E6">
+      <tr>
+      <td scope="row">
+<b>Note</b>:  Mac OS X uses a single-pass linker. Make sure that you put your framework
+and library options after the object(<code>.o</code>) files. To get more information about
+the Apple linker read the manual page for <code>ld</code>.
+       </td>
+      </tr>
+     </table>
+    </center> 
+
+<p>The Mac OS X kernel supports different mechanisms than some other UNIX systems to
+handle shared libraries. The implementation of shared libraries 
+and bundles, known as loadable modules in other systems, is different.
+You must take special steps if your application uses shared libraries. Most other
+UNIX systems, such as <a href="http://www.kernel.org/">Linux</a>[27] and <a href="http://wwws.sun.com/software/solaris/">Solaris</a>[28], 
+treat bundles and shared libraries the same, but on Mac OS X they are not same.</p>
+
+<p>Many applications being ported to Mac OS X utilize APIs such as <code>dlopen</code>, 
+ <code>dlgets</code>, and <code>dlclose</code> these are not supported on Mac OS X.
+ Below are listed these APIs along with some alternative
+APIs or suggestions that will allow port your application to Mac OS
+X.</p>
+
+<p>If you decide to move to Apple's <code>dyld</code> format for dynamic libraries 
+and bundles, here are alternatives, don't simply swap functions;
+make sure to appropriately adjust your code to handle the different data
+types.</p>
+
+<dl>
+<dt><code>dlopen</code></dt>
+<dd>You can emulate the behavior of <code>dlopen</code> yourself, using the existing
+<code>dyld</code> API <code>NSCreateObjectFileImageFromFile</code> to create and return a
+<code>NSObjectFileImage</code>. This <code>NSObjectFileImage</code>
+can then be loaded into a task with <code>_dyld_debug_task_from_core</code> to
+determine what libraries were loaded and which modules were linked.<br/><br/>
+
+For example, if your code contains something similar to: 
+
+    <center>
+     <table border="0" width="550" bgcolor="#E6E6E6">
+      <tr>
+      <td scope="row">
+       <pre>const char *filename = argv[1];
+void *handle = dlopen(filename, RTLD_NOW);</pre>
+       </td>
+      </tr>
+     </table>
+    </center> 
+
+You should replace it using the following: 
+
+    <center>
+     <table border="0" width="550" bgcolor="#E6E6E6">
+      <tr>
+      <td scope="row">
+       <pre>const char *filename = argv[1];
+NSObjectFileImage *fileImage;
+NSModule handle;
+NSObjectFileImageReturnCode *returnCode =
+NSCreateObjectFileImageFromFile(filename, &fileImage);
+
+if(returnCode == NSObjectFileImageSuccess)
+{
+    handle = NSLinkModule(fileImage,filename, 
+        NSLINKMODULE_OPTION_RETURN_ON_ERROR
+      | NSLINKMODULE_OPTION_PRIVATE);
+    NSDestroyObjectFileImage(fileImage);
+    if (handle) {
+  /* do whatever else your code does *</pre>
+       </td>
+      </tr>
+     </table>
+    </center> 
+</dd>
+
+<dt><code>dlclose</code></dt>
+<dd><code>dlclose</code> disassociates the handle made available by <code>dlopen</code>.
+In order to have the same effect in <code>NSCreateObjectFileImageFromFile</code>, you
+should use <code>NSDestroyObjectFileImage</code>. This API takes a
+<code>NSObjectFileImage</code> as its parameter, which is created by the API
+<code>NSCreateObjectFileImageFromFile</code>.<br/><br/>
+
+For example, if your code contains something similar to: 
+
+    <center>
+     <table border="0" width="550" bgcolor="#E6E6E6">
+      <tr>
+      <td scope="row">
+       <pre>int result = dlclose(handle);</pre>
+       </td>
+      </tr>
+     </table>
+    </center> 
+
+You should replace it using the following: 
+
+    <center>
+     <table border="0" width="550" bgcolor="#E6E6E6">
+      <tr>
+      <td scope="row">
+       <pre>DYLD_BOOL result = NSUnlinkModule(handle, 0);</pre>
+       </td>
+      </tr>
+     </table>
+    </center> 
+    
+This is an easy transition as long as <code>dlopen</code> was called before <code>dlclose</code> is called.</dd>
+<br/>
+
+<dt><code>dlerror</code></dt>
+<dd>Use the option <code>NSLINKMODULE_OPTION_RETURN_ON_ERROR</code> in <code>NSLinkModule</code> to 
+determine whether an error occurred while loading a module. Then, to get
+the error information, you can use the <code>NSLinkEditError</code> API.<br/><br/>
+
+For example, if your code contains something similar to: 
+
+    <center>
+     <table border="0" width="550" bgcolor="#E6E6E6">
+      <tr>
+      <td scope="row">
+       <pre>printf("%s\n", dlerror());</pre>
+       </td>
+      </tr>
+     </table>
+    </center>  
+
+You should replace it using the following: 
+
+    <center>
+     <table border="0" width="550" bgcolor="#E6E6E6">
+      <tr>
+      <td scope="row">
+       <pre>int * null;
+NSLinkEditErrors* c;
+const char ** errorMsg;
+NSLinkEditError(c, null, (const char**)lpLibFileName, errorMsg);
+
+printf("%s\n", errorMsg);</pre>
+       </td>
+      </tr>
+     </table>
+    </center>
+    
+</dd>
+
+<dt><code>dlsym</code></dt>
+
+<dd>The API <code>NSAddressOfSymbol</code> has the same functionality as <code>dlsym</code>. 
+<code>NSAddressOfSymbol</code> takes a <code>NSSymbol</code>, which is a <code>void *</code>, and return 
+the address of the symbol.<br/>
+
+    <center>
+     <table border="0" width="550" bgcolor="#E6E6E6">
+      <tr>
+      <td scope="row">
+<b>Note</b>: <code>NSAddressOfSymbol</code> does not take a second parameter as <code>dlsym</code> does.
+       </td>
+      </tr>
+     </table>
+    </center>  
+
+For example, if your code contains something similar to: 
+
+    <center>
+     <table border="0" width="550" bgcolor="#E6E6E6">
+      <tr>
+      <td scope="row">
+       <pre>void *address = dlsym(handle, symbol);</pre>
+       </td>
+      </tr>
+     </table>
+    </center>  
+
+You should replace it using the following: 
+
+    <center>
+     <table border="0" width="550" bgcolor="#E6E6E6">
+      <tr>
+      <td scope="row">
+       <pre>NSSymbol nssym = NSLookupSymbolInModule(handle, symbol);
+void *address = NSAddressOfSymbol(nssym);</pre>
+       </td>
+      </tr>
+     </table>
+    </center>
+  </dd>
+</dl>
+
+<a name="Section7"></a><h2>Two-Level and Flat Namespace</h2>
+<p>Two-level and flat namespaces refer to how references to symbols 
+ in dynamic libraries are resolved to a definition in specific dynamic
+ library.</p>
+
+<p>When a program is using images built with two-level namespace there
+    may be different global symbols with the same name being used by
+    different images in the program (this is now the default starting with
+    Mac OS X 10.1).</p>
+    
+<p>When a program is using all flat namespace images then only one
+    global symbol for each global symbol name is used by all images of
+    the program.</p>
+<dl>    
+<dt><code>-twolevel_namespace</code></dt>
+    <dd>Specifies the output to be built as a two-level namespace image.
+    This option can also be specified by setting the environment
+    variable <code>LD_TWOLEVEL_NAMESPACE</code>. 
+ 
+    <center>
+     <table border="0" width="500" bgcolor="#E6E6E6">
+      <tr>
+      <td scope="row">
+<b>Note</b>: Use <code>-multiply_defined suppress</code>
+    to stop the warnings regarding multiply defined symbols.
+       </td>
+      </tr>
+     </table>
+    </center>
+</dd>
+
+<dt><code>-flat_namespace</code></dt>
+    <dd>Specifies the output to be built as a flat namespace image. This
+    was the default in MacOS X 10.0.</dd>
+
+<dt><code>-force_flat_namespace</code></dt>
+    <dd>Specifies the executable output to be built and executed treating
+    all its dynamic libraries as flat namespace images. This marks the
+    executable so that the dynamic link editor knows to treat all dynamic
+    libraries as flat namespace images when the program is executed.</dd>
+</dl>
+
+<a name="Section8"></a><h2>Multiply Defined Symbols</h2>
+<p>If there are multiply defined symbols in the object files being linked
+into the output file being created, this always results in a multiply
+defined symbol error.</p>
+
+<dt><code>-multiply_defined treatment</code></dt>
+    <dd>Specifies how multiply defined symbols in dynamic libraries when
+    <code>-twolevel_namespace</code> is in effect are to be treated. Treatment can
+    be: <code>error</code>, <code>warning</code>, or <code>suppress</code>.
+    Which cause the treatment of
+    multiply defined symbols in dynamic libraries as either, <strong>errors</strong>,
+    <strong>warnings</strong>, or <strong>suppresses</strong> the checking of multiply symbols from
+    dynamic libraries when <code>-twolevel_namespace</code> is in effect. The default
+    is to treat multiply defined symbols in dynamic libraries as
+    warnings when <code>-twolevel_namespace</code> is in effect.</dd>
+
+<dt><code>-multiply_defined_unused treatment</code></dt>
+    <dd>Specifies how unused multiply defined symbols in dynamic libraries
+    when <code>-twolevel_namespace</code> is in effect are to be treated. An unused
+    multiply defined symbol is one when there is a symbol defined in the
+    output that is also defined in the dynamic libraries the output is
+    linked with but the symbol in the dynamic library is not used by any
+    reference in the output. treatment can be: <code>error</code>, <code>warning</code>, or
+    <code>suppress</code>. The default for unused multiply defined symbols is to
+    suppress these messages.</dd>
+</dl>
+
+<a name="Section9"></a><h2>Header Files and Frameworks</h2>
+<p>Standard header files are located in <code>/usr/include</code>.
+Frameworks are similar to shared libraries; they combine headers, libraries, etc
+into a single folder; they are stored in different locations, and therefore must
+be searched for differently.</p>
+
+<p>Apple-supplied frameworks are located in <code>/System/Library/Frameworks/</code>. 
+Within each directory, you will find a directory called </code>Headers</code> where
+public header files can be found. Each header file contain several APIs.</p>
+
+<p>You can install your frameworks in <code>/Network/Library/Framework, 
+/Library/Framework</code>, or <code>~/Library/Frameworks</code>, depending on you want to
+expose your frameworks.</p>
+
+<p>If you wish to use an API that is declared in one of the Framework
+header files, you can use the flag <code>-framework APIName -framework
+APIName2 -framework APIName3 ...</code> at compilation time. Make sure to 
+place this flag after the <code>.o</code> files, since Mac OS X uses a single-pass
+linker.</p>
+
+For example, if you wish to use the Address Book API: 
+
+    <center>
+     <table border="0" width="550" bgcolor="#E6E6E6">
+      <tr>
+      <td scope="row">
+       <pre>-(int)beginLoadingImageDataForClient:(id <ABImageClient>)client</pre>
+       </td>
+      </tr>
+     </table>
+    </center>
+
+Then, you should add this to your code: 
+
+    <center>
+     <table border="0" width="550" bgcolor="#E6E6E6">
+      <tr>
+      <td scope="row">
+       <pre>#include &lt;AddressBook/ABImageLoading.h&gt;</pre>
+       </td>
+      </tr>
+     </table>
+    </center>
+
+<a name="Section10"></a><h2>Predefined Macros</h2>
+
+<p>As specified in <a href="http://developer.apple.com/documentation/DeveloperTools/gcc3/cpp/index.html">
+Apple's developer GNU C Preprocessor documentation</a>[43], the
+following macros are predefined in Mac OS X:</p>
+
+<dl>
+<dt><code>__OBJC__</code></dt>
+<dd>This macro is defined when you compile Objective-C <code>.m</code> files or
+Objective-C++ <code>.mm</code> files, or when you override the file extension
+with <code>-ObjC</code> or <code>-ObjC++</code> flags.</dd>
+
+<dt><code>__ASSEMBLER__</code></dt>
+<dd>This macro is defined when compiling <code>.s</code> files.</dd>
+
+<dt><code>__NATURAL_ALIGNMENT__</code></dt>
+<dd>This macro is defined on systems that use natural alignment. When using
+natural alignment, an <code>int</code> is aligned on <code>sizeof(int)</code> boundary, a short
+int is aligned on <code>sizeof(short)</code> boundary, and so on. It's defined by
+default when you're compiling code for the PowerPC, SPARC, and HPPA.
+It's not defined when you use the <code>-malign-mac68k</code> compiler switch.</dt>
+
+<dt><code>__STRICT_BSD__</code></dt>
+<dd>This macro is defined if the -bsd switch was specified when GNU C was
+invoked.</dd>
+
+<dt><code>__MACH__</code></dt>
+<dd>This macro is defined if Mach system calls are supported.</dd>
+
+<dt><code>__APPLE__</code></dt>
+<dd>This macro is defined in any Apple computer.</dd>
+
+<dt><code>__APPLE_CC__</code></dt>
+<dd>This macro is set to an integer that represents the version number of
+the compiler. This lets you distinguish, for example, between compilers
+based on the same version of GCC, but with different bug fixes or
+features. Larger values denote later compilers.</dd>
+
+<dt><code>__BIG_ENDIAN__</code></dt>
+<dd>This macro sets the target architecture to be a most significant bit. See the Endian
+Issues sections for more details.</dd>
+
+    <center>
+     <table border="0" width="550" bgcolor="#E6E6E6">
+      <tr>
+      <td scope="row">
+<b>Note</b>: To define a section of code to be compiled on Mac OS X system you should define
+a section using <code>__APPLE__</code> with <code>__MACH__</code> macros. The macro
+<code>__UNIX__</code> is not supported in Mac OS X.
+       </td>
+      </tr>
+     </table>
+    </center>
+</dl>
+
+<a name="Section11"></a><h2>Endian Issues</h2>
+<p>Multi-byte data fields can be referenced a couple of ways in memory. One is
+known as big-endian, which consists of field addresses pointing to the
+most significant byte (MSB) while the second, known as little-endian, consists
+field addresses pointing to the least significant byte (LSB).</p>
+
+<p>Apple's PowerPC processor uses big-endian (MSB) addressing, while some other
+systems use little-endian (LSB). Utility
+functions for byte flipping can be found in the <code>endian.h</code> header file.</p>
+
+<a name="Section12"></a><h2>Thread Handling</h2>
+<p>UNIX applications being ported to Mac OS X will likely to use POSIX
+threads. Read the <a href="http://developer.apple.com/technotes/tn/tn2028.html">
+Mac OS X Threading Architectures</a>[29] document to understand how threads work in Mac OS X.</p>
+
+<p>Mac OS 10.2.x has increased support for POSIX APIs, which will enable 
+an easier transition for most developers porting to Mac OS X. The
+supported POSIX threading APIs are included in <code>pthread.h</code>.</p>
+
+<p>The POSIX thread functions are summarized in this section in the following groups:</p>
+<ul>
+    <li>Thread Routines</li>
+    <li>Attribute Object Routines</li>
+    <li>Mutex Routines</li>
+    <li>Condition Variable Routines</li>
+    <li>Read/Write Lock Routines</li>
+    <li>Per-Thread Context Routines</li>
+    <li>Cleanup Routines</li>
+</ul>
+
+<p>For those developers who have ported an UNIX application to Mac OS X
+10.1.x or plan to do so, note that <code>pthread_kill</code> and other <code>pthread</code> API have been added to Mac
+ OS X 10.2, and are included in <code>pthread.h</code> and <code>signal.h</code>. <code>pthread_kill</code> was
+not supported in Mac OS X prior to Mac OS X 10.2.</p>
+
+<a name="Section13"></a><h2>Internationalizaton</h2>
+
+<p>Wide-character <code>wchar</code> is not supported on Mac OS X, instead you should
+use the APIs available in the CoreFoundation's <code>CFString.h</code>, such as
+<code>CFStringGetSystemEncoding, CFStringCreateCopy, CFStringCreateMutable</code>,
+ etc. See <code>CFString.h</code> for the entire list of supported APIs.</p>
+
+<p>In Mac OS X, Internationalizaton of strings can be done using 
+Unicode-based strings. The <a href="http://www.unicode.org/standard/WhatIsUnicode.html">
+Unicode</a>[30] standard is defined by the <a href="http://www.unicode.org/">
+Unicode Consortium</a>[31], an international standards organization.</p>
+
+The encodings available in Mac OS X are: 
+
+    <center>
+     <table border="0" width="550" bgcolor="#E6E6E6">
+      <tr>
+      <td scope="row">
+       <pre>kCFStringEncodingMacRoman
+kCFStringEncodingWindowsLatin1
+kCFStringEncodingISOLatin1
+kCFStringEncodingNextStepLatin
+kCFStringEncodingASCII
+kCFStringEncodingUnicode
+kCFStringEncodingUTF8
+kCFStringEncodingNonLossyASCII</pre>
+       </td>
+      </tr>
+     </table>
+    </center>
+
+<p>To fully understand the capability of the CoreFoundation StringServices,
+please read the <a href="http://developer.apple.com/documentation/CoreFoundation/Reference/CFStringRef/Reference/index.html">
+reference documentation</a>[32].</p>
+
+<a name="Section14"></a><h2>Device Drivers</h2>
+
+<p>Device Drivers in Mac OS X are implemented differently from other 
+systems. When porting your application that uses device drivers,
+you must create new device drivers for Mac OS X.</p>
+
+
+<p>To create a new device driver you must use the I/O Kit. The I/O Kit is 
+a collection of system frameworks, libraries, tools, and other
+resources for creating device drivers in Mac OS X. An I/O Kit device
+driver is a special type of kernel extension (KEXT), which enables
+the kernel to handle your device.</p>
+
+<p>In many cases, devices can be accessed indirectly from userland processes
+without a need to write kernel drivers. We encourage this because it keeps
+your code out of the kernel whenever possible.</p>
+
+<p>See the <a href="http://developer.apple.com/documentation/DeviceDrivers/">
+documentation</a>[33] that shows you step-by-step how to create device drivers
+using Project Builder.</p>
+
+<a name="Section15"></a><h2>Audio</h2>
+
+<p>In order to port your audio application, you must understand the 
+fundamental Audio architecture used by Mac OS X, and rewrite your
+code using our Core Audio APIs.</p>
+
+<p>If you are porting an application that uses Linux's <code>soundcard.h</code>
+or Solaris's <code>audioio.h</code>, you should be able to find similar APIs in
+<code>CoreAudio.h</code>. Mac OS 10.2.x has added to the Core Audio architecture
+so that simple functionality can easily be done by simply using the
+Core Audio Framework. However, if your application uses lower-level APIs
+that deal with hardware, input or output, you will have to understand
+the entire architecture, which involves several frameworks.</p>
+
+<p>We highly recommend that you read the <a href="http://developer.apple.com/audio/coreaudio.html">
+Core Audio Developer Documentation</a>[34] before porting your application.</p>
+
+<a name="Section16"></a><h2>Video</h2>
+
+<p>If you are porting a video application, you should use the QuickTime 
+APIs, which are included in the QuickTime framework. The QuickTime
+framework will automatically call some of the audio APIs to
+guarantee that the audio from the video is ported along with the
+video. If you are not familiar with QuickTime and its APIs, please
+read the <a href="http://developer.apple.com/documentation/quicktime/quicktime.html">
+QuickTime Developer Documentation</a>[35].</p>
+
+<a name="Section17"></a><h2>Authorization Services</h2>
+
+<p>When porting an application that uses authorization services, you must
+use the APIs located in the <a href="http://developer.apple.com/security">Security Services</a>[36] framework. When using
+the Authorization APIs at the commnd line level, the APIs will ignore the
+GUI and prompt for password at the command-line.</p>
+
+<p>Authentication <em>handles</em> supported in Linux such as <code>auth_destroy,
+authnone_create, authunix_create, authunix_create_default</code> are
+supported in Mac OS X through <code>rpc</code>, see manual page for <code>rpc</code>
+for more information.</p>
+
+<p>Read the <a href="http://developer.apple.com/documentation/macosx/CoreTechnologies/securityservices/authorizationservices/authservices.html">
+Authorization Services</a>[37] document to understand how to use 
+access control in Mac OS X. Also see the <a href="http://developer.apple.com/samplecode/Sample_Code/Security/AuthSample.htm">
+sample code</a>[38] that demonstrates how to properly use the
+Authorization Services APIs.</p>
+
+<h2>Header Files</h2>
+<dl>
+<dt><code>alloc.h</code></dt>
+<dd>This file does not exist on Mac OS X, but the functionality does exist. You can simple
+ include <code>stdlib.h</code> or create own version of the file using the following code.
+    <center>
+     <table border="0" width="550" bgcolor="#E6E6E6">
+      <tr>
+      <td scope="row">
+       <pre>#ifndef _ALLOCA_H
+
+#undef  __alloca
+
+/* Now define the internal interfaces.  */
+extern void *__alloca (size_t __size);
+
+#ifdef  __GNUC__
+# define __alloca(size) __builtin_alloca (size)
+#endif /* GCC.  */
+
+#endif
+</pre>
+       </td>
+      </tr>
+     </table>
+    </center>
+</dd>
+<dt><code>ftw.h</code></dt>
+<dd>The API <code>ftw</code> traverses through the directory hierarchy and calls a
+function to get information about each file. In Mac OS X, use the API
+<code>fts_open</code> to get a handle on the file hierarchy, use <code>fts_read</code> to get
+information on each file, and use <code>fts_children</code> to get a link to a list
+of structures containing information about files in a directory.<br/><br/>
+
+Instead Mac OS X uses fts which is very
+similar to <code>ftw.h</code>. However, there isn't a function similar to <code>ftw</code> in
+<code>fts.h</code>. You must use <code>fts_open,fts_children</code>, and <code>fts_close</code> to
+implement file traverse.
+
+For example, in order to get a description of each file located in
+<code>/usr/include</code> using <code>fts.h</code>, then the code would be as follow:
+
+
+    <center>
+     <table border="0" width="550" bgcolor="#E6E6E6">
+     <tr>
+      <td scope="row">
+        <pre>/* assume that the path "/usr/include" has been passed through argv[3]*/
+
+fileStruct = fts_open(&argv[3], FTS_COMFOLLOW, 0);
+dirList = fts_children(fileStruct, FTS_NAMEONLY);
+
+do
+{
+ fileInfo = fts_read(dirList-&gt;fts_pointer);
+
+ /* at this point, you would be able to extract information from the
+ FTSENT returned by fts_read */
+
+ fileStruct = fts_open(dirList-&gt;fts_link-&gt;fts_name, 
+FTS_PHYSICAL, (void *)result);
+
+}while (dirList-&gt;fts_link != NULL);
+
+ftsResult = fts_close(fileStruct);</pre>
+       </td>
+      </tr>
+     </table>
+    </center>
+
+
+See manual page for <code>fts</code> to understand the structures <code>FTSENT, FTS</code>
+and to understand the macros used in the code. The sample code above shows a very 
+simplistic file traversing. For instance, it is not considering possible
+subdirectories existing in the directory being searched.
+</dd>
+
+<dt><code>getopt.h</code></dt>
+<dd>Not supoorted, use <code>unistd.h</code></dd>
+
+<dt><code>lcrypt.h</code></dt>
+<dd>Not supported, use <code>unistd.h</code></dd>
+
+<dt><code>malloc.h</code></dt>
+<dd>Not supported, use <code>stdlib.h</code></dd>
+
+<dt><code>mm.h</code></dt>
+<dd>This header is supported in Linux for memory mapping, but not supported
+in Max OS X. In Mac OS X, you can use <code>mmap</code> for mapping files into 
+memory. If you wish to map devices, use IOKit.</dd>
+
+<tdtd><code>module.h</code></dt>
+<dd>Use <code>NSModule</code> as the
+interface for working with modules and symbols. <code>NSModule</code> is simply a
+<code>void *</code> defined in the <code>&lt;mach-o/dyld.h&gt;</code> header file. Use the API:
+<code>NSLinkModule</code>.</dd>
+
+<dt><code>msg.h</code></dt>
+<dd>For information on how
+to implement message queues, see the <a href="http://developer.apple.com/technotes/tn/tn1071.html">Technical Note 1071</a>[39]. The APIs
+implemented in <code>msg.h</code> are also not supported, such as <code>msgget, msgsnd,
+msgrcv</code>, and <code>msgctl</code>. The Technical Note mentioned above will help
+you implement the functionality from these functions.</dd>
+
+<dt><code>nl_types.h</code></dt>
+<dd>Use <a href="http://developer.apple.com/documentation/CoreFoundation/Reference/index.html">CoreFoundation</a>[40]
+<a href="http://developer.apple.com/documentation/CoreFoundation/Reference/CFStringRef/Reference/index.html">localized string</a>[41] to access API.</dd>
+
+<dt><code>ptms.h</code></dt>
+<dd>This header file exists in Linux, but it doesn't in Mac OS X. However,
+<code>pty</code> is supported in Mac OS X. The implementation process is done very
+differently from Linux. See the full description of the <code>pty</code>
+implementation in manual page for <code>pty</code>.</dd>
+
+<dt><code>stream.h</code></dt>
+<dd>This header file is not present on the system. For file streaming use <code>iostream.h</code></dd>
+
+<dt><code>stropts.h</code></dt>
+<dd>Not supported.</dd>
+
+<dt><code>swapctl.h</code></dt>
+<dd>Mac OS X does not support this header file. You can use the header file
+<code>swap.h</code> to implement swap functionalities. The swap.h header file
+contains a large number of APIs that can be used for swap-tuning
+control.</dd>
+
+<dt><code>termio.h</code></dt>
+<dd>This header file has become obsolete, and has been replaced by <code>termios.h</code>,
+which is part of the POSIX standard. These two header files are
+very similar, however, the <code>termios.h</code> does not include the same header
+files as <code>termio.h</code>. Thus, you should make sure to look directly at
+the <code>termios.h</code> to make sure it does what your application needs.</dd>
+
+<dt><code>utmpx.h</code></dt>
+<dd>Not supported, use <code>utmp.h</code> instead.</dd>
+
+<dt><code>values.h</code></dt>
+<dd>Not supported, use <code>limits.h</code></dd>
+
+<dt><code>wchar.h</code></dt>
+<dd>Not supported, use <a href="http://developer.apple.com/documentation/CoreFoundation/Reference/index.html">CoreFoundation</a>[40] localized string API.</dd>
+
+<dt><code>wordexp.h</code></dt>
+<dd>Not supported on Mac OS X.</dd>
+</dl>
+
+<h2>Functions</h2>
+<dl>
+     <dt><code>btowc, wctob</code></dt>
+     <dd>
+Mac OS X does not currently support wchar, instead you deal with
+international strings by using <code>CFString</code>, which is part of the
+<a href="http://developer.apple.com/documentation/CoreFoundation/Reference/index.html">CoreFoundation</a>[40]
+framework. Some of the APIs available in the CoreFoundation
+<code>CFString.h</code> are <code>CFStringGetSystemEnconding, CFStringCreateCopy,
+CFStringCreateMutable</code>, etc. See <code>CFString.h</code> for the entire list of
+supported APIs.</dd>
+
+    <dt><code>catopen, catgets, catclose</code></dt><dd>
+<code>nl_types.h</code> is not supported, thus, these functions are not supported.
+These functions gives access to localized strings. There is no direct equivalent
+in Mac OS X. Typically in Mac OS X programs, including command line tools, use CoreFoundation to access localized
+resources. For example, see <a href="http://developer.apple.com/documentation/CoreFoundation/Reference/CFBundleRef/Reference/index.html"><code>CFBundleCopyLocalizedString</code></a>[42].
+        </dd>
+
+<dt><code>crypt</code></dt>
+
+<dd>The <code>crypt</code> function performs password encryption, based on the NBS
+Data Encryption Standard (DES). Additional code has been added to deter 
+ key search attempts.<br/></br/>
+
+This function takes in the same arguments, and return the same value
+type as the Linux <code>crypt</code>. Mac OS X's version of the function <code>crypt</code>
+behaves very similar to the Linux version, except that it encrypts a
+64-bit constant rather than a 128-bit constant. This function is
+located in the <code>unistd.h</code> header file rather than <code>lcrypt.h</code>.
+
+    <center>
+     <table border="0" width="550" bgcolor="#E6E6E6">
+      <tr>
+      <td scope="row">
+<b>Note</b>: The linker flag <code>-lcrypt</code> is not supported in Mac OS X.
+       </td>
+      </tr>
+     </table>
+    </center>
+</dd>
+
+
+<dt><code>dysize</code></dt>
+
+<dd>This API is not supported in Mac OS X. Its calculation for leap year is
+based on:
+
+    <center>
+     <table border="0" width="550" bgcolor="#E6E6E6">
+      <tr>
+      <td scope="row">
+       <pre>(year) %4 == 0 && ((year) %100 != 0 || (year) % 400 == 0)</pre>
+       </td>
+      </tr>
+     </table>
+    </center> 
+
+You can either use this code to implement this functionality, or you can
+use any of the existing APIs in time.h to do something similar. </dd>
+
+<dt><code>ecvt, fcvt</code></dt>
+<dd>Not supported in Mac OS X. Use <code>sprintf</code>, or <code>snprintf</code> instead.</dd>
+
+<dt><code>fcloseall</code></dt>
+<dd>This function is an extension to <code>fclose</code>. Even though Mac OS X supports
+<code>fclose</code>, <code>fcloseall</code> is not supported. You can use <code>fclose</code> to implement
+<code>fcloseall</code>:
+
+Assuming there is an array of <code>FILE *streams</code>, called <code>fileNamePtr[i]</code>:
+
+    <center>
+     <table border="0" width="550" bgcolor="#E6E6E6">
+      <tr>
+      <td scope="row">
+       <pre>for(i = 0; i &lt; MAXSTREAMS; i++)
+     fclose(fileNamePtr[i]); 
+</pre>
+       </td>
+      </tr>
+     </table>
+    </center> 
+</dd>
+
+<dt><code>getmntent, setmntent, addmntent, endmntent, hasmntopt</code></dt>
+<dd>Mac OS X uses the POSIX standard to manage file descriptors. These
+functions are not supported.</dd>
+
+<dt><code>poll</code></dt>
+<dd>This API is not supported in Mac OS X, instead, the function <code>select</code> is 
+used.
+
+The <code>select</code> function does synchronous I/O multiplexing, similar to
+<code>poll</code>. This API is located in the following header files:
+<code>&lt;sys/types.h&gt;, &lt;sys/time.h&gt;, &lt;unistd.h&gt;</code>
+
+The select API is defined as follow: 
+
+    <center>
+     <table border="0" width="550" bgcolor="#E6E6E6">
+      <tr>
+      <td scope="row">
+       <pre>int select(int nfds, fd_set *readfds, fd_set *writefds,
+       fd_set *exceptfds, struct timeval *timeout);</pre>
+       </td>
+      </tr>
+     </table>
+    </center> 
+
+The behavior of <code>select</code> is not exactly the same as <code>poll</code>, so you will
+have to alter your code. <code>select</code> gives you a number of macros to
+manipulate the file descriptor returned, which is done differently in
+<code>poll</code><br/><br/>
+
+An alternative to avoid changing your code is to use a wrapper around <code>select</code>,
+such as <code>fakepoll.h</code>. 
+Simply include the file <code>fakepoll.h</code> in your code, and the library does
+the rest of the work. See <a href="http://sealiesoftware.com/fakepoll.h">sealiesoftware.com/fakepoll.h</a> for more
+information about <code>fakepoll.h</code>.
+
+
+    <center>
+     <table border="0" width="550" bgcolor="#E6E6E6">
+      <tr>
+      <td scope="row">
+<b>Note</b>: <code>fakepoll.h</code> is a third-party library and not supported by Apple. 
+       </td>
+      </tr>
+     </table>
+    </center>
+    </dd>
+
+<dt><code>sbrk, brk</code><dt>
+<dd>The <code>brk</code> and <code>sbrk</code> functions are historical curiosities left
+over from earlier days before the advent of virtual memory management. Even though they
+are present on the system, their use is not recommended.</dd>
+
+<dt><code>shmget</code><dt>
+<dd>This API is supported but its use is not recommended. <code>shmget</code> has a
+limited memory blocks allocation. When several applications use <code>shmget</code>,
+this limit may change and cause problems for the other
+applications. We recommend the use of <code>mmap</code> for file mapping into
+memory.</dd>
+
+<dt><code>swapon, swapoff</code><dt>
+<dd>This API is not supported in Mac OS X. The equivalent to it in Mac OS X
+is <code>macx_swapon</code> and <code>macx_swapoff</code>.</dt>
+
+<dt><code>wordexp, wordfrees</code></dt>
+<dd>Not supported in Mac OS X.</dd>
+
+<h2>Utilities</h2>
+<dl>
+<dt><code>ldd</code></dt>
+<dd>The <code>ldd</code> command is not available in Mac OS X; however, you can use
+the command <code>otool -L</code> to get the same functionality that <code>ldd</code> does.
+The <code>otool</code> command displays specified parts of object files or libraries. 
+The option <code>-L</code>
+displays the name and version numbers of the shared libraries that the
+object file uses. To see all the existing options, see the manual page for
+<code>otool</code>.</dd>
+
+<dt><code>lsmod</code></dt>
+<dd><code>lsmod</code> is not available on Mac OS X, but other commands exist which offer
+similar functionality. If you simply want information, then <code>kmodstat</code> will
+be the most helpful. <code>kmodstat</code> prints statistics about  currently loaded
+drivers and other kernel extensions. Other related functions are
+listed below:
+<dl>
+<dt><code>kmodload</code><dt>
+<dd>Loads the kernel module for a device driver or other kernel extensions.</dd>
+<dt><code>kmodunload</code></dt>
+<dd>Unloads the kernel module for a device driver or other kernel extensions.</dd>
+<dt><code>kmodsyms</code></dt>
+<dd>Creates a statically linked symbol file for remote debugging.</dd>
+</dd>
+</dl>
+</dl>
+    <!-- document_end_content -->
+
+<h2>References<a name="References"></a></h2>
+  <h3>Apple's Developer Connection Documentation</h3>
+  <ul>
+    <li>
+      Darwin: (<a href="http://developer.apple.com/darwin/">developer.apple.com/darwin</a>)
+    </li>
+    <li>
+      UNIX Porting: (<a href="http://developer.apple.com/documentation/Darwin/GettingStarted/PortingUNIX/">developer.apple.com/documentation/Darwin/GettingStarted/PortingUNIX</a>)
+    </li>
+    <li>
+      Kernel Programming: (<a href="http://developer.apple.com/documentation/Darwin/General/KernelProgramming/">developer.apple.com/documentation/Darwin/General/KernelProgramming</a>)
+    </li>
+    <li>
+      IOKit Fundamentals: (<a href="http://developer.apple.com/documentation/Darwin/General/IOKitFundamentals/index.html">developer.apple.com/documentation/Darwin/General/IOKitFundamentals</a>)
+    </li>
+    <li>
+      Compiler Tools: (<a href="http://developer.apple.com/documentation/ReleaseNotes/CompilerTools.html">developer.apple.com/documentation/ReleaseNotes/CompilerTools.html</a>)
+    </li>
+    <li>
+      Differences between Mac OS X and BSD: (<a href="http://developer.apple.com/documentation/Darwin/General/KernelProgramming/BSD/chapter_11_section_3.html">developer.apple.com/documentation/Darwin/General/KernelProgramming/BSD/chapter_11_section_3.html</a>)
+    </li>
+    <li>
+      Moving Your Code to Mac OS X: (<a href="http://developer.apple.com/technotes/tn/tn2003.html">developer.apple.com/technotes/tn/tn2003.html</a>)
+    </li>
+    <li>
+      Threading Architectures (<a href="http://developer.apple.com/technotes/tn/tn2028.html">developer.apple.com/technotes/tn/tn2028.html</a>)
+    </li>
+    <li>
+      Key-based Authentication and Encryption: (<a href="http://developer.apple.com/documentation/Darwin/Conceptual/KernelProgramming/security/chapter_3_section_8.html">developer.apple.com/documentation/Darwin/Conceptual/KernelProgramming/security/chapter_3_section_8.html</a>)
+    </li>
+  </ul>
+<h3>Third Party Porting Documentation</h3>
+  <ul>
+    <li>Fink Project: (<a href="http://fink.sourceforge.net/doc/porting/">fink.sourceforge.net/doc/porting</a>)</li>
+    <li>Darwin Porting Notes: (<a href="http://gnu-darwin.sourceforge.net/porting.html">gnu-darwin.sourceforge.net/porting.html</a>)
+    </li>
+  </ul>
+  
+<h3>URLs</h3>
+<ol>
+    <li>Mac OS X: (<a href="http://www.apple.com/macosx/">www.apple.com/macosx/</a>)</li>
+    <li>UNIX: (<a href="http://www.unix.org/">www.unix.org/</a>)</li>
+    <li>Inside Mac OS X: System Overview: (<a href="http://developer.apple.com/documentation/macosx/Essentials/devessentials.html">developer.apple.com/documentation/macosx/Essentials/devessentials.html</a>)</li>
+    <li>OpenDarwin: (<a href="http://www.opendarwin.org">www.opendarwin.org</a>)</li>
+    <li>Fink: (<a href="http://fink.sourceforge.net">fink.sourceforge.net</a>)</li>
+    <li>Apple's developer Web Site: (<a href="http://developer.apple.com/techpubs">developer.apple.com/techpubs</a>)</li>
+    <li>Mac OS X Developer Tools: (<a href="http://developer.apple.com/tools/macosxtools.html">developer.apple.com/tools/macosxtools.html</a>)</li>
+    <li><code>unix-porting</code>: (<a href="http://lists.apple.com/mailman/listinfo/unix-porting">lists.apple.com/mailman/listinfo/unix-porting</a>)</li>
+    <li><code>darwin-development</code>: (<a href="http://lists.apple.com/mailman/listinfo/darwin-development">lists.apple.com/mailman/listinfo/darwin-development</a>)</li>
+    <li><code>darwinos-users</code>: (<a href="http://lists.apple.com/mailman/listinfo/darwinos-users">lists.apple.com/mailman/listinfo/darwinos-users</a>)</li>
+    <li>Lists Archives: (<a href="http://search.lists.apple.com">search.lists.apple.com</a>)</li>
+    <li>O'Reilly's Mac DevCenter: (<a href="http://www.macdevcenter.com/">www.macdevcenter.com</a>)</li>
+    <li>Stepwise: (<a href="http://www.stepwise.com">www.stepwise.com</a>)</li>
+    <li>Berkeley Software Distributions (BSD): (<a href="http://www.bsd.org/">www.bsd.org</a>)</li>
+    <li>FreeBSD: (<a href="http://www.freebsd.org">www.freebsd.org</a>)</li>
+    <li>NetBSD: (<a href="http://www.netbsd.org">www.netbsd.org</a>)</li>
+    <li>Carnegie Mellon's Mach Project: (<a href="http://www-2.cs.cmu.edu/afs/cs.cmu.edu/project/mach/public/www/mach.html">www-2.cs.cmu.edu/afs/cs.cmu.edu/project/mach/public/www/mach.html</a>)</li>
+    <li>Darwin: (<a href="http://developer.apple.com/darwin/">developer.apple.com/darwin</a>)</li>
+    <li>Quartz Extreme: (<a href="http://developer.apple.com/quartz/">developer.apple.com/quartz</a>)</li>
+    <li>OpenGL: (<a href="http://developer.apple.com/opengl/">developer.apple.com/opengl</a>)</li>
+    <li>QuickTime: (<a href="http://developer.apple.com/quicktime/">developer.apple.com/quicktime</a>)</li>
+    <li>International Technologies: (<a href="http://developer.apple.com/intl/">developer.apple.com/intl</a>)</li>
+    <li>CUPS: (<a href="http://developer.apple.com/printing/">developer.apple.com/printing</a>)</li>
+    <li>Project Builder: (<a href="http://developer.apple.com/tools/projectbuilder/">developer.apple.com/tools/projectbuilder</a>)</li>
+    <li>Interface Builder: (<a href="http://developer.apple.com/tools/interfacebuilder/">developer.apple.com/tools/interfacebuilder</a>)</li>
+    <li>Apple Development Tools: (<a href="http://developer.apple.com/tools">developer.apple.com/tools</a>)</li>
+    <li>Linux: (<a href="http://www.kernel.org/">www.kernel.org</a>)</li>
+    <li>Solaris: (<a href="http://wwws.sun.com/software/solaris/">wwws.sun.com/software/solaris</a>)</li>
+    <li>Mac OS X Threading Architectures: (<a href="http://developer.apple.com/technotes/tn/tn2028.html">developer.apple.com/technotes/tn/tn2028.html</a>)</li>
+    <li>Unicode: (<a href="http://www.unicode.org/standard/WhatIsUnicode.html">www.unicode.org/standard/WhatIsUnicode.html</a>)</li>
+    <li>Unicode Consortium: (<a href="http://www.unicode.org/">www.unicode.org</a>)</li>
+    <li>CoreFoundation StringServices: (<a href="http://developer.apple.com/documentation/CoreFoundation/Reference/CFStringRef/index.html">developer.apple.com/documentation/CoreFoundation/Reference/CFStringRef/index.html</a>)</li>
+    <li>Creating a Device Driver With Project Builder: (<a href="http://developer.apple.com/documentation/DeviceDrivers/">developer.apple.com/documentation/DeviceDrivers/</a>)</li>
+    <li>Core Audio Developer Documentation: (<a href="http://developer.apple.com/audio/coreaudio.html">developer.apple.com/audio/coreaudio.html</a>)</li>
+    <li>QuickTime Developer Documentation: (<a href="http://developer.apple.com/documentation/quicktime/quicktime.html">developer.apple.com/documentation/quicktime/quicktime.html</a>)</li>
+    <li>Security Services: (<a href="http://developer.apple.com/security">developer.apple.com/security</a>)</li>
+    <li>Authorization Services: (<a href="http://developer.apple.com/documentation/macosx/CoreTechnologies/securityservices/authorizationservices/authservices.html">developer.apple.com/documentation/macosx/CoreTechnologies/securityservices/authorizationservices/authservices.html</a>)</li>
+    <li>Authorization Sample Code: (<a href="http://developer.apple.com/samplecode/Sample_Code/Security/AuthSample.htm">developer.apple.com/samplecode/Sample_Code/Security/AuthSample.htm</a>)</li>
+    <li>Working With Multiprocessing Services (TN 1071): (<a href="http://developer.apple.com/technotes/tn/tn1071.html">developer.apple.com/technotes/tn/tn1071.html</a>)</li>
+    <li>CoreFoundation: (<a href="http://developer.apple.com/documentation/CoreFoundation/Reference/index.html">developer.apple.com/documentation/CoreFoundation/Reference/index.html</a>)</li>
+    <li>CFString Reference: (<a href="http://developer.apple.com/documentation/CoreFoundation/Reference/CFStringRef/index.html">developer.apple.com/documentation/CoreFoundation/Reference/CFStringRef/index.html</a>)</li>
+    <li><code>CFBundleCopyLocalizedString</code>: (<a href="http://developer.apple.com/documentation/CoreFoundation/Reference/CFBundleRef/index.html">developer.apple.com/documentation/CoreFoundation/Reference/CFBundleRef/index.html</a>)</li>
+    <li>GNU C Preprocessor (<a href="http://developer.apple.com/documentation/DeveloperTools/gcc3/cpp/index.html">developer.apple.com/documentation/DeveloperTools/gcc3/cpp/index.html</a>)</li>
+</ol>
+
+   </td>
+  </tr>
+ </table>
+</center>
+
+<!-- begin_footer_information -->	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/technotes/tn2002/tn2071.html%3Fid%3DDTS10003098-1.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/technotes/tn2002/tn2071.html%3Fid%3DDTS10003098-1.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/technotes/tn2002/tn2071.html%3Fid%3DDTS10003098-1.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+<!--#include virtual="/includes/footer"--><!-- end_footer_information -->
+
+</body>
+</html>

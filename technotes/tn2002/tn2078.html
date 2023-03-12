@@ -1,0 +1,420 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<!-- BEGIN META TAG INFO --><link rel="home" href="http://developer.apple.com/">
+<link rel="find" href="http://developer.apple.com/search/">
+<link rel="stylesheet" type="text/css" href="../../documentation/css/adcstyle.css" title="fonts">
+<script language="JavaScript" type="text/javascript" src="../../documentation/js/busnav.js"></script><script language="JavaScript" src="../../documentation/js/adc.js" type="text/javascript"></script><!-- END META TAG INFO --><!-- BEGIN TITLE --><title>Technical Note TN2078: Migrating to FSRefs &amp; long Unicode names from FSSpecs</title>
+<!-- END TITLE -->
+</head>
+<!-- BEGIN BODY OPEN --><body bgcolor="#ffffff"><a name="//apple_ref/doc/uid/DTS10003097" title="Migrating to FSRefs & long Unicode names from FSSpecs"></a>
+<!-- END BODY OPEN --><!-- START CENTER OPEN --><center>
+<!-- END CENTER OPEN --><a name="top"></a><!-- BEGIN LOGO AND SEARCH --><!--#include virtual="/includes/adcnavbar" --><!-- END LOGO AND SEARCH --><!-- START BREADCRUMB --><div id="breadcrumb"><table width="680" border="0" cellpadding="0" cellspacing="0">
+<tr>
+<td scope="row"><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+<td><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+</tr>
+<tr valign="middle"><td align="left" colspan="2">
+<a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../technicalnotes/index.html">Technical Notes</a> &gt; <a href="../../technicalnotes/Carbon/index.html">Carbon</a> &gt; <a href="../../technicalnotes/Carbon/idxFileManagement-date.html">File Management</a> &gt; </td></tr>
+<tr><td colspan="2" scope="row"><img width="680" height="35" src="images/1dot.gif" alt=""></td></tr>
+</table></div>
+<!-- END BREADCRUMB --><!-- START MAIN CONTENT --><!-- START TITLE GRAPHIC AND INTRO --><table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td><h1>
+<div id="pagehead">Technical Note TN2078</div>
+<div id="pageheadsub">Migrating to FSRefs &amp; long Unicode names from FSSpecs</div>
+</h1></td></tr></table>
+<!-- END TITLE GRAPHIC AND INTRO --><!-- BEGIN WIDE COLUMN --><table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td align="left" width="680">
+<!-- BEGIN CONTENTS --><table width="680" border="0" cellpadding="0" cellspacing="0">
+<tr align="left" valign="top"><td>
+<p>Long Unicode name support, large file access, and better performance are a few of the reasons you should consider migrating your legacy <code>FSSpec</code> based File Manager code to take advantage of <code>FSRef</code> based APIs.</p>
+<p>There are some things you should know about file paths, Unicode and interoperability before you make the transition.</p>
+<p>The first two sections of this document cover many of the issues you will face during the transition, offer code examples, and detailed descriptions of the options you have, as well as tips and tricks to easing the transition. The last section delves a deeper into Unicode.</p>
+</td></tr>
+<tr><td scope="row">
+<img width="680" height="10" src="images/1dot.gif" alt=""><br><img width="680" height="1" src="images/1dot_919699.gif" alt=""><br><img width="680" height="20" src="images/1dot.gif" alt="">
+</td></tr>
+</table>
+<table width="680" border="0" cellpadding="0" cellspacing="0">
+<tr align="left" valign="top"><td width="680"><ul>
+<li><a href="#TAN4">FSSpecs and FSRefs</a></li>
+<ul>
+<li><a href="#DIFFERENCES">Differences between FSSpecs and FSRefs</a></li>
+<li><a href="#CONVERTING">Converting FSSpecs to FSRefs and back</a></li>
+<li><a href="#VALIDFSREF">How can I tell if an FSRef is valid?</a></li>
+<li><a href="#SAMEFSREFS">How can I tell if they reference the same item?</a></li>
+<li><a href="#GETPARENT">Getting the parent directory of an FSRef</a></li>
+<li><a href="#NOFILEYET">How do I specify non-existent items, such as files you plan to create?</a></li>
+<li><a href="#APPLEEVENTS">Apple events</a></li>
+<li><a href="#PERSISTENTSTORAGE">Persistent storage</a></li>
+<li><a href="#CONTINUEFSSPECS">Can I continue to use FSSpecs?</a></li>
+<li><a href="#FSREFTOAPP">How do I get an FSRef to my application?</a></li>
+<li><a href="#LAUNCHSERVICES">LaunchServices</a></li>
+<li><a href="#GETTINGAFILEPATH">Getting a file path</a></li>
+<li><a href="#ADDITIONALNOTES">Additional Notes</a></li>
+</ul>
+<li><a href="#FSREFSANDLONGNAMES">FSRefs and long Unicode file names</a></li>
+<ul>
+<li><a href="#NAMEFROMFSREF">How do I get the name of an item from an FSRef?</a></li>
+<li><a href="#NOTESABOUTUNICODESTRINGS">Notes about Unicode strings</a></li>
+<li><a href="#TRUNCATEUNICODEBYWIDTH">Truncating Unicode strings by width</a></li>
+<li><a href="#TRUNCATEUNICODEBYLENGTH">Truncating Unicode strings by length</a></li>
+<li><a href="#CATENATION">Concatenation</a></li>
+<li><a href="#DETERMININGSTRINGWIDTH">Determining the width of strings</a></li>
+<li><a href="#ENCODINGFORMATS">Encoding file names in other formats</a></li>
+<li><a href="#HOWENCODED">How file names are encoded</a></li>
+</ul>
+<li><a href="#UNICODENOTES">Notes About Using Unicode</a></li>
+<ul>
+<li><a href="#WHATISUNICODE">What is Unicode?</a></li>
+<li><a href="#UNICODETERMINOLOGY">Unicode terminology</a></li>
+<li><a href="#TRUNCATINGUNICODE">Truncating and other manipulations</a></li>
+<li><a href="#FINALUNICODECOMMENTS">Final Unicode comments</a></li>
+</ul>
+<li><a href="#REFERENCES_">References </a></li>
+<li><a href="#document_revision_summary">Document Revision History</a></li>
+</ul></td></tr>
+<tr><td colspan="3" scope="row">
+<img width="680" height="10" src="images/1dot.gif" alt=""><br><img width="680" height="1" src="images/1dot_919699.gif" alt=""><br><img width="680" height="20" src="images/1dot.gif" alt="">
+</td></tr>
+</table>
+<a name="TAN4"></a><h2>FSSpecs and FSRefs</h2>
+<p>Contains information and coding techniques useful in migrating your source from FSSpecs to using FSRefs.</p>
+<a name="DIFFERENCES"></a><h3>Differences between FSSpecs and FSRefs</h3>
+<p class="caption"><strong>Listing 1: </strong>Definitions in Files.h.</p>
+<pre class="sourcecodebox">struct FSSpec {
+  short         vRefNum;
+  long          parID;
+  StrFileName   name; /* a Str63 */
+};
+
+struct FSRef {
+  UInt8         hidden[80]; /* private to File Manager*/
+};</pre>
+<p>The differences which will probably have the biggest impact on your code are that FSRefs cannot represent items which do not exist, and an <code>FSRef</code> is an opaque data structure defined as an array of 80 bytes, the content of which is not documented. In particular, an <code>FSRef</code> does not contain the name of the item to which it refers. This comes as no surprise when you consider that Mac OS X allows the use of file names containing Unicode characters, with a maximum length of 255 UniChars (see <a href="#FSREFSANDLONGNAMES">FSRefs and long Unicode file names</a> for more on this). </p>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="CONVERTING"></a><h3>Converting FSSpecs to FSRefs and back</h3>
+<p>To convert an <code>FSSpec</code> to an <code>FSRef</code>:</p>
+<p><code>err = FSpMakeFSRef( &amp;fsSpec, &amp;fsRef );</code> </p>
+<p>To obtain an <code>FSSpec</code> from an <code>FSRef</code>:</p>
+<p><code>err = FSGetCatalogInfo( &amp;fsRef, kFSCatInfoNone, NULL, NULL,   &amp;fsSpec, NULL );</code> </p>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="VALIDFSREF"></a><h3>How can I tell if an FSRef is valid?</h3>
+<pre class="sourcecodebox"> Boolean FSRefIsValid( const FSRef &amp;fsRef ) {
+
+     return ( FSGetCatalogInfo( &amp;fsRef, kFSCatInfoNone, NULL, NULL, NULL, NULL ) == noErr );
+ }</pre>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="SAMEFSREFS"></a><h3>How can I tell if they reference the same item?</h3>
+<pre class="sourcecodebox">if ( FSCompareFSRefs( &amp;fsRef1, &amp;fsRef2 ) == noErr )</pre>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="GETPARENT"></a><h3>Getting the parent directory of an FSRef</h3>
+<pre class="sourcecodebox">err = FSGetCatalogInfo( &amp;fsRef, kFSCatInfoNone, NULL, NULL, 
+          NULL, &amp;parentFSRef );</pre>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="NOFILEYET"></a><h3>How do I specify non-existent items, such as files you plan to create?</h3>
+<p class="caption"><strong>Listing 2: </strong>Common technique adopted by many developers is to create a pseudo <code>FSSpec</code> like structure or class.</p>
+<pre class="sourcecodebox">struct ExtFSRef {
+  FSRef           parentFSRef;
+  HFSUniStr255    name;
+};
+
+class CExtFSRef {
+  FSRef           parentFSRef;
+  HFSUniStr255    name;
+  // ... Some useful member functions
+};</pre>
+<p>This technique is especially useful when storing data returned by <code>NavCreatePutFileDialog()</code>. The Unicode-savvy file creation APIs take a parent <code>FSRef</code> and a <code>HFSUniStr255</code> name, so just store the information that way right up front instead of converting to a <code>CFURLRef</code> and then converting to parent <code>FSRef</code> and <code>HFSUniStr255</code> later. You could equally well save the name as a <code>CFStringRef</code> since that's how it's stored in the NavReplyRecord, and then create a <code>HFSUniStr255</code> when you need it: </p>
+<p class="caption"><strong>Listing 3: </strong>Storing file names as CFStringRefs instead of <code>HFSUniStr255</code></p>
+<pre class="sourcecodebox">struct ExtFSRef2 {
+  FSRef            parentFSRef;
+  CFStringRef      name;
+};
+
+class CExtFSRef2 {
+  FSRef            parentFSRef;
+  CFStringRef      name;
+  // ... Some useful member functions
+};</pre>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="APPLEEVENTS"></a><h3>Apple events</h3>
+<p>Don't pass FSRefs in AppleEvents. Because FSRefs are not guaranteed to be valid across processes in Mac OS X you shouldn't send them in AppleEvents. <a href="http://developer.apple.com/samplecode/Sample_Code/Archive/Interapplication_Comm/Finder/MoreFinderEvents.htm">MoreFinderEvents</a> contains code demonstrating how to pass aliases to the Finder through AppleEvents.</p>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="PERSISTENTSTORAGE"></a><h3>Persistent storage</h3>
+<p>Like FSSpecs, FSRefs are not guaranteed to be valid across boots in Mac OS 9 or Mac OS X, across processes in Mac OS X, or even across separate launches of the same application in Mac OS X, so don't use them when you need persistent storage. For persistent storage, aliases are still the recommended approach. (<a href="http://developer.apple.com/documentation/Carbon/Files/AliasManager/aliasmanager.html">Alias Manager</a>)</p>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="CONTINUEFSSPECS"></a><h3>Can I continue to use FSSpecs?</h3>
+<p>Yes, they continue to be valid file references. An <code>FSSpec</code>'s name can be mangled, though, so don't use them to get file names for either storage or display. The names are mangled when the real name can't be stored in a Pascal string, or if the name is longer than 31 characters. In the latter case you get names like "A really, really long file#23A4". The <code>FSSpec</code> still works, it just doesn't contain the item's real name.</p>
+<p>It depends on your application.</p>
+<p>The QuickTime and Drag Manager APIs still require FSSpecs, but creating temporary FSSpecs from FSRefs is an easy operation.</p>
+<p>You have to use the new <code>NavCreateXXX</code> APIs introduced in Navigation Services 3.0. (<a href="http://developer.apple.com/documentation/Carbon/Files/NavigationServices/navigationservices.html">Navigation Services</a>) You also have to use these if you want to implement open and save dialogs as sheets (though they don't need to be sheets)</p>
+<div class="notebox"><p><strong>Note: </strong>If you use kWindowModalityAppModal for any of the new <code>NavCreateXXX</code> APIs, <code>NavDialogRun()</code> will not return until the user dismisses the dialog. If you use kWindowModalityWindowModal to get sheet behavior, <code>NavDialogRun()</code> will return immediately in Mac OS X. That is, NavDialogRun gets it going, but then it runs like a normal window. This behavior is often overlooked when transitioning from application modal behavior to window modal (sheet) behavior.</p></div>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="FSREFTOAPP"></a><h3>How do I get an FSRef to my application?</h3>
+<p class="caption"><strong>Listing 4: </strong>If it's a single CFM binary, you can get an <code>FSSpec</code> and convert it to an <code>FSRef</code>.</p>
+<pre class="sourcecodebox">OSErr GetCurrentProcessFSSpec( FSSpec *outFSSpec )
+{
+  ProcessSerialNumber  currentProcess = { 0, kCurrentProcess };
+  ProcessInfoRec       processInfo;
+  processInfo.processInfoLength = sizeof(ProcessInfoRec);
+  processInfo.processName       = NULL; /* don't need the process name */
+  processInfo.processAppSpec    = outFSSpec;
+  return GetProcessInformation( &amp;currentProcess, &amp;processInfo );
+}</pre>
+<p>If your application is bundled, this will get an <code>FSRef</code> for your executable, not the bundle folder. </p>
+<p class="caption"><strong>Listing 5: </strong>How to get the <code>FSRef</code> to your application bundle, CFM or Mach-O.</p>
+<pre class="sourcecodebox">OSErr GetMyBundleFSRef( FSRef *outFSRef ) 
+{
+  ProcessSerialNumber  currentProcess = { 0, kCurrentProcess }; 
+  return( GetProcessBundleLocation( &amp;currentProcess, outFSRef ) ); 
+}</pre>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="LAUNCHSERVICES"></a><h3>LaunchServices</h3>
+<p>LaunchServices is a set of Mac OS X-only APIs for working with files. Read through &lt;LaunchServices.h&gt; if you want to be up-to-date on files in Mac OS X, where there are some new issues like bundled applications, display names, new rules for application binding, and so on. <a href="/technotes/tn/tn2017.html">Technical Note TN2017, 'Using Launch Services for discovering document binding and launching applications'</a>, also contains a wealth of information.</p>
+<p class="caption"><strong>Listing 6: </strong>Packages are kind of a cross between files and folders. Use <code>LSCopyItemInfoForRef()</code> to determine if a folder is a package/bundled application in Mac OS X.</p>
+<pre class="sourcecodebox">OSStatus LSIsApplication( const FSRef *inRef, Boolean *outIsApplication,
+                          Boolean *outIsBundled )
+{
+  LSItemInfoRecord  info;
+  OSStatus  err = LSCopyItemInfoForRef( inRef, kLSRequestBasicFlagsOnly,
+                                        &amp;info );
+
+  if ( err == noErr )
+  {
+    *outIsApplication = ( kLSItemInfoIsApplication &amp;info.flags ) != 0;
+    *outIsBundled = ( kLSItemInfoIsPackage &amp;info.flags ) != 0;
+  }
+  return( err );
+}</pre>
+<p>Use <code>LSCopyItemInfoForRef()</code> with the <code>kLSRequestTypeCreator</code> mask to get the type and creator of a bundled application. <code>FSGetCatalogInfo()</code> treats bundled applications as ordinary folders and hence can't be used to access the file type or creator of a bundled application. </p>
+<p>Use <code>LSGetApplicationForItem()</code> to determine what application would be used by the Finder to open a file.</p>
+<p>Use <code>LSGetApplicationForInfo()</code> to locate the application which would be used to open files with a certain extension, type, or creator. This is necessary in OS X because of the complex rules for binding files to applications, and the fact that users can specify an application for opening all files with a given creator, type, and/or extension, thereby overriding the default behavior you might expect.</p>
+<p>Use <code>LSCopyDisplayNameForRef()</code> to get the name the Finder displays. i.e., if the 'Always show file extensions' option is off in Finder Preferences, the name returned by <code>LSCopyDisplayNameForRef()</code> will not contain the extension if it's not displayed in the Finder. For example, TextEdit's full name is "TextEdit.cpp", but <code>LSCopyDisplayNameForRef()</code> will return "TextEdit". As with all Launch Services APIs, <code>LSCopyDisplayNameForRef()</code> is not available in Mac OS 9, but the Mac OS 9 Finder always displays the file system name, so it's not a issue there.</p>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="GETTINGAFILEPATH"></a><h3>Getting a file path</h3>
+<p>The most straightforward approach to getting a files path is with the API:</p>
+<pre class="sourcecodebox">OSStatus FSRefMakePath( const FSRef * ref, UInt8 * path, UInt32 
+          maxPathSize);</pre>
+<p>This will return back a UTF8 encoded path to the object specified by the <code>FSRef</code>. The drawback to using this routine is that you must pass in a fixed size buffer, and therefore will return an error if the path to be returned will not fit in the buffer. Be sure to read the comments in Files.h for this API, as they imply it can return mangled names in Mac OS 9. Files.h also describes when <code>FSRefMakePath()</code> returns an HFS file path (Mac OS 9), and when it returns a POSIX path in UTF-8 format (Mac OS X).</p>
+<p class="caption"><strong>Listing 7: </strong>Another way get to a file's path is to create a <code>CFURLRef</code> and use that to obtain the path</p>
+<pre class="sourcecodebox">CFURLRef url = CFURLCreateFromFSRef( kCFAllocatorDefault, &amp;fsRef );
+CFStringRef cfString = NULL;
+if ( url != NULL )
+{
+  cfString = CFURLCopyFileSystemPath( url, inPathStyle );
+  CFRelease( url );
+}</pre>
+<p class="caption"><strong>Listing 8: </strong> If you want an HFS-style path in Mac OS X, or you find <code>FSRefMakePath()</code> doesn't work all the time, you can use something like the this code to build the path yourself.</p>
+<pre class="sourcecodebox">Boolean GetPathManually( const FSRef *inFSRef, CFMutableStringRef ioPath,
+                         UniChar inSepChar )
+{
+  //ioPath should already be created with CFStringCreateMutablexxx.
+  FSCatalogInfo catalogInfo;
+  int           n;
+  int           i;
+  HFSUniStr255 names[100];
+  FSRef         localRef  = *inFSRef;
+  OSStatus      err       = noErr;
+
+  CFStringDelete( ioPath, CFRangeMake( 0, CFStringGetLength( ioPath ) ) );
+  for ( n=0 ; err==noErr &amp;&amp; catalogInfo.nodeID != fsRtDirID &amp;&amp; n&lt;100 ; n++ )
+  {
+    err = FSGetCatalogInfo( &amp;localRef, kFSCatInfoNodeID, &amp;catalogInfo,
+                           &amp;names[n], nil, &amp;localRef );
+  }
+  for ( i = n - 1; i &gt;= 0; --i )
+  {
+    CFStringAppendCharacters( ioPath, names[i].unicode, names[i].length );
+    if ( i &gt; 0 )
+      CFStringAppendCharacters( ioPath, &amp;inSepChar, 1 );
+  }
+  return( err == noErr );
+}</pre>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="ADDITIONALNOTES"></a><h3>Additional Notes</h3>
+<p>Because the contents of an <code>FSRef</code> are undocumented, those contents may vary depending on the format of the volume containing the item to which the <code>FSRef</code> refers. Currently, an <code>FSRef</code> for an item on a HFS or HFS+ volume continues to remain valid even if the item is moved or renamed, presumably because such an <code>FSRef</code> contains a file or directory ID for the item and a volume reference number. In this regard an <code>FSRef</code> is more robust than an <code>FSSpec</code>. Note that this is the current state of affairs, and as with any opaque data structure, any of this could change at any time and should not be relied upon. If you need robust file tracking, use aliases. (<a href="http://developer.apple.com/documentation/Carbon/Files/AliasManager/Alias_Manager/alias_manager/index.html">Alias Manager</a>) </p>
+<p><strong>CarbonLib</strong> If you're contemplating a CarbonLib project, be aware that FSRefs were introduced with the new HFS+ APIs in Mac OS 9 and hence require Mac OS 9 or later. CarbonLib provides a wrapper around <code>FSRef</code> APIs, but does not actually implement them, so you can't use CarbonLib to get <code>FSRef</code> functionality in any version of Mac OS 8.</p>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="FSREFSANDLONGNAMES"></a><h2>FSRefs and long Unicode file names</h2>
+<a name="NAMEFROMFSREF"></a><h3>How do I get the name of an item from an FSRef?</h3>
+<p class="caption"><strong>Listing 9: </strong>Getting a Unicode name</p>
+<pre class="sourcecodebox">OSErr FSRefGetName( const FSRef *fsRef, HFSUniStr255 *name )
+{
+  return( FSGetCatalogInfo(fsRef, kFSCatInfoNone, NULL, name, NULL, NULL) );
+}
+
+An HFSUniStr255 is defined as:
+
+struct HFSUniStr255 {
+  UInt16 length; /* number of unicode characters */
+  UniChar unicode[255]; /* unicode characters */
+};</pre>
+<p>Since HFSUniStr255s occupy 512 bytes you may want to store names as CFStringRefs:</p>
+<pre class="sourcecodebox">strRef = CFStringCreateWithCharacters( kCFAllocatorDefault, name.unicode, 
+          name.length );</pre>
+<p>In addition to conserving memory, Core Foundation provides a wealth of APIs for testing and manipulating CFStrings. There are no such APIs for working with <code>HFSUniStr255</code> file names. The assumption is that you will do such testing and manipulation with a <code>CFStringRef</code> or <code>CFMutableStringRef</code> obtained from an <code>HFSUniStr255</code>.</p>
+<p>Note that <code>FSGetCatalogInfo()</code> returns the <strong>file system name</strong>. The Mac OS X Finder doesn't always display file name extensions. The name the Finder displays is called the <strong>display name</strong>. If you want the display name in Mac OS X see the <a href="#LAUNCHSERVICES">LaunchServices</a> section.</p>
+<p>Note: While technically correct, he definition of <code>HFSUniStr255</code> is somewhat misleading. HFS+ disks store file names as UTF-16 in an Apple-modified form of Normalization Form D (decomposed). This means a single Unicode code point value can occupy more than one UniChar in an <code>HFSUniStr255</code>, which in turn means a file name may be limited to fewer than 255 characters as perceived by normal readers. (see <a href="#UNICODETERMINOLOGY">read more about Unicode character terminology</a>)</p>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="NOTESABOUTUNICODESTRINGS"></a><h3>Notes about Unicode strings</h3>
+<p>Strictly speaking, the issue here is independent of the source of the CFString, but they are often encountered when deal with Unicode file names. </p>
+<p>Many of us need to display the name of a file or folder in our applications. Since Mac OS X supports long Unicode file names, there are some related issues. Unicode has a number of things going on under the hood which you wouldn't expect if you are unfamiliar with Unicode and how it works. The following are some basic points to remember when working with Unicode file names. </p>
+<p>A Unicode string (speaking from the viewpoint of Mac OS X) is a string of UniChars. Such a string can be converted to and from a <code>CFStringRef</code> or a <code>CFMutableStringRef</code>. </p>
+<p>A single Unicode code point may require multiple UniChars, so never modify a Unicode string by simply removing a range of UniChars or inserting UniChars at an arbitrary offset. Doing so can produce a string which is not what you expect, incorrect, or even leave you with a string which is no longer a legal Unicode string. </p>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="TRUNCATEUNICODEBYWIDTH"></a><h3>Truncating Unicode strings by width</h3>
+<p class="caption"><strong>Listing 10: </strong>To truncate a file name to a desired width prior to drawing it or other use, convert the name to a <code>CFMutableStringRef</code> and use <code>TruncateThemeText()</code> to truncate it.</p>
+<pre class="sourcecodebox">Boolean TruncateWidth( CFMutableStringRef ioString, SInt16 inMaxWidth,
+                       TruncCode inTruncCode, ThemeFontID inThemeFontID,
+                       ThemeDrawState inState )
+{
+  Boolean  wasTruncated = false;
+  OSStatus err = TruncateThemeText( ioString, inThemeFontID, inState,
+          inMaxWidth, inTruncCode, &amp;wasTruncated );
+  return( (err == noErr) &amp;&amp; wasTruncated );
+}</pre>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="TRUNCATEUNICODEBYLENGTH"></a><h3>Truncating Unicode strings by length</h3>
+<p>Unfortunately, there is no simple API available which you can use to correctly truncate a Unicode string to a certain number of characters. To truncate a file name based on length, you'll need to convert the name to a UniChar string and use <code>UCFindTextBreak()</code> with <code>kUCTextBreakClusterMask</code>. (this actually requires a bit of code, but this is a summary) Using <code>UCFindTextBreak()</code> ensures you won't truncate the string in the middle of a cluster, the smallest group of UniChars which have semantic meaning. Any time you remove one or more characters from a cluster, at best you change its meaning, and at worst you end up with something which isn't legal in Unicode. (see <a href="#GRAPHEMECLUSTERS">grapheme clusters</a>)</p>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="CATENATION"></a><h3>Concatenation</h3>
+<p>You can concatenate Unicode strings at will. The individual pieces will retain their original meaning. For example, you can append ".txt" to a Unicode string without changing the meaning of the existing string. Or, you could concatenate English and Arabic (a right-to-left script) and get the desired result. </p>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="DETERMININGSTRINGWIDTH"></a><h3>Determining the width of strings</h3>
+<p>Don't try to estimate the width of a Unicode string based on the number of UniChars in the string. In addition to the issues of combining characters and surrogate pairs, Unicode text can contain invisible characters which are not rendered. Unicode goes beyond the simple encoding of characters and scripts. There are are several code point values which can be used to provide hints or instructions to rendering software, but are never rendered themselves. </p>
+<p class="caption"><strong>Listing 11: </strong>How to determine the width of a Unicode string stored as a CFString.</p>
+<pre class="sourcecodebox">SInt16 GetWidth( const CFStringRef inString, ThemeFontID inFontID,
+                 ThemeDrawState inState )
+{
+  Point  pt;
+  SInt16 baseline;
+  GetThemeTextDimensions( inString, inFontID, inState, false, &amp;pt,
+                          &amp;baseline );
+  return( pt.h );
+}</pre>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="ENCODINGFORMATS"></a><h3>Encoding file names in other formats</h3>
+<p>Again, this is not an issue limited to file names, but is included because people often make the mistake of assuming that the size of the buffer needed when converting a CFString to a C string is <code>CFStringGetSize( cfString )</code>. Because a single UniChar can (and will for all but the simplest Latin characters) require multiple characters when encoded with <code>kCFStringEncodingUTF8</code>. </p>
+<p class="caption"><strong>Listing 12: </strong>The correct way to determine the required buffer size using <code>CFStringGetMaximumSizeForEncoding()</code>.</p>
+<pre class="sourcecodebox">char* CreateUTF8CStringFromCFString( const CFStringRef inString )
+{
+  // DisposePtr(cStr) must be called when with the result if successful.
+  CFIndex  max;
+  char     *cStr;
+  CFIndex  len   = CFStringGetLength( inString );
+
+  max = CFStringGetMaximumSizeForEncoding( len, kCFStringEncodingUTF8 );
+  cStr = NewPtr( 1 + max );
+  if ( cStr != NULL )
+  {
+    if ( !CFStringGetCString(inString, cStr, len, kCFStringEncodingUTF8) )
+    {
+      DisposePtr( cStr );
+      cStr = NULL;
+    }
+    if ( cStr != NULL )
+      SetPtrSize( cStr, strlen( cStr ) + 1 );
+      // SetPtrSize has no effect in Mac OS X if the new size is less than
+      // the old size. If you really want to shrink the pointer to the
+      // amount actually used, inMac OS X, you'll need to allocate a new
+      // pointer whose size is strlen(cStr) + 1 and copy the contents of
+      // cStr to the new pointer.
+  }
+  return( cStr );
+}</pre>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="HOWENCODED"></a><h3>How file names are encoded</h3>
+<p>HFS+ disks store file names as UTF-16 in an Apple-modified form of Normalization Form D (decomposed). This form excludes certain compatibility decompositions and parts of the symbol blocks, in order to assure round-trip of file names to Mac OS encodings (applications using the HFS APIs assume they get the same bytes out that they put in). </p>
+<p>In Mac OS X 10.2, the decomposition rules used were changed from Unicode 2.0.x (based on an intermediate draft) plus the above-mentioned Apple modifications, to Unicode 3.2 plus the above-mentioned Apple modifications. The Unicode Consortium has committed to not changing the decomposition rules after Unicode 3.2, so we shouldn't have to do this again. The change from 2.0.x to 3.2 was necessary because A) lots of new decompositions had been added, and B) the 2.0.x data was full of errors. </p>
+<p>Other file systems use different storage formats. UFS disks use UTF-8, HFS disks use Mac OS encodings. AFP (AppleShare) uses Mac OS encodings prior to 3.0, and UTF-16 for 3.0 or later. </p>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="UNICODENOTES"></a><h2>Notes About Using Unicode</h2>
+<p>This could also be called "Unicode for File Names," as there are many aspects of Unicode which won't be discussed here because they aren't needed if all you're doing with Unicode is working with file names in Mac OS X. The reason for focusing on this particular area is that it's an area which every Mac OS X application should be prepared to support. If you're writing a Unicode-savvy word processor, you're going to need a lot more understanding than any glossary notes. Most of the information presented here is from the book, Unicode Demystified by Richard Gillam. However, its 800 pages and may be overkill if all you want to do is handle file names properly in Mac OS X.</p>
+<a name="WHATISUNICODE"></a><h3>What is Unicode?</h3>
+<p>Unicode is a universal text encoding standard for representing written language in a format suitable for use and storage by computers. It's goal is to allow the encoding of all, or at least all significant forms of writing in use in the world today, as well as many which are no longer used, but are of historical or scholarly interest. </p>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="UNICODETERMINOLOGY"></a><h3>Unicode terminology</h3>
+<p>There are two major challenges for those new to Unicode. First is getting a handle on the terminology. Second, and directly related to the first, is understanding what constitutes a character in a written language, in Unicode, and how the two are related (i.e., how characters are encoded in Unicode). English is one of the simplestâif not the simplestâof all the world's languages to write and encode for use by computers. Understandably, people whose native language is English tend to make incorrect assumptions about how other languages are written and encoded into Unicode. When code is written based on those false assumptions, it will not work correctly for all languages. Following are a some terms often used in Unicode discussions. </p>
+<p>A <strong>character</strong> is an abstract linguistic concept such as "the Latin letter A" or "the Chinese character for 'sun.'" </p>
+<p>Every character defined in the Unicode standard is assigned a single 21-bit abstract <strong>code point value</strong>. Apple refers to a code point value in Unicode as a Unicode Scalar Value. </p>
+<p>MacTypes.h has the following to say: </p>
+<p class="smalltext"><strong>Table 1:</strong>MacTypes.h definitions</p>
+<table cellspacing="0" class="graybox">
+<tr>
+<td scope="row">typedef UInt32</td>
+<td>UnicodeScalarValue</td>
+</tr>
+<tr>
+<td scope="row">typedef UInt16</td>
+<td>UniChar</td>
+</tr>
+<tr>
+<td scope="row">typedef UInt16</td>
+<td>UTF16Char</td>
+</tr>
+<tr>
+<td scope="row">UniChar</td>
+<td>A 16-bit Unicode code value in the default UTF-16 format.</td>
+</tr>
+<tr>
+<td scope="row">UTF16Char</td>
+<td>UnicodeScalarValues 0-0xFFFF are expressed in UTF-16 format using a single UTF16Char with the same value. UnicodeScalarValues 0x10000-0x10FFFF are expressed in UTF-16 format using a pair of UTF16Chars - one in the high surrogate range (0xD800-0xDBFF) followed by one in the low surrogate range (0xDC00-0xDFFF). All of the characters defined in Unicode versions through 3.0 are in the range 0-0xFFFF and can be expressed using a single UTF16Char, thus the term "Unicode character" generally refers to a UniChar = UTF16Char.</td>
+</tr>
+</table>
+<p>In Unicode terms: The <strong>Basic Multilingual Plane</strong> or <strong>BMP</strong> refers to the code point values from U+0000 to U+FFFF, and was the original Unicode encoding space. Later, when it was realized additional space was needed, 16 <strong>supplementary planes</strong> were added to the encoding space and code point values were extended from 16 bits to 21 bits. Hence the BMP contains the code point values which can be converted to corresponding UniChars by simply lopping off the upper five zero bits. The nth supplementary plane contains code point values in the range U+n0000 to U+nFFFF, where n ranges from 0x01 - 0x10. Thus the full range of Unicode code point values is 0x0000 to 0x10FFFF. Planes 3 - 13 (U+30000 to U+EFFFF) are currently unused and available for future use. </p>
+<p><strong>Surrogate pairs</strong> - Unicode sets aside 2,048 code point values (U+8000 - U+DFFF) in the BMP which will never be assigned to actual characters. They are reserved for defining paired combinations to represent characters outside the BMP. These values are called <strong>surrogates</strong>. The first 1,024 surrogate values (U+D800-U+DBFF) are called <strong>high-surrogates</strong>, and the remaining 1,024 surrogate values (U+DC00-U+DFFF) are called <strong>low-surrogates</strong>. A supplementary-plane character (a character not in the BMP) is represented by high-surrogate followed by a low-surrogate. Note that surrogates are only legal when they occur in high-low pairs. An unpaired surrogate is considered an error in Unicode. </p>
+<p>In case you're just dying to know how a 21âbit code point value is mapped to a surrogate pair, it goes like this: First, subtract 0x10000 from the original code point value to get a 20âbit value. Split those 20 bits down the middle to get two 10âbit sequences. The first 10âbit sequence becomes the lower 10 bits of the high-surrogate value and the second 10âbit sequence becomes the lower 10 bits of the low-surrogate value. </p>
+<p><strong>Combining marks</strong> are code point values which do not represent characters themselves, but apply a mark to a base character which precedes them. Diacritical marks are one kind of combining mark. For example: </p>
+<p>Ã© = e + Â´ (U+0065 LATIN SMALL LETTER E) + (U+0301 COMBINING ACUTE ACCENT) </p>
+<p>A <strong>grapheme</strong> is a minimal writing unit is some written language; a mark that is considered a single "character" by an average reader or writer of a particular written language. </p>
+<a name="GRAPHEMECLUSTERS"></a><p>A <strong>grapheme cluster</strong> is a sequence of one or more Unicode code points (UniChars) that should be treated as an indivisible unit by most processes operating on Unicode text, such as searching and sorting, hit testing, arrow key movement, and so on. References to the term "cluster" in documentation, or in the headers, such as <code>kUCTextBreakClusterMask</code>, refer to grapheme clusters. </p>
+<p>A <strong>glyph</strong> is a concrete visual representation of a character. It's what you see on screen or in print. </p>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="TRUNCATINGUNICODE"></a><h3>Truncating and other manipulations</h3>
+<p>The original intention was for Unicode to represent every character with a single UniChar, but it quickly became obvious that it isn't possible to do this. More than 95,000 characters are now defined in the Unicode standard, far more than can be represented by a single 16-bit value. Only code point values in the Basic Multilingual Plane can be represented with a single UniChar. Furthermore, a significant number of characters are represented as a base character plus one or more diacritical or other combining marks. Assuming that there's a one-to-one relationship between characters and the Unicode characters which represent them leads to one of the most common errors in code which manipulates Unicode strings, which is to truncate a Unicode string at an inappropriate offset. Always use appropriate Unicode-aware APIs to truncate a Unicode string or determine where to insert or remove characters. (See <a href="#TRUNCATEUNICODEBYWIDTH">truncation comments</a>.) </p>
+<p>(Encoded into Unicode as is done by the File Manager in Mac OS X, the string "rÃ©sumÃ©" contains eight UniChars. Lop off the last one and you'll have a Unicode string for "rÃ©sume".) </p>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="FINALUNICODECOMMENTS"></a><h3>Final Unicode comments</h3>
+<p>A 32-bit encoding would allow Unicode to provide a direct 1-1 correspondence between code point values and their encoded values, which in turn would eliminate most of those issues about where you can safely insert or truncate characters. 21 bits provides support for about a million characters, roughly 10 times the number currently encoded. But the smallest data type used by computers that's easily manipulated and will contain 21 bits is 32 bits. The downside is that an encoding scheme based on a 32-bit data type would waste a lot of space. If Unicode used a 32-bit encoding schemeâwhich would allow encoding every code point value in a single code valueâit would waste at least 11 bits for every character, and at least 16 bits/character for the vast majority of characters in common use. For example, a 32-bit based <code>HFSUniStr255</code> (used for file names in Mac OS X) would occupy 1022 bytes, even though most file names consist of less than 40-50 characters in the BMP. </p>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="REFERENCES_"></a><h2>References </h2>
+<ul><li><p><a href="http://www.skytag.com/">Laurence Harris, SkyTag Software</a></p></li></ul>
+<a name="document_revision_summary"></a><h2>Document Revision History</h2>
+<table cellspacing="0" class="graybox" width="680">
+<tr>
+<th width="100">Date</th>
+<th width="580">Notes</th>
+</tr>
+<tr>
+<td scope="row">2003-05-06</td>
+<td>Answers and coding techniques to commonly asked questions about adopting FSRefs and long file names.</td>
+</tr>
+</table>
+<p><b>Posted: </b>2003-05-06</p>
+<!-- END CONTENTS -->
+</td></tr></table>
+<!-- END WIDE COLUMN --><!-- END MAIN CONTENT --><!-- START BOTTOM APPLE NAVIGATION -->	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/technotes/tn2002/tn2078.html%3Fid%3DDTS10003097-1.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/technotes/tn2002/tn2078.html%3Fid%3DDTS10003097-1.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/technotes/tn2002/tn2078.html%3Fid%3DDTS10003097-1.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+<!--#include virtual="/includes/footer" --><!-- END BOTTOM APPLE NAVIGATION --><!-- START CENTER CLOSE -->
+</center>
+<!-- END CENTER CLOSE -->
+</body>
+</html>

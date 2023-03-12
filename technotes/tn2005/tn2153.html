@@ -1,0 +1,196 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/1999/REC-html401-19991224/loose.dtd">
+<html><head>
+<!-- BEGIN META TAG INFO -->
+<link rel="home" href="http://developer.apple.com/">
+<link rel="find" href="http://developer.apple.com/search/">
+<link rel="stylesheet" type="text/css" href="../../documentation/css/adcstyle.css" title="fonts">
+<script language="JavaScript" type="text/javascript" src="../../documentation/js/busnav.js"></script>
+<script language="JavaScript" src="../../documentation/js/adc.js" type="text/javascript"></script>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<!-- END META TAG INFO -->
+<!-- BEGIN TITLE -->
+<title>Technical Note TN2153: Improving Windows Screen Updating with QuickTime for Windows Double-Buffering Feature</title>
+<!-- END TITLE -->
+</head>
+<!-- BEGIN BODY OPEN -->
+<body bgcolor="#ffffff"><a name="//apple_ref/doc/uid/DTS10003802" title="Improving Windows Screen Updating with QuickTime for Windows Double-Buffering Feature"></a>
+<!--END BODY OPEN -->
+<!-- START CENTER OPEN -->
+<center>
+<!-- END CENTER OPEN -->
+<a name="top"></a>
+<!-- BEGIN LOGO AND SEARCH -->
+<!--#include virtual="/includes/adcnavbar"-->
+<!-- END LOGO AND SEARCH -->
+<!-- START BREADCRUMB -->
+<div id="breadcrumb"><table width="680" border="0" cellpadding="0" cellspacing="0"><tr>
+<td scope="row"><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+<td><img width="340" height="10" src="images/1dot.gif" alt=""></td></tr><tr valign="middle"><td align="left" colspan="2">
+<a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../technicalnotes/index.html">Technical Notes</a> &gt; <a href="../../technicalnotes/QuickTime/index.html">QuickTime</a> &gt; <a href="../../technicalnotes/QuickTime/idxQuickTimeforWindows-date.html">QuickTime for Windows</a> &gt; 
+</td></tr><tr><td colspan="2" scope="row"><img width="680" height="35" src="images/1dot.gif" alt=""></td></tr></table></div>
+<!-- END BREADCRUMB -->
+
+<!-- START MAIN CONTENT -->
+<!-- START TITLE GRAPHIC AND INTRO-->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top">
+<td><h1>
+<div id="pagehead">Technical Note TN2153</div>
+<div id="pageheadsub">Improving Windows Screen Updating with QuickTime for Windows Double-Buffering Feature</div>
+</h1></td></tr></table>
+<!-- END TITLE GRAPHIC AND INTRO -->
+<!-- BEGIN WIDE COLUMN -->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td align="left" width="680">
+<!-- BEGIN CONTENTS -->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td><p>This TechNote describes the new QuickTime double-buffering feature which provides optimal screen updating for Windows applications.</p></td></tr><tr><td scope="row"><img width="680" height="10" src="images/1dot.gif" alt=""><br><img height="1" width="680" src="images/1dot_919699.gif" alt=""><br><img width="680" height="20" src="images/1dot.gif" alt=""></td></tr></table><table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td width="680"><ul><li><a href="#TNTAG1">Introduction</a></li><li><a href="#TNTAG2">Feature Is Optional</a></li><li><a href="#TNTAG3">Simplest Use</a></li><li><a href="#TNTAG5">Using the New APIs</a><ul><li><a href="#TNTAG6">New flags</a></li><li><a href="#TNTAG7">New functions</a></li></ul></li><li><a href="#TNTAG8">Important Notes</a><ul><li><a href="#TNTAG12">QuickTime</a></li><li><a href="#TNTAG13">QuickDraw</a></li><li><a href="#TNTAG14">GDI</a></li><li><a href="#TNTAG15">Direct PixMap Access</a></li></ul></li><li><a href="#TNTAG9">Examples</a></li><li><a href="#TNT_HISTORY_TAG">Document Revision History</a></li></ul></td></tr><tr><td colspan="3" scope="row"><img width="680" height="10" src="images/1dot.gif" alt=""><br><img height="1" width="680" src="images/1dot_919699.gif" alt=""><br><img width="680" height="20" src="images/1dot.gif" alt=""></td></tr></table><A NAME="TNTAG1"></A><H2>Introduction</H2><p>QuickTime 6.4 includes a new double-buffering feature to improve screen updating for Windows applications. This feature uses a deferred flushing model, similar to that used on Mac OS X. It provides a complete off-screen (back) buffer for each QuickTime graphics port, flushing the buffer to the screen periodically or upon explicit request. This approach provides numerous benefits, including improved clipping and elimination of occasional flashing of UI elements.</p><p>Here's more detail:</p><p>Updated pixel data for QuickTime graphics ports are drawn into a back buffer -- they are not immediately drawn to the screen.  The &quot;dirty&quot; area (the area that has changed) for each port is accumulated until a flush is performed, at which time the entire dirty region is drawn to the screen.</p><div class="notebox"><p><strong>IMPORTANT:</strong> QuickTime will automatically flush the dirty region to the screen when movies are drawn or when movies are idled.</p></div><p>Your application can also explicitly perform a flush when appropriate (see <A HREF="#TNTAG7">New functions</A>).</p><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG2"></A><H2>Feature Is Optional</H2><p>Some applications may choose not to use this feature, so its use is optional (see <A HREF="#TNTAG8">Important Notes</A> below).</p><p>To use it, your Windows application must activate it by passing the <code><code>kInitializeQTMLEnableDoubleBufferedSurface</code></code> flag to <code>InitializeQTML</code> at startup as shown here:</p><A NAME="TNTAG4"></A><p class="smalltext"><strong>Listing 1:</strong> Activating QuickTime double-buffering.</p><pre class="sourcecodebox">
+// enable QuickTime double-buffering
+InitializeQTML(kInitializeQTMLEnableDoubleBufferedSurface);
+</pre><p>Once the feature is activated, QuickTime will then automatically use double-buffering for screen updates to graphics ports associated with the requesting application.</p><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG3"></A><H2>Simplest Use</H2><p>If your application doesn&rsquo;t perform any special processing of update regions, it can simply activate the feature as shown in <A HREF="#TNTAG4">Listing 1</A> above. QuickTime will use it by default to perform dirty region accumulation and basic flushing for normal screen update operations.  In some cases, no further use of the API will be required.</p><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG5"></A><H2>Using the New APIs</H2><p>If your application does perform special processing of update regions, you will need to use the new double-buffering APIs to take advantage of this facility. This section briefly describes these APIs.</p><A NAME="TNTAG6"></A><H3>New flags</H3><pre class="sourcecodebox"> kInitializeQTMLEnableDoubleBufferedSurface</pre><p>The <code><code>kInitializeQTMLEnableDoubleBufferedSurface</code></code> flag is passed in the <code>InitializeQTML</code> call to activate the double-buffering feature.</p><pre class="sourcecodebox">kQTMLNoDoubleBufferPort</pre><p>The <code>kQTMLNoDoubleBufferPort</code> flag is passed in the <code>CreatePortAssociation</code> call to disable double buffering on a particular port. This flag will be ignored if the feature hasn&rsquo;t been activated.</p><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG7"></A><H3>New functions</H3><p>The following new APIs can be used to add a region (<code>MacRegion</code>, <code>Rect</code>, or Windows <code>HRGN</code>) to the accumulated dirty region for a port:</p><pre class="sourcecodebox">
+QTMLAddRgnToDirtyRgn(GrafPtr port, RgnHandle *dirtyRgn)
+QTMLAddRectToDirtyRgn(GrafPtr port, Rect *dirtyRect)
+QTMLAddNativeRgnToDirtyRgn(GrafPtr port, void *dirtyHRGN)
+</pre><p>Use these new APIs to:</p><ul><li><p>indicate an application has drawn directly into the back buffer using <code>HDC</code> access to the back buffer (through the <code>HDC</code> access APIs)</p></li><li><p>add a region dirtied by directly manipulating the bits in a <code>pixMap</code> (after locking it)</p></li><li><p>add Windows update regions to the dirty region during <code>WM_PAINT</code> handling to explictily force them to refresh</p></li></ul><div class="notebox"><p><strong>Note:</strong> The above calls are provided to allow you to add to the dirty region in a format convenient to your code, with a minimum of conversion. Use whichever call is appropriate for the update task at hand.</p></div><p><strong> QTMLFlushDirtyPorts </strong></p><p>Walks the list of all dirtied ports, flushing their dirtied regions to the screen. This call is intended to be used for periodic total flushes, not for flushes that are being invoked because of an immediate need to sync a particular port&rsquo;s back buffer to the screen.</p><pre class="sourcecodebox">
+QTMLFlushDirtyPorts()
+</pre><p><strong> QTMLFlushPortDirtyRgn </strong></p><p>Flushes the dirty region of the specified port to the screen.  This call is useful during <code>WM_PAINT</code> handling to flush the window contents to the screen after adding the Windows update region to the dirty region.</p><pre class="sourcecodebox">
+QTMLFlushPortDirtyRgn(GrafPtr port)
+</pre><p><strong> QTMLGetBackbufferHDC </strong></p><p>Allows GDI access to the back buffer.  The caller must release the back buffer <code>HDC</code> with <code>QTMLReleaseBackbufferHDC</code>.  This is reference counted, so a Release call must be made for each Get call.</p><pre class="sourcecodebox">
+QTMLGetBackbufferHDC(GrafPtr port, HDC *backBufferHDC)
+</pre><p><strong> QTMLReleaseBackbufferHDC </strong></p><p>Allows GDI access to the back buffer.  The caller will have to call <code>QTMLAddRegionToDirtyRgn</code> after releasing the back buffer <code>HDC</code> in order to let QuickTime know what area of the back buffer has been dirtied.</p><pre class="sourcecodebox">
+QTMLReleaseBackbufferHDC(GrafPtr port, HDC *backBufferHDC)
+</pre><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG8"></A><H2>Important Notes</H2><p>Applications should avoid combining QTML and Windows drawing on top of each other into a single window. Use of a child <code>hWnd</code> for a QTML owned area within a Windows owned window is encouraged.</p><p>Another important consideration is your application must not cache the <code>baseAddress</code> of the port <code>pixMap</code>.  When the port is locked, the <code>pixMap</code> will be updated to reflect the backbuffer <code>baseAddress</code> and metrics, and when it is unlocked it will contain the screen <code>baseAddress</code> and metrics.  This backbuffer <code>baseAddress</code> may change as the window size changes or for a variety of other reasons.</p><p>Drawing into a port generally falls into one of four categories which all behave slightly differently:</p><A NAME="TNTAG12"></A><H3>QuickTime</H3><p>QuickTime drawing involves a movie drawing visual elements into the port associated with the movie. This type of drawing will be done into the backbuffer if double buffering is enabled, and the dirty region will automatically be added to the port and flushed to the screen.</p><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG13"></A><H3>QuickDraw</H3><p>Drawing done using QuickDraw calls will automatically add the appropriate dirty region to the port, but they will not automatically flush to the screen (this is done to allow you to perform batches of QuickDraw rendering, but only incur the expense of a single blit to the screen).  The screen flush must be done either explicitly after the call(s) or through a periodic timer.</p><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG14"></A><H3>GDI</H3><p>Drawing can be done into a port using GDI to render into the <code>HDC</code>  acquired from <code>QTMLGetBackbufferHDC</code>.  Since QuickTime and QuickDraw have no hint about what pixels have been touched, it is important to call <code>QTMLAddDirtyRect</code> or something similar, or the pixels that were touched may not get flushed to the screen.  As with QuickDraw rendering, an explicit flush is required.</p><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG15"></A><H3>Direct PixMap Access</H3><p>If you are careful to lock the port, you can directly manipulate the pixels in the backbuffer since the <code>baseAddress</code> and <code>rowBytes</code> will be updated to point there.  As with GDI drawing, you must explicitly declare the region that you have dirtied in the backbuffer, and an explicit flush is required.</p><p>As with any new feature, if you want to use the double-buffering feature but also wish to retain backwards compatibility with older QuickTime versions, be sure to check the QuickTime version when your application launches  and do not attempt to use the new APIs on earlier QuickTime versions.  These calls should function back to QuickTime 6.4.</p><p>Here's code showing how to get the QuickTime version:</p><p class="smalltext"><strong>Listing 2:</strong> Getting the QuickTime version.</p><pre class="sourcecodebox">
+{
+    /* check the version of QuickTime installed */
+
+    long version;
+    OSErr result;
+
+    result = Gestalt(gestaltQuickTime,&amp;version);
+    if ((result == noErr) &amp;&amp; (version &gt;= 0x06408000))
+    {
+        /* we have version 6.4 or better! */
+    }
+}
+</pre><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG9"></A><H2>Examples</H2><p>Example 1</p><p>An application opting into this behavior may wish to handle <code>WM_PAINT</code> messages a little differently, since there is already a valid representation of the window in the offscreen buffer.  The Windows update region needs to be added to the port's dirty region, and then the port can be flushed to the screen.  A simple example of this follows:</p><p class="smalltext"><strong>Listing 3:</strong> Adding Windows update region to the port's dirty region, then flushing the port to the screen.</p><pre class="sourcecodebox">
+case WM_PAINT:
+{
+    RgnHandle   macUpdateRgn = nil;
+    HRGN    winUpdateRgn = CreateRectRgn(0,0,0,0);
+
+    macUpdateRgn = NewRgn();
+
+    BeginUpdate((GrafPtr) moviePort);
+    // If your app does any special handling of update regions,
+    // grab the Mac update region. Otherwise,
+    // you can skip this.
+    MacCopyRgn(moviePort-&gt;visRgn, macUpdateRgn);
+    EndUpdate((GrafPtr) moviePort);
+
+    // If there is any new drawing that your app wants to
+    // do (in response to the MacUpdateRgn or for any other
+    // reason) it should be done here.  This drawing will
+    // be done into the backbuffer, and flushed to the screen
+    // at the end of this call.
+
+    // Get the Windows update region
+    GetUpdateRgn(hWnd, winUpdateRgn, FALSE);
+    // Call BeginPaint/EndPaint to clear the update region
+    BeginPaint (hWnd, &amp;ps);
+    EndPaint(hWnd, &amp;ps);
+
+    // Add to the dirty region of the port any region
+    // that Windows says needs updating. This allows the
+    // union of the two to be copied from the back buffer
+    // to the screen on the next flush.
+    QTMLAddNativeRgnToDirtyRgn((GrafPtr) moviePort, winUpdateRgn);
+    DeleteObject(winUpdateRgn);
+
+    // Flush the entire dirty region to the screen
+    QTMLFlushPortDirtyRgn((GrafPtr) moviePort);
+}
+</pre><p>Example 2</p><p>It is often useful to combine a long series of drawing operations and use a single flush at the end to display them all simultaneously.  The following example draws a series of inset rectangles, first using QuickDraw, and then using GDI to draw directly into the backbuffer <code>HDC</code>.  All of these are flushed to the screen at once at the end.</p><p class="smalltext"><strong>Listing 4:</strong> Combining a long series of drawing operations and using a single flush to display them all simultaneously.</p><pre class="sourcecodebox">
+{
+    Rect    myRect;
+    Pattern currentPattern;
+
+    myRect.top = myRect.left = 0;
+    myRect.bottom = myRect.right = 200;
+
+    SetPort(myWindowPort);
+
+    // this drawing is done using QuickDraw.
+    // QuickDraw drawing operations
+    // will automatically add the area that
+    // they have touched to the accumulated
+    // dirty region for the port.
+    while (myRect.top &lt; 50) {
+        // alternate patterns
+        currentPattern =
+            (currentPattern == pattern1) ? pattern2 : pattern1;
+        // fill the current rect with the pattern
+        MacFillRect(myRect, currentPattern);
+        // inset the rect a tiny bit.
+        MacInsetRect(myRect, 10, 10);
+    }
+
+    {
+        RECT winRect;
+        HDC backbufferHDC = NULL;
+
+        // get the HDC of the Backbuffer for the port
+        QTMLGetBackbufferHDC(myWindowPort, &amp;backbufferHDC);
+
+        // create a Windows RECT where we left off with our QuickDraw
+        // rendering above
+        winRect.top = myRect.top;
+        winRect.left = myRect.left;
+        winRect.bottom = myRect.bottom;
+        winRect.right = myRect.right;
+
+        // fill in yet another rect
+        FillRect(backbufferHDC, &amp;winRect, hBrush);
+
+        // need to release that backbuffer HDC.
+        QTMLReleaseBackbufferHDC(myWindowPort, &amp;backbufferHDC);
+
+        // since this drawing was done directly into the backbuffer,
+        // we need to add the dirty region to the port.
+        QTMLAddRectToDirtyRgn(myWindowPort, &amp; myRect);
+    }
+
+    // now, go ahead and flush all that drawing to the screen
+    QTMLFlushPortDirtyRgn(myWindowPort);
+}
+</pre><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNT_HISTORY_TAG"></A><H2>Document Revision History</H2><table cellspacing="0" class="graybox" width="680"><tr><th width="100">Date</th><th width="580">Notes</th></tr><tr><td scope="row">2005-10-18</td><td>QuickTime 6.4 includes a facility to improve screen updating for Windows applications</td></tr></table><p><b>Posted:</b> 2005-10-18</p>
+<!-- END CONTENTS -->
+</td></tr></table>
+<!-- END WIDE COLUMN -->
+<!-- END MAIN CONTENT -->
+	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/technotes/tn2005/tn2153.html%3Fid%3DDTS10003802-1.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/technotes/tn2005/tn2153.html%3Fid%3DDTS10003802-1.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/technotes/tn2005/tn2153.html%3Fid%3DDTS10003802-1.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+
+<!-- START BOTTOM APPLE NAVIGATION -->
+<!--#include virtual="/includes/footer"-->
+<!-- END BOTTOM APPLE NAVIGATION -->
+<!-- START CENTER CLOSE -->
+</center>
+<!-- END CENTER CLOSE -->
+</body></html>

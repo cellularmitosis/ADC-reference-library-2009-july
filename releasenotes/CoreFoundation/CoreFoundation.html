@@ -1,0 +1,221 @@
+<HTML>
+<!--This file created by ali using rtf2html by aozer from CF.rtf on 2007-10-03 09:08:17 -0700 -->
+<HEAD>
+<TITLE>Mac OS X Developer Release Note</TITLE>
+</HEAD>
+<BODY BGCOLOR="#FFFFFF"><a name="//apple_ref/doc/uid/TP40000994" title="CoreFoundation Framework Release Notes"></a>
+	<!-- start of path -->
+	<font face="Geneva,Helvetica,Arial" size="1"><b>PATH<spacer type="horizontal" size="5">&nbsp;</b><a href="../../documentation/index.html#//apple_ref/doc/uid/TP30000440" target="_top">Documentation</a> &gt; <a href="../index.html#//apple_ref/doc/uid/TP30000872" target="_top">Release Notes</a></font></td>
+	<!-- end of path --><BR><BR><H1>
+Mac OS X Leopard Developer Release Notes<BR>CoreFoundation Framework</H1>
+<BR><BR>CoreFoundation (aka CF) is a framework which provides C APIs for strings, collections, user preferences, property lists, plug-ins, application and shared library packages, and XML handling. These APIs are designed with portability, performance, and consistency in mind, and are available to Cocoa and Carbon applications.<BR>
+<BR>CoreFoundation is accessible directly as a public framework. But it is also within the CoreServices umbrella framework and is very often pulled into your application simply by linking against CoreServices or one of the higher level umbrellas such as Cocoa or Carbon which bring in CoreServices.<BR>
+<BR>This document describes the changes in CF since Mac OS X release 10.4, Tiger.  Note that you may be able to find more information on many of these changes in Apple's developer documentation.<BR>
+<BR><BR><H4>
+64 Bit</H4>
+Mac OS X Leopard contains 64-bit versions of many system frameworks, enabling building and running Cocoa apps as 64-bit.<BR>
+<BR>To enable 64-bit in CoreFoundation APIs, the typedef CFIndex is now a 64-bit quantity when running under 64-bit.  This enables APIs of CF types such as CFArray, CFData, CFString, etc to reference more than 32 bits worth of items.<BR>
+<BR>Note that in Tiger, CFIndex was declared as SInt32, whose underlying type in Tiger was long.  In Leopard, CFIndex is directly declared as long, which means there is no change in the underlying primitive C type. However, any code which intermixes SInt32 with CFIndexes might have problems when recompiled for 64-bit. An example is:<BR>
+<PRE><TT> CFIndex c;      // Used to be declared as SInt32, now long<BR> CFNumberRef n = CFNumberCreate(NULL, &amp;c, kCFNumberSInt32Type);</TT></PRE>
+Other CF types - CFTypeID, CFOptionFlags, CFHashCode, and CFTypeRef - are also 64-bit under 64-bit.<BR>
+<BR><BR><H4>
+Separate typing for enum constants</H4>
+As a part of 64-bit clean-up, we added explicitly sized types where we were previously using enums. For instance, we went from:<BR>
+<PRE><TT>typedef enum {<BR>     kCFNumberFormatterPadBeforePrefix = 0,<BR>     kCFNumberFormatterPadAfterPrefix = 1,<BR>     kCFNumberFormatterPadBeforeSuffix = 2,<BR>     kCFNumberFormatterPadAfterSuffix = 3<BR>} CFNumberFormatterPadPosition;</TT></PRE>
+to<BR>
+<PRE><TT>enum {<BR>     kCFNumberFormatterPadBeforePrefix = 0,<BR>     kCFNumberFormatterPadAfterPrefix = 1,<BR>     kCFNumberFormatterPadBeforeSuffix = 2,<BR>     kCFNumberFormatterPadAfterSuffix = 3<BR>};<BR>typedef CFIndex CFNumberFormatterPadPosition;</TT></PRE>
+The latter makes sure that CFNumberFormatterPadPosition remains a fixed size and signedness no matter how the enum contents change.<BR>
+<BR>In doing this, we removed the enum names from the enum declarations, where they existed, so any attempt to use &quot;enum CFFoo&quot; will now fail.  Please switch to using the typedef instead, which is fixed size.  The change also means that you will not get certain types of enum constant warnings from the compiler, for, say, cases in switch statements.<BR>
+<BR><BR><H4>
+CFError</H4>
+CFError is a new public CFType for representing error information.  CFError is similar to NSError, and is in fact toll-free bridged with NSError.  Primary purpose of CFError is to provide CF-level subsystems with a consistent and flexible way to represent errors, and in addition, to enable great end-user error presentation.<BR>
+<BR>At minimum, errors are identified by their domain (a string) and an error code (CFIndex) within that domain. In addition, a dictionary supplied at creation time enables providing additional arbitrary info that might be useful for the interpretation and reporting of the error. This dictionary can even contain an &quot;underlying&quot; error, which is preserved as an error bubbles up through various layers.<BR>
+<BR>We define a number of domains out of the box, corresponding to error codes in various preexisting subsystems.<BR>
+<BR>Cocoa includes error presentation infrastructure which enables CF/NSErrors to be displayed in a localized fashion, along with a recovery suggestion and even recovery options. Apps can choose to present the errors in standard alerts or using whatever other presentation mechanism they'd like to substitute.<BR>
+<BR>In addition CFError's rich and flexible error info can be used by developers for their own handling of errors.<BR>
+<BR>With user-presentation goals in mind, CFError guidelines include:<BR>
+<BR>- When creating a CFError, provide values for the userInfo keys which enable end-user presentation. These keys are kCFErrorLocalizedDescriptionKey, kCFErrorLocalizedFailureReasonKey, and kCFErrorLocalizedRecoverySuggestionKey.   For CFErrors which are never likely to bubble up to the user you can instead provide a value for kCFErrorDescriptionKey. This lets CFError and the presentation infrastructure know that this error is not directly end-user presentable.<BR>
+<BR>- Typically CFErrors are returned by pointer. If the caller does not desire to see the error, they should be allowed to pass NULL in as the pointer. If an error is returned in the by-pointer style, the caller should be responsible for releasing it.<BR>
+<BR>- Do not use CFErrors for status, just for errors.<BR>
+<BR>- Do not use CFErrors on every possible function. CFErrors are not an substitute for the OSStatus/errno granularity of errors. Instead, use CFErrors on functions whose results are likely to be interesting to report to the end-user in a meaningful way.  For example,  a function such as CFArrayGetCount() should not return a CFError. Same goes for something like -[NSTableView numberOfRows].  However, a (hypothetical) function such as CFDataWriteFile() could benefit from a CFError; and the CFError it generates should attempt to sound reasonable to the end-user:<BR>
+<BR>localizedDescription: &quot;Could not save file 'Letter' in folder 'Documents' because the volume 'MyDisk' doesn't have enough space.&quot;<BR>localizedFailureReason: &quot;The volume 'MyDisk' doesn't have enough space.&quot;<BR>localizedRecoverySuggestion: &quot;Remove files from the disk and try again.&quot;<BR>
+<BR>Please also see <A HREF="http://developer.apple.com/documentation/Cocoa/Conceptual/ErrorHandlingCocoa/ErrorHandling/chapter_1_section_1.html">Error Handling Programming Guide For Cocoa</A> for more info.<BR>
+<BR><BR><BR><H4>
+CFBundle Load Errors, Preflighting, and Architecture Detection</H4>
+CFBundle now contains functions to allow it to return a CFErrorRef if bundle loading fails, to allow preflight testing of bundle loading without actually causing the bundle to be loaded, and to determine the processor architectures that a Mach-O executable contains.  CFBundleLoadExecutableAndReturnError() behaves like the existing CFBundleLoadExecutable(), except that if the optional by-reference error parameter is non-NULL and the load fails, then it will be filled in with a suitable CFErrorRef providing a description of the problem suitable for presenting to the user.  If the function returns true--that is, if the bundle was already loaded, or has now been successfully loaded--then the contents of the error parameter will not be touched.  All of the errors returned are in the Cocoa error domain, and their codes are described in Foundation.  It is the caller's responsibility to release any returned CFErrorRef.  Note that if the error parameter is non-NULL and the load fails, then this function may do additional work over and beyond what CFBundleLoadExecutable() would do, in order to determine the precise error type.<BR>
+<BR>The current possible error codes are:  NSFileNoSuchFileError, if the bundle's executable cannot be located; NSExecutableNotLoadableError, if the bundle's executable exists but is not a loadable executable; NSExecutableArchitectureMismatchError, if the bundle's executable exists but does not provide a version for the processor architecture of the current process; NSExecutableRuntimeMismatchError, if the bundle's executable exists but contains Objective-C runtime information that is not compatible with the current process; NSExecutableLoadError, if the bundle's executable fails to be loadable for some other reason detectable prior to linking, notably the lack of a required library, or the lack of an architecture- and runtime-compatible version of a required library; and NSExecutableLinkError, if the bundle's executable passes all other checks but fails to load due to link errors.  Note that NSExecutableNotLoadableError will be returned if the bundle's executable is PEF/CFM but the current process does not support CFM.  Other error codes may be added in future releases.  More specific information may be shown in the error's debug description, available via CFShow or the gdb print-object command.<BR>
+<BR>Similar information about load errors can also be obtained without actually loading the bundle, using CFBundlePreflightExecutable().  This function returns true if the bundle is already loaded, or if it appears to be loadable by all tests short of actual linking.  The optional by-reference error parameter behaves like the error parameter to CFBundleLoadExecutableAndReturnError(), except that it cannot return NSExecutableLinkError.  Note that bundle loading may fail for a variety of reasons even if CFBundlePreflightExecutable() indicates no errors.<BR>
+<BR>CFBundleCopyExecutableArchitectures() can be used to determine the list of processor architectures that a bundle's executable supports.  If the executable is Mach-O, then this function returns an array of CFNumbers of type kCFNumberSInt32Type, each of which represents a cpu type for which the executable has a version.  CFBundle declares constants for certain well-known types (kCFBundleExecutableArchitecturePPC,  kCFBundleExecutableArchitecturePPC64, kCFBundleExecutableArchitectureI386, and kCFBundleExecutableArchitectureX86_64) but the values are taken directly from the executable, so other values may occur, and other values may be added in the future.  If the executable is not Mach-O, then this function returns NULL.  CFBundleCopyExecutableArchitecturesForURL() returns the same information for a CFURLRef that may point either to a bundle or to a standalone executable.<BR>
+<BR><BR><H4>
+CFBundle Unloading of Frameworks</H4>
+In the past CFBundle has not supported unloading of frameworks, or more generally of bundles whose executable is of type MH_DYLIB, because dyld did not allow it.  In Leopard, CFBundle will now support the unloading of these bundles, but only if the main executable is linked against Leopard and later, because some existing applications assume that frameworks can never be unloaded.  Note that many framework bundles will not be unloadable due to dependency issues; in particular, frameworks linked against by the main executable will not be unloadable.  As a general rule, however, clients of CFBundle should continue to retain a CFBundle instance for as long as the underlying bundle is in use, in particular at least as long as the bundle's code needs to remain loaded.<BR>
+<BR><BR><H4>
+CFPlugIn Dynamic Registration</H4>
+For those plugins using dynamic registration (CFPlugInDynamicRegistration = YES) invocation of the dynamic registration function will now be delayed from plugin creation time to plugin load time.  However, as a compatibility measure, for main executables linked against pre-Leopard systems, plugins using dynamic registration will have their dynamic registration function invoked when CFPlugInCreate() is called.<BR>
+<BR><BR><H4>
+CFBundle Lookup of Decorated Symbols</H4>
+Some functions in the System framework have behavioral variants intended to conform to the UNIX03 specification.  The symbols for these variants have a suffix, $UNIX2003, even though in code the functions may appear to be unchanged; their use in linkage depends on compile-time flags.  There is also a $DARWIN_EXTSN suffix used for certain other behavioral variants.  CFBundleGetFunctionPointerForName(s) does not supply any special treatment for these symbols.  Clients wishing to use CFBundle to look up these functions must decide whether they wish the UNIX03 or other variant, or the unsuffixed base version of the function, and supply appropriate names to CFBundleGetFunctionPointerForName(s).<BR>
+<BR>None of these suffixes are used on earlier versions of Mac OS X, and the $UNIX2003 suffix is not used in 64-bit architectures, so clients attempting to obtain the suffixed versions should probably fall back to the unsuffixed versions if the suffixed versions are not found.  The /usr/bin/nm tool is useful for determining which symbols a framework exports, and which symbols an executable imports.<BR>
+<BR>Note also that CFBundleGetFunctionPointerForName(s) does not supply any special treatment for C++ mangling of symbols.  Clients wishing to look up these symbols using CFBundle must apply the mangling themselves.<BR>
+<BR><BR><H4>
+Non-Cached Localized Strings</H4>
+In the past CFBundle has always cached the localizable strings contained in a .strings file after a string has been requested from that file.  For applications linked on Leopard or later, a .strings file whose table name ends with &quot;.nocache&quot;, for example &quot;ErrorNames.nocache.strings&quot;, will not have its contents cached by CFBundle.<BR>
+<BR><BR><H4>
+ CFPreferences</H4>
+CFPreferences is now careful to ensure that preferences files are owned by appropriate users and their permissions are set properly even if the application in question is a setuid() application, or elevated its privileges during its run.<BR>
+<BR><BR><H4>
+CFPreferences kCFPreferencesAnyUser+kCFPreferencesAnyHost preferences</H4>
+For applications linked on 10.5 and later, preference domains with this AnyHost+AnyUser pair of arguments are no longer implemented with persistent domains (that is: saved to the file system, or anywhere). &nbsp;For applications linked on 10.4 and earlier, they continue to be stored to the previous location.<BR>
+<BR>Another way of stating &quot;AnyHost+AnyUser&quot; is &quot;AllHosts+AllUsers (in the universe)&quot;. &nbsp;It doesn't really make sense to store preferences in such domains, as the values should logically apply to everybody, in which case -- if actually implemented -- it is the universal behavior of the app, and it's not a preference. &nbsp;Or consider another case: the user types in an app's license key, enabling all the features of the app, and the app writes the license key into the AnyHost+AnyUser domain. &nbsp;Logically, all that has to happen is for one user to go buy the software and license it, and now all users on any machine should be licensed. &nbsp;Obviously, that's unlikely to be what the software company wants; more likely, the license would be for a particular computer or for a particular user.<BR>
+<BR><BR><H4>
+CFXMLParser</H4>
+CFXMLParser is CoreFoundation's XML parser API that provides both an event-based parsing model and a document-based model to its clients.<BR>
+<BR>The implementation of CFXMLParser is a custom implementation which does not allow for other features like namespacing, XPath evaluation, or XQuery evaluation. Clients who desire more sophisticated XML parsing should be using Foundation's NSXMLParser or NSXMLDocument or should use libxml2 or libexpat directly.<BR>
+<BR>While we have not deprecated the CFXMLParser API in Leopard, it is unlikely to gain any new features in future releases of the operating system.<BR>
+<BR><BR><H4>
+CFNumberFormatter</H4>
+CFNumberFormatter has the following new property constants API useful for scientific notation formatting:<BR>
+<PRE><TT>CFStringRef kCFNumberFormatterUseSignificantDigits; // CFBoolean, whether to use the next two or not<BR>CFStringRef kCFNumberFormatterMinSignificantDigits; // CFNumber value<BR>CFStringRef kCFNumberFormatterMaxSignificantDigits; // CFNumber value</TT></PRE>
+<BR>CFNumberFormatter has the following new property constant API:<BR>
+<PRE><TT>const CFStringRef kCFNumberFormatterCurrencyGroupingSeparator; // CFString value</TT></PRE>
+This is the grouping separator for currency values, which could be different than the usual grouping separator in some locales.<BR>
+<BR><BR>CFNumberFormatter has the following new property constant API:<BR>
+<PRE><TT>const CFStringRef kCFNumberFormatterIsLenient; // CFBoolean value</TT></PRE>
+May enable greater leniency in parsing strings into numbers in some operating system releases when true.<BR>
+<BR><BR><H4>
+CFDateFormatter</H4>
+CFDateFormatter adds the following new properties (whose values are all CFArrays of CFStrings):<BR>
+<PRE><TT>const CFStringRef kCFDateFormatterLongEraSymbols;<BR>const CFStringRef kCFDateFormatterVeryShortMonthSymbols;<BR>const CFStringRef kCFDateFormatterStandaloneMonthSymbols;<BR>const CFStringRef kCFDateFormatterShortStandaloneMonthSymbols;<BR>const CFStringRef kCFDateFormatterVeryShortStandaloneMonthSymbols;<BR>const CFStringRef kCFDateFormatterVeryShortWeekdaySymbols;<BR>const CFStringRef kCFDateFormatterStandaloneWeekdaySymbols;<BR>const CFStringRef kCFDateFormatterShortStandaloneWeekdaySymbols;<BR>const CFStringRef kCFDateFormatterVeryShortStandaloneWeekdaySymbols;<BR>const CFStringRef kCFDateFormatterQuarterSymbols;<BR>const CFStringRef kCFDateFormatterShortQuarterSymbols;<BR>const CFStringRef kCFDateFormatterStandaloneQuarterSymbols;<BR>const CFStringRef kCFDateFormatterShortStandaloneQuarterSymbols;</TT></PRE>
+These add support for:<BR>- &quot;long&quot; era names, for example &quot;Anno Domini&quot; instead of &quot;AD&quot;<BR>- &quot;very short&quot; names for months and weekdays; for example, &quot;F&quot; instead of &quot;Friday&quot;<BR>- &quot;standalone&quot; names for months and weekdays; for some locales/languages, a month name displayed in isolation needs to be written differently than a month name within a displayed date<BR>- names of quarters; for example, &quot;Q2&quot; for a short quarter name<BR>
+<BR><BR>CFDateFormatter adds the following new properties (whose value is a CFDate):<BR>
+<PRE><TT>const CFStringRef kCFDateFormatterGregorianStartDate;</TT></PRE>
+This is used to specify the start date for the Gregorian calendar switch from the Julian calendar.  Different locales switched at different times.  Normally you should just accept the locale's default date for the switch.<BR>
+<BR><BR><BR><H4>
+CFLocale</H4>
+CFLocale has the following new API to return an array of CFStrings that represents ISO currency codes for currencies in common use:<BR>
+<PRE><TT>CFArrayRef CFLocaleCopyCommonISOCurrencyCodes(void);</TT></PRE>
+<BR>CFLocale has the following new API to return an array of CFStrings giving the user's preferred language identifiers, canonicalized, in order:<BR>
+<PRE><TT>CFArrayRef CFLocaleCopyPreferredLanguages(void);</TT></PRE>
+<BR>CFLocale has the following new notification name API:<BR>
+<PRE><TT>const CFStringRef kCFLocaleCurrentLocaleDidChangeNotification;</TT></PRE>
+This is a local notification posted when the user changes locale information in the System Preferences panel.  Keep in mind that there is no order in how notifications are delivered to observers, and frameworks or other parts of your code may be observing this notification as well to take their own actions, which may not have occurred by the time you receive the notification.  There is no object or user info for this notification.<BR>
+<BR><BR><H4>
+CFTimeZone</H4>
+CFTimeZone has the following new API:<BR>
+<PRE><TT>CFTimeInterval CFTimeZoneGetDaylightSavingTimeOffset(CFTimeZoneRef tz, CFAbsoluteTime at);<BR>CFAbsoluteTime CFTimeZoneGetNextDaylightSavingTimeTransition(CFTimeZoneRef tz, CFAbsoluteTime at);</TT></PRE>
+The first function returns the daylight saving time offset from GMT at the given moment, or 0.0 if there is no data for that time.  The second function returns the next moment after the given time at which a daylight saving time occurs, or 0.0 if there is no data after that time.<BR>
+<BR><BR>CFTimeZone has the following new API:<BR>
+<PRE><TT>enum {<BR>&nbsp;&nbsp;&nbsp;&nbsp;kCFTimeZoneNameStyleStandard,<BR>&nbsp;&nbsp;&nbsp;&nbsp;kCFTimeZoneNameStyleShortStandard,<BR>&nbsp;&nbsp;&nbsp;&nbsp;kCFTimeZoneNameStyleDaylightSaving,<BR>&nbsp;&nbsp;&nbsp;&nbsp;kCFTimeZoneNameStyleShortDaylightSaving<BR>};<BR>typedef CFIndex CFTimeZoneNameStyle;</TT></PRE>
+<PRE><TT>CFStringRef CFTimeZoneCopyLocalizedName(CFTimeZoneRef tz, CFTimeZoneNameStyle style, CFLocaleRef locale);</TT></PRE>
+This API returns the localized display string for the given time zone and locale, in the given style.  If the data does not exist for that combination of parameters, returns NULL.<BR>
+<BR><BR>CFTimeZone has the following new notification name API:<BR>
+<PRE><TT>const CFStringRef kCFTimeZoneSystemTimeZoneDidChangeNotification;</TT></PRE>
+This notification is posted when the system time zone changes.  The object of the notification is the previous system time zone object.  This notification carries no user info.  Keep in mind that there is no order in how notifications are delivered to observers, and frameworks or other parts of your code may be observing this notification as well to take their own actions, which may not have occurred by the time you receive the notification.<BR>
+<BR><BR><H4>
+CFCalendar new API</H4>
+CFCalendar has the following new API to compute the time range for a given unit surrounding a given moment:<BR>
+<PRE><TT>Boolean CFCalendarGetTimeRangeOfUnit(CFCalendarRef calendar,<BR>                                     CFCalendarUnit unit,<BR>                                     CFAbsoluteTime at,<BR>                                     CFAbsoluteTime *startp,<BR>                                     CFTimeInterval *tip);</TT></PRE>
+For example, to find the starting moment and length of the week around the current moment, for a given calendar, you might do:<BR>
+<PRE><TT>CFAbsoluteTime start;<BR>CFTimeInterval length;<BR>Boolean ret = CFCalendarGetTimeRangeOfUnit(calendar,<BR>                                           kCFCalendarUnitWeek,<BR>                                           CFAbsoluteTimeGetCurrent(),<BR>                                           &amp;start,<BR>                                           &amp;length);</TT></PRE>
+Keep in mind that the time at (start + length) will usually be in the next occurrence of the unit, not in the current one, so you may need to fudge the arithmetic slightly to work with the end date of the unit.  Also, some values have no defined end point (like usually, the current era), so an arbitrary point in the future is chosen.<BR>
+<BR><BR><H4>
+Chinese calendar still not available</H4>
+Although there is a constant for it, the Chinese calendar is not available from CFCalendar or related APIs yet.  In 10.5, trying to create a CFCalendarRef with that constant will return NULL (fail).<BR>
+<BR><BR><H4>
+Calendrical computations</H4>
+Some calendrical computations have been corrected in 10.5.  In particular CFCalendarGetRangeOfUnit() has changed to a more literalist interpretation of &quot;range&quot; for applications linked on or after 10.5.<BR>
+<BR><BR><H4>
+CFRunLoop</H4>
+CFRunLoop has the following newly exposed API:<BR>
+<PRE><TT>CFRunLoopRef CFRunLoopGetMain(void);</TT></PRE>
+This function returns the run loop object of the main thread.  This function is available in Mac OS X 10.1 and later.<BR>
+<BR><BR><H4>
+CFFileDescriptor</H4>
+CFFileDescriptor is an entirely new API in Mac OS X 10.5.  CFFileDescriptor.h is a new header.<BR>
+<BR>This API can be used to monitor file descriptors for read and write activity via CFRunLoop.  Note that each call back is one-shot, and must be re-enabled before you'll get another one.  You might do this re-enabling in the callback function itself.  However, re-enabling when you haven't entirely serviced the file descriptor is a sure way to spin at 100% cpu usage.  For example, if you get a callback because there are bytes to be read on a pipe [that you created the CFFileDescriptorRef with], and you don't read all of the bytes, and re-enable the CFFileDescriptor for read activity, you'll get called back again immediately.<BR>
+<BR>kqueue file descriptors can be monitored for read activity to find out when some event the kqueue is filtering for has occurred.  You are responsible for understanding the use of the kevent() API and inserting and removing filters from the kqueue file descriptor yourself.<BR>
+<BR>For example, the following little command-line program example takes a UNIX process ID as argument, and watches up to 20 seconds, and reports if the process terminates in that time:<BR>
+<PRE><TT>// cc test.c -framework CoreFoundation -O</TT></PRE>
+<PRE><TT>#include &lt;CoreFoundation/CoreFoundation.h&gt;<BR>#include &lt;unistd.h&gt;<BR>#include &lt;sys/event.h&gt;</TT></PRE>
+<PRE><TT>static void noteProcDeath(CFFileDescriptorRef fdref, CFOptionFlags callBackTypes, void *info) {<BR>    struct kevent kev;<BR>    int fd = CFFileDescriptorGetNativeDescriptor(fdref);<BR>    kevent(fd, NULL, 0, &amp;kev, 1, NULL);</TT></PRE>
+<PRE><TT>    // take action on death of process here<BR>    printf(&quot;process with pid '%u' died\n&quot;, (unsigned int)kev.ident);</TT></PRE>
+<PRE><TT>    CFFileDescriptorInvalidate(fdref);<BR>    CFRelease(fdref); // the CFFileDescriptorRef is no longer of any use in this example<BR>}</TT></PRE>
+<PRE><TT>// one argument, an integer pid to watch, required<BR>int main(int argc, char *argv[]) {<BR>    if (argc &lt; 2) exit(1);</TT></PRE>
+<PRE><TT>    int fd = kqueue();<BR>    struct kevent kev;<BR>    EV_SET(&amp;kev, atoi(argv[1]), EVFILT_PROC, EV_ADD|EV_ENABLE, NOTE_EXIT, 0, NULL);<BR>    kevent(fd, &amp;kev, 1, NULL, 0, NULL);<BR>    CFFileDescriptorRef fdref = CFFileDescriptorCreate(kCFAllocatorDefault, fd, true, noteProcDeath, NULL);<BR>    CFFileDescriptorEnableCallBacks(fdref, kCFFileDescriptorReadCallBack);<BR>    CFRunLoopSourceRef source = CFFileDescriptorCreateRunLoopSource(kCFAllocatorDefault, fdref, 0);<BR>    CFRunLoopAddSource(CFRunLoopGetMain(), source, kCFRunLoopDefaultMode);<BR>    CFRelease(source);</TT></PRE>
+<PRE><TT>    // run the run loop for 20 seconds<BR>    CFRunLoopRunInMode(kCFRunLoopDefaultMode, 20.0, false);<BR>    return 0;<BR>}</TT></PRE>
+<BR><H4>
+CFMessagePort and launchd services</H4>
+Looking up a remote CFMessagePort by name will autolaunch launchd services, and creating a message port with the local name in the service process will check that service in with launchd, in 10.5.<BR>
+<BR><BR><H4>
+CFNumber</H4>
+CFNumber's caching behavior (introduced in Tiger) has been changed to cache only CFNumbers allocated with the default system allocator.<BR>
+<BR>CFNumber now has type values for CGFloat and NSInteger. Like CFIndex, these are currently not storage types.<BR>
+<BR>CFNumber's hashing algorithm has been changed; consecutive integers no longer hash to consecutive values, and floating point values are also hashed better.<BR>
+<BR>When creating a CFNumber with one type of value and extracting the value later as a different type, the resulting value may be different in 10.5 than in Tiger.<BR>
+<BR><BR><H4>
+CFString</H4>
+CFString now exports the following function, which is similar to the other NoCopy functions - No guarantee that the provided buffer will be used; but if it isn't, it will be passed to the contents deallocator.  It is your responsibility to make sure the provided buffer is valid for the lifetime of the string:<BR>
+<PRE><TT>CFStringRef CFStringCreateWithBytesNoCopy(CFAllocatorRef alloc, const UInt8 *bytes, CFIndex numBytes,<BR>                                          CFStringEncoding encoding, Boolean isExternalRepresentation,<BR>                                          CFAllocatorRef contentsDeallocator);</TT></PRE>
+CFStringCreateWithBytesNoCopy is available back to 10.4.<BR>
+<BR><BR>The following two new functions enable CFString to compare and sort using an explicit CFLocale argument. In both cases locale == NULL indicates the canonical locale, returned from CFLocaleGetSystem().<BR>
+<PRE><TT>CFComparisonResult CFStringCompareWithOptionsAndLocale(CFStringRef theString1,<BR>                                                       CFStringRef theString2,<BR>                                                       CFRange rangeToCompare,<BR>                                                       CFOptionFlags compareOptions,<BR>                                                       CFLocaleRef locale);</TT></PRE>
+<PRE><TT>Boolean CFStringFindWithOptionsAndLocale(CFStringRef theString,<BR>                                         CFStringRef stringToFind,<BR>                                         CFRange rangeToSearch,<BR>                                         CFOptionFlags searchOptions,<BR>                                         CFLocaleRef locale,<BR>                                         CFRange *result);</TT></PRE>
+<BR>CFString now has the following flags for use in comparison and finding functions:<BR>
+<BR>- kCFCompareDiacriticInsensitive - If specified, ignores diacritics (o-umlaut == o)<BR>- kCFCompareWidthInsensitive - If specified, ignores width differences ('a' == UFF41)<BR>- kCFCompareForcedOrdering - Comparisons are forced to return either kCFCompareLessThan or kCFCompareGreaterThan if the strings are equivalent but not strictly equal, for stability when sorting (e.g. &quot;aaa&quot; &gt; &quot;AAA&quot; with kCFCompareCaseInsensitive specified).<BR>
+<BR><BR>CFString now has a CFStringGetParagraphBounds() API, which parallels the existing CFStringGetLineBounds(), except it does not stop on Unicode NextLine or LineSeparator characters. Thus it finds paragraph boundaries.<BR>
+<BR>CFStringTransform() is now documented to accept any valid ICU transform ID as defined in the <A HREF="http://www.icu-project.org/userguide/Transform.html">ICU User Guide</A>. This feature works back to 10.4. Note that it does not support arbitrary set of ICU transform rules.<BR>
+<BR>CFString now supports the formatting characters L, a, A, F, z, t, and j when formatting strings.   The formatting character n, which never worked properly (it always returned value of zero), is now disabled for applications linked on Leopard. %n in the format string is still processed as before, but, the value pointed to by the argument corresponding to %n is no longer written to.  There are better ways to get a zero.<BR>
+<BR>CFString's hashing algorithm has been changed to hash more characters. It's a strict improvement over the existing hash in all cases.<BR>
+<BR>The following new function is introduced in Mac OS X 10.5 Leopard to allow &quot;folding&quot; characters employing the same logic used by various insensitivity CFStringCompareFlags flags. Folding string returns a canonical representative of the class of strings that are equivalent with respect to the options passed. &nbsp;For example, if you fold two strings that differ only with respect to case, you will get the same string back.<BR>
+<PRE><TT>void CFStringFold(CFMutableStringRef theString, CFOptionFlags flags, CFLocaleRef theLocale);</TT></PRE>
+CFString no longer loosely maps U+2029 (PARAGRAPH SEPARATOR) to 0x0A (ASCII Newline).<BR>
+<BR><BR><H4>
+CFString sharing</H4>
+CFString will now check most immutable CFString creation requests against a set of &quot;popular&quot; strings, and in some cases will return a pre-created string. What this means is that it's now more likely that two distinct creation requests for a CFString with the same contents might return the same exact string; don't count on pointer inequality in those cases. It's also possible that in those cases any unbalanced retain/release requests will go unnoticed.<BR>
+<BR>Note that the set of &quot;popular&quot; strings will change between releases, so do not make any assumptions about what strings are shared based on observations on Leopard. In fact, the set has been updated significantly between the WWDC 2007 seed and final release of Leopard.<BR>
+<BR><BR><H4>
+CFCharacterSet</H4>
+A new predefined charater set selector, kCFCharacterSetNewline, is added.<BR>
+<BR><BR><H4>
+CoreFoundation Unicode Database</H4>
+The CoreFoundation Unicode Database is updated to version 5.0.<BR>
+<BR><BR><H4>
+CFStream</H4>
+New API CFStreamCreateBoundPair() that produces a read stream and a write stream such that when you write to the write stream, those bytes can be read from the read stream.<BR>
+<BR>With the introduction of CFError, CFStream has introduced the calls CFReadStreamCopyError() and CFWriteStreamCopyError() that return CFErrors. &nbsp;These calls replace and obsolete CFReadStreamGetError() and CFWriteStreamGetError().<BR>
+<BR><BR><H4>
+CFNetwork Notes</H4>
+CFNetwork now supports CFErrors; the new header CFNetworkErrors.h contains those error codes that can be returned under the error domain kCFErrorDomainCFNetwork.<BR>
+<BR>The HTTP engine now supports the authentication schemes NTLM and Negotiate.<BR>
+<BR>The new header CFProxySupport.h adds support for inspecting the proxies separately from the larger HTTP engine; it supports computing the correct proxy to use given a proxy dictionary (such as SystemConfiguration provides) and asynchronously downloading and executing an autoconfiguration script (also called a PAC file). &nbsp;See that header for full details.<BR>
+<BR>The property kCFStreamPropertyHTTPFinalRequest has been added to allow the developer to retrieve the final, transmitted request from an HTTP stream.<BR>
+<BR>CFNetServiceGetPortNumber() has been added to allow the developer to retrieve the port from a net service.<BR>
+<BR><BR><H4>
+CoreFoundation APIs are not async-cancel-safe</H4>
+No CoreFoundation APIs are async-cancel-safe as defined by POSIX.  No CoreFoundation functions should be used within signal handlers.  This goes for all APIs built on top of CoreFoundation as well.<BR>
+<BR><BR><H4>
+CoreFoundation and fork()</H4>
+Due to the behavior of fork(), CoreFoundation cannot be used on the child-side of fork().  If you fork(), you must follow that with an exec*() call of some sort, and you should not use CoreFoundation APIs within the child, before the exec*().  The applies to all higher-level APIs which use CoreFoundation, and since you cannot know what those higher-level APIs are doing, and whether they are using CoreFoundation APIs, you should not use any higher-level APIs either.  This includes use of the daemon() function.<BR>
+<BR>Additionally, per POSIX, only async-cancel-safe functions are safe to use on the child side of fork(), so even use of lower-level libSystem/BSD/UNIX APIs should be kept to a minimum, and ideally to only async-cancel-safe functions.<BR>
+<BR>This has always been true, and there have been notes made of this on various Cocoa developer mailling lists in the past.  But CoreFoundation is taking some stronger measures now to &quot;enforce&quot; this limitation, so we thought it would be worthwhile to add a release note to call this out as well.  A message is written to stderr when something uses API which is definitely known not to be safe in CoreFoundation after fork().  If file descriptor 2 has been closed, however, you will get no message or notice, which is too bad.  We tried to make processes terminate in a very recognizable way, and did for a while and that was very handy, but backwards binary compatibility prevented us from doing so.<BR>
+<BR><BR><H4>
+CoreFoundation profile binary</H4>
+CoreFoundation no longer provides a version of the binary built for profiling.  Of course, CoreFoundation used to be one of the few libraries that actually did provide one.  Use dtrace instead.<BR>
+<BR><BR><H4>
+Fixed-mutable collection types eliminated</H4>
+CFArray, CFBag, CFBinaryHeap, CFDictionary, and CFSet no longer offer a &quot;fixed-mutable&quot; variant.  This used to be created when the mutable collection was created with a positive capacity value.  We recommend just passing in 0 as the capacity argument.<BR>
+<BR><BR><H4>
+Order of values in hashing-based collections</H4>
+The CoreFoundation and Foundation framework-provided implementations of hashing-based collections such as dictionaries have changed how they store elements, so elements may be retrieved in a different order than in previous releases.  The order of elements in hashing-based collections is undefined and can change at any time, so developers must never rely on the order that elements are enumerated, or returned from a function like CFDictionaryGetKeysAndValues().  This is true even for cases where a developer may be trying to manipulate the hash codes of the objects in order to achieve some particular ordering.<BR>
+<BR><BR><H4>
+CoreFoundation and C++ namespaces with C standard headers</H4>
+Some C++ clients of CoreFoundation discovered that the global C++ namespace had become &quot;polluted&quot; with with symbols that belonged in a different namespace. This occurred because CoreFoundation.h unconditionally #included 19 headers automatically.<BR>
+<BR>These C standard headers are now guarded by CF_EXCLUDE_CSTD_HEADERS. If you do not with these headers to be #included, define CF_EXCLUDE_CSTD_HEADERS in your project. You will have to provide your own replacements for these headers as appropriate.<BR>
+<BR><BR><H4>
+Performance and compatibility</H4>
+As in any major software update, many things have changed their specific performance characteristics in 10.5.  Some things may be somewhat slower, but we try not to do too much of that.  Some things may be faster, perhaps much faster, and thus may be much slower when the same app is run on 10.4 or earlier.  Always check and test your app on the earlier release that you want to run on, for performance as well as just for correct functioning.<BR>
+<p>
+		<font face="Geneva,Helvetica,Arial" size="1">Copyright &#169; 2007 Apple Computer, Inc.</font>
+	</p>
+</BODY>
+</HTML>

@@ -1,0 +1,146 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+	<title>Affinity API Release Notes for Mac OS X v10.5: Thread Affinity API Release Notes</title>
+	<meta name="Generator" content="Gutenberg"/>
+	<meta name="GeneratorVersion" content="v132"/>
+	<meta http-equiv="content-type" content="text/html;charset=utf-8"/>
+	<meta name = "Copyright" content="Copyright 2009 AppleInc. All Rights Reserved."/>
+	<meta name="IndexTitle" content="Thread Affinity API Release Notes"/>
+	<meta name="xcode-display" content="render"/>
+	<meta id="RESOURCES" content="../../../documentation/Resources" />
+	<link rel="stylesheet" type="text/css" href="../../../documentation/Resources/CSS/frameset_styles.css"/>
+	<script language="JavaScript" type="text/javascript" src="../../../documentation/Resources/JavaScript/lib/prototype.js"></script>
+	<script language="JavaScript" type="text/javascript" src="../../../documentation/Resources/JavaScript/lib/scriptaculous.js"></script>
+	<script language="JavaScript" type="text/javascript" src="../../../documentation/Resources/JavaScript/page.js"></script>
+	<script language="JavaScript" type="text/javascript" src="../../../documentation/Resources/JavaScript/pedia.js"></script>
+</head>
+<body bgcolor="#ffffff" onload="initialize_page();"><a name="//apple_ref/doc/uid/TP40006635" title="Thread Affinity API Release Notes"></a>
+        <a name="top"></a>
+        <!-- start of header -->
+        <!--#include virtual="/includes/framesetheader" -->
+        <!-- end of header -->
+        
+        <!-- start of path -->
+<div class="breadcrumb hideOnPrint hideInXcode"><a href="http://developer.apple.com/" target="_top">ADC Home</a> &gt; <a href="../../../referencelibrary/index.html#//apple_ref/doc/uid/TP30000943" target="_top">Reference Library</a> &gt; <a href="../../index.html#//apple_ref/doc/uid/TP30000872" target="_top">Release Notes</a> &gt; <a href="../index.html#//apple_ref/doc/uid/TP30000872-TP30000430" target="_top">Performance</a> &gt; <a href="../idxDarwin-date.html#//apple_ref/doc/uid/TP30000872-TP30000430-TP30000502">Darwin</a> &gt; </div><br class="hideInXcode"/><!-- end of path -->
+                
+        
+        <a name="//apple_ref/doc/uid/TP40006635-DontLinkElementID_7" title="Thread Affinity API Release Notes"></a><h1>Thread Affinity API Release Notes</h1>
+<!-- This template is being used for both PDF and HTML. -->
+<!-- TopicBook.pm currently relies on the element name bmini_toc. -->
+
+    <h4>Contents:</h4>
+    
+    <p class="blockquote">
+
+        
+			
+            
+                <a href="index.html#//apple_ref/doc/uid/TP40006635-DontLinkElementID_1" target="_top">Applications, Processors, Memory, and Caches</a>
+                
+            <br/>
+            
+        
+			
+            
+                <a href="index.html#//apple_ref/doc/uid/TP40006635-DontLinkElementID_2" target="_top">Thread Affinity API</a>
+                
+            <br/>
+            
+        
+			
+            
+                <a href="index.html#//apple_ref/doc/uid/TP40006635-DontLinkElementID_3" target="_top">The sysctl for Cache Sizes and Sharing Levels</a>
+                
+            <br/>
+            
+        
+			
+            
+                <a href="index.html#//apple_ref/doc/uid/TP40006635-DontLinkElementID_4" target="_top">The sysctl for Processor Package Count</a>
+                
+            <br/>
+            
+        
+			
+            
+                <a href="index.html#//apple_ref/doc/uid/TP40006635-DontLinkElementID_5" target="_top">The sysctl for Processor Family</a>
+                
+            <br/>
+            
+        
+			
+            
+                <a href="index.html#//apple_ref/doc/uid/TP40006635-DontLinkElementID_6" target="_top">For More Information</a>
+                
+            <br/>
+            
+        
+
+    </p><br/>
+
+<a name="//apple_ref/doc/uid/TP40006635-DontLinkElementID_1" title="Applications, Processors, Memory, and Caches"></a><h2>Applications, Processors, Memory, and Caches</h2><p>Optimized multithreaded applications need to know the number of available processors (for concurrency), and the size and sharing of the processor caches (for memory sharing).</p><p>Mac OS X does not export interfaces that identify processors or control thread placement—explicit thread to processor binding is not supported. Instead, the kernel manages all thread placement.  Applications expect that the scheduler will, under most circumstances, run its threads using a good processor placement with respect to cache affinity.</p><p>However, the application itself knows the detailed caching characteristics of its threads and its data—in particular, the organization of threads as disjoint sets characterized by their association with (affinity to) distinct shared data.</p><p>While threads within such a set exhibit affinity with each other via shared data, they share a disaffinity or negative affinity with respect to other sets. In other words, a set expresses an affinity with an L2 cache and the scheduler should seek to run threads in a set on processors sharing that L2 cache.</p><p>To support this, two new APIs are introduced in Leopard:</p><ul class="ul"><li class="li"><p>A mechanism for an application to express thread affinity hints to the scheduler as an extension to Mach thread policies.</p></li><li class="li"><p>A more uniform and complete set of <code><a href="../../../documentation/Darwin/Reference/ManPages/man3/sysctl.3.html#//apple_ref/doc/man/3/sysctl" target="_top">sysctl(3)</a></code> controls to obtain processor cache sharing information.</p></li></ul><a name="//apple_ref/doc/uid/TP40006635-DontLinkElementID_2" title="Thread Affinity API"></a><h2>Thread Affinity API</h2><p>An affinity set is a collection of threads which share memory resources and wish to share an L2 cache. Distinct affinity sets represent separate affinities—that is, threads belonging to a different set should use a separate L2 cache and hence be run on a different logical processors.</p><p>An affinity set is identified by a "tag". Threads are assigned to a particular affinity set by assigning it the tag identifying that set. A thread can belong to at most one affinity set; that is, it has one affinity tag. The default, null, tag represents no affinity.</p><p>Each task has a distinct universe of affinity sets and thus a private namespace of tags; a tag value in one task does not identify the same affinity set in another task.</p><p>The Mach thread policy calls are defined in header <code>/usr/include/mach/thread_policy.h</code> and in <code>/System/Library/Frameworks/System.framework/PrivateHeaders/mach/thread_policy.h</code> as follows:</p><div class="codesample"><table><tr><td scope="row"><pre>kern_return_t  thread_policy_set(
+                        thread_t                thread,
+                        thread_policy_flavor_t  flavor,
+                        thread_policy_t         policy_info,
+                        mach_msg_type_number_t  count);<span></span></pre></td></tr><tr><td scope="row"><pre>kern_return_t  thread_policy_get(
+                        thread_t                thread,
+                        thread_policy_flavor_t  flavor,
+                        thread_policy_t         policy_info,
+                        mach_msg_type_number_t  *count);
+                        boolean_t               *get_default);<span></span></pre></td></tr></table></div><p>These calls have been extended by adding a new flavor of thread policy:</p><div class="codesample"><table><tr><td scope="row"><pre>#define THREAD_AFFINITY_POLICY         4
+
+struct thread_affinity_policy {
+        integer_t       affinity_tag;
+};
+typedef struct thread_affinity_policy   thread_affinity_policy_data_t;
+typedef struct thread_affinity_policy   *thread_affinity_policy_t;
+
+#define THREAD_AFFINITY_POLICY_COUNT    ((mach_msg_type_number_t) \
+                (sizeof (thread_affinity_policy_data_t) / sizeof (integer_t)))
+
+#define THREAD_AFFINITY_TAG_NULL        0
+<span></span></pre></td></tr></table></div><p>By setting a (non-null) affinity tag for a thread, the thread is placed into the affinity set identified by the "tag". By default, all threads have the <code>THREAD_AFFINITY_NULL</code> affinity. A non-null tag is arbitrary and can convey application-specific information.</p><p>The <code>thread_policy_set(THREAD_AFFINITY_POLICY)</code> call can be made after creating a thread but before starting it running in order to influence its initial placement.</p><p>For example, an application wanting to run 2 threads on separate L2 caches would set the threads with different affinity tags. On a dual core machine, this affinity will effectively be ignored. However, on a 4-core MacPro, the scheduler will try to run threads on separate packages. Similarly, on an 8-core MacPro, the scheduler will try to run these threads on separate dies (which may or may not be in the same physical CPU package).</p><p>An application with a producer and a consumer thread that should share an L2 cache would perform the following steps:</p><ul class="ul"><li class="li"><p>Create both threads.</p></li><li class="li"><p>Set the same affinity tag for each thread.</p></li><li class="li"><p>Start both threads.</p></li></ul><p>An application that wants to place a thread on every available processor would do the following:</p><ul class="ul"><li class="li"><p>Obtain the number of processors on the system using <code><a href="../../../documentation/Darwin/Reference/ManPages/man3/sysctl.3.html#//apple_ref/doc/man/3/sysctl" target="_top">sysctl(3)</a></code> (see below).</p></li><li class="li"><p>Create that number of threads.</p></li><li class="li"><p>Set each thread with a distinct affinity tag.</p></li><li class="li"><p>Start all threads.</p></li></ul><p>Threads with default affinity policy will be scheduled more freely on any processor. These threads will be preferentially migrated to run on an idle processor. Threads with affinity tags will tend to remain in place.</p><p>Generally, the affinity tag namespace is private to one task (process). However, a child process forked after its parent has made a <code>THREAD_AFFINITY_POLICY</code> call will share the affinity namespace of the parent process. This enables a family of forked processes to share an affinity namespace despite comprising separate tasks. Moreover, the forked child inherits the affinity tag of its parent. Hence, a parent can seed a number of child processes within an arbitrary organization of shared affinity sets. Note: affinity namespace inheritance is destroyed by the <code><a href="../../../documentation/Darwin/Reference/ManPages/man3/exec.3.html#//apple_ref/doc/man/3/exec" target="_top">exec(3)</a></code> system call, however.</p><p>In addition, the header <code>/usr/include/mach/task_info.h</code> includes the following new information request:</p><div class="codesample"><table><tr><td scope="row"><pre>struct task_affinity_tag_info {         integer_t        count;
+        integer_t        min;
+        integer_t        max;
+        integer_t        task_count;
+};
+typedef struct task_affinity_tag_info   task_affinity_tag_info_data_t;
+typedef struct task_affinity_tag_info   *task_affinity_tag_info_t;
+#define TASK_AFFINITY_TAG_INFO          16
+#define TASK_AFFINITY_TAG_INFO_COUNT    \
+                (sizeof(task_affinity_tag_info_data_t) / sizeof(natural_t))
+<span></span></pre></td></tr></table></div><p>This enables you to obtain the number (<code>count</code>) and range [<code>min</code> .. <code>max</code>] of the affinity tags currently defined for a task.</p><a name="//apple_ref/doc/uid/TP40006635-DontLinkElementID_3" title="The sysctl for Cache Sizes and Sharing Levels"></a><h2>The sysctl for Cache Sizes and Sharing Levels</h2><p>For Leopard, the <code>hw.cacheconfig</code> sysctl reports the number of logical processors sharing caches at various levels in the system. That is:</p><ul class="simple"><li><p><code>hw.cacheconfig[0]</code> reports the RAM sharing (the total number of logical processors).</p></li><li><p><code>hw.cacheconfig[1]</code> reports the L1 sharing (the number of logical processors sharing a level 1 cache).</p></li><li><p><code>hw.cacheconfig[2]</code> reports the L2 sharing.</p></li><li><p>...</p></li></ul><p>There are already assorted sysctl controls that report the size of various caches. These continue to exist for compatibility, but this information is now consolidated into hw.cachesize where:</p><ul class="simple"><li><p><code>hw.cachesize[0]</code> reports the size of memory.</p></li><li><p><code>hw.cachesize[1]</code> reports the size of the L1 data cache.</p></li><li><p><code>hw.cachesize[2]</code> reports the size of the L2 cache.</p></li><li><p>...</p></li></ul><p>Both <code>hw.cacheconfig</code> and <code>hw.cachesize</code> are arrays of 64-bit values.</p><p>Hence, <code>hw.cacheconfig</code> and <code>hw.cachesize</code> provide the information needed for an application to configure:</p><ul class="ul"><li class="li"><p>its threading level for maximum parallelism</p></li><li class="li"><p>buffer space for cache residency</p></li><li class="li"><p>affinity hints for thread placement and cache sharing.</p></li></ul><a name="//apple_ref/doc/uid/TP40006635-DontLinkElementID_4" title="The sysctl for Processor Package Count"></a><h2>The sysctl for Processor Package Count</h2><p>The number of processor packages present on a machine is published through <code>hw.packages</code>. For currently shipping machines this is <code>1</code> or <code>2</code>.</p><a name="//apple_ref/doc/uid/TP40006635-DontLinkElementID_5" title="The sysctl for Processor Family"></a><h2>The sysctl for Processor Family</h2><p>The sysctl <code>hw.cpufamily</code> publishes a value identifying the micro-architectural family of the processor. This value is arbitrarily chosen to be unique for this family. No numerical relationship can be inferred between any two values. Processor features present in any family should be determined by querying other specific <code>hw.optional</code> variables.</p><p>The values returned for processor families supported by Leopard are:</p><div class="tableholder"><table class="graybox" border = "0" cellspacing="0" cellpadding="5"><tr><th scope="col" align="left" style="font-weight: bold" bgcolor="#CCCCCC"><p>Processor</p></th><th scope="col" align="left" style="font-weight: bold" bgcolor="#CCCCCC"><p>hw.cpufamily</p></th></tr><tr><td  scope="row"><p>PowerPC G4</p></td><td ><p>2009171118</p></td></tr><tr><td  scope="row"><p>PowerPC G5</p></td><td ><p>3983988906</p></td></tr><tr><td  scope="row"><p>Intel Core Solo/Duo</p></td><td ><p>1943433984</p></td></tr><tr><td  scope="row"><p>Intel Core 2 Duo</p></td><td ><p>1114597871</p></td></tr></table></div><a name="//apple_ref/doc/uid/TP40006635-DontLinkElementID_6" title="For More Information"></a><h2>For More Information</h2><p>For more information on using <code>sysctl</code> controls, see the <span class="content_text"><a href="../../../documentation/Darwin/Conceptual/KernelProgramming/boundaries/boundaries.html#//apple_ref/doc/uid/TP30000905-CH217" target="_top">Boundary Crossings</a></span> chapter of <em><a href="../../../documentation/Darwin/Conceptual/KernelProgramming/index.html#//apple_ref/doc/uid/TP30000905" target="_top">Kernel Programming Guide</a></em> and the manual pages for <code><a href="../../../documentation/Darwin/Reference/ManPages/man3/sysctl.3.html#//apple_ref/doc/man/3/sysctl" target="_top">sysctl(3)</a></code>, <code><a href="../../../documentation/Darwin/Reference/ManPages/man3/sysctlbyname.3.html#//apple_ref/doc/man/3/sysctlbyname" target="_top">sysctlbyname(3)</a></code>, and the <code><a href="../../../documentation/Darwin/Reference/ManPages/man8/sysctl.8.html#//apple_ref/doc/man/8/sysctl" target="_top">sysctl(8)</a></code> command.</p>
+
+        <br/><br/> 
+        
+        <br/><hr /><div align="center"><p class="content_text" lang="en" dir="ltr"> <!--#if expr="0=1" -->&#x00a9; 2007 Apple Inc. All Rights Reserved. &#40;<!--#endif -->Last updated: 2007-10-31<!--#if expr="0=1" -->&#041;<!--#endif --></p></div>
+
+        
+        <!-- start of footer -->
+        	<table width="100%" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/releasenotes/Performance/RN-AffinityAPI/index.html%3Fid%3DTP40006635-1.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/releasenotes/Performance/RN-AffinityAPI/index.html%3Fid%3DTP40006635-1.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/releasenotes/Performance/RN-AffinityAPI/index.html%3Fid%3DTP40006635-1.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+
+        <!--#include virtual="/includes/framesetfooter" -->
+        <!-- end of footer -->
+</body>
+</html>

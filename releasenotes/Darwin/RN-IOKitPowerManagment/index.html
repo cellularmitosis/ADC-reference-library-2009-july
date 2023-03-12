@@ -1,0 +1,101 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+	<title>I/O Kit Power Management Release Notes</title>
+	<meta name="Generator" content="Gutenberg"/>
+	<meta name="GeneratorVersion" content="v132"/>
+	<meta http-equiv="content-type" content="text/html;charset=utf-8"/>
+	<meta name = "Copyright" content="Copyright 2009 AppleInc. All Rights Reserved."/>
+	<meta name="IndexTitle" content="I/O Kit Power Management Release Notes"/>
+	<meta name="xcode-display" content="render"/>
+	<meta id="RESOURCES" content="../../../documentation/Resources" />
+	<link rel="stylesheet" type="text/css" href="../../../documentation/Resources/CSS/frameset_styles.css"/>
+	<script language="JavaScript" type="text/javascript" src="../../../documentation/Resources/JavaScript/lib/prototype.js"></script>
+	<script language="JavaScript" type="text/javascript" src="../../../documentation/Resources/JavaScript/lib/scriptaculous.js"></script>
+	<script language="JavaScript" type="text/javascript" src="../../../documentation/Resources/JavaScript/page.js"></script>
+	<script language="JavaScript" type="text/javascript" src="../../../documentation/Resources/JavaScript/pedia.js"></script>
+</head>
+<body bgcolor="#ffffff" onload="initialize_page();"><a name="//apple_ref/doc/uid/TP40006501" title="I/O Kit Power Management Release Notes"></a>
+        <a name="top"></a>
+        <!-- start of header -->
+        <!--#include virtual="/includes/framesetheader" -->
+        <!-- end of header -->
+        
+        <!-- start of path -->
+<div class="breadcrumb hideOnPrint hideInXcode"><a href="http://developer.apple.com/" target="_top">ADC Home</a> &gt; <a href="../../../referencelibrary/index.html#//apple_ref/doc/uid/TP30000943" target="_top">Reference Library</a> &gt; <a href="../../index.html#//apple_ref/doc/uid/TP30000872" target="_top">Release Notes</a> &gt; <!--a  -->Darwin<!--/a--> &gt; <a href="../idxHardwareDrivers-date.html#//apple_ref/doc/uid/TP30000872-TP30000422-TP40003590">Hardware &amp; Drivers</a> &gt; </div><br class="hideInXcode"/><!-- end of path -->
+                
+        
+        <a name="//apple_ref/doc/uid/TP40006501-DontLinkElementID_5" title="I/O Kit Power Management Release Notes"></a><h1>I/O Kit Power Management Release Notes</h1>
+<!-- This template is being used for both PDF and HTML. -->
+<!-- TopicBook.pm currently relies on the element name bmini_toc. -->
+
+    <h4>Contents:</h4>
+    
+    <p class="blockquote">
+
+        
+			
+            
+                <a href="index.html#//apple_ref/doc/uid/TP40006501-DontLinkElementID_1" target="_top">Managing Power Chapter</a>
+                
+            <br/>
+            
+        
+			
+            
+                <a href="index.html#//apple_ref/doc/uid/TP40006501-DontLinkElementID_2" target="_top">Kernel Functional Changes</a>
+                
+            <br/>
+            
+        
+			
+            
+                <a href="index.html#//apple_ref/doc/uid/TP40006501-DontLinkElementID_3" target="_top">New Driver API</a>
+                
+            <br/>
+            
+        
+			
+            
+                <a href="index.html#//apple_ref/doc/uid/TP40006501-DontLinkElementID_4" target="_top">New Application API</a>
+                
+            <br/>
+            
+        
+
+    </p><br/>
+
+<a name="//apple_ref/doc/uid/TP40006501-DontLinkElementID_1" title="Managing Power Chapter"></a><h2>Managing Power Chapter</h2><p>Please see the newly re-written <strong>Managing Power</strong> chapter in <em><a href="../../../documentation/DeviceDrivers/Conceptual/IOKitFundamentals/index.html#//apple_ref/doc/uid/TP0000011" target="_top">I/O Kit Fundamentals</a></em> - it documents many previously undocumented IOService power management API’s and behaviors.</p><a name="//apple_ref/doc/uid/TP40006501-DontLinkElementID_2" title="Kernel Functional Changes"></a><h2>Kernel Functional Changes</h2><p>In Leopard, the kernel implementation of driver power management has been revised and re-written. Threading, locking, and timing semantics have been changed for more robust, stable, and predictable behavior. </p><p>This means that your power managed I/O Kit device driver will have different threading and locking interactions with power management. Although the changes make for a more consistent and usable power management system, driver code that worked fine in Tiger may behave unexpectedly in Leopard.</p><ul class="ul"><li class="li"><p>Calls into kernel Power Management are now asynchronous</p><p>All IOService PM API calls simply enqueue the work to be done for later processing, and immediately return.</p><p>For example, upon calling <code>IOService::changePowerStateTo</code>, a driver must wait for the call’s completion before taking any action (like trying to access device registers or communicate with the device before it has powered on). Drivers must wait for the following <code>IOService::setPowerState</code> call that indicates power management has actually changed the device’s state.</p></li><li class="li"><p>Calls from kernel PM into drivers are now “clean”</p><p>Any place power management will call into a driver, namely <code>IOService::setPowerState</code>, <code>IOService::powerStateWillChangeTo</code>, or <code>IOService::powerStateDidChangeTo</code>, is now performed on a newly created thread. </p></li><li class="li"><p>Do not access IOService member variable <strong>pm_vars</strong></p><p>The <code>pm_vars</code> variable is deprecated in Leopard. The most common reason to use it was to check your driver’s current power state - please call <code>IOService::getPowerState</code> instead.</p></li></ul><a name="//apple_ref/doc/uid/TP40006501-DontLinkElementID_3" title="New Driver API"></a><h2>New Driver API</h2><ul class="ul"><li class="li"><p><strong>IOService::systemWillShutdown</strong></p><p>Any power managed IOService driver may receive a <code>kIOMessageSystemWillRestart</code> or <code>kIOMessageSystemWillShutdown</code> notification that the system is shutting down or restarting and take appropriate action. </p><p>Shutdown notifications are delivered in child-first <strong>IOPower</strong> plane order. Shutdowns are delivered after all user processes have been terminated and after all filesystems have been unmounted. If your hardware does not have any physical state to save (like a disk driver flushing caches to disk), you probably do not need to run at shutdown time.</p><p>Please use discretion, as any unnecessary use of this API can cause slowdowns in shutdown or restart. For debugging, OS X reports per-driver time measurements via <em>FireWire kprintf</em> with <code>boot-args="debug=0x14e io=0x880"</code>. See <em>FireWire SDK 24</em> for details on kprintf logging.</p></li><li class="li"><p><strong>IOService::getPowerState</strong></p><p>Returns a device’s current power state (i.e. returns the integer index into the device’s power state array. A device's "current power state" is updated at the end of each power state transition.</p></li></ul><a name="//apple_ref/doc/uid/TP40006501-DontLinkElementID_4" title="New Application API"></a><h2>New Application API</h2><ul class="ul"><li class="li"><p><strong>Actively prevent System Sleep and Display Sleep</strong></p><p><code>IOPMAssertionCreate</code> and <code>IOPMAssertionRelease</code> allow a process to assert <code>kIOPMAssertionTypeNoDisplaySleep</code> or <code>kIOPMAssertionTypeNoIdleSleep</code>. As long as a sleep prevention or display sleep prevention assertion is active, the system will not idle sleep or display sleep, accordingly. </p><p>Preventing idle sleep with an IOPMAssertion is far simpler than the existing technique of using <code>IORegisterForSystemPower</code>.</p><p> Creating an assertion only requires one call at the beginning of any activities that should prevent sleep (making a backup, beginning a long computation) or that should prevent display sleep (playing a movie or slideshow).</p><p>Assertions should be released with <code>IOPMAssertionRelease</code>. However, even if not properly released, assertions will be automatically released when the process exits, dies, or crashes. A crashed process will not prevent idle sleep indefinitely.</p><p>The command-line tool <code>pmset -g</code> provides accountability by listing all outstanding assertions affecting <strong>System Sleep</strong> or <strong>Display Sleep</strong>.</p><p>Neither this API nor any other API allow an application to prevent <strong>forced system sleep</strong> (e.g. lid close sleep, Apple Menu sleep, thermal emergency sleep, or low battery sleep).</p></li></ul>
+
+        <br/><br/> 
+        
+        <br/><hr /><div align="center"><p class="content_text" lang="en" dir="ltr"> <!--#if expr="0=1" -->&#x00a9; 2007 Apple Inc. All Rights Reserved. &#40;<!--#endif -->Last updated: 2007-10-31<!--#if expr="0=1" -->&#041;<!--#endif --></p></div>
+
+        
+        <!-- start of footer -->
+        	<table width="100%" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/releasenotes/Darwin/RN-IOKitPowerManagment/index.html%3Fid%3DTP40006501-1.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/releasenotes/Darwin/RN-IOKitPowerManagment/index.html%3Fid%3DTP40006501-1.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/releasenotes/Darwin/RN-IOKitPowerManagment/index.html%3Fid%3DTP40006501-1.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+
+        <!--#include virtual="/includes/framesetfooter" -->
+        <!-- end of footer -->
+</body>
+</html>

@@ -7,6 +7,11 @@ Viewable online at http://leopard-adc.pepas.com.
 
 [![](.media/screenshot.png)](http://leopard-adc.pepas.com)
 
+Note: two files have been compressed using xz because they exceed github's 50MB filesize limit:
+- documentation/GraphicsImaging/Reference/CoreImageFilterReference/CoreImageFilterReference.pdf
+- documentation/GraphicsImaging/Reference/CoreImagingRef/CoreImageRef.pdf
+
+
 ## Expanded Sample Code Zip Files
 
 All of the sample code zip files have been expanded for online browsing:

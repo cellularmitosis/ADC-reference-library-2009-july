@@ -1,0 +1,101 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/1999/REC-html401-19991224/loose.dtd">
+<html><head>
+<!-- BEGIN META TAG INFO -->
+<link rel="home" href="http://developer.apple.com/">
+<link rel="find" href="http://developer.apple.com/search/">
+<link rel="stylesheet" type="text/css" href="../../documentation/css/adcstyle.css" title="fonts">
+<script language="JavaScript" type="text/javascript" src="../../documentation/js/busnav.js"></script>
+<script language="JavaScript" src="../../documentation/js/adc.js" type="text/javascript"></script>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<!-- END META TAG INFO -->
+<!-- BEGIN TITLE -->
+<title>Technical Q&amp;A QA1297: Don't forget to cancel your Bonjour resolve</title>
+<!-- END TITLE -->
+</head>
+<!-- BEGIN BODY OPEN -->
+<body bgcolor="#ffffff"><a name="//apple_ref/doc/uid/DTS10002343" title="Don't forget to cancel your Bonjour resolve"></a>
+<!--END BODY OPEN -->
+<!-- START CENTER OPEN -->
+<center>
+<!-- END CENTER OPEN -->
+<a name="top"></a>
+<!-- BEGIN LOGO AND SEARCH -->
+<!--#include virtual="/includes/adcnavbar"-->
+<!-- END LOGO AND SEARCH -->
+<!-- START BREADCRUMB -->
+<div id="breadcrumb"><table width="680" border="0" cellpadding="0" cellspacing="0"><tr>
+<td scope="row"><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+<td><img width="340" height="10" src="images/1dot.gif" alt=""></td></tr><tr valign="middle"><td align="left" colspan="2">
+<a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../technicalqas/index.html">Technical Q&As</a> &gt; <a href="../../technicalqas/Carbon/index.html">Carbon</a> &gt; <a href="../../technicalqas/Carbon/idxNetworking-date.html">Networking</a> &gt; 
+</td></tr><tr><td colspan="2" scope="row"><img width="680" height="35" src="images/1dot.gif" alt=""></td></tr></table></div>
+<!-- END BREADCRUMB -->
+
+<!-- START MAIN CONTENT -->
+<!-- START TITLE GRAPHIC AND INTRO-->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top">
+<td><h1>
+<div id="pagehead">Technical Q&amp;A QA1297</div>
+<div id="pageheadsub">Don't forget to cancel your Bonjour resolve</div>
+</h1></td></tr></table>
+<!-- END TITLE GRAPHIC AND INTRO -->
+<!-- BEGIN WIDE COLUMN -->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td align="left" width="680">
+<!-- BEGIN CONTENTS -->
+<h2>Q: After I Resolve a Bonjour service in order to get its IP addresses, do I need to cancel the Resolve operation?</h2><p>A: Yes.  Leaving the Resolve operation running places an unnecessary burden on the network because you end up sending query packets every couple of minutes in order to keep the DNS resource records up-to-date in the local machine's Bonjour cache.  You should only Resolve the service at the moment you need to connect to it, and you should cancel the Resolve immediately after successfully connecting to the service. Manually stopping the Resolve also holds for any resolution involving a timeout scheme. Starting in Mac OS X 10.3, failure to cancel the Resolve will cause the following message to appear in the system log (<code>/var/log/system.log</code>).</p><p class="smalltext"><strong>Listing 1:</strong> system.log message</p><pre class="sourcecodebox">Oct 11 12:57:54 admin mDNSResponder[266]: 37755: DNSServiceResolver(Ice Cube._http._tcp.local.) has remained
+active for over two minutes. This places considerable burden on the network.</pre><p>The process by which you cancel the Resolve operation(s) depends on the method you are using.</p><ul><li><p>If you are using <code>DNSServiceResolve</code>, you need to call <code>DNSServiceRefDeallocate</code>.</p></li><li><p>If you are using <code>CFNetServiceResolve</code> or <code>CFNetServiceResolveWithTimeout</code>, you need to make the following calls:</p><p class="smalltext"><strong>Listing 2:</strong> CFNetServiceResolve Cancellation</p><pre class="sourcecodebox">
+CFNetServiceSetClient(netService, NULL, NULL);
+CFNetServiceUnscheduleFromRunLoop(netService, runLoop, runLoopMode);
+CFNetServiceCancel(netService);
+CFRelease(netService);
+</pre></li><li><p>If you are using <code>NSNetService</code>, you need to make the following calls:</p><p class="smalltext"><strong>Listing 3:</strong> NSNetService Cancellation</p><pre class="sourcecodebox">
+[NSNetService stop];
+[NSNetService release];
+</pre><p>Or you can use [NSNetService resolveWithTimeout:] and specify a timeout interval. An example of the calls needed would look similar to the following:</p><p class="smalltext"><strong>Listing 4:</strong> NSNetService Timeout Example</p><pre class="sourcecodebox">
+if ([someNetServiceInstance respondsToSelector:@selector(resolveWithTimeout:)]) {
+     // Mac OS X 10.4 &quot;Tiger&quot; or later
+     [someNetServiceInstance resolveWithTimeout:20];
+} else {
+     // Mac OS X 10.3 &quot;Panther&quot; or earlier
+     [someNetServiceInstance resolve];
+     NSTimer * stopTimer = [NSTimer timerWithTimeInterval:20
+                                    target:someNetServiceInstance
+                                    selector:@selector(stop)
+                                    userInfo:nil
+                                    repeats:NO];
+     [[NSRunLoop currentRunLoop] addTimer:stopTimer forMode:NSDefaultRunLoopMode];
+}
+</pre><div class="notebox"><p><strong>IMPORTANT:</strong> As mentioned above, be sure to stop your Resolve once you've succesfully connected to a service even when you are using a timeout scheme. Otherwise CF/NSNetServices will continually call you back with newly discovered IP addresses until the timeout value has been reached.</p></div><div class="notebox"><p><strong>Note:</strong> For Mac OS X 10.4 <code>[NSNetService resolve]</code> times out automatically after 5 seconds.</p></div></li></ul><p>There are some rare applications that need to keep a Resolve running in order to monitor for TXT record changes. iChat, for example, continuously monitors for changes to a buddy's status message, which is stored in the Bonjour TXT record.  If your application requires this type of functionality, starting in Mac OS X 10.4 you can now monitor for TXT records using <code>CFNetServiceMonitor</code> and/or <code>[NSNetService startMonitoring]</code>. If you want your application to support Mac OS X 10.3 use the DNSServiceDiscovery APIs, located at <code>/usr/include/dns_sd.h</code>.</p><div class="notebox"><p><strong>Note:</strong> The function <code>DNSServiceQueryRecord</code> will allow you to restrict your query to only TXT records, which is more efficient than using the regular Resolve operations which send a query for SRV, TXT and address records.</p></div><div class="notebox"><p><strong>IMPORTANT:</strong> If you are creating an application designed to support Mac OS X 10.3 &quot;Panther&quot; and are planning to include a Mac OS X 10.4 &quot;Tiger&quot; or later API you should read <A HREF="../../technotes/tn2002/tn2064.html">TN2084: &quot;Ensuring Backwards Compatability&quot;</A>.</p></div><A NAME="TNT_HISTORY_TAG"></A><H2>Document Revision History</H2><table cellspacing="0" class="graybox" width="680"><tr><th width="100">Date</th><th width="580">Notes</th></tr><tr><td scope="row">2007-08-30</td><td>Disambiguated language conveying timeout cancellation.</td></tr><tr><td scope="row">2007-08-07</td><td>Added language to emphasize the importance of stopping a resolve once connected to a service.</td></tr><tr><td scope="row">2006-10-06</td><td>Added the descriptions by which you can cancel the resolve operation.</td></tr><tr><td scope="row">2003-10-15</td><td>Explains why it's important to cancel a Bonjour resolve operation.</td></tr></table><p><b>Posted:</b> 2007-08-30</p>
+<!-- END CONTENTS -->
+</td></tr></table>
+<!-- END WIDE COLUMN -->
+<!-- END MAIN CONTENT -->
+	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/qa/qa2001/qa1297.html%3Fid%3DDTS10002343-1.1&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/qa/qa2001/qa1297.html%3Fid%3DDTS10002343-1.1&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/qa/qa2001/qa1297.html%3Fid%3DDTS10002343-1.1&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+
+<!-- START BOTTOM APPLE NAVIGATION -->
+<!--#include virtual="/includes/footer"-->
+<!-- END BOTTOM APPLE NAVIGATION -->
+<!-- START CENTER CLOSE -->
+</center>
+<!-- END CENTER CLOSE -->
+</body></html>

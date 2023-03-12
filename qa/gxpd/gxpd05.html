@@ -1,0 +1,42 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN"			"http://www.w3.org/TR/REC-html40/loose.dtd"><HTML><!--Template 06-20-02--><HEAD><LINK REL="stylesheet" HREF="../../adcstyle.css" TYPE="text/css"><LINK REL="stylesheet" HREF="../../style.css" TYPE="text/css"><title>Technical Q&amp;A GXPD05: Quickdraw GX Raster Printer Drivers</title><meta name="keywords" content="Mac OS 7 QuickDraw GX Raster Printer Drivers RasterPackageBitMap"><meta name="Description" content="Technical Q&amp;A GXPD05: NOTE: QuickDraw GX printer driversand GX printing extensions will not be supported in Mac OS8.0 or in future Mac OS releases. Q&amp;A gives possible reasonswhy a driver's RasterDataIn may not be calling RasterPackageBitMap,especially on blank lines."><meta name="categories" content="QuickDraw GX"><meta name="week-posted" content="May 1, 1995 - May 5, 1995"><LINK REL="stylesheet" HREF="../../css/adcstyle.css" TYPE="text/css"><script language="JavaScript" type="text/javascript" src="../../js/adc.js"></script></HEAD><BODY BGCOLOR="#FFFFFF"><a name="//apple_ref/doc/uid/DTS10001220" title="Quickdraw GX Raster Printer Drivers"></a><!-- top_of_header_marker_comment --><!-- begin_header_information --><!--#include virtual="/adcnavbar" --><p><a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../technicalqas/index.html">Technical Q&As</a> &gt; <a href="../../technicalqas/LegacyTechnologies/index.html">Legacy Documents</a> &gt; <a href="../../technicalqas/LegacyTechnologies/idxGraphicsImaging-date.html">Graphics & Imaging</a> &gt; </p><div style="width:100%; position:fixed;"><div align="center" id="watermark" style="position: relative; margin-left:auto; margin-right:auto; z-index:20; width:500px;"><div class="legacybox"><h1>Legacy Document<span class=closebutton><a href="javascript:closeWatermark()"><img src="../../images/closebutton.png" width="14" height="14" border="0"  alt="close button"></a></span></h1>
+
+<p><strong>Important: </strong>This document is part of the Legacy section of the ADC Reference Library. This information should not be used for new development.</p>
+
+<div class="reflibtopic">
+	<p>Current information on this Reference Library topic can be found here:</p>
+	<ul>
+				<li><a href="http://developer.apple.com/referencelibrary/GraphicsImaging/index.html" target="_blank">Reference Library > Graphics & Imaging</a></li>
+	</ul>
+</div>
+
+
+
+
+</div></div></div><!-- end_header_information --><!-- bottom_of_header_marker_comment --><!-- top_of_titles_marker_comment --><CENTER><table width="600" cellpadding="0" cellspacing="0" border="0">
+<tr><td align="left" scope="row">
+<h1>
+<div id="pagehead">Technical Q&amp;A GXPD05</div>
+<div id="pageheadsub">Quickdraw GX Raster Printer Drivers</div>
+</h1>
+</td></tr></table></CENTER><!-- bottom_of_titles_marker_comment -->						<!-- begin_content --> <CENTER><TABLE BORDER=0 CELLPADDING=0 WIDTH=600><TR> <td align="left"><hr width=500 align=center><TABLE BORDER="0"><TR>	<td bgcolor="#e6e6e6" align=left>		<B>Important for all Apple Printing and Graphics Developers: </B><p id=p4>		The information in this Technical Q &amp; A is still relevant up to and including		<A HREF="../../technotes/tn/tn1090.html" target="_blank">Mac OS 7.6</A>		with QuickDraw GX 1.1.5. Beginning with the release of Mac OS 8.0,		however, Apple plans to deliver a system which incorporates QuickDraw GX		graphics and typography <B>only</B>. QuickDraw GX printer drivers and GX printing		extensions will <B>not</B> be supported in Mac OS 8.0 or in future Mac OS releases. Apple's		goal is to simplify the user experience of printing by unifying the Macintosh		graphic and printing architectures and standardizing on the classic Printing		Manager. </P>				For details on Apple's official announcement, refer to 		<A HREF="../../technotes/gxchange.html" target="_blank">		&lt;/dev/technotes/gxchange.html&gt;</A>	</TD></TR></TABLE><BR><p id = p2>Q:  I'm having a problem with my GX raster driver (for a monochromeplotter): I need to call my <code>RasterPackageBitmap</code> override for all the lines in aprint, regardless of whether the lines are dirty or not. It seems that<code>RasterDataIn</code> is checking for clean lines, but not bothering to call<code>RasterPackageBitmap</code> for these lines, and is just calling <code>RasterLineFeed</code> on itsown. Is there a way for me to use the default <code>RasterDataIn</code> to accomplish thistask, or do I have to override it myself?</p> <p id=p4>It seems that there are plenty of options available in the resources to sendall bands, regardless of whether they are dirty, but this doesn't seem to helpindividual blank lines to get through to <code>PackageBitmap</code>. I've tried setting<code>dirtyRectangle</code> to <code>bandRectangle</code>, but this doesn't work for individual blanklines within bands.</p><p id=p4>A:  There are two possible causes for your problem. The first is the <code>'rdip'</code>resource of your driver. The <code>gxSendAllBands</code> flag of the <code>'rdip'</code> should be set toforce the default implementation of <code>RasterDataIn</code> to call <code>RasterPackageBitmap</code>,even if a line isn't dirty. You should also override <code>RasterLineFeed</code>. In thisoverride, you should package up blank lines in the same way that you package updirty lines in <code>RasterPackageBitmap</code>. You have to override both these messages ifyou use the default implementation of <code>RasterDataIn</code>.</p> <p id=p4>There is also a bug in QuickDraw GX 1.0.x, where the <code>gxOnePlaneAtATime</code> bit iswrongly used to invoke this behavior. To quickly find out if this is the causeof your problem, try setting the <code>gxOnePlaneAtATime</code> bit instead. This bug wasfixed in the GX 1.1.1.</p><p id=p4>If you need a workaround that works with GX 1.0.x, you should have your<code>RasterDataIn</code> override pad the output with the appropriate number of empty linesbefore and after forwarding the message. Pad the output again after<code>Forward_RenderPage</code> for any empty bands at the tail end of the page.</p> <p id=p4>It is also possible that the problem is caused, at least in part, by theapproach that your driver is taking. We've found that most raster driverscompletely override the <code>RasterDataIn</code> message (which circumvents<code>RasterPackageBitmap</code> altogether) in order to have total control of the bandingand the buffering (i.e., <code>SendBufferData</code>) process. This is a much easier way toimplement your driver.</p></td></tr></table></center><!-- end_content --><!-- begin_date --><H4 ALIGN=center>[May 01 1995]</H4><!-- end_date --><!-- begin_footer_information -->	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/qa/gxpd/gxpd05.html%3Fid%3DDTS10001220-1.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/qa/gxpd/gxpd05.html%3Fid%3DDTS10001220-1.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/qa/gxpd/gxpd05.html%3Fid%3DDTS10001220-1.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+<!--#include virtual="/includes/footer"--><!-- end_footer_information --> <hr width=500 align=center> </BODY> </HTML>

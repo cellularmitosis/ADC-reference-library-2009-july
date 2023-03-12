@@ -1,0 +1,98 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN"
+"http://www.w3.org/TR/REC-html40/loose.dtd">
+<HTML>
+<HEAD>
+
+<title>Technical Q&amp;A QA1252: PPPoE Server for Testing</title>
+
+<LINK REL="stylesheet" HREF="../../adcstyle.css" TYPE="text/css">
+<LINK REL="stylesheet" HREF="../../style.css" TYPE="text/css">
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+<meta name="keywords" content="Mac OS X, PPPoE, pppd, concentrator">
+<meta name="Description" content="This Q&amp;A describes how to configure Mac OS X as a PPPoE server for testing purposes.">
+
+<LINK REL="stylesheet" HREF="../../css/adcstyle.css" TYPE="text/css"><script language="JavaScript" type="text/javascript" src="../../js/adc.js"></script></HEAD>
+
+
+<BODY BGCOLOR=WHITE><a name="//apple_ref/doc/uid/DTS10002288" title="PPPoE Server for Testing"></a>
+
+<!-- begin_header_information --><!--#include virtual="/adcnavbar" --><p><a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../technicalqas/index.html">Technical Q&As</a> &gt; <a href="../../technicalqas/Networking/index.html">Networking</a> &gt; <a href="../../technicalqas/Networking/idxCocoa-date.html">Cocoa</a> &gt; </p><!-- end_header_information -->
+
+<!-- begin_titles_information --><CENTER><table width="600" cellpadding="0" cellspacing="0" border="0">
+<tr><td align="left" scope="row">
+<h1>
+<div id="pagehead">Technical Q&amp;A QA1252</div>
+<div id="pageheadsub">PPPoE Server for Testing</div>
+</h1>
+</td></tr></table></CENTER><!-- end_titles_information -->
+
+<CENTER><TABLE BORDER=0 CELLSPACING=1 WIDTH=600> <TR>
+					<td align="left">
+						<hr width=500 align=center>
+						<!-- begin_document_contents -->
+						<p id=p2>Q: I'm writing some Internet setup assistant software. I would like to test my PPPoE setup code, but I don't have access to a PPPoE concentrator. Can I use Mac OS X as a PPPoE server for testing?</p>
+						<p id=p4>A: Yes you can. Enter the following two command lines into a Terminal window on the machine you want to act as a PPPoE server.</p>
+						<p id=p4><code>sudo sysctl -w net.inet.ip.forwarding=1</code></p>
+						<p id=p4><code>sudo pppd plugin PPPoE.ppp noauth debug nodetach persist holdoff 1 mru 1492 mtu 1492 proxyarp pppoemode listen 10.0.0.32:10.0.0.64 ms-dns 17.128.100.9</code></p>
+						<div align="center">
+							<table border=0 cellpadding=3 width=500>
+								<tr>
+									<td bgcolor="#EEEEE0" scope="row">
+										<p><b>WARNING:</b><br>
+											These commands were specifically tailored for testing PPPoE on a private network (either an isolated network or a network behind a firewall). They are not appropriate for a production PPPoE installation, nor for a public network.</p>
+									</td>
+								</tr>
+							</table>
+						</div>
+						<p id=p4>The first command line enables IP forwarding on your machine. Without this, the PPPoE client will only be able to talk to the PPPoE server itself.</p>
+						<p id=p4>Each element of the second command line is explained below.</p>
+						<ul>
+							<li id=p4>The <code>sudo</code> command causes <code>pppd</code> to run with privileges, which is necessary to start a PPPoE server in this way.
+							<li id=p4><code>pppd</code> is the name of the PPP daemon program on Mac OS X.
+							<li id=p4>The <code>plugin PPPoE.ppp</code> option causes <code>pppd</code> to load the PPPoE plug-in.
+							<li id=p4>The <code>noauth</code> option allows any client to connect to your PPPoE server without authentication. Take heed of the warning above.
+							<li id=p4>The <code>debug</code> option causes <code>pppd</code> to log the contents of control packets to the Terminal window.
+							<li id=p4>Normally <code>pppd</code> will detach from its controlling terminal and run in the background. The <code>nodetach</code> option prevents this, which is useful because you can then quit <code>pppd</code> by typing ^C.
+							<li id=p4>The <code>persist</code> option prevents <code>pppd</code> from terminating when the client disconnects. This is useful when debugging because you can connect and disconnect the client as many times as you like without having to touch the server.
+							<li id=p4>The <code>holdoff 1</code> option causes <code>pppd</code> to resume listening for connections one second after the connection terminates.							<li id=p4>The Maximum Receive Unit (MRU) and Maximum Transmit Unit (MTU) values are set using the options <code>mru 1492 mtu 1492</code>. These are the standard values for PPPoE.
+							<li id=p4>The <code>proxyarp</code> option will allow the client to communicate with machines other than the PPPoE server itself. You need this if you want to connect to other machines on the Internet from the PPPoE client.
+							<li id=p4>The <code>pppoemode listen</code> option forces <code>pppd</code> to listen for incoming connections.
+							<li id=p4>The <code>10.0.0.32:10.0.0.64</code> option specifies the local and remote IP addresses for the PPP connection. Both should be unused IP addresses on the local subnet of the PPPoE server.  The first will be used as the local address of the PPP connection. The second forms the remote address of the PPP connection; it will be handed out to the PPP client. This example uses 10.0.0.z addresses, which would be appropriate if you were behind a NAT router.
+							<li id=p4>The <code>ms-dns 17.128.100.9</code> option allows you to specify the IP address of a DNS server that <code>pppd</code> will pass to the client (using IPCP options 129 and 131 as documented in <a href="http://www.ietf.org/rfc/rfc1877.txt?number=1877">RFC 1877</a>). This eliminates the need for you to configure DNS on the client by hand. You should replace <code>17.128.100.9</code> with the IP address of a DNS server appropriate for your network.
+						</ul>
+						<p id=p4>After you have run this command line on the server, you should be able to create a basic PPPoE configuration on the client, run Internet Connect, and connect to your server.</p>
+						<p id=p4>For more details about these <code>pppd</code> options, enter <code>man</code> <code>pppd</code> into Terminal.</p>
+						<div align="center">
+							
+						</div>
+						<hr width=500 align=center>
+						<!-- begin_date -->
+						<h4 align=center>[Apr 11, 2003]</h4>
+						<!-- end_date --><!-- end_document_contents --></td>
+				</TR></TABLE></CENTER>
+
+<!-- begin_footer_information -->	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/qa/qa2001/qa1252.html%3Fid%3DDTS10002288-1.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/qa/qa2001/qa1252.html%3Fid%3DDTS10002288-1.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/qa/qa2001/qa1252.html%3Fid%3DDTS10002288-1.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+<!--#include virtual="/includes/footer"--><!-- end_footer_information -->
+
+</BODY>
+</HTML>

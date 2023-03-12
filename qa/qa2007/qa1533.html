@@ -1,0 +1,105 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/1999/REC-html401-19991224/loose.dtd">
+<html><head>
+<!-- BEGIN META TAG INFO -->
+<link rel="home" href="http://developer.apple.com/">
+<link rel="find" href="http://developer.apple.com/search/">
+<link rel="stylesheet" type="text/css" href="../../documentation/css/adcstyle.css" title="fonts">
+<script language="JavaScript" type="text/javascript" src="../../documentation/js/busnav.js"></script>
+<script language="JavaScript" src="../../documentation/js/adc.js" type="text/javascript"></script>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<!-- END META TAG INFO -->
+<!-- BEGIN TITLE -->
+<title>Technical Q&amp;A QA1533: How to handle kAudioUnitProperty_MaximumFramesPerSlice</title>
+<!-- END TITLE -->
+</head>
+<!-- BEGIN BODY OPEN -->
+<body bgcolor="#ffffff"><a name="//apple_ref/doc/uid/DTS10004404" title="How to handle kAudioUnitProperty_MaximumFramesPerSlice"></a>
+<!--END BODY OPEN -->
+<!-- START CENTER OPEN -->
+<center>
+<!-- END CENTER OPEN -->
+<a name="top"></a>
+<!-- BEGIN LOGO AND SEARCH -->
+<!--#include virtual="/includes/adcnavbar"-->
+<!-- END LOGO AND SEARCH -->
+<!-- START BREADCRUMB -->
+<div id="breadcrumb"><table width="680" border="0" cellpadding="0" cellspacing="0"><tr>
+<td scope="row"><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+<td><img width="340" height="10" src="images/1dot.gif" alt=""></td></tr><tr valign="middle"><td align="left" colspan="2">
+<a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../technicalqas/index.html">Technical Q&As</a> &gt; <a href="../../technicalqas/MusicAudio/index.html">Audio</a> &gt; <a href="../../technicalqas/MusicAudio/idxCoreAudio-date.html">Core Audio</a> &gt; 
+</td></tr><tr><td colspan="2" scope="row"><img width="680" height="35" src="images/1dot.gif" alt=""></td></tr></table></div>
+<!-- END BREADCRUMB -->
+
+<!-- START MAIN CONTENT -->
+<!-- START TITLE GRAPHIC AND INTRO-->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top">
+<td><h1>
+<div id="pagehead">Technical Q&amp;A QA1533</div>
+<div id="pageheadsub">How to handle kAudioUnitProperty_MaximumFramesPerSlice</div>
+</h1></td></tr></table>
+<!-- END TITLE GRAPHIC AND INTRO -->
+<!-- BEGIN WIDE COLUMN -->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td align="left" width="680">
+<!-- BEGIN CONTENTS -->
+<h2>Q: What is the <code>kAudioUnitProperty_MaximumFramesPerSlice</code> and how do I use it appropriately?</h2><p>A: The <code>kAudioUnitProperty_MaximumFramesPerSlice</code> is used by Audio Units to determine what the maximum number of frames the Audio Unit will be asked to render for any given render call. If you ask an Audio Unit to render for more frames than the value specified by this property, the Audio Unit will return an error and not render any data. Therefore, you need to ensure that value specified by the <code>kAudioUnitProperty_MaximumFramesPerSlice</code> property is always as big as the largest number of frames you would ask to render.</p><div class="notebox"><p><strong>IMPORTANT:</strong> Your application should always configure and honor this property. It allows the Audio Units to know how big to allocate their internal buffers and perform any additional setup. Additionally,  an Audio Unit will not ask its input for more samples than the maximum frames. If more frames are required the Audio Unit will pull multiple times. This can arise in situations, for example, when using the Varispeed Audio Unit where it may be performing playback at 4X speed.</p></div><p class="smalltext"><strong>Listing 1:</strong> Configuring maximum frames</p><pre class="sourcecodebox">
+// get the output device's frame count and set any Audio Units to match
+UInt32 numFrames;
+UInt32 dataSize = sizeof(numFrames);
+result = AudioDeviceGetProperty(myDeviceID, 0, false,
+  kAudioDevicePropertyBufferFrameSize, &amp;dataSize, &amp; numFrames);
+if (result == noErr)
+{
+  result = AudioUnitSetProperty(myOutputAU, kAudioUnitProperty_MaximumFramesPerSlice,
+    kAudioUnitScope_Global, 0, &amp; numFrames, sizeof(numFrames));
+
+  result = AudioUnitSetProperty(myMixerAU, kAudioUnitProperty_MaximumFramesPerSlice,
+    kAudioUnitScope_Global, 0, &amp; numFrames, sizeof(numFrames));
+}
+</pre><p>If you utilize any sample rate conversions in your Audio Unit chain or graph it is important to take this into account. For example, if the output sample rate of your AUConverter is 44.1kHz and the input is 22.0kHz the AUConverter will scale up its maximum frames by 2X to ensure it will be able to pull the data through correctly.</p><p class="smalltext"><strong>Listing 2:</strong> AUConverter scaling</p><pre class="sourcecodebox">
+// input sample rate = 22kHz
+// output sample rate = 44.1kHz
+
+UInt32 numFrames = 1500;
+AudioUnitSetProperty (myAU, kAudioUnitProperty_MaximumFramesPerSlice,
+  kAudioUnitScope_Global, 0, &amp;numFrames, sizeof(numFrames))
+
+// the AUConverter will scale up
+AudioUnitGetProperty(myAU, kAudioUnitProperty_MaximumFramesPerSlice,
+  kAudioUnitScope_Global, 0, &amp;numFrames, sizeof(numFrames))
+
+// numFrames is now 3000
+</pre><div class="notebox"><p><strong>Note:</strong> For maximum memory utilization and performance you may wish to install a property listener on your Audio Unit using <code>AudioUnitAddPropertyListener</code> and listen for sample rate or I/O cycle changes and re-assess the maximum frames.</p></div><A NAME="TNTAG1"></A><H2>References</H2><ul><li><p><A HREF="../../documentation/MusicAudio/CoreAudio-date.html">CoreAudio Documentation</A></p></li><li><p><A HREF="../../documentation/MusicAudio/Conceptual/AudioUnitProgrammingGuide/">Audio Unit Programming Guide</A></p></li><li><p><A HREF="http://lists.apple.com/mailman/listinfo/coreaudio-api">CoreAudio Mailing List</A></p></li></ul><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNT_HISTORY_TAG"></A><H2>Document Revision History</H2><table cellspacing="0" class="graybox" width="680"><tr><th width="100">Date</th><th width="580">Notes</th></tr><tr><td scope="row">2007-07-16</td><td>First Version</td></tr></table><p><b>Posted:</b> 2007-07-16</p>
+<!-- END CONTENTS -->
+</td></tr></table>
+<!-- END WIDE COLUMN -->
+<!-- END MAIN CONTENT -->
+	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/qa/qa2007/qa1533.html%3Fid%3DDTS10004404-1.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/qa/qa2007/qa1533.html%3Fid%3DDTS10004404-1.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/qa/qa2007/qa1533.html%3Fid%3DDTS10004404-1.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+
+<!-- START BOTTOM APPLE NAVIGATION -->
+<!--#include virtual="/includes/footer"-->
+<!-- END BOTTOM APPLE NAVIGATION -->
+<!-- START CENTER CLOSE -->
+</center>
+<!-- END CENTER CLOSE -->
+</body></html>

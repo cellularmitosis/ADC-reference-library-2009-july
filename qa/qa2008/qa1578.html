@@ -1,0 +1,155 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/1999/REC-html401-19991224/loose.dtd">
+<html><head>
+<!-- BEGIN META TAG INFO -->
+<link rel="home" href="http://developer.apple.com/">
+<link rel="find" href="http://developer.apple.com/search/">
+<link rel="stylesheet" type="text/css" href="../../documentation/css/adcstyle.css" title="fonts">
+<script language="JavaScript" type="text/javascript" src="../../documentation/js/busnav.js"></script>
+<script language="JavaScript" src="../../documentation/js/adc.js" type="text/javascript"></script>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<!-- END META TAG INFO -->
+<!-- BEGIN TITLE -->
+<title>Technical Q&amp;A QA1578: QuickTime Audio - Rendering QuickTime Movie audio to a specific Audio Device</title>
+<!-- END TITLE -->
+</head>
+<!-- BEGIN BODY OPEN -->
+<body bgcolor="#ffffff"><a name="//apple_ref/doc/uid/DTS10004584" title="QuickTime Audio - Rendering QuickTime Movie audio to a specific Audio Device"></a>
+<!--END BODY OPEN -->
+<!-- START CENTER OPEN -->
+<center>
+<!-- END CENTER OPEN -->
+<a name="top"></a>
+<!-- BEGIN LOGO AND SEARCH -->
+<!--#include virtual="/includes/adcnavbar"-->
+<!-- END LOGO AND SEARCH -->
+<!-- START BREADCRUMB -->
+<div id="breadcrumb"><table width="680" border="0" cellpadding="0" cellspacing="0"><tr>
+<td scope="row"><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+<td><img width="340" height="10" src="images/1dot.gif" alt=""></td></tr><tr valign="middle"><td align="left" colspan="2">
+<a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../technicalqas/index.html">Technical Q&As</a> &gt; <a href="../../technicalqas/QuickTime/index.html">QuickTime</a> &gt; <a href="../../technicalqas/QuickTime/idxMusicAudio-date.html">Audio</a> &gt; 
+</td></tr><tr><td colspan="2" scope="row"><img width="680" height="35" src="images/1dot.gif" alt=""></td></tr></table></div>
+<!-- END BREADCRUMB -->
+
+<!-- START MAIN CONTENT -->
+<!-- START TITLE GRAPHIC AND INTRO-->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top">
+<td><h1>
+<div id="pagehead">Technical Q&amp;A QA1578</div>
+<div id="pageheadsub">QuickTime Audio - Rendering QuickTime Movie audio to a specific Audio Device</div>
+</h1></td></tr></table>
+<!-- END TITLE GRAPHIC AND INTRO -->
+<!-- BEGIN WIDE COLUMN -->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td align="left" width="680">
+<!-- BEGIN CONTENTS -->
+<h2>Q: How can I render QuickTime Movie audio to a specific Audio Device once I have a Audio Device ID?</h2><p>A: This task can be accomplished with two QuickTime APIs. First, a QuickTime Audio Context must be created for the chosen Audio Device using <code>QTAudioContextCreateForAudioDevice</code>. Once a valid <code>QTAudioContextRef</code> is returned simply call <code>SetMovieAudioContext</code> to have QuickTime assign the Audio Context to the Movie. Listing 1 demonstrates these steps.</p><p class="smalltext"><strong>Listing 1:</strong> Creating a QuickTime Audio Context and assigning it to a Movie.</p><pre class="sourcecodebox">
+// Pass in a fully initialized QTKit QTMovie object and an Audio Device UID CFStringRef
+// NOTE: The Audio Device UID String is the persistent kAudioDevicePropertyDeviceUID property returned
+//       using AudioDeviceGetProperty.
+OSStatus SetMyMovieAudioContextForDevice(QTMovie inMovie, CFStringRef inAudioDeviceUID)
+{
+    Movie aMovie;
+    QTAudioContextRef audioContext;
+    OSStatus status = paramErr;
+
+    // while inAudioDeviceUID may be NULL to specify a default audio device the inMovie may not
+    if (NULL == inMovie) return status;
+
+    aMovie = [inMovie quickTimeMovie];
+    if (NULL == aMovie) return status;
+
+    // create a QT Audio Context and set it on a Movie
+    status = QTAudioContextCreateForAudioDevice(kCFAllocatorDefault, inAudioDeviceUID,
+                                                NULL, &amp;audioContext);
+    if (status) fprintf(stderr, &quot;QTAudioContextCreateForAudioDevice failed: %d\n&quot;, (int)status);
+
+    if (NULL != audioContext &amp;&amp; noErr == status) {
+        status = SetMovieAudioContext(aMovie, audioContext);
+        if (status) fprintf(stderr, &quot;SetMovieAudioContext failed: %d\n&quot;, (int)status);
+
+        // release the Audio Context since SetMovieAudioContext will retain it
+        CFRelease(audioContext);
+    }
+
+    return status;
+}
+</pre><A NAME="GENID1"></A><H2>QTAudioContextCreateForAudioDevice</H2><pre class="sourcecodebox">
+Creates a QTAudioContext object that encapsulates a connection to a CoreAudio output device.
+
+OSStatus QTAudioContextCreateForAudioDevice (
+   CFAllocatorRef allocator,
+   CFStringRef coreAudioDeviceUID,
+   CFDictionaryRef options,
+   QTAudioContextRef *newAudioContextOut );
+
+Parameters:
+
+allocator - Allocator used to create the audio context.
+
+coreAudioDeviceUID - CoreAudio device UID, a CFString that contains a persistent identifier for the
+                    AudioDevice (kAudioDevicePropertyDeviceUID).
+                    Use NULL to specify the default device.
+
+options - Reserved. Pass NULL.
+
+newAudioContextOut - Points to a variable to receive the new audio context.
+
+Discussion
+
+This routine creates a QTAudioContext object that encapsulates a connection to a CoreAudio output
+device. This object is suitable for passing to SetMovieAudioContext or NewMovieFromProperties, which
+targets the audio output of the movie to that device. A QTAudioContext object cannot be associated with
+more than one movie. Each movie needs its own connection to the device. In order to play more than one
+movie to a particular device, create a QTAudioContext object for each movie. You are responsible for
+releasing the QTAudioContext object created by this routine. After calling SetMovieAudioContext or
+NewMovieFromProperties, you can release the object since these APIs will retain it for their own use.
+
+Introduced in QuickTime 7
+</pre><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="GENID2"></A><H2>SetMovieAudioContext</H2><pre class="sourcecodebox">
+Targets a movie to render into an audio context.
+
+OSStatus SetMovieAudioContext (
+   Movie movie,
+   QTAudioContextRef audioContext;
+
+Parameters:
+
+movie - A QuickTime Movie.
+
+audioContext - The audio context that the movie will render into.
+
+Introduced in QuickTime 7
+</pre><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="GENID3"></A><H2>References</H2><ul><li><p><A HREF="../../documentation/QuickTime/Conceptual/QT7Win_Update_Guide/Chapter02/chapter_2_section_6.html">QuickTime 7 Audio Enhancements</A></p></li><li><p><A HREF="../../documentation/QuickTime/RM/MovieBasics/MTOpenPlayMovies/3openplaymovies_output/chapter_1000_section_6.html">Setting an Audio Context</A></p></li></ul><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNT_HISTORY_TAG"></A><H2>Document Revision History</H2><table cellspacing="0" class="graybox" width="680"><tr><th width="100">Date</th><th width="580">Notes</th></tr><tr><td scope="row">2008-01-08</td><td>First Version</td></tr></table><p><b>Posted:</b> 2008-01-08</p>
+<!-- END CONTENTS -->
+</td></tr></table>
+<!-- END WIDE COLUMN -->
+<!-- END MAIN CONTENT -->
+	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/qa/qa2008/qa1578.html%3Fid%3DDTS10004584-1.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/qa/qa2008/qa1578.html%3Fid%3DDTS10004584-1.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/qa/qa2008/qa1578.html%3Fid%3DDTS10004584-1.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+
+<!-- START BOTTOM APPLE NAVIGATION -->
+<!--#include virtual="/includes/footer"-->
+<!-- END BOTTOM APPLE NAVIGATION -->
+<!-- START CENTER CLOSE -->
+</center>
+<!-- END CENTER CLOSE -->
+</body></html>

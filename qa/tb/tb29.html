@@ -1,0 +1,42 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN"			"http://www.w3.org/TR/REC-html40/loose.dtd"><html><HEAD><LINK REL="stylesheet" HREF="../../adcstyle.css" TYPE="text/css"><LINK REL="stylesheet" HREF="../../style.css" TYPE="text/css"><title>Technical Q&amp;A TB29: Calling TrackDrag with the Event Record's 'where' Field Expressed in Local Coordinates</title><meta name="keywords" content="Mac OS 8 TrackDrag event record where field crashes memory"><meta name="Description" content="Technical Q&amp;A TB29: Q&amp;A explains why calling Track Drag withan event record's where field set to local coordinates maycause a crash in low memory at an illegal instruction."><meta name="categories" content="Human Interface Toolbox"><meta name="week-posted" content="Nov 25, 1996 - Nov 29, 1996"><LINK REL="stylesheet" HREF="../../css/adcstyle.css" TYPE="text/css"><script language="JavaScript" type="text/javascript" src="../../js/adc.js"></script></HEAD><BODY BGCOLOR="#FFFFFF" TEXT="#000000"><a name="//apple_ref/doc/uid/DTS10002215" title="Calling TrackDrag with the Event Record's 'where' Field Expressed in Local Coordinates"></a> <!-- white background --><!-- top_of_header_marker_comment --><!-- begin_header_information --><!--#include virtual="/adcnavbar" --><p><a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../technicalqas/index.html">Technical Q&As</a> &gt; <a href="../../technicalqas/LegacyTechnologies/index.html">Legacy Documents</a> &gt; <a href="../../technicalqas/LegacyTechnologies/idxMacOS9Earlier-date.html">Mac OS 9 & Earlier</a> &gt; </p><div style="width:100%; position:fixed;"><div align="center" id="watermark" style="position: relative; margin-left:auto; margin-right:auto; z-index:20; width:500px;"><div class="legacybox"><h1>Legacy Document<span class=closebutton><a href="javascript:closeWatermark()"><img src="../../images/closebutton.png" width="14" height="14" border="0"  alt="close button"></a></span></h1>
+
+<p><strong>Important: </strong>This document is part of the Legacy section of the ADC Reference Library. This information should not be used for new development.</p>
+
+<div class="reflibtopic">
+	<p>Current information on this Reference Library topic can be found here:</p>
+	<ul>
+				<li><a href="http://developer.apple.com/referencelibrary/Carbon/idxHumanInterfaceToolbox-date.html" target="_blank">Carbon > Human Interface Toolbox</a></li>
+	</ul>
+</div>
+
+
+
+
+</div></div></div><!-- end_header_information --><!-- bottom_of_header_marker_comment --><!-- top_of_titles_marker_comment --><CENTER><table width="600" cellpadding="0" cellspacing="0" border="0">
+<tr><td align="left" scope="row">
+<h1>
+<div id="pagehead">Technical Q&amp;A TB29</div>
+<div id="pageheadsub">Calling TrackDrag with the Event Record's 'where' Field Expressed in Local Coordinates</div>
+</h1>
+</td></tr></table></CENTER><!-- bottom_of_titles_marker_comment --><CENTER>			<!-- -->						<!-- Document Body --><table cellspacing="0" cellpadding="0" border="0" WIDTH="600"><tr><td align="left" scope="row"><font size="+4">Q</font>  When my application calls TrackDrag, it crashes in low memory at anillegal instruction. The MacsBug stack crawl doesn't produce anyuseful information. (I think the errant code did a JMP to the badinstruction, as opposed to a JSR.) I've stared and stared at all myapp's calls to the Drag Manager and all the parameters appear to bevalid. My drag tracking handler is never called, incidentally. If I takeall calls to Drag Manager out of my application, it runs just fine. I'vebeen investigating this crash for two months. Why is life so cruel?<br><br><font size="+4">A</font>You've unearthed a really ugly problem.<P>Early versions of Drag Manager did not enjoy the benefits of adrag-enabled Finder, so Drag Manager plays a little fast and loose withFinder's jump table. Yes, that means what it sounds like: Drag Managercalls Finder routines through its jump table. (It disgusted me at first, too.)</P><P>The even more interesting story concerns the method by which DragManager decides your application is Finder. When TrackDrag is called,Drag Manager determines whether the drag originates in any of thewindows in the window list of the current process. If not, Drag Managerdetermines whether the drag originates in any Finder window. Since thedesktop is a window for these purposes, there is a large area which qualifies.</P><P>Once Drag Manager has decided the drag originates in a Finder window, itassumes that Finder is the current process. (This is the fatal mistake.)Once this assumption is in place, the next thing for Drag Manager to do in order to coaxFinder into exhibiting the correct drag behavior is call an entry in whatever jump table can be found by offsetting the current value of register A5. This is a valid assumption if Finder is the current process, which of course it is not. This is where things go terriblyastray: Drag Manager calls a jump table entry in your application thinking your app is Finder, your app's routine doesn't do the same thing as the Finder routine, and any number of spectacular effects can result.</P><P>Now wait a minute, you're thinking, the drag originated in one of myapplication's windows; how is this stuff about Finder relevant? Considerthe event record your app is passing to TrackDrag. An event record issupposed to contain a 'where' field expressed in global coordinates.However, the 'where' field your app is passing is expressed in localcoordinates. How? Well, that depends on your application, but often thiscan result from application frameworks (like PowerPlant, MacApp, orTHINK Class Library) modifying the event record before passing it toyour code. There's no language-level way to specify the record has beenmodified, so the compiler doesn't warn you. (Honestly, this is Not Your Fault.)</P><P>Your code blithely calls TrackDrag with what it ought to be able toassume is a valid event record but is not. TrackDrag interprets the'where' field, which is actually expressed in local coordinates, asglobal coordinates. This point is somewhere up and to the left of whereyour application expects, and quite often it's in the desktop, which aswe said above is considered a Finder window for these purposes. DragManager reacts by going through its ritual for drags originating inFinder windows and eventually crashes after calling some odd routine inyour application, as described above.</P><P>To solve this problem, simply call LocalToGlobal on the 'where' field ofthe event record before calling TrackDrag.</P><!-- begin_date --><H4 ALIGN=center>[Nov 27 1996]</H4><!-- end_date --></td></tr></table></CENTER><!-- begin_footer_information -->	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/qa/tb/tb29.html%3Fid%3DDTS10002215-1.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/qa/tb/tb29.html%3Fid%3DDTS10002215-1.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/qa/tb/tb29.html%3Fid%3DDTS10002215-1.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+<!--#include virtual="/includes/footer"--><!-- end_footer_information --></BODY></HTML>

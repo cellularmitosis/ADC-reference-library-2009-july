@@ -1,0 +1,224 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/1999/REC-html401-19991224/loose.dtd">
+<html><head>
+<!-- BEGIN META TAG INFO -->
+<link rel="home" href="http://developer.apple.com/">
+<link rel="find" href="http://developer.apple.com/search/">
+<link rel="stylesheet" type="text/css" href="../../documentation/css/adcstyle.css" title="fonts">
+<script language="JavaScript" type="text/javascript" src="../../documentation/js/busnav.js"></script>
+<script language="JavaScript" src="../../documentation/js/adc.js" type="text/javascript"></script>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<!-- END META TAG INFO -->
+<!-- BEGIN TITLE -->
+<title>Technical Q&amp;A QA1438: Using the QuickTime DVCompressor properties</title>
+<!-- END TITLE -->
+</head>
+<!-- BEGIN BODY OPEN -->
+<body bgcolor="#ffffff"><a name="//apple_ref/doc/uid/DTS10003743" title="Using the QuickTime DVCompressor properties"></a>
+<!--END BODY OPEN -->
+<!-- START CENTER OPEN -->
+<center>
+<!-- END CENTER OPEN -->
+<a name="top"></a>
+<!-- BEGIN LOGO AND SEARCH -->
+<!--#include virtual="/includes/adcnavbar"-->
+<!-- END LOGO AND SEARCH -->
+<!-- START BREADCRUMB -->
+<div id="breadcrumb"><table width="680" border="0" cellpadding="0" cellspacing="0"><tr>
+<td scope="row"><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+<td><img width="340" height="10" src="images/1dot.gif" alt=""></td></tr><tr valign="middle"><td align="left" colspan="2">
+<a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../technicalqas/index.html">Technical Q&As</a> &gt; <a href="../../technicalqas/QuickTime/index.html">QuickTime</a> &gt; <a href="../../technicalqas/QuickTime/idxImportExport-date.html">Import & Export</a> &gt; 
+</td></tr><tr><td colspan="2" scope="row"><img width="680" height="35" src="images/1dot.gif" alt=""></td></tr></table></div>
+<!-- END BREADCRUMB -->
+
+<!-- START MAIN CONTENT -->
+<!-- START TITLE GRAPHIC AND INTRO-->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top">
+<td><h1>
+<div id="pagehead">Technical Q&amp;A QA1438</div>
+<div id="pageheadsub">Using the QuickTime DVCompressor properties</div>
+</h1></td></tr></table>
+<!-- END TITLE GRAPHIC AND INTRO -->
+<!-- BEGIN WIDE COLUMN -->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td align="left" width="680">
+<!-- BEGIN CONTENTS -->
+<h2>Q: Can the <code>kQTPropertyClass_DVCompressor</code> properties only be used with a DV codec or do they also work with the DV export component?Additionally, what do the <code>kDVCompressorPropertyID_ProgressiveScan</code> and <code>kDVCompressorPropertyID_AspectRatio16x9</code> properties actually set?</h2><p>A: The <code>kQTPropertyClass_DVCompressor</code> properties ( <code>kDVCompressorPropertyID_ProgressiveScan</code> and <code>kDVCompressorPropertyID_AspectRatio16x9</code> ) are supported by  both the DV25 and DV50 compressor components as well as the DV export component.</p><p>These properties are supported via <code>QTGetComponentPropertyInfo</code>, <code>QTGetComponentProperty</code> and <code>QTSetComponentProperty</code> APIs. They are also part of the serialized DV compressor settings stored and restored with <code>ImageCodecGetSettings</code> and <code>ImageCodecSetSettings</code>.</p><p>These DVCompressor class properties cause the corresponding flags to be set for the encoded DV frames; Frames marked as progressive-scan when <code>kDVCompressorPropertyID_ProgressiveScan</code> is set, and frames marked as having a 16:9 picture aspect ratio when <code>kDVCompressorPropertyID_AspectRatio16x9</code> is set.</p><p>When used with the compressor components, these DVCompressor properties will also add the appropriate Field/Frame Information (<code>'fiel'</code>),  Clean Aperture (<code>'clap'</code>) and Pixel Aspect Ratio (<code>'pasp'</code>) Image Description Extensions to describe the content.</p><div class="notebox"><p><strong>Note:</strong> For more information about these Image Description Extentions see <A HREF="../../quicktime/icefloe/dispatch019.html#pasp">Ice Floe Dispatch 19</A></p></div><p>To retrieve these properties from Image Descriptions without calling <code>GetImageDescriptionExtension</code> directly, use the <A HREF="../../documentation/QuickTime/APIREF/icmimagedescriptiongetproperty.htm"><code>ICMImageDescriptionGetProperty</code></A> API introduced in QuickTime 7.</p><div class="notebox"><p><strong>Note:</strong> The <code>ICMImageDescriptionGetProperty</code> API has special knowledge about the standard values for various DV formats and will return default values when the Image Description Exensions are absent.  For example, a Pixel Aspect Ratio of 10:11 is returned for DV25 NTSC when no <code>'pasp'</code> Image Description Extension is available.</p></div><p><A HREF="../../quicktime/quicktimeintro/tools/index.html">Dumpster version 7.0.1</A> will display several of these Image Description Extensions, including:</p><p>Field/Frame Information - <code>'fiel'</code></p><p>Clean Aperture - <code>'clap'</code></p><p>Pixel Aspect Ratio - <code>'pasp'</code></p><p>Color parameters - <code>'colr'</code></p><p class="smalltext"><strong>Listing 1:</strong> Setting DVCompressor properties on the DV Export Component.</p><pre class="sourcecodebox">
+// Set the ProgressiveScan and AspectRatio16x9 properties for the DV Export Component
+//
+// inProgressiveScan - if set to true, the compressed frames will be marked as
+//                     progressive-scan. If set to false the frames will be marked as
+//                     interlaced.
+// inAspectRatio16x9 - if set to true, the compressor will use a 16:9 picture
+//                     aspect ratio. If set to false, the compressor will use the
+//                     default 4:3 picture aspect ratio.
+OSStatus SetDVExportProperties(MovieExportComponent inDVExporter,
+                               Boolean inProgressiveScan,
+                               Boolean inAspectRatio16x9)
+{
+    OSStatus status;
+
+    if (NULL == inDVExporter) return paramErr;
+
+    // set the properties we want
+    status = QTSetComponentProperty(inDVExporter, // DV export component instance
+                                    kQTPropertyClass_DVCompressor,           // property class
+                                    kDVCompressorPropertyID_ProgressiveScan, // property
+                                    sizeof(inProgressiveScan),  // size
+                                    &amp;inProgressiveScan);        // value
+    if (status) goto bail;
+
+    status = QTSetComponentProperty(inDVExporter, // DV export component instance
+                                    kQTPropertyClass_DVCompressor,           // property class
+                                    kDVCompressorPropertyID_AspectRatio16x9, // property
+                                    sizeof(inAspectRatio16x9), // size
+                                    &amp;inAspectRatio16x9);       // value
+
+bail:
+    return status;
+}
+</pre><p>The Image Compression Manager Session APIs allow attaching a serialized settings handle to the <code>ICMCompressionSessionOptions</code> object. This allows applications to use custom codec settings without the need to specifically open a compressor instance, configure it, use it throughout the compression operation and close it when done as was required by the older Compression Sequence API.</p><p class="smalltext"><strong>Listing 2:</strong> Setting DVCompressor properties for a ICM Compression Session.</p><pre class="sourcecodebox">
+// Configure the ProgressiveScan and AspectRatio16x9 properties for a DV compression session.
+//
+// inCompressionSessionOptions - a reference to a compression session options object
+//                               created by calling ICMCompressionSessionOptionsCreate
+// inCodecType - a DV25 or DV50 codec OSType, one of: kDVCNTSCCodecType
+//                                                    kDVCPALCodecType
+//                                                    kDVCProPALCodecType
+//                                                    kDVCPro50NTSCCodecType
+//                                                    kDVCPro50PALCodecType
+// inProgressiveScan - if set to true, the compressed frames will be marked as
+//                     progressive-scan. If set to false the frames will be marked as
+//                     interlaced
+// inAspectRatio16x9 - if set to true, the compressor will use a 16:9 picture
+//                     aspect ratio. If set to false, the compressor will use the
+//                     default 4:3 picture aspect ratio.
+OSStatus ConfigureDVCodecCompressionSessionOptions(
+                            ICMCompressionSessionOptionsRef inCompressionSessionOptions,
+                            OSType inCodecType,
+                            Boolean inProgressiveScan,
+                            Boolean inAspectRatio16x9)
+{
+
+    OSStatus status;
+
+    if (NULL == inCompressionSessionOptions || 0 == inCodecType ) return paramErr;
+
+    ComponentInstance dvCodecInstance = 0;
+    Handle hCodecSettings = NewHandle(0);
+
+    status = OpenADefaultComponent(compressorComponentType, inCodecType, &amp;dvCodecInstance);
+    if (status) goto bail;
+
+    // set the properties we want
+    status = QTSetComponentProperty(dvCodecInstance, // DV codec component instance
+                                    kQTPropertyClass_DVCompressor, // property class
+                                    kDVCompressorPropertyID_ProgressiveScan, // property
+                                    sizeof(inProgressiveScan),  // size
+                                    &amp;inProgressiveScan);        // value
+    if (status) goto bail;
+
+    status = QTSetComponentProperty(dvCodecInstance, // DV codec component instance
+                                    kQTPropertyClass_DVCompressor, // property class
+                                    kDVCompressorPropertyID_AspectRatio16x9, // property
+                                    sizeof(inAspectRatio16x9), // size
+                                    &amp;inAspectRatio16x9);       // value
+
+    // once we've set the codec properties, ask for the codec's specific settings
+    status = ImageCodecGetSettings(dvCodecInstance, hCodecSettings);
+    if (status) goto bail;
+
+    // now set these codec specific settings on our compression session
+    status = ICMCompressionSessionOptionsSetProperty(
+        inCompressionSessionOptions, // compression session options object reference
+        kQTPropertyClass_ICMCompressionSessionOptions,              // property class
+        kICMCompressionSessionOptionsPropertyID_CompressorSettings, // property
+        sizeof(hCodecSettings), // size
+        &amp;hCodecSettings);       // codec settings
+
+    if (status) goto bail;
+
+bail:
+    if (dvCodecInstance) CloseComponent(dvCodecInstance);
+    DisposeHandle(hCodecSettings);
+
+    return status;
+}
+</pre><p class="smalltext"><strong>Listing 3:</strong> Retrieving the Pixel Aspect Ratio Image Description Extension.</p><pre class="sourcecodebox">
+PixelAspectRatioImageDescriptionExtension pixelAspectRatio;
+OSStatus status;
+.
+.
+.
+status = ICMImageDescriptionGetProperty(hSourceImageDescription, // image description
+                                        kQTPropertyClass_ImageDescription, // class
+                                        // 'pasp' image description extention property
+                                        kICMImageDescriptionPropertyID_PixelAspectRatio,
+                                        sizeof(pixelAspectRatio), // size
+                                        &amp;pixelAspectRatio,        // returned value
+                                        NULL);                    // byte count
+.
+.
+.
+
+// Other Image Description Extentions are retrieved in a similar fashion, see
+// ImageCompression.h for more details.
+//
+// Use kICMImageDescriptionPropertyID_FieldInfo to retrieve information about the number
+// and order of fields, if available.
+//
+//     kICMImageDescriptionPropertyID_FieldInfo = 'fiel'
+//         FieldInfoImageDescriptionExtension2
+//
+// Use kICMImageDescriptionPropertyID_CleanAperture to retrieve information describing
+// the clean aperture. If not specified explicitly in the image description, a default
+// clean aperture (full encoded width and height) will be returned.
+//
+//     kICMImageDescriptionPropertyID_CleanAperture = 'clap'
+//         Native-endian CleanApertureImageDescriptionExtension
+//
+// Use kICMImageDescriptionPropertyID_PixelAspectRatio to retrieve information
+// describing the pixel aspect ratio. If not specified explicitly in the image
+// description, a square (1:1) pixel aspect ratio will be returned.
+//
+//    kICMImageDescriptionPropertyID_PixelAspectRatio = 'pasp'
+//        Native-endian PixelAspectRatioImageDescriptionExtension
+//
+// Use kICMImageDescriptionPropertyID_NCLCColorInfo to retrieve color information if available, in the
+// NCLCColorInfoImageDescriptionExtension format.
+//
+//    kICMImageDescriptionPropertyID_NCLCColorInfo = 'nclc'
+//        Native-endian NCLCColorInfoImageDescriptionExtension
+</pre><A NAME="TNTAG5"></A><H2>References:</H2><p><A HREF="../../documentation/QuickTime/Conceptual/QT7UpdateGuide/index.html">QuickTime 7 Update Guide</A></p><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNT_HISTORY_TAG"></A><H2>Document Revision History</H2><table cellspacing="0" class="graybox" width="680"><tr><th width="100">Date</th><th width="580">Notes</th></tr><tr><td scope="row">2005-10-04</td><td>Updated</td></tr><tr><td scope="row">2005-07-05</td><td>Describes the function of the DVCompressor class component properties.</td></tr></table><p><b>Posted:</b> 2005-10-04</p>
+<!-- END CONTENTS -->
+</td></tr></table>
+<!-- END WIDE COLUMN -->
+<!-- END MAIN CONTENT -->
+	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/qa/qa2005/qa1438.html%3Fid%3DDTS10003743-1.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/qa/qa2005/qa1438.html%3Fid%3DDTS10003743-1.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/qa/qa2005/qa1438.html%3Fid%3DDTS10003743-1.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+
+<!-- START BOTTOM APPLE NAVIGATION -->
+<!--#include virtual="/includes/footer"-->
+<!-- END BOTTOM APPLE NAVIGATION -->
+<!-- START CENTER CLOSE -->
+</center>
+<!-- END CENTER CLOSE -->
+</body></html>

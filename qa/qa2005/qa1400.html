@@ -1,0 +1,228 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/1999/REC-html401-19991224/loose.dtd">
+<html><head>
+<!-- BEGIN META TAG INFO -->
+<link rel="home" href="http://developer.apple.com/">
+<link rel="find" href="http://developer.apple.com/search/">
+<link rel="stylesheet" type="text/css" href="../../documentation/css/adcstyle.css" title="fonts">
+<script language="JavaScript" type="text/javascript" src="../../documentation/js/busnav.js"></script>
+<script language="JavaScript" src="../../documentation/js/adc.js" type="text/javascript"></script>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<!-- END META TAG INFO -->
+<!-- BEGIN TITLE -->
+<title>Technical Q&amp;A QA1400: Adding Unicode characters to Text Media in a Text Track</title>
+<!-- END TITLE -->
+</head>
+<!-- BEGIN BODY OPEN -->
+<body bgcolor="#ffffff"><a name="//apple_ref/doc/uid/DTS10003772" title="Adding Unicode characters to Text Media in a Text Track"></a>
+<!--END BODY OPEN -->
+<!-- START CENTER OPEN -->
+<center>
+<!-- END CENTER OPEN -->
+<a name="top"></a>
+<!-- BEGIN LOGO AND SEARCH -->
+<!--#include virtual="/includes/adcnavbar"-->
+<!-- END LOGO AND SEARCH -->
+<!-- START BREADCRUMB -->
+<div id="breadcrumb"><table width="680" border="0" cellpadding="0" cellspacing="0"><tr>
+<td scope="row"><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+<td><img width="340" height="10" src="images/1dot.gif" alt=""></td></tr><tr valign="middle"><td align="left" colspan="2">
+<a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../technicalqas/index.html">Technical Q&As</a> &gt; <a href="../../technicalqas/QuickTime/index.html">QuickTime</a> &gt; <a href="../../technicalqas/QuickTime/idxMediaTypesMediaHandlers-date.html">Media Types & Media Handlers</a> &gt; 
+</td></tr><tr><td colspan="2" scope="row"><img width="680" height="35" src="images/1dot.gif" alt=""></td></tr></table></div>
+<!-- END BREADCRUMB -->
+
+<!-- START MAIN CONTENT -->
+<!-- START TITLE GRAPHIC AND INTRO-->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top">
+<td><h1>
+<div id="pagehead">Technical Q&amp;A QA1400</div>
+<div id="pageheadsub">Adding Unicode characters to Text Media in a Text Track</div>
+</h1></td></tr></table>
+<!-- END TITLE GRAPHIC AND INTRO -->
+<!-- BEGIN WIDE COLUMN -->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td align="left" width="680">
+<!-- BEGIN CONTENTS -->
+<h2>Q: I am able to add English language text samples to text media in a text track using <code>TextMediaAddTESample</code>. But when I try to pass Unicode Japanese text my movie shows the text as unreadable characters. Is it possible to add text samples other than English to text media in a text track using <code>TextMediaAddTESample</code>?<br><br>Also, can I pass my text as a <code>CFString</code> to <code>TextMediaAddTESample</code> and others?</h2><p>A: You can't pass Unicode characters to <code>TextMediaAddTESample</code> -- instead, use <code>TextMediaAddTextSample</code>. You can pass <code>TextMediaAddTextSample</code> UTF-16 characters prepended with a byte order marker (BOM) to indicate endianess.</p><div class="notebox"><p><strong>IMPORTANT:</strong> <code>TextMediaAddTESample</code> should no longer be used (it will soon be deprecated). Use <code>TextMediaAddTextSample</code> in its place.</p></div><p>You can't pass your text as a <code>CFString</code> to <code>TextMediaAddTextSample</code>; you must pass a buffer with the raw array of Unicode characters (and if you are passing UTF-16 these must include a BOM).</p><div class="notebox"><p><strong>IMPORTANT:</strong> You shoud use big endian UTF-16 characters in text samples. Virtually all the data in a movie file (movie atoms and so forth) is big endian. Also, if the BOM is absent QuickTime will by default assume the data is big endian.</p></div><p>Also, before adding your text you need to tell the Text Media Handler the added sample is encoded in Unicode with a BOM. You do this with the <code>TextMediaSetTextSampleData</code> API as follows:</p><pre class="sourcecodebox">
+    // tell the text media handler the upcoming text sample is
+    // encoded in Unicode with a byte order mark (BOM)
+
+    SInt32 dataPtr = kTextEncodingUnicodeDefault;
+    ComponentResult myErr =
+        TextMediaSetTextSampleData (inTextMediaHandler,
+                                    (void *)&amp;dataPtr,
+                                    kTXNTextEncodingAttribute);
+</pre><p>Lastly, you should specify a media\x92s localized language or region code using the <code>SetMediaLanguage</code> API. This will avoid unexpected errors in any text encoding conversion (if a conversion is necessary). Also, it will help QuickTime select an alternate language track if one is provided.</p><pre class="sourcecodebox">
+    // Set the language of the text track media to the desired value
+    SetMediaLanguage (inMedia, langJapanese /* your language here */);
+</pre><p>Here's a code snippet which shows how to add UTF-16 characters with a prepended BOM to a text media:</p><p class="smalltext"><strong>Listing 1:</strong> Adding UTF-16 characters with a prepended BOM to a text media.</p><pre class="sourcecodebox">
+
+//
+// DoAddUTF16ToTextMedia
+//
+// Create some UTF-16 characters and add them to a given text media
+//
+//    inMedia - text media for your text track sample data
+//
+
+ComponentResult DoAddUTF16ToTextMedia(Media inMedia)
+{
+    // Set the language of the text track media to the desired value
+    SetMediaLanguage (inMedia, langJapanese /* your language here */);
+    ComponentResult myErr = GetMoviesError ();
+    require(myErr == noErr, SETMEDIALANG);
+
+    // Make a buffer of UTF16 characters, preceded by
+    // a BOM (byte order marker)
+    CFDataRef charData = MakeUTF16Characters();
+    require(nil != charData, MAKECHARS);
+
+    Rect myTextBounds = {0,0,200,100}; // text box within which the text
+                                       // is to be displayed
+
+    // Add the UTF16 characters to our text media
+    myErr = TextMedia_AddUTF16Text(   GetMediaHandler(inMedia),
+                                      &amp;myTextBounds,
+                                      GetMediaTimeScale(inMedia),
+                                      (char *)CFDataGetBytePtr (charData),
+                                      CFDataGetLength (charData)
+                                    );
+    CFRelease(charData);
+
+SETMEDIALANG:
+MAKECHARS:
+
+    return myErr;
+}
+
+
+//
+// TextMedia_AddUTF16Text
+//
+// Adds UTF16 styled text to an existing media.
+//
+
+ComponentResult TextMedia_AddUTF16Text(   MediaHandler    inTextMediaHandler,
+                                          Rect            *inTextBox,
+                                          TimeValue       inDuration,
+                                          Ptr             inChars,
+                                          SInt32          inCharLen)
+{
+    // tell the text media handler the upcoming text sample is
+    // encoded in Unicode with a byte order mark (BOM)
+    SInt32 dataPtr = kTextEncodingUnicodeDefault;
+    FourCharCode txtEncodingAttribute = 'encd';
+    ComponentResult myErr = TextMediaSetTextSampleData (inTextMediaHandler,
+                                                        (void *)&amp;dataPtr,
+                                                        txtEncodingAttribute);
+    require(myErr == noErr, SETTEXTDATA);
+
+    // specify the desired font name here!
+    ATSFontFamilyRef fontRef = ATSFontFamilyFindFromQuickDrawName(&quot;Osaka&quot;);
+
+    // write out the new text sample data to the media
+    myErr = TextMediaAddTextSample( inTextMediaHandler,
+                                    inChars,
+                                    inCharLen,
+                                    fontRef,        // font number
+                                    12,             // font size
+                                    normal,         // text face
+                                    NULL,
+                                    NULL,
+                                    teCenter,
+                                    inTextBox,
+                                    dfClipToTextBox,
+                                    0,
+                                    0,
+                                    0,
+                                    NULL,
+                                    inDuration,
+                                    NULL);
+
+SETTEXTDATA:
+
+    return myErr;
+}
+
+
+//
+// MakeUTF16Characters
+//
+// Returns a CFData object filled with some
+// UTF16 characters preceded by a BOM (byte
+// order marker)
+//
+
+CFDataRef MakeUTF16Characters()
+{
+    // Make a CFString of some Japanese characters to add to our text track
+    UniChar uniBuf[] = { 0x30A1, 0x30A2, 0x30A3, 0x30A4, 0x30A5, 0x30A6 };
+    CFStringRef stringRef =
+            CFStringCreateWithCharacters(NULL,
+                                        uniBuf,
+                                        sizeof(uniBuf) / sizeof(UniChar));
+    require(stringRef != nil, CREATESTRING);
+
+    // Make a CFData object that stores the characters of the CFString as an
+    // \x93external representation.\x94. If the encoding of the characters in the
+    // data object is Unicode, the function inserts a BOM (byte order marker)
+    // to indicate endianness.
+
+    // Note:
+    //
+    // kCFStringEncodingUTF16 here means to use native endian (big endian
+    // on PPC, little endian on Intel)
+    //
+    // Use kCFStringEncodingUTF16BE if you want big endian
+    //
+    CFDataRef data =
+        CFStringCreateExternalRepresentation
+                                    (NULL,
+                                     stringRef,
+                                     kCFStringEncodingUTF16, // native endian
+                                     0);
+    require(data != nil, CREATEEXTERNALREP);
+
+    CFRelease(stringRef);
+
+    return data;
+
+CREATESTRING:
+CREATEEXTERNALREP:
+
+    return nil;
+
+}
+</pre><A NAME="TNT_HISTORY_TAG"></A><H2>Document Revision History</H2><table cellspacing="0" class="graybox" width="680"><tr><th width="100">Date</th><th width="580">Notes</th></tr><tr><td scope="row">2005-09-01</td><td>Describes how to add Unicode characters to text media in a text track</td></tr></table><p><b>Posted:</b> 2005-09-01</p>
+<!-- END CONTENTS -->
+</td></tr></table>
+<!-- END WIDE COLUMN -->
+<!-- END MAIN CONTENT -->
+	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/qa/qa2005/qa1400.html%3Fid%3DDTS10003772-1.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/qa/qa2005/qa1400.html%3Fid%3DDTS10003772-1.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/qa/qa2005/qa1400.html%3Fid%3DDTS10003772-1.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+
+<!-- START BOTTOM APPLE NAVIGATION -->
+<!--#include virtual="/includes/footer"-->
+<!-- END BOTTOM APPLE NAVIGATION -->
+<!-- START CENTER CLOSE -->
+</center>
+<!-- END CENTER CLOSE -->
+</body></html>

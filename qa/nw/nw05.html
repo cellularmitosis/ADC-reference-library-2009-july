@@ -1,0 +1,42 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN"			"http://www.w3.org/TR/REC-html40/loose.dtd"><HTML><!--Template 06-20-02--><HEAD><LINK REL="stylesheet" HREF="../../adcstyle.css" TYPE="text/css"><LINK REL="stylesheet" HREF="../../style.css" TYPE="text/css"><title>Technical Q&amp;A NW05: Ethernet Addresses</title>	<meta name="keywords" content="Mac OS 8 Ethernet Card get address OpenDriver"><meta name="Description" content="Technical Q&amp;A NW05: Q&amp;A provides code snippet that illustrateshow to programmatically obtain an Ethernet address by scanningfor Ethernet cards."><meta name="categories" content="Networking"><meta name="week-posted" content="May 1, 1995 - May 5, 1995"><LINK REL="stylesheet" HREF="../../css/adcstyle.css" TYPE="text/css"><script language="JavaScript" type="text/javascript" src="../../js/adc.js"></script></HEAD><BODY BGCOLOR="#FFFFFF"><a name="//apple_ref/doc/uid/DTS10001417" title="Ethernet Addresses"></a><!-- top_of_header_marker_comment --><!-- begin_header_information --><!--#include virtual="/adcnavbar" --><p><a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../technicalqas/index.html">Technical Q&As</a> &gt; <a href="../../technicalqas/LegacyTechnologies/index.html">Legacy Documents</a> &gt; <a href="../../technicalqas/LegacyTechnologies/idxNetworking-date.html">Networking</a> &gt; </p><div style="width:100%; position:fixed;"><div align="center" id="watermark" style="position: relative; margin-left:auto; margin-right:auto; z-index:20; width:500px;"><div class="legacybox"><h1>Legacy Document<span class=closebutton><a href="javascript:closeWatermark()"><img src="../../images/closebutton.png" width="14" height="14" border="0"  alt="close button"></a></span></h1>
+
+<p><strong>Important: </strong>This document is part of the Legacy section of the ADC Reference Library. This information should not be used for new development.</p>
+
+<div class="reflibtopic">
+	<p>Current information on this Reference Library topic can be found here:</p>
+	<ul>
+				<li><a href="http://developer.apple.com/referencelibrary/Networking/index.html" target="_blank">Reference Library > Networking</a></li>
+	</ul>
+</div>
+
+
+
+
+</div></div></div><!-- end_header_information --><!-- bottom_of_header_marker_comment --><!-- top_of_titles_marker_comment --><CENTER><table width="600" cellpadding="0" cellspacing="0" border="0">
+<tr><td align="left" scope="row">
+<h1>
+<div id="pagehead">Technical Q&amp;A NW05</div>
+<div id="pageheadsub">Ethernet Addresses</div>
+</h1>
+</td></tr></table></CENTER><!-- bottom_of_titles_marker_comment -->						<!-- begin_content --> <CENTER><TABLE BORDER=0 CELLPADDING=0 WIDTH=600><TR> <td align="left"><hr width=500 align=center><p id = p2>Q:  How can I obtain an Ethernet address programmatically? I can get correctEthernet addresses for RAM-based drivers, but this does not appear to work forall drivers. For example,  addresses for PowerBooks with DaynaPort connectionsare not available. I am using the following code to obtain Ethernet addresses:</p><CENTER><TABLE BORDER=0 CELLPADDING=5 WIDTH=550><TR>	<td bgcolor="#E6E6E6" align=left><pre>    myErr = OpenDriver("\p.ENET", &amp;myRefNum);    theEPB.EParms1.ioRefNum = myRefNum;    theEPB.EParms1.ePointer = NewPtrClear(78);    theEPB.EParms1.eBuffSize = 78;    theEPB.EParms1.ioNamePtr = NULL;    myErr = EGetInfo(&amp;theEPB,false);</pre>	</TD></TR></TABLE></CENTER><P id = p2>How can I scan through all the installed Ethernet drivers for the one that's activeand obtain information about that one?</p><p id=p4>A:  Your approach for obtaining Ethernet address information seems appropriate.Here are a few pieces of information that may help:</p><ol type="1" start="1">	<li>OpenDriver("\p.ENET", &amp;myRefNum) only opens the first Ethernet driver. If the system has more than one Ethernet card installed, you have to open them explicitly.</li>	<li>Machines such as the SE and PowerBooks that have the Ethernet hardware connected via the SCSI port are accessed through ENET0 (most machines have this ability).</li></ol><p id=p4>The following is a code fragment that you can use:</p><CENTER><TABLE BORDER=0 CELLPADDING=5 WIDTH=550><TR>	<td bgcolor="#E6E6E6" align=left><pre>/* check internal non slotted card   check if enet0 driver is installed*/ short     saveRes;    saveRes = LMGetResLoad();    LMSetResLoad(0)    GetNamedResource('DRVR',"\p.ENET0");   // check if ENET0 is in ROM    LMSetResLoad(saveRes)    if(!ResError()) {/* Setup Open PB */    PB.slotDevParam.ioNamePtr  = "\p.ENET0";   // Attempt to open it    PB.slotDevParam.ioVRefNum    = 0;    PB.slotDevParam.csCode        = 0;    PB.slotDevParam.ioSlot        = 0;    PB.slotDevParam.ioID        = 0;/* try and open the internal non slotted enet card */    ErrNo = PBOpenSync(&amp;PB);   // notice I do a regular open call $A000    refnum = PB.ioRefNum;</pre>	</TD></TR></TABLE></CENTER><ol type="1" start="3">	<li>For NuBus and SE30 devices (and PCI slots), you have to use the Slot Manager to scan for available Ethernet cards, per this example:</li></ol><CENTER><TABLE BORDER=0 CELLPADDING=5 WIDTH=550><TR>	<td bgcolor="#E6E6E6" align=left><pre>/* Setup Open PB  for sloted device */    PB.slotDevParam.ioNamePtr  = "\p.ENET";    PB.slotDevParam.ioVRefNum    = 0;    PB.slotDevParam.csCode        = 0;/* try Slotmanger Call */    if(!OSTrapAvailable (_SlotManager)) return(Error);    SPB.spExtDev     = 0;    SPB.spCategory    = 4;        /* Network     */    SPB.spCType        = 1 ;        /* EtherNet */    SPB.spTBMask    = 0x3;/* loop on each card */    while((ErrNo = SNextTypeSRsrc(&amp;SPB)) == noErr){        PB.slotDevParam.ioSlot        = SPB.spSlot;        PB.slotDevParam.ioID        = SPB.spID;/* try and open the enet card */        ErrNo = PBOpenImmed(&amp;PB);       // Notice I Do an OpenImmed $A200        refnum = PB.ioRefNum;    }</pre>	</TD></TR></TABLE></CENTER><ol type="1" start="4">	<li>An important point to consider: <code>OpenDriver</code> calls fail when Ethernet devices are not cabled or hooked up, so it's not possible to get the address of Ethernet cards that aren't hooked up.</li></ol></td></tr></table></center><!-- end_content --><!-- begin_date --><H4 ALIGN=center>[May 01 1995]</H4><!-- end_date --><!-- begin_footer_information -->	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/qa/nw/nw05.html%3Fid%3DDTS10001417-1.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/qa/nw/nw05.html%3Fid%3DDTS10001417-1.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/qa/nw/nw05.html%3Fid%3DDTS10001417-1.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+<!--#include virtual="/includes/footer"--><!-- end_footer_information --><hr width=500 align=center> </BODY></HTML>

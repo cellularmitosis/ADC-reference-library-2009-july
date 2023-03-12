@@ -1,0 +1,260 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN"
+"http://www.w3.org/TR/REC-html40/loose.dtd">
+<HTML>
+<HEAD>
+
+<title>Technical Q&amp;A QA1259: Empty Memory Objects</title>
+
+<LINK REL="stylesheet" HREF="../../adcstyle.css" TYPE="text/css">
+<LINK REL="stylesheet" HREF="../../style.css" TYPE="text/css">
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+<meta name="keywords" content="memory management, malloc, free, Core Foundation, Memory Manager, pointer, handle, Multiprocessing, MP, Open Transport, OT">
+<meta name="Description" content="This Q&amp;A describes how two memory management edges cases (allocating an empty block and free a NULL pointer) are handled by the common Mac OS memory allocators.">
+
+<LINK REL="stylesheet" HREF="../../css/adcstyle.css" TYPE="text/css"><script language="JavaScript" type="text/javascript" src="../../js/adc.js"></script></HEAD>
+
+
+<BODY BGCOLOR=WHITE><a name="//apple_ref/doc/uid/DTS10002291" title="Empty Memory Objects"></a>
+
+<!-- begin_header_information --><!--#include virtual="/adcnavbar" --><p><a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../technicalqas/index.html">Technical Q&As</a> &gt; <a href="../../technicalqas/HardwareDrivers/index.html">Hardware & Drivers</a> &gt; <a href="../../technicalqas/HardwareDrivers/idxPerformance-date.html">Performance</a> &gt; </p><!-- end_header_information -->
+
+<!-- begin_titles_information --><CENTER><table width="600" cellpadding="0" cellspacing="0" border="0">
+<tr><td align="left" scope="row">
+<h1>
+<div id="pagehead">Technical Q&amp;A QA1259</div>
+<div id="pageheadsub">Empty Memory Objects</div>
+</h1>
+</td></tr></table></CENTER><!-- end_titles_information -->
+
+<CENTER><TABLE BORDER=0 CELLSPACING=1 WIDTH=600> <TR>
+					<td align="left">
+						<hr width=500 align=center>
+						<!-- begin_document_contents -->
+						<p id=p2>Q: What does <code>malloc(0)</code> do? What about <code>free(NULL)</code>?</p>
+						<p id=p4>A: These seemingly simple questions have remarkably complex answers, especially if you generalize them to cover other Mac OS memory management APIs. Tables 1 and 2 list some commonly-used routines and their behavior in these cases.</p>
+						<p id=p4><br>
+							<br>
+							<!-- table starts here --></p>
+						<center>
+							<table border=0 cellpadding=0 width=550>
+								<tr>
+									<td scope="row"><!-- your table title -->
+										<p><b>Table 1</b>. Allocating a block of zero bytes.</p>
+										<!-- beginning of your table data -->
+										<table border=1 width="100%">
+											<tr>
+												<th align=left>
+													<p>Routine</p>
+												</th>
+												<th align=left>
+													<p>Platform</p>
+												</th>
+												<th align=left><p>Returns</p></th>
+											</tr>
+											<tr>
+												<td align=left scope="row">
+													<p><code>malloc</code></p>
+												</td>
+												<td align=left>
+													<p>ANSI C specification</p>
+												</td>
+												<td align=left>either <code>NULL</code> or a pointer to a zero-length block</td>
+											</tr>
+											<tr>
+												<td align=left scope="row">
+													<p><code>malloc</code></p>
+												</td>
+												<td align=left>
+													<p>Mac OS X System framework</p>
+												</td>
+												<td align=left>a pointer to a zero-length block</td>
+											</tr>
+											<tr>
+												<td align=left scope="row"><code>malloc</code></td>
+												<td align=left>CodeWarrior MSL</td>
+												<td align=left><code>NULL</code> [1] [2]</td>
+											</tr>
+											<tr>
+												<td align=left scope="row"><code>CFAllocatorAllocate</code></td>
+												<td align=left>all</td>
+												<td align=left><code>NULL</code> [3]</td>
+											</tr>
+											<tr>
+												<td align=left scope="row"><code>NewPtr</code></td>
+												<td align=left>all</td>
+												<td align=left>a pointer to a zero-length block</td>
+											</tr>
+											<tr>
+												<td align=left scope="row"><code>NewHandle</code></td>
+												<td align=left>all</td>
+												<td align=left>a handle to a zero-length block</td>
+											</tr>
+											<tr>
+												<td align=left scope="row"><code>MPAllocateAligned</code></td>
+												<td align=left>Mac OS X</td>
+												<td align=left>a pointer to a zero-length block</td>
+											</tr>
+											<tr>
+												<td align=left scope="row"><code>MPAllocateAligned</code></td>
+												<td align=left>traditional Mac OS</td>
+												<td align=left><code>NULL</code></td>
+											</tr>
+											<tr>
+												<td align=left scope="row"><code>OTAllocMem</code>[<code>InContext</code>]</td>
+												<td align=left>all</td>
+												<td align=left>a pointer to a zero-length block</td>
+											</tr>
+											<tr>
+												<td align=left scope="row"><code>operator new []</code></td>
+												<td align=left>ANSI C++ specification</td>
+												<td align=left>a pointer to a zero-length block</td>
+											</tr>
+											<tr>
+												<td align=left scope="row"><code>operator new []</code></td>
+												<td align=left>all</td>
+												<td align=left>a pointer to a zero-length block</td>
+											</tr>
+										</table>
+										<!-- end of your table data --></td>
+								</tr>
+							</table>
+						</center>
+						<!-- table ends here --><br>
+						<br>
+						<br>
+						<br>
+						<!-- table starts here -->
+						<center>
+						<table border=0 cellpadding=0 width=550>
+							<tr>
+								<td scope="row"><!-- your table title -->
+									<p><b>Table 2</b>. Freeing a <code>NULL</code> pointer.</p>
+									<!-- beginning of your table data -->
+									<table border=1 width="100%">
+										<tr>
+											<th align=left>
+												<p>Routine</p>
+											</th>
+											<th align=left>
+												<p>Platform</p>
+											</th>
+												<th align=left><p>Behavior</p></th>
+											</tr>
+										<tr>
+											<td align=left scope="row">
+												<p><code>free</code></p>
+											</td>
+											<td align=left>
+												<p>ANSI C specification</p>
+											</td>
+												<td align=left>does nothing</td>
+											</tr>
+											<tr>
+												<td align=left scope="row"><code>free</code></td>
+												<td align=left>all</td>
+												<td align=left>does nothing [1]</td>
+											</tr>
+											<tr>
+											<td align=left scope="row">
+												<p><code>CFAllocatorDeallocate</code></p>
+											</td>
+											<td align=left>
+												<p>all</p>
+											</td>
+												<td align=left>does nothing [4]</td>
+											</tr>
+											<tr>
+												<td align=left scope="row"><code>DisposePtr</code></td>
+												<td align=left>Mac OS X</td>
+												<td align=left>sets <code>MemErr</code> to <code>noErr</code></td>
+											</tr>
+											<tr>
+												<td align=left scope="row"><code>DisposePtr</code></td>
+												<td align=left>traditional Mac OS, PowerPC</td>
+												<td align=left>sets <code>MemErr</code> to <code>noErr</code></td>
+											</tr>
+											<tr>
+												<td align=left scope="row"><code>DisposePtr</code></td>
+												<td align=left>traditional Mac OS, 68K</td>
+												<td align=left>illegal</td>
+											</tr>
+											<tr>
+												<td align=left scope="row"><code>DisposeHandle</code></td>
+												<td align=left>Mac OS X</td>
+												<td align=left>sets <code>MemErr</code> to <code>nilHandleErr</code></td>
+											</tr>
+											<tr>
+												<td align=left scope="row"><code>DisposeHandle</code></td>
+												<td align=left>traditional Mac OS</td>
+												<td align=left>sets <code>MemErr</code> to <code>noErr</code></td>
+											</tr>
+											<tr>
+												<td align=left scope="row"><code>MPFree</code></td>
+												<td align=left>Mac OS X</td>
+												<td align=left>illegal [5]</td>
+											</tr>
+											<tr>
+												<td align=left scope="row"><code>MPFree</code></td>
+												<td align=left>traditional Mac OS</td>
+												<td align=left>does nothing</td>
+											</tr>
+											<tr>
+												<td align=left scope="row"><code>OTFreeMem</code></td>
+												<td align=left>all</td>
+												<td align=left>does nothing</td>
+											</tr>
+											<tr>
+												<td align=left scope="row"><code>operator delete</code></td>
+												<td align=left>ANSI C++ specification</td>
+												<td align=left>does nothing</td>
+											</tr>
+											<tr>
+												<td align=left scope="row"><code>operator delete</code></td>
+												<td align=left>all</td>
+												<td align=left>does nothing</td>
+											</tr>
+										</table>
+									<!-- end of your table data --></td>
+							</tr>
+						</table>
+						</center>
+						<!-- table ends here --><br>
+						<br>
+						<p><b>Notes:</b></p>
+						<ol>
+							<li>MSL information obtained from CodeWarrior Pro 8.3 MSL.							<li>You can alter this behavior by setting the <code>_MSL_MALLOC_0_RETURNS_NON_NULL</code> compile-time variable and rebuilding MSL.
+							<li>This behavior is part of <code>CFAllocatorAllocate</code> and is independent of the actual allocator used.
+
+							<li>This behavior is part of <code>CFAllocatorDeallocate</code> and is independent of the actual allocator used.
+							<li>On current versions of Mac OS X (10.2 and earlier), this will not crash but instead print an a warning message to the console (r. 3227311).						</ol>
+						<hr width=500 align=center>
+						<!-- begin_date -->
+						<h4 align=center>[Apr 14, 2003]</h4>
+						<!-- end_date --><!-- end_document_contents --></td>
+				</TR></TABLE></CENTER>
+
+<!-- begin_footer_information -->	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/qa/qa2001/qa1259.html%3Fid%3DDTS10002291-1.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/qa/qa2001/qa1259.html%3Fid%3DDTS10002291-1.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/qa/qa2001/qa1259.html%3Fid%3DDTS10002291-1.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+<!--#include virtual="/includes/footer"--><!-- end_footer_information -->
+
+</BODY>
+</HTML>

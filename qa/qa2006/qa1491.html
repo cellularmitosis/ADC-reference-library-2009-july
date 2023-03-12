@@ -1,0 +1,91 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/1999/REC-html401-19991224/loose.dtd">
+<html><head>
+<!-- BEGIN META TAG INFO -->
+<link rel="home" href="http://developer.apple.com/">
+<link rel="find" href="http://developer.apple.com/search/">
+<link rel="stylesheet" type="text/css" href="../../documentation/css/adcstyle.css" title="fonts">
+<script language="JavaScript" type="text/javascript" src="../../documentation/js/busnav.js"></script>
+<script language="JavaScript" src="../../documentation/js/adc.js" type="text/javascript"></script>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<!-- END META TAG INFO -->
+<!-- BEGIN TITLE -->
+<title>Technical Q&amp;A QA1491: Volumes Not Showing Up On The Desktop</title>
+<!-- END TITLE -->
+</head>
+<!-- BEGIN BODY OPEN -->
+<body bgcolor="#ffffff"><a name="//apple_ref/doc/uid/DTS10004154" title="Volumes Not Showing Up On The Desktop"></a>
+<!--END BODY OPEN -->
+<!-- START CENTER OPEN -->
+<center>
+<!-- END CENTER OPEN -->
+<a name="top"></a>
+<!-- BEGIN LOGO AND SEARCH -->
+<!--#include virtual="/includes/adcnavbar"-->
+<!-- END LOGO AND SEARCH -->
+<!-- START BREADCRUMB -->
+<div id="breadcrumb"><table width="680" border="0" cellpadding="0" cellspacing="0"><tr>
+<td scope="row"><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+<td><img width="340" height="10" src="images/1dot.gif" alt=""></td></tr><tr valign="middle"><td align="left" colspan="2">
+<a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../technicalqas/index.html">Technical Q&As</a> &gt; <a href="../../technicalqas/Darwin/index.html">Darwin</a> &gt; <a href="../../technicalqas/Darwin/idxFileManagement-date.html">File Management</a> &gt; 
+</td></tr><tr><td colspan="2" scope="row"><img width="680" height="35" src="images/1dot.gif" alt=""></td></tr></table></div>
+<!-- END BREADCRUMB -->
+
+<!-- START MAIN CONTENT -->
+<!-- START TITLE GRAPHIC AND INTRO-->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top">
+<td><h1>
+<div id="pagehead">Technical Q&amp;A QA1491</div>
+<div id="pageheadsub">Volumes Not Showing Up On The Desktop</div>
+</h1></td></tr></table>
+<!-- END TITLE GRAPHIC AND INTRO -->
+<!-- BEGIN WIDE COLUMN -->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td align="left" width="680">
+<!-- BEGIN CONTENTS -->
+<h2>Q: I'm writing a custom file system (VFS plug-in).  I can mount my volume just fine at the BSD level, but its icon doesn't show up on the desktop.  How can I make my file system's volumes show up on the desktop?</h2><p>A: If you're developing a <strong>local file system</strong> (using the terminology from <A HREF="../qa2001/qa1242.html">Technical Q&amp;A QA1242, 'Developing for VFS'</A>), you need to create a file system bundle and install it in <code>/System/Library/Filesystems</code>.  The file system bundle format is not formally documented <A HREF="rdar://problem/3524590">(r. 3524590)</A>, but you can look at <A HREF="../../samplecode/MFSLives/index.html">Sample Code Project 'MFSLives'</A> for an example.  For a local file system, a valid file system bundle (including the embedded utility and mount tools) is sufficient for the system to probe and mount your file system, and for your volumes to automatically appear on the desktop.</p><p>This is, however, not sufficient for a <strong>network file system</strong>.  A network file system must have a file system bundle (this allows the Finder to show the correct localized name in the Format field of the Get Info window), but that's not sufficient for your volumes to show up on the desktop automatically.  For a network file system, the user typically does some explicit operation to mount a volume.  For the built-in network file systems (AppleShare, SMB, and so on), the users mounts a volume using the Connect to Server dialog in the Finder, or by browsing <code>/Network</code>.  There is currently no way for third party network file systems to integrate into these standard locations.  See <A HREF="../qa2004/qa1387.html">Technical Q&amp;A QA1387, 'Integrating With The Connect to Server Dialog'</A> for the details.</p><p>If you follow the advice from that document and create your own mounting application, your volumes will still not show up on the desktop.  You must explicitly notify the sytem when you mount a new volume.  The mechanism for doing this is documented <A HREF="#SECDISKARB">below</A>.</p><p>In this context a <strong>cluster file system</strong> works the same way as a network file system.</p><A NAME="SECDISKARB"></A><H2>New Volume Mount Notification</H2><p>When you mount a new network volume, you must tell the system about it.  You do this by calling the DiskArbitration routine <code>DiskArbDiskAppearedWithMountpointPing_auto</code>.  This routine isn't part of the standard DiskArbitration framework headers, so you have to declare your own prototype for it.  The correct prototype is shown in <A HREF="#LISTDISKARB">Listing 1</A>.</p><A NAME="LISTDISKARB"></A><p class="smalltext"><strong>Listing 1:</strong> DiskArbDiskAppearedWithMountpointPing_auto prototype</p><pre class="sourcecodebox">
+extern kern_return_t DiskArbDiskAppearedWithMountpointPing_auto(
+    char *   disk,
+    unsigned flags,
+    char *   mountpoint
+) __attribute__((weak_import));
+
+enum {
+    kDiskArbDiskAppearedEjectableMask              = 1 &lt;&lt; 1,
+    kDiskArbDiskAppearedNetworkDiskMask            = 1 &lt;&lt; 3
+};
+</pre><p>The parameters to this routine are:</p><ul><li><p><code>disk</code> is the device on which the disk is mounted.  In the case of a network volume, you can use any unique string.  However, it must match the <code>f_mntfromname</code> value returned by <A HREF="x-man-page://2/statfs">statfs</A> for your volume.</p></li><li><p><code>flags</code> must be <code>kDiskArbDiskAppearedEjectableMask | kDiskArbDiskAppearedNetworkDiskMask</code>.</p></li><li><p><code>mountpoint</code> is an absolute path to the directory on which the volume is mounted.  Typically this is a unique subdirectory that you create within <code>/Volumes</code>.</p></li></ul><p>This routine is part of the old (pre-Mac OS X 10.3), private, DiskArbitration framework interface.  When we introduced a new, public DiskArbitration interface in Mac OS X 10.3, we didn't introduce a replacement for this routine because, in the long term, DiskArbitration will automatically learn about new network volumes by way of a kernel notification.  So, ultimately, you won't need to call this routine for your volume to appear on the desktop.  For that reason, we strongly recommend that you weak link against this symbol and, if it's not present, just don't call it.</p><div class="notebox"><p><strong>IMPORTANT:</strong> The prototype in <A HREF="#LISTDISKARB">Listing 1</A> causes <code>DiskArbDiskAppearedWithMountpointPing_auto</code> to be imported weakly.  This will allow you to launch even if <code>DiskArbDiskAppearedWithMountpointPing_auto</code> is removed from the system.  However, to avoid crashing you must check the address of the routine and not call it if it's <code>NULL</code>.</p><p>For more information about this technique, see <A HREF="../../technotes/tn2002/tn2064.html">Technical Note TN2064, 'Ensuring Backwards Binary Compatibility - Weak Linking and Availability Macros on Mac OS X'</A>.</p></div><p>Finally, because you're calling the old, private DiskArbitration framework interface, you have to explicitly initialize that interface.  You do this by calling <code>DiskArbInit</code>, the prototype of which is given in <A HREF="#LISTDISKARBINIT">Listing 2</A>.  If you fail to do this, it's likely that <code>DiskArbDiskAppearedWithMountpointPing_auto</code> will fail with an error code of 5 (<code>KERN_FAILURE</code>).</p><A NAME="LISTDISKARBINIT"></A><p class="smalltext"><strong>Listing 2:</strong> DiskArbInit prototype</p><pre class="sourcecodebox">
+extern kern_return_t DiskArbInit(void) __attribute__((weak_import));
+</pre><p>As with <code>DiskArbDiskAppearedWithMountpointPing_auto</code>, you should weak link to this routine and not call it if it's not present.</p><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNT_HISTORY_TAG"></A><H2>Document Revision History</H2><table cellspacing="0" class="graybox" width="680"><tr><th width="100">Date</th><th width="580">Notes</th></tr><tr><td scope="row">2006-12-20</td><td>First Version</td></tr></table><p><b>Posted:</b> 2006-12-20</p>
+<!-- END CONTENTS -->
+</td></tr></table>
+<!-- END WIDE COLUMN -->
+<!-- END MAIN CONTENT -->
+	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/qa/qa2006/qa1491.html%3Fid%3DDTS10004154-1.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/qa/qa2006/qa1491.html%3Fid%3DDTS10004154-1.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/qa/qa2006/qa1491.html%3Fid%3DDTS10004154-1.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+
+<!-- START BOTTOM APPLE NAVIGATION -->
+<!--#include virtual="/includes/footer"-->
+<!-- END BOTTOM APPLE NAVIGATION -->
+<!-- START CENTER CLOSE -->
+</center>
+<!-- END CENTER CLOSE -->
+</body></html>

@@ -1,0 +1,166 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/1999/REC-html401-19991224/loose.dtd">
+<html><head>
+<!-- BEGIN META TAG INFO -->
+<link rel="home" href="http://developer.apple.com/">
+<link rel="find" href="http://developer.apple.com/search/">
+<link rel="stylesheet" type="text/css" href="../../documentation/css/adcstyle.css" title="fonts">
+<script language="JavaScript" type="text/javascript" src="../../documentation/js/busnav.js"></script>
+<script language="JavaScript" src="../../documentation/js/adc.js" type="text/javascript"></script>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<!-- END META TAG INFO -->
+<!-- BEGIN TITLE -->
+<title>Technical Q&amp;A QA1471: Enumerating fonts with ATS</title>
+<!-- END TITLE -->
+</head>
+<!-- BEGIN BODY OPEN -->
+<body bgcolor="#ffffff"><a name="//apple_ref/doc/uid/DTS10003916" title="Enumerating fonts with ATS"></a>
+<!--END BODY OPEN -->
+<!-- START CENTER OPEN -->
+<center>
+<!-- END CENTER OPEN -->
+<a name="top"></a>
+<!-- BEGIN LOGO AND SEARCH -->
+<!--#include virtual="/includes/adcnavbar"-->
+<!-- END LOGO AND SEARCH -->
+<!-- START BREADCRUMB -->
+<div id="breadcrumb"><table width="680" border="0" cellpadding="0" cellspacing="0"><tr>
+<td scope="row"><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+<td><img width="340" height="10" src="images/1dot.gif" alt=""></td></tr><tr valign="middle"><td align="left" colspan="2">
+<a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../technicalqas/index.html">Technical Q&As</a> &gt; <a href="../../technicalqas/Carbon/index.html">Carbon</a> &gt; <a href="../../technicalqas/Carbon/idxTextFonts-date.html">Text & Fonts</a> &gt; 
+</td></tr><tr><td colspan="2" scope="row"><img width="680" height="35" src="images/1dot.gif" alt=""></td></tr></table></div>
+<!-- END BREADCRUMB -->
+
+<!-- START MAIN CONTENT -->
+<!-- START TITLE GRAPHIC AND INTRO-->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top">
+<td><h1>
+<div id="pagehead">Technical Q&amp;A QA1471</div>
+<div id="pageheadsub">Enumerating fonts with ATS</div>
+</h1></td></tr></table>
+<!-- END TITLE GRAPHIC AND INTRO -->
+<!-- BEGIN WIDE COLUMN -->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td align="left" width="680">
+<!-- BEGIN CONTENTS -->
+<h2>Q: ATS provides several different methods for enumerating the fonts and font families available in Mac OS X. Which method should I use for my application?</h2><p>A: First you'll want to validate that your situation requires you to enumerate the font list. If your goal is to gather information about all fonts installed in the system, you should enumerate once and then cache the results. Enumerating the entire system can be time-consuming and degrade system performance, especially on systems with many fonts installed. ATS includes notification mechanisms to inform you of font system changes thus eliminating the need to poll the system. See  <A HREF="../../documentation/Carbon/Conceptual/ATS_Concepts/atsfonts_tasks/chapter_3_section_5.html">Setting Up Notifications</A> in the 'Managing Fonts: ATS' guide.</p><p>If your goal is to provide a font selection menu to the user, you should implement the fonts window instead. This ensures that your application user interface remains consistent with the rest of Mac  OS X. For more information on how to display and manage a fonts window see <A HREF="../../documentation/Carbon/Reference/FontsWindow/">Fonts Window Services Reference.</A></p><p>The following code listings demonstrate using ATS to iterate the system font database within a local context with an unrestricted scope. While similar, Listing 1 creates an iterator to enumerate all the fonts and Listing 2 creates an iterator to enumerate all the font families.</p><p>It's important to note here that your application should gracefully handle the kATSIterationScopeModified error that could be returned by ATSFontIteratorNext. This is not a fatal error, it simply indicates that one or more changes occurred in the font database since you started the iteration. In most cases, you should reset the iterator and start again. However, you should take preventive measures to not get stuck in a reset loop should the user make sudden, drastic changes to the font database, for example, adding many fonts at once.</p><div class="notebox"><p><strong>Note:</strong> When you iterate using a global context and a restricted scope, you enumerate only those fonts that are activated globally. Locally activated fonts, including those activated locally for your application, are not enumerated. A font whose context is local can be accessed by your application, a font with a global context can be accessed by all applications on a system.</p></div><p class="smalltext"><strong>Listing 1:</strong> ATS Font Iterator</p><pre class="sourcecodebox">
+CFArrayRef CreateCarbonSystemFontList(void)
+{
+  ATSFontIterator theFontIterator = NULL;
+  CFMutableArrayRef outArray = NULL;
+  ATSFontRef theATSFontRef = 0;
+  OSStatus status = noErr;
+
+  // Create array to store font names
+  outArray = CFArrayCreateMutable(kCFAllocatorDefault, 0, &amp;kCFTypeArrayCallBacks);
+  if(!outArray)
+    return NULL;
+
+  // Create the iterator
+  status = ATSFontIteratorCreate(kATSFontContextLocal, nil,nil,
+                  kATSOptionFlagsUnRestrictedScope,
+                  &amp;theFontIterator );
+  while (status == noErr)
+  {
+    // Get the next font in the iteration.
+    status = ATSFontIteratorNext( theFontIterator, &amp;theATSFontRef );
+    if(status == noErr)
+    {
+      CFStringRef theName = NULL;
+
+      // Add your code here to do something with font information.
+      // This example gets font name and stores it in our array
+      ATSFontGetName(theATSFontRef, kATSOptionFlagsDefault, &amp;theName);
+      CFArrayAppendValue(outArray, theName);
+      CFRelease(theName);
+    }
+    else if (status == kATSIterationScopeModified) // Make sure the font database hasn&rsquo;t changed.
+    {
+      // reset the iterator
+      status = ATSFontIteratorReset (kATSFontContextLocal, nil, nil,
+                      kATSOptionFlagsUnRestrictedScope,
+                      &amp;theFontIterator);
+      CFArrayRemoveAllValues(outArray);
+    }
+  }
+
+  ATSFontIteratorRelease(&amp;theFontIterator);
+
+  return outArray;
+}
+</pre><p class="smalltext"><strong>Listing 2:</strong> ATS Font Family Iterator</p><pre class="sourcecodebox">
+  ATSFontFamilyIterator theFontFamilyIterator = NULL;
+  CFMutableArrayRef outArray = NULL;
+  ATSFontFamilyRef theATSFontFamilyRef = 0;
+  OSStatus status = noErr;
+
+  // Create array to store font names
+  outArray = CFArrayCreateMutable(kCFAllocatorDefault, 0, &amp;kCFTypeArrayCallBacks);
+  if(!outArray)
+    return NULL;
+
+  // Create the iterator
+  status = ATSFontFamilyIteratorCreate(kATSFontContextLocal, nil,nil,
+                      kATSOptionFlagsUnRestrictedScope,
+                      &amp;theFontFamilyIterator );
+  while (status == noErr)
+  {
+    // Get the next font family in the iteration.
+    status = ATSFontFamilyIteratorNext( theFontFamilyIterator, &amp;theATSFontFamilyRef );
+    if(status == noErr)
+    {
+      CFStringRef theName = NULL;
+
+      // Add your code here to do something with font information.
+      // This example gets font name and stores it in our array
+      ATSFontFamilyGetName(theATSFontFamilyRef, kATSOptionFlagsDefault, &amp;theName);
+      CFArrayAppendValue(outArray, theName);
+      CFRelease(theName);
+    }
+    else if (status == kATSIterationScopeModified) // Make sure the font database hasn&rsquo;t changed.
+    {
+      // reset the iterator
+      status = ATSFontFamilyIteratorReset (kATSFontContextLocal, nil, nil,
+                          kATSOptionFlagsUnRestrictedScope,
+                          &amp;theFontFamilyIterator);
+      CFArrayRemoveAllValues(outArray);
+    }
+  }
+
+  ATSFontFamilyIteratorRelease(&amp;theFontFamilyIterator);
+
+  return outArray;
+}
+</pre><A NAME="TNTAG3"></A><H2>References</H2><ul><li><p><A HREF="../../documentation/Carbon/Conceptual/ATS_Concepts/index.html">Managing Fonts: ATS</A></p></li><li><p><A HREF="../../documentation/Carbon/Reference/FontsWindow/index.html">Fonts Window Services Reference</A></p></li></ul><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNT_HISTORY_TAG"></A><H2>Document Revision History</H2><table cellspacing="0" class="graybox" width="680"><tr><th width="100">Date</th><th width="580">Notes</th></tr><tr><td scope="row">2006-04-14</td><td>First Version</td></tr></table><p><b>Posted:</b> 2006-04-14</p>
+<!-- END CONTENTS -->
+</td></tr></table>
+<!-- END WIDE COLUMN -->
+<!-- END MAIN CONTENT -->
+	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/qa/qa2006/qa1471.html%3Fid%3DDTS10003916-1.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/qa/qa2006/qa1471.html%3Fid%3DDTS10003916-1.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/qa/qa2006/qa1471.html%3Fid%3DDTS10003916-1.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+
+<!-- START BOTTOM APPLE NAVIGATION -->
+<!--#include virtual="/includes/footer"-->
+<!-- END BOTTOM APPLE NAVIGATION -->
+<!-- START CENTER CLOSE -->
+</center>
+<!-- END CENTER CLOSE -->
+</body></html>

@@ -1,0 +1,197 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<!-- BEGIN META TAG INFO --><link rel="home" href="http://developer.apple.com/">
+<link rel="find" href="http://developer.apple.com/search/">
+<link rel="stylesheet" type="text/css" href="../../documentation/css/adcstyle.css" title="fonts">
+<script language="JavaScript" type="text/javascript" src="../../documentation/js/busnav.js"></script><script language="JavaScript" src="../../documentation/js/adc.js" type="text/javascript"></script><!-- END META TAG INFO --><!-- BEGIN TITLE --><title>Technical Q&amp;A QA1134: Programmatically causing restart, shutdown and/or logout</title>
+<!-- END TITLE --><style>
+			.sourcecodebox {
+				white-space: pre-wrap;
+				white-space: -moz-pre-wrap !important;
+				white-space: -pre-wrap;
+				white-space: -o-pre-wrap;
+				word-wrap: break-word;
+			}
+			</style>
+</head>
+<!-- BEGIN BODY OPEN --><body bgcolor="#ffffff"><a name="//apple_ref/doc/uid/DTS10001681" title="Programmatically causing restart, shutdown and/or logout"></a>
+<!-- END BODY OPEN --><!-- START CENTER OPEN --><center>
+<!-- END CENTER OPEN --><a name="top"></a><!-- BEGIN LOGO AND SEARCH --><!--#include virtual="/includes/adcnavbar" --><!-- END LOGO AND SEARCH --><!-- START BREADCRUMB --><div id="breadcrumb"><table width="680" border="0" cellpadding="0" cellspacing="0">
+<tr>
+<td scope="row"><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+<td><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+</tr>
+<tr valign="middle"><td align="left" colspan="2">
+<a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../technicalqas/index.html">Technical Q&amp;As</a> &gt; <a href="../../technicalqas/Carbon/index.html">Carbon</a> &gt; <a href="../../technicalqas/Carbon/idxResourceManagement-date.html">Resource Management</a> &gt; </td></tr>
+<tr><td colspan="2" scope="row"><img width="680" height="35" src="images/1dot.gif" alt=""></td></tr>
+</table></div>
+<!-- END BREADCRUMB --><!-- START MAIN CONTENT --><!-- START TITLE GRAPHIC AND INTRO --><table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td><h1>
+<div id="pagehead">Technical Q&amp;A QA1134</div>
+<div id="pageheadsub">Programmatically causing restart, shutdown and/or logout</div>
+</h1></td></tr></table>
+<!-- END TITLE GRAPHIC AND INTRO --><!-- BEGIN WIDE COLUMN --><table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td align="left" width="680">
+<!-- BEGIN CONTENTS --><h2>Q:
+	
+How do I programmatically shutdown, restart, sleep or logout a machine running Mac OS X?
+</h2>
+<p>A: An application can do all of the above by sending specific Apple events to the loginwindow process. The loginwindow process will interpret the Apple events and cause the requested event. You can target the loginwindow process for Apple events using the constant {0,kSystemProcess} as the ProcessSerialNumber of the target application. Note that the restart, shutdown or logout sequence initiated using this method can be cancelled by running applications. </p>
+<p>For details on applications canceling the restart/shutdown/logout sequence see "Terminating Processes" in <a href="http://developer.apple.com/DOCUMENTATION/MacOSX/Conceptual/BPSystemStartup/BPSystemStartup.html">System Startup Programming Topics</a>.</p>
+<div class="notebox"><p><strong>IMPORTANT: </strong>Developers should only initiate a restart, shutdown, sleep or logout event when absolutely necessary. Also, these actions should only be undertaken after getting user consent.</p></div>
+<p>The specific Apple events sent to initiate system restart, shutdown, logout or sleep are kAERestart, kAEShutDown, kAEReallyLogOut or kAESleep, respectively.</p>
+<div class="notebox"><p><strong>Note: </strong>Previous to Mac OS X 10.2 kAEReallyLogOut was not defined in the Apple event headers but was still supported. On previous Mac OS X versions developers can substitute the equivalent character code 'rlgo' for kAEReallyLogOut in their code. </p></div>
+<p>The code below demonstrates how to programmatically cause restart, shutdown, sleep or logout by sending Apple events to the loginwindow process. The function SendAppleEventToSystemProcess does the work of sending the Apple event. </p>
+<p class="caption"><strong>Listing 1: </strong>Demonstration of how to programatically restart, shutdown, sleep and logout the system</p>
+<pre class="sourcecodebox">#include &lt;stdio.h&gt; 
+#include &lt;CoreServices/CoreServices.h&gt;
+#include &lt;Carbon/Carbon.h&gt;
+
+static OSStatus SendAppleEventToSystemProcess(AEEventID EventToSend);
+
+int main(void)
+{
+    const int bufferSize = 256;
+    OSStatus error = noErr;
+    char select [bufferSize];
+
+    printf("1: Restart computer\n");
+    printf("2: Shutdown computer\n");
+    printf("3: Logout computer\n");
+    printf("4: Sleep computer\n");
+    printf("q: quit program\n");
+
+    printf("please enter choice:\n");fflush(stdout);
+    fgets(select, bufferSize, stdin);
+
+    switch (select[0])
+    {
+         case '1':
+            //sending restart event to system
+            error = SendAppleEventToSystemProcess(kAERestart);
+            if (error == noErr)
+                {printf("Computer is going to restart!\n");}
+            else
+                {printf("Computer wouldn't restart\n");}
+         break;
+         case '2':
+            //sending shutdown event to system
+            error = SendAppleEventToSystemProcess(kAEShutDown);
+            if (error == noErr)
+                {printf("Computer is going to shutdown!\n");}
+            else
+                {printf("Computer wouldn't shutdown\n");}
+         break;
+         case '3':
+            //sending logout event to system
+            error = SendAppleEventToSystemProcess(kAEReallyLogOut);
+            if (error == noErr)
+                {printf("Computer is going to logout!\n");}
+            else
+                {printf("Computer wouldn't logout");}
+         break;
+         case '4':
+            //sending sleep event to system
+            error = SendAppleEventToSystemProcess(kAESleep);
+            if (error == noErr)
+                {printf("Computer is going to sleep!\n");}
+            else
+                {printf("Computer wouldn't sleep");}
+    };
+
+    return(0);
+}
+
+OSStatus SendAppleEventToSystemProcess(AEEventID EventToSend)
+{
+    AEAddressDesc targetDesc;
+    static const ProcessSerialNumber kPSNOfSystemProcess = { 0, kSystemProcess };
+    AppleEvent eventReply = {typeNull, NULL};
+    AppleEvent appleEventToSend = {typeNull, NULL};
+
+    OSStatus error = noErr;
+
+    error = AECreateDesc(typeProcessSerialNumber, &amp;kPSNOfSystemProcess, 
+                                            sizeof(kPSNOfSystemProcess), &amp;targetDesc);
+
+    if (error != noErr)
+    {
+        return(error);
+    }
+
+    error = AECreateAppleEvent(kCoreEventClass, EventToSend, &amp;targetDesc, 
+                   kAutoGenerateReturnID, kAnyTransactionID, &amp;appleEventToSend);
+
+    AEDisposeDesc(&amp;targetDesc);
+    if (error != noErr)
+    {
+        return(error);
+    }
+
+    error = AESend(&amp;appleEventToSend, &amp;eventReply, kAENoReply, 
+                  kAENormalPriority, kAEDefaultTimeout, NULL, NULL);
+
+    AEDisposeDesc(&amp;appleEventToSend);
+    if (error != noErr)
+    {
+        return(error);
+    }
+
+    AEDisposeDesc(&amp;eventReply);
+
+    return(error); 
+}</pre>
+<a name="POWER_STATE_CHANGES_FROM_DAEMONS"></a><h2>Power State Changes From Daemons</h2>
+<p>On Mac OS X daemons are run within the global context and without a connection to the window server. For this reason they should not, and often cannot, use the method outlined above for generating power state changes. </p>
+<p>See <a href="http://developer.apple.com/technotes/tn2005/tn2083.html">Technical Note TN2083: Daemons and Agents</a> for detailed information about daemons and execution contexts. </p>
+<p>In the case where there are no GUI login sessions a daemon can issue the standard <a href="x-man-page://8/shutdown">shutdown</a> command to power the system down, appending the "<code>-r</code>" flag if a restart is desired. A daemon can also sleep the system by calling <a href="http://developer.apple.com/documentation/Darwin/Reference/IOKit/IOPMLib/CompositePage.html#//apple_ref/c/func/IOPMSleepSystem">IOPMSleepSystem</a>.</p>
+<p>However, if one or more GUI login sessions are active, a daemon can use a separate per-user launchd agent to implement the Apple event power state commands outlined above. Interprocess communication between daemons and agents is outlined in <a href="http://developer.apple.com/technotes/tn2005/tn2083.html">Technical Note TN2083: Daemons and Agents</a>.</p>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="document_revision_summary"></a><h2>Document Revision History</h2>
+<table cellspacing="0" class="graybox" width="680">
+<tr>
+<th width="100">Date</th>
+<th width="580">Notes</th>
+</tr>
+<tr>
+<td scope="row">2008-09-24</td>
+<td>Updated source listing.</td>
+</tr>
+<tr>
+<td scope="row">2008-01-23</td>
+<td>Added information for daemon authors.</td>
+</tr>
+<tr>
+<td scope="row">2003-02-10</td>
+<td>Describes how to programmatically cause restart, shutdown, sleep or logout.</td>
+</tr>
+</table>
+<p><b>Posted: </b>2008-09-24</p>
+<!-- END CONTENTS -->
+</td></tr></table>
+<!-- END WIDE COLUMN --><!-- END MAIN CONTENT --><!-- START BOTTOM APPLE NAVIGATION -->	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/qa/qa2001/qa1134.html%3Fid%3DDTS10001681-3.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/qa/qa2001/qa1134.html%3Fid%3DDTS10001681-3.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/qa/qa2001/qa1134.html%3Fid%3DDTS10001681-3.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+<!--#include virtual="/includes/footer" --><!-- END BOTTOM APPLE NAVIGATION --><!-- START CENTER CLOSE -->
+</center>
+<!-- END CENTER CLOSE -->
+</body>
+</html>

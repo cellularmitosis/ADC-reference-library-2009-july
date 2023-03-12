@@ -1,0 +1,109 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<!-- BEGIN META TAG INFO --><link rel="home" href="http://developer.apple.com/">
+<link rel="find" href="http://developer.apple.com/search/">
+<link rel="stylesheet" type="text/css" href="../../documentation/css/adcstyle.css" title="fonts">
+<script language="JavaScript" type="text/javascript" src="../../documentation/js/busnav.js"></script><script language="JavaScript" src="../../documentation/js/adc.js" type="text/javascript"></script><!-- END META TAG INFO --><!-- BEGIN TITLE --><title>Technical Q&amp;A QA1195: Retain Counts of io_object_t Objects in IOKit.framework</title>
+<!-- END TITLE --><style>
+			.sourcecodebox {
+				white-space: pre-wrap;
+				white-space: -moz-pre-wrap !important;
+				white-space: -pre-wrap;
+				white-space: -o-pre-wrap;
+				word-wrap: break-word;
+			}
+			</style>
+</head>
+<!-- BEGIN BODY OPEN --><body bgcolor="#ffffff"><a name="//apple_ref/doc/uid/DTS10001723" title="Retain Counts of io_object_t Objects in IOKit.framework"></a>
+<!-- END BODY OPEN --><!-- START CENTER OPEN --><center>
+<!-- END CENTER OPEN --><a name="top"></a><!-- BEGIN LOGO AND SEARCH --><!--#include virtual="/includes/adcnavbar" --><!-- END LOGO AND SEARCH --><!-- START BREADCRUMB --><div id="breadcrumb"><table width="680" border="0" cellpadding="0" cellspacing="0">
+<tr>
+<td scope="row"><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+<td><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+</tr>
+<tr valign="middle"><td align="left" colspan="2">
+<a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../technicalqas/index.html">Technical Q&amp;As</a> &gt; <a href="../../technicalqas/Darwin/index.html">Darwin</a> &gt; <a href="../../technicalqas/Darwin/idxHardwareDrivers-date.html">Hardware &amp; Drivers</a> &gt; </td></tr>
+<tr><td colspan="2" scope="row"><img width="680" height="35" src="images/1dot.gif" alt=""></td></tr>
+</table></div>
+<!-- END BREADCRUMB --><!-- START MAIN CONTENT --><!-- START TITLE GRAPHIC AND INTRO --><table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td><h1>
+<div id="pagehead">Technical Q&amp;A QA1195</div>
+<div id="pageheadsub">Retain Counts of io_object_t Objects in IOKit.framework</div>
+</h1></td></tr></table>
+<!-- END TITLE GRAPHIC AND INTRO --><!-- BEGIN WIDE COLUMN --><table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td align="left" width="680">
+<!-- BEGIN CONTENTS --><h2>Q:
+	
+I think I'm leaking <code>io_object_t</code> objects in my user space I/O Kit code. I used the function <code>IOObjectGetRetainCount</code> to find the retain count of those objects, but the values I get back are larger than I expected. Why is this?
+</h2>
+<p>A: There are actually two separate retain counts involved here. The first is the retain count of the underlying kernel object represented by the <code>io_object_t</code>. The function <code>IOObjectGetRetainCount</code> returns this retain count by calling through to the kernel.</p>
+<p>The second is the retain count of the <code>io_object_t</code> itself. An <code>io_object_t</code> is a wrapper around a Mach port used to  communicate between user space and the kernel, and Mach ports have their own retain count. This also applies to the other types derived from <code>io_object_t</code>: <code>io_service_t, io_connect_t, io_iterator_t, io_registry_entry_t,</code> and <code>io_enumerator_t</code>. (These types are defined in <code>IOKit/IOTypes.h</code>.)</p>
+<p><code>IOObjectRetain</code> and <code>IOObjectRelease</code> operate on the retain count of the <code>io_object_t </code> Mach port itself. This can be verified by looking at <code>IOKitLib.c </code> in the IOKitUser project in <a href="http://www.opensource.apple.com/darwinsource/">Darwin</a>.</p>
+<p>So, the correct way to get the retain count of an <code>io_object_t</code> is to use the Mach function <code>mach_port_get_refs</code> as shown in the snippet in <a href="#TNTAG1">Listing 1</a>.</p>
+<a name="TNTAG1"></a><p class="caption"><strong>Listing 1: </strong>Getting the retain count of an io_object_t.</p>
+<pre class="sourcecodebox">#include &lt;IOKit/IOKitLib.h&gt;
+#include &lt;mach/mach_port.h&gt;
+
+kern_return_t   kr;
+unsigned int    result;
+io_object_t     theObject;
+io_name_t       className;
+
+kr = IOObjectGetClass(theObject, className);
+
+if (KERN_SUCCESS == kr) {
+    kern_return_t  kr2;
+
+    kr2 = mach_port_get_refs(mach_task_self(),
+                             theObject,
+                             MACH_PORT_RIGHT_SEND,
+                             &amp;result);
+
+    printf("io_object_t: 0x%08x, Class: %s, Retain Count: %d, Result=0x%08x\n",
+           theObject, className, result, kr2);
+}</pre>
+<p>If you get the famous 0x10000003 (<code>MACH_SEND_INVALID_DEST</code>) return code back from an IOKit.framework function, that's referring to a stale <code>io_object_t</code>, not the underlying kernel object. For more information on I/O Kit error codes, please refer to <a href="qa1075.html#//apple_ref/doc/uid/DTS10001627">Making sense of IOKit error codes</a>.</p>
+<a name="document_revision_summary"></a><h2>Document Revision History</h2>
+<table cellspacing="0" class="graybox" width="680">
+<tr>
+<th width="100">Date</th>
+<th width="580">Notes</th>
+</tr>
+<tr>
+<td scope="row">2008-09-24</td>
+<td>Minor editorial changes.</td>
+</tr>
+<tr>
+<td scope="row">2002-09-04</td>
+<td>Distinguishes between the retain counts of an I/O Kit kernel object and its io_object_t user space proxy.</td>
+</tr>
+</table>
+<p><b>Posted: </b>2008-09-24</p>
+<!-- END CONTENTS -->
+</td></tr></table>
+<!-- END WIDE COLUMN --><!-- END MAIN CONTENT --><!-- START BOTTOM APPLE NAVIGATION -->	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/qa/qa2001/qa1195.html%3Fid%3DDTS10001723-2.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/qa/qa2001/qa1195.html%3Fid%3DDTS10001723-2.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/qa/qa2001/qa1195.html%3Fid%3DDTS10001723-2.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+<!--#include virtual="/includes/footer" --><!-- END BOTTOM APPLE NAVIGATION --><!-- START CENTER CLOSE -->
+</center>
+<!-- END CENTER CLOSE -->
+</body>
+</html>

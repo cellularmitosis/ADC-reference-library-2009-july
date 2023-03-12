@@ -1,0 +1,232 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/1999/REC-html401-19991224/loose.dtd">
+<html><head>
+<!-- BEGIN META TAG INFO -->
+<link rel="home" href="http://developer.apple.com/">
+<link rel="find" href="http://developer.apple.com/search/">
+<link rel="stylesheet" type="text/css" href="../../documentation/css/adcstyle.css" title="fonts">
+<script language="JavaScript" type="text/javascript" src="../../documentation/js/busnav.js"></script>
+<script language="JavaScript" src="../../documentation/js/adc.js" type="text/javascript"></script>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<!-- END META TAG INFO -->
+<!-- BEGIN TITLE -->
+<title>Technical Q&amp;A QA1450: Compression Sessions - Enabling muti-pass encoding</title>
+<!-- END TITLE -->
+</head>
+<!-- BEGIN BODY OPEN -->
+<body bgcolor="#ffffff"><a name="//apple_ref/doc/uid/DTS10003814" title="Compression Sessions - Enabling muti-pass encoding"></a>
+<!--END BODY OPEN -->
+<!-- START CENTER OPEN -->
+<center>
+<!-- END CENTER OPEN -->
+<a name="top"></a>
+<!-- BEGIN LOGO AND SEARCH -->
+<!--#include virtual="/includes/adcnavbar"-->
+<!-- END LOGO AND SEARCH -->
+<!-- START BREADCRUMB -->
+<div id="breadcrumb"><table width="680" border="0" cellpadding="0" cellspacing="0"><tr>
+<td scope="row"><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+<td><img width="340" height="10" src="images/1dot.gif" alt=""></td></tr><tr valign="middle"><td align="left" colspan="2">
+<a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../technicalqas/index.html">Technical Q&As</a> &gt; <a href="../../technicalqas/QuickTime/index.html">QuickTime</a> &gt; <a href="../../technicalqas/QuickTime/idxCarbon-date.html">Carbon</a> &gt; 
+</td></tr><tr><td colspan="2" scope="row"><img width="680" height="35" src="images/1dot.gif" alt=""></td></tr></table></div>
+<!-- END BREADCRUMB -->
+
+<!-- START MAIN CONTENT -->
+<!-- START TITLE GRAPHIC AND INTRO-->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top">
+<td><h1>
+<div id="pagehead">Technical Q&amp;A QA1450</div>
+<div id="pageheadsub">Compression Sessions - Enabling muti-pass encoding</div>
+</h1></td></tr></table>
+<!-- END TITLE GRAPHIC AND INTRO -->
+<!-- BEGIN WIDE COLUMN -->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td align="left" width="680">
+<!-- BEGIN CONTENTS -->
+<h2>Q: When configuring a Compression Session how do you enable multi-pass encoding?</h2><p>A: Multi-pass encoding is enabled for a compression session by performing two steps:</p><ul><li><p>Create a temporary multi-pass storage location.</p></li><li><p>Add this reference to a compression session options object used when creating the ICM compression session.</p></li></ul><p><strong>Specifying a temporary storage location</strong></p><p>To create a temporary storage location call <code>ICMMultiPassStorageCreateWithTemporaryFile</code>. This API will return a <code>ICMMultiPassStorageRef</code> which you can then add to the compression sessions configuration object. See listing 1.</p><pre class="sourcecodebox">
+OSStatus ICMMultiPassStorageCreateWithTemporaryFile(
+                                        CFAllocatorRef allocator,
+                                        FSRef *directoryRef,
+                                        CFStringRef fileName,
+                                        ICMMultiPassStorageCreationFlags flags,
+                                        ICMMultiPassStorageRef *multiPassStorageOut)
+
+Discussion:
+
+Creates multi-pass storage using a temporary file and returns a ICMMultiPassStorageRef
+object. You own the returned object.
+
+Parameter Descriptions:
+
+allocator - An allocator for this task. Pass kCFAllocatorDefault to use the default
+            allocator.
+
+directoryRef - A reference to a file directory. If you pass NULL, the Image Compression
+               Manager will use the user's Temporary Items folder.
+
+fileName - A file name to use for the storage. If you pass NULL, the Image Compression
+           Manager will pick a unique name. This file will be deleted
+           when the multi-pass storage is released, unless you set the
+           kICMMultiPassStorage_DoNotDeleteWhenDone flag.
+
+flags - Flag controlling this process:
+
+kICMMultiPassStorage_DoNotDeleteWhenDone - The temporary file should not be deleted when
+                                           the multi-pass storage is released.
+
+multiPassStorageOut - A reference to the new multi-pass storage.
+
+Returns noErr if there is no error.
+</pre><pre class="sourcecodebox">
+void ICMMultiPassStorageRelease(ICMMultiPassStorageRef multiPassStorage)
+
+Discussion:
+
+Decrements the retain count of a multi-pass storage object. If the retain count drops to
+0, the object is disposed.
+
+Parameter Descriptions:
+
+multiPassStorage - A reference to a multi-pass storage object. If you pass NULL, nothing
+                   happens.
+</pre><p><strong>Adding the reference to a compression session options object</strong></p><p>Once a multi-pass storage reference has been created, add this reference to the compression session options object by calling <code>ICMCompressionSessionOptionsSetProperty</code>. Use the <code>kICMCompressionSessionOptionsPropertyID_MultiPassStorage</code> key and pass in the <code>ICMMultiPassStorageRef</code>. See listing 1.</p><pre class="sourcecodebox">
+kICMCompressionSessionOptionsPropertyID_MultiPassStorage - Storage for multi-pass compression.
+
+Discussion:
+
+To enable multi-pass compression, the client must provide a storage location for
+multi-pass data.  Use ICMMultiPassStorageCreateWithTemporaryFile to have the ICM store it
+in a temporary file. Note that the amount of multi-pass data to be stored can be
+substantial; it could be greater than the size of the output movie file.
+
+If this property has been set for a Compression Session (i.e. not NULL), the client must
+call ICMCompressionSessionBeginPass and ICMCompressionSessionEndPass around groups of
+calls to ICMCompressionSessionEncodeFrame. By default, this property is NULL and
+multi-pass compression is not enabled.
+
+The Compression Session Options Object retains the multi-pass storage object when one is
+set, a client can therefore release it.
+
+This property is read/write.
+</pre><p class="smalltext"><strong>Listing 1:</strong> Enabling Multi-pass compression.</p><pre class="sourcecodebox">
+OSStatus EnableMultiPassWithTemporaryFile(
+                    ICMCompressionSessionOptionsRef inCompressionSessionOptions,
+                    ICMMultiPassStorageRef *outMultiPassStorage);
+{
+    FSRef tempDirRef;
+    ICMMultiPassStorageRef multiPassStorage = NULL;
+
+    OSStatus status;
+
+    *outMultiPassStorage = NULL;
+
+    // users temp directory
+    status = FSFindFolder(kUserDomain, kTemporaryFolderType,
+                          kCreateFolder, &amp;tempDirRef);
+    if (noErr != status) goto bail;
+
+    // create storage using a temporary file with a unique file name
+    status = ICMMultiPassStorageCreateWithTemporaryFile(kCFAllocatorDefault,
+                                                        &amp;tempDirRef,
+                                                        NULL, 0,
+                                                        &amp;multiPassStorage);
+    if (noErr != status) goto bail;
+
+    // enable multi-pass by setting the compression session options
+    // note - the compression session options object retains the multi-pass
+    // storage object
+    status = ICMCompressionSessionOptionsSetProperty(
+                       inCompressionSessionOptions,
+                       kQTPropertyClass_ICMCompressionSessionOptions,
+                       kICMCompressionSessionOptionsPropertyID_MultiPassStorage,
+                       sizeof(ICMMultiPassStorageRef),
+                       &amp;multiPassStorage);
+
+bail:
+    if (noErr != status) {
+        // this api is NULL safe so we can just call it
+        ICMMultiPassStorageRelease(multiPassStorage);
+    } else {
+        *outMultiPassStorage = multiPassStorage;
+    }
+
+    return status;
+}
+</pre><p class="smalltext"><strong>Listing 2:</strong> Typical usage of Listing 1.</p><pre class="sourcecodebox">
+ICMCompressionSessionRef session = NULL;
+ICMCompressionSessionOptionsRef sessionOptions = NULL;
+CodecQ compressionQuality = codecNormalQuality;
+ICMMultiPassStorageRef multiPassStorage = NULL;
+OSStatus status;
+
+...
+
+// create the compression session options object
+ICMCompressionSessionOptionsCreate(kCFAllocatorDefault, &amp;sessionOptions);
+
+// some configuration
+ICMCompressionSessionOptionsSetAllowTemporalCompression(sessionOptions, true);
+ICMCompressionSessionOptionsSetAllowFrameReordering(sessionOptions, true);
+
+ICMCompressionSessionOptionsSetProperty(sessionOptions,
+                                    kQTPropertyClass_ICMCompressionSessionOptions,
+                                    kICMCompressionSessionOptionsPropertyID_Quality,
+                                    sizeof(compressionQuality),
+                                    &amp;compressionQuality);
+
+// turn on multi-pass encoding
+status = EnableMultiPassWithTemporaryFile(sessionOptions, &amp;multiPassStorage);
+if (noErr != status) goto bail;
+
+// you can choose to release the multi-pass storage here or keep it around
+// and release it later - note that the compression session option object retains it
+ICMMultiPassStorageRelease(multiPassStorage);
+
+// perform other configuration as required
+...
+
+// create a compression session using the configured options which include multi-pass
+ICMCompressionSessionCreate(kCFAllocatorDefault,
+                            width,
+                            height,
+                            cType,
+                            timescale,
+                            sessionOptions,  // &lt;- Pass in Compression Session Configuration Options Object
+                            sourcePixelBufferOptions,
+                            &amp;encodedFrameOutputRecord,
+                            &amp;compressionSessionOut);
+
+...
+</pre><p><strong>References:</strong></p><ul><li><p><A HREF="../../documentation/QuickTime/APIREF/icmmultipassstoragecreatewithtemporaryfile.htm"><code>ICMMultiPassStorageCreateWithTemporaryFile</code></A></p></li><li><p><A HREF="../../documentation/QuickTime/APIREF/icmcompressionsessionoptionssetproperty.htm"><code>ICMCompressionSessionOptionsSetProperty</code></A></p></li><li><p><A HREF="../../documentation/QuickTime/APIREF/ICMCompressionSessionOptions.htm">ICM Compression Session Options</A></p></li><li><p><A HREF="../../documentation/QuickTime/APIREF/icmmultipassstoragerelease.htm">ICMMultiPassStorageRelease</A></p></li></ul><A NAME="TNT_HISTORY_TAG"></A><H2>Document Revision History</H2><table cellspacing="0" class="graybox" width="680"><tr><th width="100">Date</th><th width="580">Notes</th></tr><tr><td scope="row">2006-01-12</td><td>Describes how to enable multi-pass encoding when using ICM compression sessions.</td></tr></table><p><b>Posted:</b> 2006-01-12</p>
+<!-- END CONTENTS -->
+</td></tr></table>
+<!-- END WIDE COLUMN -->
+<!-- END MAIN CONTENT -->
+	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/qa/qa2005/qa1450.html%3Fid%3DDTS10003814-1.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/qa/qa2005/qa1450.html%3Fid%3DDTS10003814-1.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/qa/qa2005/qa1450.html%3Fid%3DDTS10003814-1.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+
+<!-- START BOTTOM APPLE NAVIGATION -->
+<!--#include virtual="/includes/footer"-->
+<!-- END BOTTOM APPLE NAVIGATION -->
+<!-- START CENTER CLOSE -->
+</center>
+<!-- END CENTER CLOSE -->
+</body></html>

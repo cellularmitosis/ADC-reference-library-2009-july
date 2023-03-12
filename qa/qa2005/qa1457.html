@@ -1,0 +1,201 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/1999/REC-html401-19991224/loose.dtd">
+<html><head>
+<!-- BEGIN META TAG INFO -->
+<link rel="home" href="http://developer.apple.com/">
+<link rel="find" href="http://developer.apple.com/search/">
+<link rel="stylesheet" type="text/css" href="../../documentation/css/adcstyle.css" title="fonts">
+<script language="JavaScript" type="text/javascript" src="../../documentation/js/busnav.js"></script>
+<script language="JavaScript" src="../../documentation/js/adc.js" type="text/javascript"></script>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<!-- END META TAG INFO -->
+<!-- BEGIN TITLE -->
+<title>Technical Q&amp;A QA1457: Compression Sessions - Multipass encoding and the pass mode flags</title>
+<!-- END TITLE -->
+</head>
+<!-- BEGIN BODY OPEN -->
+<body bgcolor="#ffffff"><a name="//apple_ref/doc/uid/DTS10003831" title="Compression Sessions - Multipass encoding and the pass mode flags"></a>
+<!--END BODY OPEN -->
+<!-- START CENTER OPEN -->
+<center>
+<!-- END CENTER OPEN -->
+<a name="top"></a>
+<!-- BEGIN LOGO AND SEARCH -->
+<!--#include virtual="/includes/adcnavbar"-->
+<!-- END LOGO AND SEARCH -->
+<!-- START BREADCRUMB -->
+<div id="breadcrumb"><table width="680" border="0" cellpadding="0" cellspacing="0"><tr>
+<td scope="row"><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+<td><img width="340" height="10" src="images/1dot.gif" alt=""></td></tr><tr valign="middle"><td align="left" colspan="2">
+<a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../technicalqas/index.html">Technical Q&As</a> &gt; <a href="../../technicalqas/QuickTime/index.html">QuickTime</a> &gt; <a href="../../technicalqas/QuickTime/idxCarbon-date.html">Carbon</a> &gt; 
+</td></tr><tr><td colspan="2" scope="row"><img width="680" height="35" src="images/1dot.gif" alt=""></td></tr></table></div>
+<!-- END BREADCRUMB -->
+
+<!-- START MAIN CONTENT -->
+<!-- START TITLE GRAPHIC AND INTRO-->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top">
+<td><h1>
+<div id="pagehead">Technical Q&amp;A QA1457</div>
+<div id="pageheadsub">Compression Sessions - Multipass encoding and the pass mode flags</div>
+</h1></td></tr></table>
+<!-- END TITLE GRAPHIC AND INTRO -->
+<!-- BEGIN WIDE COLUMN -->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td align="left" width="680">
+<!-- BEGIN CONTENTS -->
+<h2>Q: When performing multipass encoding how are the compression pass mode flags used with <code>ICMCompressionSessionBeginPass</code>?</h2><p>A: QuickTime 7 defines five <code>ICMCompressionPassModeFlags</code> in ImageCompression.h:</p><ul><li><p><code>kICMCompressionPassMode_OutputEncodedFrames</code> -  Set during an encoding pass, the compressor must output encoded frames. This flag can only be set once the <code>kICMCompressionPassMode_NotReadyToOutputEncodedFrames</code> flag has been cleared.</p></li><li><p><code>kICMCompressionPassMode_NoSourceFrames</code> -  If the compressor has set this flag for the pass, the client should not provide source frame buffers and may pass NULL pixel buffers to <code>ICMCompressionSessionEncodeFrame</code>.</p></li><li><p><code>kICMCompressionPassMode_WriteToMultiPassStorage</code> - Set during an analysis pass, the compressor does not output encoded frames but records compressor-private information for each frame to the multipass storage.</p></li><li><p><code>kICMCompressionPassMode_ReadFromMultiPassStorage</code>  - Set during repeated analysis passes and the encoding pass, the compressor may refer to  the compressor-private information and use it to improve encoding.</p></li><li><p><code>kICMCompressionPassMode_NotReadyToOutputEncodedFrames</code> - The compressor will set this flag to indicate that it will not be able to output encoded frames in the coming pass. Once this flag has been cleared, the client may set the <code>kICMCompressionPassMode_OutputEncodedFrames</code> flag when calling <code>ICMCompressionSessionBeginPass</code> to cut short a compression operation.</p></li></ul><p>When multipass encoding is enabled (see <A HREF="qa1450.html">Technical Q&amp;A QA1450, 'Compression Sessions - Enabling muti-pass encoding'</A>), calls to <code>ICMCompressionSessionEncodeFrame</code> must be bracketed by <code>ICMCompressionSessionBeginPass</code> and <code>ICMCompressionSessionEndPass</code>.</p><p>During a multipass encoding session, a multipass capable compressor has a lot of latitude with the type of work it performs in each pass. The client doesn't really get to know the details of a pass, nor is it told ahead of time how many passes there will be.</p><p>The pass mode flags are used to communicate the compressors state in a given pass and allow the client to modify this state when calling <code>ICMCompressionSessionBeginPass</code>. For example, the client could choose to write out an &quot;early generation preview&quot; of pass 3 of a 5-pass export operation by setting the <code>kICMCompressionPassMode_OutputEncodedFrames</code> flag once the compressor has cleared the <code>kICMCompressionPassMode_NotReadyToOutputEncodedFrames</code> flag. Doing so can cut short a compression operation forcing  the compressor to output frames before all of its passes are done.</p><p>Table 1 as an example shows a list of passes and their corresponding pass mode flags during a hypothetical encoding session. A client choosing to let the pass mode flags go though without modification would observe the results listed. Alternatively, the client could set the <code>kICMCompressionPassMode_OutputEncodedFrames</code> flag for pass 3 and either stop after that pass, or preview the results and continue on to later passes for better results.</p><p class="smalltext"><strong>Table 1:</strong> Pass mode flags during a hypothetical encoding session.</p><table cellspacing="0" class="graybox"><tr><th>Pass</th><th>Pass Mode Flags</th></tr><tr><td scope="row">1</td><td><code>kICMCompressionPassMode_WriteToMultiPassStorage</code> | <code>kICMCompressionPassMode_NotReadyToOutputEncodedFrames</code></td></tr><tr><td scope="row">2</td><td><code>kICMCompressionPassMode_ReadFromMultiPassStorage</code> | <code>kICMCompressionPassMode_WriteToMultiPassStorage</code> I <code>kICMCompressionPassMode_NotReadyToOutputEncodedFrames</code></td></tr><tr><td scope="row">3</td><td><code>kICMCompressionPassMode_ReadFromMultiPassStorage</code> I <code>kICMCompressionPassMode_WriteToMultiPassStorage</code></td></tr><tr><td scope="row">4</td><td><code>kICMCompressionPassMode_NoSourceFrames</code> I <code>kICMCompressionPassMode_ReadFromMultiPassStorage</code> I <code>kICMCompressionPassMode_OutputEncodedFrames</code></td></tr></table><div class="notebox"><p><strong>WARNING:</strong> Do not assume the pass mode flags will be set exactly as shown in Table 1, your results may be different. For example, any pass could be a <code>kICMCompressionPassMode_NoSourceFrames</code> pass or there may be more passes before the <code>kICMCompressionPassMode_NotReadyToOutputEncodedFrames</code> flag is cleared and so on.</p></div><A NAME="TNTAG4"></A><H2>API</H2><p>The pass mode flags are used with three APIs:</p><pre class="sourcecodebox">
+Boolean ICMCompressionSessionSupportsMultiPassEncoding(ICMCompressionSessionRef session,
+                                                       UInt32 multiPassStyleFlags,
+                                                       ICMCompressionPassModeFlags *firstPassModeFlagsOut)
+Discussion:
+
+The client should make this call before starting a multipass compression operation to query whether
+a compression session supports multipass encoding. If it does, this call returns the initial state of
+the pass mode flags in the firstPassModeFlagsOut parameter.
+
+Parameters:
+
+multiPassStyleFlags - Reserved, set to 0
+
+firstPassModeFlagsOut ( read ) - A pointer to a variable to receive the session&rsquo;s recommended mode
+flags for the first pass. The client may modify these flags, but should not set
+kICMCompressionPassMode_NoSourceFrames. Pass NULL if you do not want this information.
+</pre><pre class="sourcecodebox">
+OSStatus ICMCompressionSessionBeginPass(ICMCompressionSessionRef session,
+                                        ICMCompressionPassModeFlags passModeFlags,
+                                        UInt32 flags)
+
+Discussion:
+
+The client must make this call to signal the start of a specific compression pass. The client can
+describe how the compressor should behave in this pass by passing in the pass mode flags in the
+parameter passModeFlags.
+
+Parameters:
+
+passModeFlags ( write ) - Flags that describe how the compressor should behave in this pass.
+
+flags - Reserved. Set to 0.
+</pre><pre class="sourcecodebox">
+OSStatus ICMCompressionSessionProcessBetweenPasses(ICMCompressionSessionRef session,
+                                                   UInt32 flags,
+                                                   Boolean *interpassProcessingDoneOut,
+                                                   ICMCompressionPassModeFlags *requestedNextPassModeFlagsOut)
+
+Discussion:
+
+The client must make this call after calling ICMCompressionSessionEndPass to let the compressor perform
+processing between passes, but only if kICMCompressionPassMode_OutputEncodedFrames has not been set.
+
+Parameters:
+
+session - A compression session reference. This reference is returned by ICMCompressionSessionCreate.
+
+flags - Reserved. Set to 0.
+
+interpassProcessingDoneOut  - A pointer to a Boolean that will be set to FALSE if this function
+should be called again, TRUE if it should not be called again.
+
+requestedNextPassModeFlagsOut ( read ) - A pointer to a variable that will be set to the
+compressors recommended mode flags for the next pass. kICMCompressionPassMode_OutputEncodedFrames will
+be set only if it recommends that the next pass be the final one.
+</pre><p>The compressor drives the number of passes and communicates state though these flags and the client is not required to change them. For example, the compressor will set <code>kICMCompressionPassMode_NoSourceFrames</code> when it doesn't need pixel buffers from the client, or <code>kICMCompressionPassMode_OutputEncodedFrames</code> when it will output encoded frames on the next pass.</p><p class="smalltext"><strong>Listing 1:</strong> Pseudo code - Pass mode flags in use.</p><pre class="sourcecodebox">
+ICMCompressionPassModeFlags passModeFlags = 0;
+Boolean multipassYES = false;
+Boolean done = false;
+
+...
+
+// passModeFlags recieve the session's requested mode flags for the first pass
+multipassYES = ICMCompressionSessionSupportsMultiPassEncoding(session,
+                                                              0,
+                                                              &amp;passModeFlags);
+
+while(!done) {
+
+    if (multipassYES) {
+        // passModeFlags describe how the compressor should behave in this pass
+        // the client may modify the pass mode flags and set
+        // kICMCompressionPassMode_OutputEncodedFrames to force frames to be output
+        // prematurely if desired in this pass once the codec has cleared the
+        // kICMCompressionPassMode_NotReadyToOutputEncodedFrames flag
+        ICMCompressionSessionBeginPass(session, passModeFlags, 0);
+    }
+
+    // Feed all the frames to the compression session
+    // The source frames and frame options for each display timestamp
+    // must be the same across passes
+    for (frameNumber = 1; frameNumber &lt;= kFrameCount; frameNumber++) {
+
+        if (0 == (passModeFlags &amp; kICMCompressionPassMode_NoSourceFrames)) {
+            // provide the source frames here - kICMCompressionPassMode_NoSourceFrames
+            // is NOT set -- if it was set, then don't provide source frames to
+            // ICMCompressionSessionEncodeFrame pass NULL for the pixelBuffer
+            // parameter but make sure to supplying all the other information
+            // consistently between passes
+
+            ...
+        }
+
+        ICMCompressionSessionEncodeFrame(...)
+    }
+
+    ICMCompressionSessionCompleteFrames(...)
+
+    if (multipassYES)  {
+        ICMCompressionSessionEndPass(session);
+
+        if (passModeFlags &amp; kICMCompressionPassMode_OutputEncodedFrames) {
+             // the compressor has output encoded frames in this pass so we choose to be done
+             // NOTE: a client could add code to provide an early preview and continue as documented in QA1457
+             done = true;
+        } else {
+            Boolean interpassDone = false;
+
+            while(!interpassDone) {
+                // passModeFlags will be set to the sessions recommended mode flags
+                // for the next pass. kICMCompressionPassMode_OutputEncodedFrames will
+                // only be set if the codec recommends that the next pass be the last
+                ICMCompressionSessionProcessBetweenPasses(session,
+                                                          0,
+                                                          &amp;interpassDone,
+                                                          &amp;passModeFlags);
+            }
+        }
+    } else {
+        done = true;
+    }
+}
+</pre><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG2"></A><H2>References</H2><p><A HREF="../../documentation/QuickTime/Conceptual/QT7UpdateGuide/Chapter02/chapter_2_section_7.html#//apple_ref/doc/uid/TP40001163-CH313-BBCGDBDF">QuickTime 7 Update Guide - Video Enhancements</A></p><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNT_HISTORY_TAG"></A><H2>Document Revision History</H2><table cellspacing="0" class="graybox" width="680"><tr><th width="100">Date</th><th width="580">Notes</th></tr><tr><td scope="row">2006-10-02</td><td>Editorial</td></tr><tr><td scope="row">2006-01-18</td><td>Discusses how the pass mode flags work when performing multipass compression operations.</td></tr></table><p><b>Posted:</b> 2006-10-02</p>
+<!-- END CONTENTS -->
+</td></tr></table>
+<!-- END WIDE COLUMN -->
+<!-- END MAIN CONTENT -->
+	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/qa/qa2005/qa1457.html%3Fid%3DDTS10003831-1.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/qa/qa2005/qa1457.html%3Fid%3DDTS10003831-1.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/qa/qa2005/qa1457.html%3Fid%3DDTS10003831-1.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+
+<!-- START BOTTOM APPLE NAVIGATION -->
+<!--#include virtual="/includes/footer"-->
+<!-- END BOTTOM APPLE NAVIGATION -->
+<!-- START CENTER CLOSE -->
+</center>
+<!-- END CENTER CLOSE -->
+</body></html>

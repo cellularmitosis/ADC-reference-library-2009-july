@@ -1,0 +1,119 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<!-- BEGIN META TAG INFO --><link rel="home" href="http://developer.apple.com/">
+<link rel="find" href="http://developer.apple.com/search/">
+<link rel="stylesheet" type="text/css" href="../../documentation/css/adcstyle.css" title="fonts">
+<script language="JavaScript" type="text/javascript" src="../../documentation/js/busnav.js"></script><script language="JavaScript" src="../../documentation/js/adc.js" type="text/javascript"></script><!-- END META TAG INFO --><!-- BEGIN TITLE --><title>Technical Q&amp;A QA1197: Allocating and sharing memory with user space from an I/O Kit driver</title>
+<!-- END TITLE --><style>
+			.sourcecodebox {
+				white-space: pre-wrap;
+				white-space: -moz-pre-wrap !important;
+				white-space: -pre-wrap;
+				white-space: -o-pre-wrap;
+				word-wrap: break-word;
+			}
+			</style>
+</head>
+<!-- BEGIN BODY OPEN --><body bgcolor="#ffffff"><a name="//apple_ref/doc/uid/DTS10001724" title="Allocating and sharing memory with user space from an I/O Kit driver"></a>
+<!-- END BODY OPEN --><!-- START CENTER OPEN --><center>
+<!-- END CENTER OPEN --><a name="top"></a><!-- BEGIN LOGO AND SEARCH --><!--#include virtual="/includes/adcnavbar" --><!-- END LOGO AND SEARCH --><!-- START BREADCRUMB --><div id="breadcrumb"><table width="680" border="0" cellpadding="0" cellspacing="0">
+<tr>
+<td scope="row"><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+<td><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+</tr>
+<tr valign="middle"><td align="left" colspan="2">
+<a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../technicalqas/index.html">Technical Q&amp;As</a> &gt; <a href="../../technicalqas/Darwin/index.html">Darwin</a> &gt; <a href="../../technicalqas/Darwin/idxHardwareDrivers-date.html">Hardware &amp; Drivers</a> &gt; </td></tr>
+<tr><td colspan="2" scope="row"><img width="680" height="35" src="images/1dot.gif" alt=""></td></tr>
+</table></div>
+<!-- END BREADCRUMB --><!-- START MAIN CONTENT --><!-- START TITLE GRAPHIC AND INTRO --><table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td><h1>
+<div id="pagehead">Technical Q&amp;A QA1197</div>
+<div id="pageheadsub">Allocating and sharing memory with user space from an I/O Kit driver</div>
+</h1></td></tr></table>
+<!-- END TITLE GRAPHIC AND INTRO --><!-- BEGIN WIDE COLUMN --><table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td align="left" width="680">
+<!-- BEGIN CONTENTS --><h2>Q:
+	
+My I/O Kit kernel driver maps memory to user space using <code>IOMemoryDescriptor::createMappingInTask</code>. But <code> createMappingInTask </code> fails and returns <code>NULL</code>. How should a driver share memory with a user process?
+</h2>
+<p>A: <code>IOMemoryDescriptor::createMappingInTask</code> returns <code>NULL</code> because the buffer could not be mapped as requested. There are a couple of reasons why this can happen. </p>
+<p>I/O Kit uses the kernel <code>zalloc</code> pool as its small <code>malloc</code> resource. This gives driver writers fast allocations for local use. This is very important for <code>new</code> operators and short-lived buffers.</p>
+<p>The problem arises when a driver writer tries to share memory with user space, forgetting that the zone allocator is designed for temporary and very private allocations. Under the covers, I/O Kit allocators such as <code>IOMalloc, IOMallocAligned, </code>and <code>IOMallocContiguous</code> may use this zone allocator to improve the performance of frequent, small allocations.</p>
+<div class="notebox"><p><strong>IMPORTANT: </strong>The kernel <code>zalloc</code> pool is of a limited fixed size and is shared by all code running in the kernel. If your code makes heavy use of<code>IOMalloc</code>, it is possible to exhaust this pool and panic the kernel. </p></div>
+<p>Also, since mapping is a virtual memory concept, maps are always sized to an integral number of pages. </p>
+<div class="notebox"><p><strong>Note: </strong><code>IOMemoryDescriptor::createMappingInTask</code> was added in Mac OS X 10.5 Leopard. The equivalent function on older versions of Mac OS X was <code>IOMemoryDescriptor::map</code> which has been deprecated.</p></div>
+<p>The preferred way to allocate kernel memory for sharing is to allocate the buffer and memory descriptor together using <code> IOBufferMemoryDescriptor</code> as shown in <a href="#IOBMD">Listing 1</a>.</p>
+<a name="IOBMD"></a><p class="caption"><strong>Listing 1: </strong>Use of IOBufferMemoryDescriptor.</p>
+<pre class="sourcecodebox">IOBufferMemoryDescriptor* memDesc;
+
+memDesc = IOBufferMemoryDescriptor::withOptions(
+              kIODirectionOutIn | kIOMemoryKernelUserShared,
+              alloc_bytes, page_size );</pre>
+<div class="notebox"><p><strong>Note: </strong>The size of a page should not be hard-coded; use the kernel global variable <code>page_size</code> instead.</p></div>
+<p>The <code>kIOMemoryKernelUserShared</code> option ensures that the buffer is mapped to a page boundary.</p>
+<p>A less-preferable option is to request an integral number of pages from <code>IOMallocAligned</code> or <code>IOMallocContiguous</code>. In that case, either of these interfaces will return a buffer capable of being shared. </p>
+<div class="notebox"><p><strong>IMPORTANT: </strong>Do not use <code>IOMalloc</code> to acquire memory you ultimately intend to share.</p></div>
+<p>Once you've allocated your buffer using either of these techniques, it can be shared with user space using <code>IOMemoryDescriptor::createMappingInTask</code>.</p>
+<p>It is strongly recommended that you create buffers shared between the kernel and user space from the kernel. However, there are cases where that isn't practical, such as a driver that reads from or writes to application-created buffers. In that situation, <code>createMappingInTask</code> can fail for another reason. <code>createMappingInTask</code> can only create mappings for memory that is described by a single VM object. However, a memory range allocated in a typical fashion using <code>malloc</code>-based functions might be described by more than one VM object.</p>
+<p>To allocate memory in user space that is guaranteed to be described by only a single VM object, use anonymous <code>mmap</code> as shown in <a href="#MMAP">Listing 2</a>.</p>
+<a name="MMAP"></a><p class="caption"><strong>Listing 2: </strong>Use of anonymous mmap.</p>
+<pre class="sourcecodebox">#include &lt;sys/mman.h&gt;
+
+size_t		bigBufferLen;
+uint8_t		*bigBuffer;
+
+bigBufferLen = 54321;
+
+// Use anonymous mmap to ensure we get a single VM object.
+bigBuffer = (uint8_t *) mmap(NULL, bigBufferLen, PROT_READ | PROT_WRITE, MAP_ANON | MAP_SHARED, -1, 0);
+if (bigBuffer == MAP_FAILED) {
+    perror("mmap() call error:");
+}
+else {
+    // Success.
+    printf("buffer is created @ %p\n", bigBuffer);
+}</pre>
+<a name="document_revision_summary"></a><h2>Document Revision History</h2>
+<table cellspacing="0" class="graybox" width="680">
+<tr>
+<th width="100">Date</th>
+<th width="580">Notes</th>
+</tr>
+<tr>
+<td scope="row">2008-10-13</td>
+<td>Modernized content and and made editorial changes.</td>
+</tr>
+<tr>
+<td scope="row">2002-09-13</td>
+<td>Describes the preferred technique for allocating and sharing buffers in an I/O Kit kernel driver.</td>
+</tr>
+</table>
+<p><b>Posted: </b>2008-10-13</p>
+<!-- END CONTENTS -->
+</td></tr></table>
+<!-- END WIDE COLUMN --><!-- END MAIN CONTENT --><!-- START BOTTOM APPLE NAVIGATION -->	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/qa/qa2001/qa1197.html%3Fid%3DDTS10001724-1.1&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/qa/qa2001/qa1197.html%3Fid%3DDTS10001724-1.1&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/qa/qa2001/qa1197.html%3Fid%3DDTS10001724-1.1&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+<!--#include virtual="/includes/footer" --><!-- END BOTTOM APPLE NAVIGATION --><!-- START CENTER CLOSE -->
+</center>
+<!-- END CENTER CLOSE -->
+</body>
+</html>

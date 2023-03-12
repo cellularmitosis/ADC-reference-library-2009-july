@@ -1,0 +1,133 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<!-- BEGIN META TAG INFO --><link rel="home" href="http://developer.apple.com/">
+<link rel="find" href="http://developer.apple.com/search/">
+<link rel="stylesheet" type="text/css" href="../../documentation/css/adcstyle.css" title="fonts">
+<script language="JavaScript" type="text/javascript" src="../../documentation/js/busnav.js"></script><script language="JavaScript" src="../../documentation/js/adc.js" type="text/javascript"></script><!-- END META TAG INFO --><!-- BEGIN TITLE --><title>Technical Q&amp;A QA1417: How to work around HIMovieViewCreate failing</title>
+<!-- END TITLE --><style>
+			.sourcecodebox {
+				white-space: pre-wrap;
+				white-space: -moz-pre-wrap !important;
+				white-space: -pre-wrap;
+				white-space: -o-pre-wrap;
+				word-wrap: break-word;
+			}
+			</style>
+</head>
+<!-- BEGIN BODY OPEN --><body bgcolor="#ffffff"><a name="//apple_ref/doc/uid/DTS10003620" title="How to work around HIMovieViewCreate failing"></a>
+<!-- END BODY OPEN --><!-- START CENTER OPEN --><center>
+<!-- END CENTER OPEN --><a name="top"></a><!-- BEGIN LOGO AND SEARCH --><!--#include virtual="/includes/adcnavbar" --><!-- END LOGO AND SEARCH --><!-- START BREADCRUMB --><div id="breadcrumb"><table width="680" border="0" cellpadding="0" cellspacing="0">
+<tr>
+<td scope="row"><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+<td><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+</tr>
+<tr valign="middle"><td align="left" colspan="2">
+<a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../technicalqas/index.html">Technical Q&amp;As</a> &gt; <a href="../../technicalqas/Carbon/index.html">Carbon</a> &gt; <a href="../../technicalqas/Carbon/idxQuickTime-date.html">QuickTime</a> &gt; </td></tr>
+<tr><td colspan="2" scope="row"><img width="680" height="35" src="images/1dot.gif" alt=""></td></tr>
+</table></div>
+<!-- END BREADCRUMB --><!-- START MAIN CONTENT --><!-- START TITLE GRAPHIC AND INTRO --><table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td><h1>
+<div id="pagehead">Technical Q&amp;A QA1417</div>
+<div id="pageheadsub">How to work around HIMovieViewCreate failing</div>
+</h1></td></tr></table>
+<!-- END TITLE GRAPHIC AND INTRO --><!-- BEGIN WIDE COLUMN --><table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td align="left" width="680">
+<!-- BEGIN CONTENTS --><h2>Q:
+	
+I've created a Window using Interface Builder containing an <code>HIMovieView</code> which was dragged into it from the Carbon-Enhanced Controls palette. When I call <code>HIViewFindByID</code> to find the view, the call fails with error -30584 <code>errUnknownControl</code>. I've made sure to check that the view's signature and ID are correct.
+I've also tried to specifically call <code>HIMovieViewCreate</code>,  but that fails with error -30581 <code>errDataNotSupported</code>. Is this a known issue?
+</h2>
+<p>A: Yes, there is currently a bug in <code>HIMovieViewCreate</code> with QuickTime 7 (r. 3882439). Consequently, <code>HIViewFindByID</code> fails because the runtime trying to create the view from the NIB is using <code>HIMovieViewCreate</code> and fails, therefore the view is never actually created.</p>
+<p>There are however a couple of very simple workarounds:</p>
+<p>1) If you would like to create an <code>HIMovieView</code> programatically, simply use <code>HIObjectCreate</code> instead.</p>
+<p class="caption"><strong>Listing 1: </strong>Use <code>HIObjectCreate</code> instead of <code>HIMovieViewCreate</code></p>
+<pre class="sourcecodebox">HIObjectRef theHIMovieView;
+
+// create an HIMovieview
+HIObjectCreate(kHIMovieViewClassID, NULL, &amp;theHIMovieView);
+
+// set some attributes and a movie for the HIMovieView 
+HIMovieViewChangeAttributes((HIViewRef)theHIMovieView, kHIMovieViewStandardAttributes, 0);
+HIMovieViewSetMovie((HIViewRef)theHIMovieView, aMovie);
+
+...</pre>
+<p>2) If you would like to use Interface Builder, instead of using <code>HIMovieView</code> from the Carbon-Enhanced Controls palette use <code>HIView</code> and make sure it's Class ID is set to the <code>kHIMovieViewClassID</code> identifier <code>com.apple.quicktime.HIMovieView</code> as shown in figure 1.</p>
+<p>When this is done, using standard HIView calls will work as expected, see listing 2.</p>
+<p class="caption"><strong>Figure 1: </strong>Using HIView to specify an <code>HIMovieView</code> in IB.</p>
+<p><img src="images/qa1417_figure1.jpg" width="640" height="301" alt="Figure 1, Using HIView to specify an HIMovieView in IB."></p>
+<p class="caption"><strong>Listing 2: </strong>Getting an <code>HIMovieView</code> created as a Custom Control in a NIB file.</p>
+<pre class="sourcecodebox">HIViewID  kMovieViewID = {'moov', 0};
+HIViewRef theHIMovieView;
+
+...
+
+// get the window
+CreateWindowFromNib(nib, CFSTR("MovieWindow"), &amp;window);
+
+// find our HIMovieView
+HIViewFindByID(HIViewGetRoot(window), kMovieViewID, &amp;theHIMovieView);
+
+// install some event handlers 
+InstallWindowEventHandler(window, &amp;MainWindowEventHandler,
+                          GetEventTypeCount(windowEvents), windowEvents, window, NULL);
+
+InstallHIObjectEventHandler((HIObjectRef)theHIMovieView, &amp;HIMovieViewEventSniffer,
+                            GetEventTypeCount(viewEvents), viewEvents, window, NULL);
+
+// set some attributes and a movie for the HIMovieView 
+HIMovieViewChangeAttributes(theHIMovieView, kHIMovieViewAutoIdlingAttribute | 
+                                            kHIMovieViewControllerVisibleAttribute,
+                                            kHIMovieViewEditableAttribute |
+                                            kHIMovieViewHandleEditingHIAttribute |
+                                            kHIMovieViewAcceptsFocusAttribute);
+HIMovieViewSetMovie(theHIMovieView, aMovie);
+
+...
+
+ShowWindow(window);
+
+...</pre>
+<a name="document_revision_summary"></a><h2>Document Revision History</h2>
+<table cellspacing="0" class="graybox" width="680">
+<tr>
+<th width="100">Date</th>
+<th width="580">Notes</th>
+</tr>
+<tr>
+<td scope="row">2008-03-11</td>
+<td>Editorial</td>
+</tr>
+<tr>
+<td scope="row">2005-05-16</td>
+<td>Describes how to work around HIMovieViewCreate failing to initialize the view in QuickTime 7</td>
+</tr>
+</table>
+<p><b>Posted: </b>2008-03-11</p>
+<!-- END CONTENTS -->
+</td></tr></table>
+<!-- END WIDE COLUMN --><!-- END MAIN CONTENT --><!-- START BOTTOM APPLE NAVIGATION -->	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/qa/qa2005/qa1417.html%3Fid%3DDTS10003620-1.1&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/qa/qa2005/qa1417.html%3Fid%3DDTS10003620-1.1&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/qa/qa2005/qa1417.html%3Fid%3DDTS10003620-1.1&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+<!--#include virtual="/includes/footer" --><!-- END BOTTOM APPLE NAVIGATION --><!-- START CENTER CLOSE -->
+</center>
+<!-- END CENTER CLOSE -->
+</body>
+</html>

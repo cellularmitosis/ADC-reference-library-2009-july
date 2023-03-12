@@ -1,0 +1,42 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN"			"http://www.w3.org/TR/REC-html40/loose.dtd"><HTML><!--Template 06-20-02--><HEAD><LINK REL="stylesheet" HREF="../../adcstyle.css" TYPE="text/css"><LINK REL="stylesheet" HREF="../../style.css" TYPE="text/css">   <title>Technical Q&amp;A FL07: PBXGetVolInfo Glue</title>          <meta name="keywords" content="Mac OS 8 PBXGetVolInfoSync PBXGetVolInfoAsync glue">	<meta name="Description" content="Technical Q&amp;A FL07: Q&amp;A provides the correct glue for callingPBXGetVolInfoSync and PBXGetVolInfoAsync and gives a warningabout a previous incorrect glue circulating around.">         <meta name="categories" content="Files"><meta name="week-posted" content="Jul 27, 1998 - Jul 31, 1998"><LINK REL="stylesheet" HREF="../../css/adcstyle.css" TYPE="text/css"><script language="JavaScript" type="text/javascript" src="../../js/adc.js"></script></HEAD><BODY BGCOLOR="#FFFFFF"><a name="//apple_ref/doc/uid/DTS10001193" title="PBXGetVolInfo Glue"></a><!-- top_of_header_marker_comment --><!-- begin_header_information --><!--#include virtual="/adcnavbar" --><p><a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../technicalqas/index.html">Technical Q&As</a> &gt; <a href="../../technicalqas/LegacyTechnologies/index.html">Legacy Documents</a> &gt; <a href="../../technicalqas/LegacyTechnologies/idxCarbon-date.html">Carbon</a> &gt; </p><div style="width:100%; position:fixed;"><div align="center" id="watermark" style="position: relative; margin-left:auto; margin-right:auto; z-index:20; width:500px;"><div class="legacybox"><h1>Legacy Document<span class=closebutton><a href="javascript:closeWatermark()"><img src="../../images/closebutton.png" width="14" height="14" border="0"  alt="close button"></a></span></h1>
+
+<p><strong>Important: </strong>This document is part of the Legacy section of the ADC Reference Library. This information should not be used for new development.</p>
+
+<div class="reflibtopic">
+	<p>Current information on this Reference Library topic can be found here:</p>
+	<ul>
+				<li><a href="http://developer.apple.com/referencelibrary/Carbon/idxFileManagement-date.html" target="_blank">Carbon > File Management</a></li>
+	</ul>
+</div>
+
+
+
+
+</div></div></div><!-- end_header_information --><!-- bottom_of_header_marker_comment --><!-- top_of_titles_marker_comment --><CENTER><table width="600" cellpadding="0" cellspacing="0" border="0">
+<tr><td align="left" scope="row">
+<h1>
+<div id="pagehead">Technical Q&amp;A FL07</div>
+<div id="pageheadsub">PBXGetVolInfo Glue</div>
+</h1>
+</td></tr></table></CENTER><!-- bottom_of_titles_marker_comment -->			<!-- begin_content --> <CENTER><TABLE BORDER=0 CELLPADDING=0 WIDTH=600><TR> <td align="left"><hr width=500 align=center><p id=p2>Q: What is the glue for calling<CODE>PBXGetVolInfoSync</CODE> and <CODE>PBXGetVolInfoAsync</CODE>?</P><p id=p4>A: Here is the glue that you need:</P><CENTER><TABLE BORDER=0 CELLPADDING=5 WIDTH=550><TR>	<td bgcolor="#E6E6E6" align=left><pre>#if GENERATINGCFM#include &lt;Traps.h&gt;#include &lt;FSM.h&gt;// kFSMXGetVolInfo was not introduced until Universal Interfaces 3.0.1.#if UNIVERSAL_INTERFACES_VERSION &lt; 0x0301    enum {        kFSMXGetVolInfo = 0x0012    };#endif// Define the ProcInfoType value for the PBXGetVolInfo routines.enum {    uppXGetVolInfoProcInfo = kRegisterBased |        RESULT_SIZE(SIZE_CODE(sizeof(OSErr))) |        REGISTER_RESULT_LOCATION(kRegisterD0) |        REGISTER_ROUTINE_PARAMETER(1, kRegisterD0, kFourByteCode) |        REGISTER_ROUTINE_PARAMETER(2, kRegisterD1, kFourByteCode) |        REGISTER_ROUTINE_PARAMETER(3, kRegisterA0, SIZE_CODE(sizeof(XVolumeParamPtr)))};// Glue for the sync routine.extern pascal OSErr PBXGetVolInfoSync(XVolumeParamPtr paramBlock){    return CallOSTrapUniversalProc(GetOSTrapAddress(_FSDispatch), uppXGetVolInfoProcInfo,        kFSMXGetVolInfo,            // selector   in D0        _FSDispatch,                // trap word  in D1        paramBlock                  // paramBlock in A0    );}// Glue for the async routine.extern pascal OSErr PBXGetVolInfoAsync(XVolumeParamPtr paramBlock){    return CallOSTrapUniversalProc(GetOSTrapAddress(_FSDispatch), uppXGetVolInfoProcInfo,        kFSMXGetVolInfo,            // selector   in D0        _FSDispatch | kAsyncMask,   // trap word  in D1        paramBlock                  // paramBlock in A0    );}#endif</pre>	</TD></TR></TABLE></CENTER><TABLE BORDER=0 WIDTH=498>   <TR>      <td bgcolor="#e6e6e6" align=left>         <p id=p4><B>IMPORTANT:</B><BR>                  While the glue in this Q&amp;A has always been correct, DTS         has given out incorrect glue for         <CODE>PBXGetVolInfoSync</CODE> to a number of individual         developers. This glue appears to work, but there is a         distinct chance it will cause the computer to crash         eventually. If you are using this incorrect glue, you should         update to the glue given above as soon as possible.</P>                  <p id=p4>You can recognize the incorrect glue by looking at the         <CODE>ProcInfoType</CODE> it constructs. The         <CODE>ProcInfoType</CODE> construction code for the         incorrect glue is shown below.</P>          </TD></TR>         </TABLE><BR>                                    <CENTER><TABLE BORDER=0 CELLPADDING=5 WIDTH=550><TR>	<td bgcolor="#E6E6E6" align=left><pre>// WARNING: Do not use this code</pre>	</TD></TR></TABLE></CENTER><BR><CENTER><TABLE BORDER=0 CELLPADDING=5 WIDTH=550><TR>	<td bgcolor="#E6E6E6" align=left><pre>#define PROCINFO \    kRegisterBased | \    RESULT_SIZE(SIZE_CODE(sizeof(OSErr))) | \    REGISTER_RESULT_LOCATION(kRegisterD0) | \    REGISTER_ROUTINE_PARAMETER(1, kRegisterD0, kTwoByteCode) | \    REGISTER_ROUTINE_PARAMETER(2, kRegisterA0, SIZE_CODE(sizeof(XVolumeParamPtr)))    </pre>	</TD></TR></TABLE></CENTER>    <CENTER><TABLE BORDER=0 CELLPADDING=5 WIDTH=550><TR>	<td bgcolor="#E6E6E6" align=left><pre>// WARNING: Do not use this code</pre>	</TD></TR></TABLE></CENTER><BR>                                <p id=p4>This <CODE>ProcInfoType</CODE> is incorrect because it         does not describe the use of 68K register D1 as an implicit         parameter to <CODE>PBXGetVolInfoSync</CODE>. Register D1         determines whether the trap runs synchronously or         asynchronously. If you fail to set it up, the trap may run         asynchronously (based on the previous contents of register         D1) which, depending on a variety of circumstances, may         crash the computer.</P>                  <p id=p4>For more information on how to build glue for calling         classic 68K code from CFM, including OS traps like         <CODE>PBXGetVolInfoSync</CODE>, read Technote 1127         <a href="../../technotes/tn/tn1127.html" target="_blank">In Search of Missing         Links</A>.</P>      </TD></TR></TABLE></CENTER><!-- end_content --><!-- begin_date --><H4 ALIGN=center>[Jul 30 1998]</H4><!-- end_date --><!-- begin_footer_information -->	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/qa/fl/fl07.html%3Fid%3DDTS10001193-1.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/qa/fl/fl07.html%3Fid%3DDTS10001193-1.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/qa/fl/fl07.html%3Fid%3DDTS10001193-1.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+<!--#include virtual="/includes/footer"--><!-- end_footer_information --> <hr width=500 align=center> </BODY> </HTML>

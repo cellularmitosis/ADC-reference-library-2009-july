@@ -1,0 +1,195 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<!-- BEGIN META TAG INFO --><link rel="home" href="http://developer.apple.com/">
+<link rel="find" href="http://developer.apple.com/search/">
+<link rel="stylesheet" type="text/css" href="../../documentation/css/adcstyle.css" title="fonts">
+<script language="JavaScript" type="text/javascript" src="../../documentation/js/busnav.js"></script><script language="JavaScript" src="../../documentation/js/adc.js" type="text/javascript"></script><!-- END META TAG INFO --><!-- BEGIN TITLE --><title>Technical Q&amp;A QA1459: QuickTime Audio - Easy Frequency Level Metering with MovieAudio APIs</title>
+<!-- END TITLE --><style>
+			.sourcecodebox {
+				white-space: pre-wrap;
+				white-space: -moz-pre-wrap !important;
+				white-space: -pre-wrap;
+				white-space: -o-pre-wrap;
+				word-wrap: break-word;
+			}
+			</style>
+</head>
+<!-- BEGIN BODY OPEN --><body bgcolor="#ffffff"><a name="//apple_ref/doc/uid/DTS10003833" title="QuickTime Audio - Easy Frequency Level Metering with MovieAudio APIs"></a>
+<!-- END BODY OPEN --><!-- START CENTER OPEN --><center>
+<!-- END CENTER OPEN --><a name="top"></a><!-- BEGIN LOGO AND SEARCH --><!--#include virtual="/includes/adcnavbar" --><!-- END LOGO AND SEARCH --><!-- START BREADCRUMB --><div id="breadcrumb"><table width="680" border="0" cellpadding="0" cellspacing="0">
+<tr>
+<td scope="row"><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+<td><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+</tr>
+<tr valign="middle"><td align="left" colspan="2">
+<a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../technicalqas/index.html">Technical Q&amp;As</a> &gt; <a href="../../technicalqas/Cocoa/index.html">Cocoa</a> &gt; <a href="../../technicalqas/Cocoa/idxQuickTime-date.html">QuickTime</a> &gt; </td></tr>
+<tr><td colspan="2" scope="row"><img width="680" height="35" src="images/1dot.gif" alt=""></td></tr>
+</table></div>
+<!-- END BREADCRUMB --><!-- START MAIN CONTENT --><!-- START TITLE GRAPHIC AND INTRO --><table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td><h1>
+<div id="pagehead">Technical Q&amp;A QA1459</div>
+<div id="pageheadsub">QuickTime Audio - Easy Frequency Level Metering with MovieAudio APIs</div>
+</h1></td></tr></table>
+<!-- END TITLE GRAPHIC AND INTRO --><!-- BEGIN WIDE COLUMN --><table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td align="left" width="680">
+<!-- BEGIN CONTENTS --><h2>Q:
+	
+How can I retrieve the frequency levels of an audio file or a QuickTime Movie and display them like iTunes or QuickTime Player does?
+</h2>
+<p>A: QuickTime 7 introduced a number of 'MovieAudio' APIs that now make performing tasks such as volume and frequency metering, adjusting gain, setting audio balance and mute very easy. While some of these APIs may duplicate existing functionality, the 'MovieAudio' APIs present a simpler, more consistent programmer interface and are now the preferred way to perform these tasks.</p>
+<p>For example, to monitor frequency levels it is no longer necessary to drop down to the media handler level and use <code>MediaSetSoundEqualizerBands</code> and <code>MediaGetSoundEqualizerBandLevels</code>.</p>
+<p>Given a QuickTime Movie, it's easy to perform frequency metering using two 'MovieAudio' APIs. First call <code>SetMovieAudioFrequencyMeteringNumBands</code> to configure frequency metering for a particular audio mix (see the <a href="#TNTAG3">References</a> section for a description of the available mixes), then call <code>GetMovieAudioFrequencyLevels</code> to retrieve the current frequency meter levels whenever you want them. The values are returned in a <code>QTAudioFrequencyLevels</code> structure you allocate according to the number of bands you would like to monitor.</p>
+<div class="notebox"><p><strong>Note: </strong>These Metering APIs will only function during Movie playback since they get their audio data from the playback chain.</p></div>
+<p><code>GetMovieAudioFrequencyLevels</code> is performing FFTs (<a href="http://mathworld.wolfram.com/FastFourierTransform.html">Fast Fourier Transform</a>) to calculate the meter levels. The FFT window is proportional to the number of spectral bands you are interested in viewing:</p>
+<ul>
+<li><p>1-4 bands -&gt; 256-pt FFT</p></li>
+<li><p>5-15 bands -&gt; 512-pt FFT</p></li>
+<li><p>16-128 bands -&gt; 1024-pt FFT</p></li>
+</ul>
+<div class="notebox"><p><strong>Note: </strong>The FFT is performed each time you request meter levels so the amount of overhead incurred is proportional to the frequency of the call. Additionally there is an FFT for each channel you request, this means that if you're  trying to meter N-channel surround sound data without a pre-mix (for example, using <code>kQTAudioMeter_DeviceMix</code>) then N FFTs are being performed per call.</p></div>
+<p class="caption"><strong>Listing 1: </strong>Setting up frequency metering.</p>
+<pre class="sourcecodebox">UInt32 numberOfBandLevels = 7; // increase this number for more frequency bands
+UInt32 numberOfChannels = 2; // for StereoMix - if using DeviceMix,
+                                 // you need to get the channel count of the device
+
+QTAudioFrequencyLevels *freqResults = NULL;
+
+...
+
+// call this once per movie to establish metering
+err = SetMovieAudioFrequencyMeteringNumBands(myMovie,
+                                             kQTAudioMeter_StereoMix,
+                                             &amp;numberOfBandLevels);
+if (err) goto bail;
+
+freqResults = malloc(offsetof(QTAudioFrequencyLevels,
+                              level[numberOfBandLevels * numberOfChannels]));
+if (freqResults == NULL) {
+    err = memFullErr;
+    goto bail:
+}
+
+freqResults-&gt;numChannels = numberOfChannels;
+freqResults-&gt;numFrequencyBands = numberOfBandLevels;
+
+...</pre>
+<p class="caption"><strong>Listing 2: </strong>Getting the metered levels.</p>
+<pre class="sourcecodebox">...
+
+// call each time you are ready to display meter levels
+if (freqResults != NULL) {
+    err = GetMovieAudioFrequencyLevels(myMovie, kQTAudioMeter_StereoMix, freqResults);
+    if (err) goto bail;
+
+    for (i = 0; i &lt; freqResults-&gt;numChannels; i++) {
+        for (j = 0; j &lt; freqResults-&gt;numFrequencyBands; j++) {
+            // the frequency levels are Float32 values between 0. and 1.
+            Float32 value = freqResults-&gt;level[(i *
+                                                freqResults-&gt;numFrequencyBands) + j];
+
+            // do something with the value
+            ...
+        }
+    }
+}
+
+...</pre>
+<p class="caption"><strong>Listing 3: </strong>Retrieving the channel count when using <code>kQTAudioMeter_DeviceMix</code>.</p>
+<pre class="sourcecodebox"> AudioChannelLayout *layout = NULL;
+    UInt32 size = 0;
+    UInt32 numChannels = 0;
+    OSStatus err;
+
+...
+
+    // get the size of the device layout
+    err = QTGetMoviePropertyInfo(theMovie, kQTPropertyClass_Audio,
+                                 kQTAudioPropertyID_DeviceChannelLayout,
+                                 NULL, &amp;size, NULL);
+
+    if (err || (0 == size)) goto bail; 
+
+    // allocate memory for the device layout
+    layout = (AudioChannelLayout*)calloc(1, size);
+    if (NULL == layout) {
+        err = memFullErr;
+        goto bail;
+    } 
+
+    // get the device layout from the movie
+    err = QTGetMovieProperty(theMovie, kQTPropertyClass_Audio, 
+                             kQTAudioPropertyID_DeviceChannelLayout, 
+                             size, 
+                             layout, 
+                             NULL);
+    if (err) goto bail;
+
+    // now get the number of channels
+    numChannels = (layout-&gt;mChannelLayoutTag ==
+                   kAudioChannelLayoutTag_UseChannelDescriptions) ?
+                   layout-&gt;mNumberChannelDescriptions :
+                   AudioChannelLayoutTag_GetNumberOfChannels(layout-&gt;mChannelLayoutTag);
+
+    free(layout);
+
+...</pre>
+<a name="TNTAG3"></a><h2>References</h2>
+<pre class="sourcecodebox">Movie Audio Mixes
+
+Three constants define the mix of audio channels for frequency metering:
+
+kQTAudioMeter_StereoMix - Meter a stereo (two-channel) mix of the enabled sound tracks in the movie.
+
+kQTAudioMeter_MonoMix - Meter the movie as if it had been mixed to monaural.
+
+kQTAudioMeter_DeviceMix - Meter the movie’s mix to the AudioChannelLayout of the device the
+movie is playing to.</pre>
+<ul>
+<li><p><a href="http://developer.apple.com/documentation/QuickTime/Conceptual/QT7UpdateGuide/Chapter02/chapter_2_section_6.html#//apple_ref/doc/uid/TP40001163-CH313-784529">QuickTime 7 Audio Enhancements</a></p></li>
+<li><p><a href="http://developer.apple.com/samplecode/SillyFrequencyLevels/index.htmll">SillyFrequencyLevels</a></p></li>
+</ul>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="document_revision_summary"></a><h2>Document Revision History</h2>
+<table cellspacing="0" class="graybox" width="680">
+<tr>
+<th width="100">Date</th>
+<th width="580">Notes</th>
+</tr>
+<tr>
+<td scope="row">2009-01-29</td>
+<td>Editorial</td>
+</tr>
+<tr>
+<td scope="row">2006-01-26</td>
+<td>Describes how to perform frequency band level metering using MovieAudio metering APIs.</td>
+</tr>
+</table>
+<p><b>Posted: </b>2009-01-29</p>
+<!-- END CONTENTS -->
+</td></tr></table>
+<!-- END WIDE COLUMN --><!-- END MAIN CONTENT --><!-- START BOTTOM APPLE NAVIGATION -->	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/qa/qa2005/qa1459.html%3Fid%3DDTS10003833-1.1&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/qa/qa2005/qa1459.html%3Fid%3DDTS10003833-1.1&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/qa/qa2005/qa1459.html%3Fid%3DDTS10003833-1.1&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+<!--#include virtual="/includes/footer" --><!-- END BOTTOM APPLE NAVIGATION --><!-- START CENTER CLOSE -->
+</center>
+<!-- END CENTER CLOSE -->
+</body>
+</html>

@@ -1,0 +1,42 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN"			"http://www.w3.org/TR/REC-html40/loose.dtd"><HTML><!--Template 06-20-02--><HEAD><LINK REL="stylesheet" HREF="../../adcstyle.css" TYPE="text/css"><LINK REL="stylesheet" HREF="../../style.css" TYPE="text/css"><title>Technical Q&amp;A NW03: CTB &amp; the AppleTalk ADSP Tool</title><meta name="keywords" content="Mac OS 8 AppleTalk ADSP Tool CMStatus CTB CMClose data"><meta name="Description" content="Technical Q&amp;A NW03: Q&amp;A gives the possible causes to a problemof two machines connected with the ADSP Tool. One machinewrites data to a remote machine and uses a call to CMStatusto determine that there isn't a write pending and then makesa call to CMClose to end the connection. The problem is thatthe data hasn't been recieved by the remote machine."><meta name="categories" content="Networking"><meta name="week-posted" content="May 1, 1995 - May 5, 1995"><LINK REL="stylesheet" HREF="../../css/adcstyle.css" TYPE="text/css"><script language="JavaScript" type="text/javascript" src="../../js/adc.js"></script></HEAD><BODY BGCOLOR="#FFFFFF"><a name="//apple_ref/doc/uid/DTS10001415" title="CTB & the AppleTalk ADSP Tool"></a><!-- top_of_header_marker_comment --><!-- begin_header_information --><!--#include virtual="/adcnavbar" --><p><a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../technicalqas/index.html">Technical Q&As</a> &gt; <a href="../../technicalqas/LegacyTechnologies/index.html">Legacy Documents</a> &gt; <a href="../../technicalqas/LegacyTechnologies/idxCarbon-date.html">Carbon</a> &gt; </p><div style="width:100%; position:fixed;"><div align="center" id="watermark" style="position: relative; margin-left:auto; margin-right:auto; z-index:20; width:500px;"><div class="legacybox"><h1>Legacy Document<span class=closebutton><a href="javascript:closeWatermark()"><img src="../../images/closebutton.png" width="14" height="14" border="0"  alt="close button"></a></span></h1>
+
+<p><strong>Important: </strong>This document is part of the Legacy section of the ADC Reference Library. This information should not be used for new development.</p>
+
+<div class="reflibtopic">
+	<p>Current information on this Reference Library topic can be found here:</p>
+	<ul>
+				<li><a href="http://developer.apple.com/referencelibrary/Carbon/index.html" target="_blank">Reference Library > Carbon</a></li>
+	</ul>
+</div>
+
+
+
+
+</div></div></div><!-- end_header_information --><!-- bottom_of_header_marker_comment --><!-- top_of_titles_marker_comment --><CENTER><table width="600" cellpadding="0" cellspacing="0" border="0">
+<tr><td align="left" scope="row">
+<h1>
+<div id="pagehead">Technical Q&amp;A NW03</div>
+<div id="pageheadsub">CTB &amp; the AppleTalk ADSP Tool</div>
+</h1>
+</td></tr></table></CENTER><!-- bottom_of_titles_marker_comment -->						<!-- begin_content --> <CENTER><TABLE BORDER=0 CELLPADDING=0 WIDTH=600><TR> <td align="left"><hr width=500 align=center><p id = p2>Q:   I have a question about the CTB &amp; the AppleTalk ADSP Tool.</p><p id = p2>I have a connection between two machines using the ADSP Tool. The local machinewrites a bunch of data to the remote machine, then wants to shut down theconnection. I use a <code>CMStatus</code> call to verify that there isn't a write pending,and also check the buffer sizes returned by the <code>CMStatus</code> call and verify thatthere is nothing in the <code>cmDataOut</code> part of the sizes array. I then call <code>CMClose</code>,and the connection closes. The problem is  the remote machine has not receivedall of the data before the connection is closed! How do I detect if the ADSPTool has "really" written all the data? Or how do I invoke the <code>CMClose</code> so thatit properly concludes the write (i.e., setting the abort parameter to 0 whendoing the <code>dspRemove</code> to the ADSP Driver)?</p><p id = p2>I've tried two <code>CMClose</code> variations:</p><p id = p2>In one case, I make a synchronous call to <code>CMClose</code> as follows (in Pascal):</p><CENTER><TABLE BORDER=0 CELLPADDING=5 WIDTH=550><TR>	<td bgcolor="#E6E6E6" align=left><pre>     theErr := CMClose(theConnection, FALSE, NIL, 0, FALSE);</pre></TD></TR></TABLE></CENTER><p id=p2>This call exhibits the behavior I've described above.</p><p id=p2>I've also tried an asynchronous call, in the hope that the ADSP Tool wouldhandle finishing off the connection properly:</p><CENTER><TABLE BORDER=0 CELLPADDING=5 WIDTH=550><TR>	<td bgcolor="#E6E6E6" align=left><pre>  theErr := CMClose(theConnection, TRUE, nil, 60, FALSE);  while (theErr = noErr) and    (BAND(status, cmStatusOPEN + cmStatusClosing) &lt;&gt; 0) do  begin    CPI_Idle(theConnection);    theErr := CPI_Status(theConnection, sizes, status);   end;</pre>	</TD></TR></TABLE></CENTER><p id=p2>What I've found in this case is that the ADSP Tool never completes the write. I'vevaried the timeout from 60 above to -1 and also 6000. In all of these cases,the <code>cmStatusClosing</code> bit is ALWAYS set, and never goes low. Any suggestions?</p><p id=p4>A:   You're using the correct options on your call to <code>CMClose</code>, i.e., finishing allpending writes and then closing the connection.</p><p id=p4>Making the assumption that you're also using the ADSP Tool on the receiving endof the connection, it's possible that the data has been received and then theconnection closed down. The receiver should be called with <code>CMStatus</code> to see ifthere is data to read, regardless of whether the <code>cmStatusOpen</code> bit is set; if<code>cmStatusDataAvail</code> is set, the connection can still be read for additional data,even if it is closed. The Tool may have buffered the incoming data and thencompleted the close connection request from the sender.</p><p id=p4>Check to see that you are testing the flags parameter of <code>CMStatus</code> on thereceiver side against <code>cmStatusDataAvail</code> and basing your final read on that.</p></td></tr></table></center><!-- end_content --><!-- begin_date --><H4 ALIGN=center>[May 01 1995]</H4><!-- end_date --><!-- begin_footer_information -->	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/qa/nw/nw03.html%3Fid%3DDTS10001415-1.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/qa/nw/nw03.html%3Fid%3DDTS10001415-1.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/qa/nw/nw03.html%3Fid%3DDTS10001415-1.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+<!--#include virtual="/includes/footer"--><!-- end_footer_information --><hr width=500 align=center> </BODY></HTML>

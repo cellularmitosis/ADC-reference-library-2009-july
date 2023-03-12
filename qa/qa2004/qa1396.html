@@ -1,0 +1,163 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/1999/REC-html401-19991224/loose.dtd">
+<html><head>
+<!-- BEGIN META TAG INFO -->
+<link rel="home" href="http://developer.apple.com/">
+<link rel="find" href="http://developer.apple.com/search/">
+<link rel="stylesheet" type="text/css" href="../../documentation/css/adcstyle.css" title="fonts">
+<script language="JavaScript" type="text/javascript" src="../../documentation/js/busnav.js"></script>
+<script language="JavaScript" src="../../documentation/js/adc.js" type="text/javascript"></script>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<!-- END META TAG INFO -->
+<!-- BEGIN TITLE -->
+<title>Technical Q&amp;A QA1396: Creating color spaces that ensure color matching.</title>
+<!-- END TITLE -->
+</head>
+<!-- BEGIN BODY OPEN -->
+<body bgcolor="#ffffff"><a name="//apple_ref/doc/uid/DTS10003466" title="Creating color spaces that ensure color matching."></a>
+<!--END BODY OPEN -->
+<!-- START CENTER OPEN -->
+<center>
+<!-- END CENTER OPEN -->
+<a name="top"></a>
+<!-- BEGIN LOGO AND SEARCH -->
+<!--#include virtual="/includes/adcnavbar"-->
+<!-- END LOGO AND SEARCH -->
+<!-- START BREADCRUMB -->
+<div id="breadcrumb"><table width="680" border="0" cellpadding="0" cellspacing="0"><tr>
+<td scope="row"><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+<td><img width="340" height="10" src="images/1dot.gif" alt=""></td></tr><tr valign="middle"><td align="left" colspan="2">
+<a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../technicalqas/index.html">Technical Q&As</a> &gt; <a href="../../technicalqas/GraphicsImaging/index.html">Graphics & Imaging</a> &gt; <a href="../../technicalqas/GraphicsImaging/idxColorSync-date.html">ColorSync</a> &gt; 
+</td></tr><tr><td colspan="2" scope="row"><img width="680" height="35" src="images/1dot.gif" alt=""></td></tr></table></div>
+<!-- END BREADCRUMB -->
+
+<!-- START MAIN CONTENT -->
+<!-- START TITLE GRAPHIC AND INTRO-->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top">
+<td><h1>
+<div id="pagehead">Technical Q&amp;A QA1396</div>
+<div id="pageheadsub">Creating color spaces that ensure color matching.</div>
+</h1></td></tr></table>
+<!-- END TITLE GRAPHIC AND INTRO -->
+<!-- BEGIN WIDE COLUMN -->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td align="left" width="680">
+<!-- BEGIN CONTENTS -->
+<h2>Q: How do I create color spaces so that I can make sure my colors are matched?</h2><p>A: To work with color effectively and to understand the Quartz 2D functions for using color spaces and color, you should be familiar with the terminology discussed in the <A HREF="../../documentation/GraphicsImaging/Conceptual/csintro/index.html">Color Management Overview</A>. That document discusses color perception, color values, device-independent and device color spaces, the color-matching problem, rendering intent, color management modules, and ColorSync.</p><p>Devices (displays, printers, scanners, cameras) don't treat color the same way; each has its own range of colors that the device can produce faithfully. A color produced on one device might not be able to be produced on another device. The best way to avoid these kinds of problems is to use a color space with a &quot;calibration profile&quot; ? for example, an ICCBased color space which uses an ICC profile for calibration. In such a case the system will be able to translate color from  this color space to any destination (e.g. display) in the best possible way.  Unless there is already a profile for the destination, the best solution is to use a generic color space.  Generic color spaces, for example Generic RGB or Generic CYMK, are color spaces that will always be calibrated when copied to a destination device.</p><p>New in Mac OS X 10.4, the constants <code>kCGColorSpaceGenericRGB</code>, <code>kCGColorSpaceGenericCMYK</code> and <code>kCGColorSpaceGenericGray</code> can be used to easily create generic RGB, CYMK, and Gray color spaces using the <code>CGColorSpaceCreateWithName</code> function. These constants are not available in 10.3.9 or earlier; if backwards compatibility is needed for systems before 10.4 use the code from <A HREF="#TNTAG1">Listing 2</A> to create color spaces from the generic ICC color profiles.</p><p class="smalltext"><strong>Listing 1:</strong> Creating a generic RGB color space using the kCGColorSpaceGenericRGB avalible in 10.4 and later</p><pre class="sourcecodebox">
+CGColorSpaceRef genericRGBColorSpace = CGColorSpaceCreateWithName(kCGColorSpaceGenericRGB);
+</pre><p>Device color spaces are device-dependent and assume all colors are already calibrated for the destination device. The following APIs create device-dependent color spaces and should be avoided: <code>CGColorSpaceCreateDeviceRGB()</code>, <code>CGColorSpaceCreateDeviceCYMK()</code>, and <code>CGColorSpaceCreateDeviceGray()</code>.</p><p>Mac OS X provides the following ICC profile files in the directory <code>'/System/Library/ColorSync/Profiles/'</code>:</p><ul><li><p>Generic CMYK Profile.icc</p></li><li><p>Generic Gray Profile.icc</p></li><li><p>Generic Lab Profile.icc</p></li><li><p>Generic RGB Profile.icc</p></li><li><p>Generic XYZ Profile.icc</p></li><li><p>sRGB Profile.icc</p></li></ul><p>While there isn't a simple API for creating ICC color space from an ICC color profile, <A HREF="#TNTAG1">Listing 2</A> provides an example of how to create one.</p><A NAME="TNTAG1"></A><p class="smalltext"><strong>Listing 2:</strong> Creating a color space from an ICC profile, and examples for creating a Generic RGB Color Space and an sRGB Color Space.</p><pre class="sourcecodebox">
+CGColorSpaceRef CreateICCColorSpaceFromPathToProfile (const char * iccProfilePath) {
+
+  CMProfileRef    iccProfile = (CMProfileRef) 0;
+  CGColorSpaceRef iccColorSpace = NULL;
+  CMProfileLocation loc;
+
+  // Specify that the location of the profile will be a POSIX path to the profile.
+  loc.locType = cmPathBasedProfile;
+
+  // Make sure the path is not larger then the buffer
+  if(strlen(iccProfilePath) &gt; sizeof(loc.u.pathLoc.path))
+    return NULL;
+
+  // Copy the path the profile into the CMProfileLocation structure
+  strcpy (loc.u.pathLoc.path, iccProfilePath);
+
+  // Open the profile
+  if (CMOpenProfile(&amp;iccProfile, &amp;loc) != noErr)
+  {
+    iccProfile = (CMProfileRef) 0;
+                return NULL;
+  }
+
+  // Create the ColorSpace with the open profile.
+  iccColorSpace = CGColorSpaceCreateWithPlatformColorSpace( iccProfile );
+
+  // Close the profile now that we have what we need from it.
+  CMCloseProfile(iccProfile);
+
+  return iccColorSpace;
+}
+
+CGColorSpaceRef CreateColorSpaceFromSystemICCProfileName(CFStringRef profileName) {
+  FSRef pathToProfilesFolder;
+    FSRef pathToProfile;
+
+  // Find the Systems Color Sync Profiles folder
+  if(FSFindFolder(kOnSystemDisk, kColorSyncProfilesFolderType,
+      kDontCreateFolder, &amp;pathToProfilesFolder) == noErr) {
+
+    // Make a UniChar string of the profile name
+    UniChar uniBuffer[sizeof(CMPathLocation)];
+    CFStringGetCharacters (profileName,CFRangeMake(0,CFStringGetLength(profileName)),uniBuffer);
+
+    // Create a FSRef to the profile in the Systems Color Sync Profile folder
+    if(FSMakeFSRefUnicode (&amp;pathToProfilesFolder,CFStringGetLength(profileName),uniBuffer,
+      kUnicodeUTF8Format,&amp;pathToProfile) == noErr) {
+        char path[sizeof(CMPathLocation)];
+
+      // Write the posix path to the profile into our path buffer from the FSRef
+      if(FSRefMakePath (&amp;pathToProfile,path,sizeof(CMPathLocation)) == noErr)
+        return CreateICCColorSpaceFromPathToProfile(path);
+    }
+  }
+
+  return NULL;
+}
+
+CGColorSpaceRef CreateICCGenericRGBColorSpace() {
+  return CreateColorSpaceFromSystemICCProfileName(CFSTR(&quot;Generic RGB Profile.icc&quot;));
+}
+
+CGColorSpaceRef CreateICCsRGBColorSpace() {
+     return CreateColorSpaceFromSystemICCProfileName(CFSTR(&quot;sRGB Profile.icc&quot;));
+}
+</pre><p>Offscreen caches are generally used to enhance performance, but if a color space is used to create an offscreen cache that doesn't match the display device, then every time the data is copied to the display device it must go though a color calibration process. Since every display device maps colors differently to the same color values, the optimum method is to ask the system for the display devices profile. Once the display devices profile is obtained, it can then be used to create a display color space which can be used to create a CGBitmapContext to be used as an offscreen cache.  Listing 2 shows how to create a color space based on the current display profile.</p><p class="smalltext"><strong>Listing 3:</strong> Creating a color space that represents the main display</p><pre class="sourcecodebox">
+CGColorSpaceRef CreateSystemColorSpace () {
+  CMProfileRef sysprof = NULL;
+  CGColorSpaceRef dispColorSpace = NULL;
+
+  // Get the Systems Profile for the main display
+  if (CMGetSystemProfile(&amp;sysprof) == noErr)
+  {
+    // Create a colorspace with the systems profile
+    dispColorSpace = CGColorSpaceCreateWithPlatformColorSpace(sysprof);
+
+    // Close the profile
+    CMCloseProfile(sysprof);
+  }
+
+  return dispColorSpace;
+}
+</pre><p>Using &quot;display color space&quot;, based on the current display profile, is telling the system that you don't want the color to be matched when it is copied to the screen, but you do want color matching when drawing to the offscreen cache. Since this &quot;display color space&quot; is based on the current display, if the cached data is going to be repeated on another system with a different display, the color appearance will be different because each device reacts differently to the same color values.</p><A NAME="TNT_HISTORY_TAG"></A><H2>Document Revision History</H2><table cellspacing="0" class="graybox" width="680"><tr><th width="100">Date</th><th width="580">Notes</th></tr><tr><td scope="row">2005-10-04</td><td>Added the new constants for creating generic RGB, CYMK, and Grey color spaces in 10.4 and later.</td></tr><tr><td scope="row">2005-01-13</td><td>How to create color spaces that ensure color matching.</td></tr></table><p><b>Posted:</b> 2005-10-04</p>
+<!-- END CONTENTS -->
+</td></tr></table>
+<!-- END WIDE COLUMN -->
+<!-- END MAIN CONTENT -->
+	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/qa/qa2004/qa1396.html%3Fid%3DDTS10003466-1.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/qa/qa2004/qa1396.html%3Fid%3DDTS10003466-1.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/qa/qa2004/qa1396.html%3Fid%3DDTS10003466-1.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+
+<!-- START BOTTOM APPLE NAVIGATION -->
+<!--#include virtual="/includes/footer"-->
+<!-- END BOTTOM APPLE NAVIGATION -->
+<!-- START CENTER CLOSE -->
+</center>
+<!-- END CENTER CLOSE -->
+</body></html>

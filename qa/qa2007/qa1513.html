@@ -1,0 +1,124 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/1999/REC-html401-19991224/loose.dtd">
+<html><head>
+<!-- BEGIN META TAG INFO -->
+<link rel="home" href="http://developer.apple.com/">
+<link rel="find" href="http://developer.apple.com/search/">
+<link rel="stylesheet" type="text/css" href="../../documentation/css/adcstyle.css" title="fonts">
+<script language="JavaScript" type="text/javascript" src="../../documentation/js/busnav.js"></script>
+<script language="JavaScript" src="../../documentation/js/adc.js" type="text/javascript"></script>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<!-- END META TAG INFO -->
+<!-- BEGIN TITLE -->
+<title>Technical Q&amp;A QA1513: Advertising a Bonjour service on a specific set of networking interfaces.</title>
+<!-- END TITLE -->
+</head>
+<!-- BEGIN BODY OPEN -->
+<body bgcolor="#ffffff"><a name="//apple_ref/doc/uid/DTS10004223" title="Advertising a Bonjour service on a specific set of networking interfaces."></a>
+<!--END BODY OPEN -->
+<!-- START CENTER OPEN -->
+<center>
+<!-- END CENTER OPEN -->
+<a name="top"></a>
+<!-- BEGIN LOGO AND SEARCH -->
+<!--#include virtual="/includes/adcnavbar"-->
+<!-- END LOGO AND SEARCH -->
+<!-- START BREADCRUMB -->
+<div id="breadcrumb"><table width="680" border="0" cellpadding="0" cellspacing="0"><tr>
+<td scope="row"><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+<td><img width="340" height="10" src="images/1dot.gif" alt=""></td></tr><tr valign="middle"><td align="left" colspan="2">
+<a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../technicalqas/index.html">Technical Q&As</a> &gt; <a href="../../technicalqas/Networking/index.html">Networking</a> &gt; <a href="../../technicalqas/Networking/idxBonjour-date.html">Bonjour</a> &gt; 
+</td></tr><tr><td colspan="2" scope="row"><img width="680" height="35" src="images/1dot.gif" alt=""></td></tr></table></div>
+<!-- END BREADCRUMB -->
+
+<!-- START MAIN CONTENT -->
+<!-- START TITLE GRAPHIC AND INTRO-->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top">
+<td><h1>
+<div id="pagehead">Technical Q&amp;A QA1513</div>
+<div id="pageheadsub">Advertising a Bonjour service on a specific set of networking interfaces.</div>
+</h1></td></tr></table>
+<!-- END TITLE GRAPHIC AND INTRO -->
+<!-- BEGIN WIDE COLUMN -->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td align="left" width="680">
+<!-- BEGIN CONTENTS -->
+<h2>Q: I want to use Bonjour to advertise my services but I only want to do so on a specific set of networking interfaces. Is this possible?</h2><p>A: Yes. However, you will <strong>NOT</strong> be able to use the <A HREF="../../documentation/Networking/Conceptual/NSNetServiceProgGuide/index.html">NSNetServices</A> and <A HREF="../../documentation/Networking/Conceptual/NSNetServiceProgGuide/index.html">CFNetServices</A> APIs to do this. You will need to use the <A HREF="../../documentation/Networking/Reference/DNSServiceDiscovery_CRef/dns_sd/index.html">DNSServiceDiscovery</A> socket-based API.</p><p>You can register your service by issuing a call to <code>DNSServiceRegister()</code>, paying close attention to the third parameter specifying an interface index. Determining which interface index maps to a specific interface name can be done by calling <code>if_nametoindex()</code>. See below for an example:</p><p class="smalltext"><strong>Listing 1:</strong> Example function that registers a service on a single interface.</p><pre class="sourcecodebox">
+static int doBonjourRegisterOnSingleInterface(
+    char * interface_name,          // e.g., &quot;en0&quot;, &quot;en1&quot;, etc.
+    DNSServiceRef * ssr,
+    DNSServiceRegisterReply callBack
+)
+{
+    int err = 0;
+
+    DNSServiceFlags flags   = kDNSServiceFlagsDefault;
+    uint32_t int_index      = 0;
+    const char *name        = &quot;Clarus&quot;;
+    const char *regtype     = &quot;_http._tcp&quot;;
+    const char *domain      = NULL;     // default domain
+    const char *host        = NULL;     // default host
+    uint16_t port           = 9999;
+    uint16_t txtLen         = 5;
+    const char txtRecord[]  = &quot;\x04Moof&quot;;
+
+    // Resolve the index of the specified interface.
+    int_index = if_nametoindex(interface_name);
+
+    if(int_index != 0) {
+
+          err = DNSServiceRegister(
+                            ssr,
+                            flags,
+                            int_index,
+                            name,       /* may be NULL */
+                            regType,
+                            domain,     /* may be NULL */
+                            host,       /* may be NULL */
+                            htons(port),
+                            txtLen,
+                            txtRecord,
+                            callback,   /* may be NULL */
+                            NULL        /* may be NULL */
+          );
+
+     } else {
+          // Desired interface name could not be resolved.
+          err = -1;
+     }
+
+    return err;
+}
+</pre><div class="notebox"><p><strong>Note:</strong> Be mindful of the formats and types for the data parameters passed into <code>DNSServiceRegister()</code>, e.g., &quot;the TXT record string must be in DNS TXT record format of [length byte] [data] [length byte] [data] ...&quot;, otherwise you will receive an invalid parameter (<code>-65540</code>) error. See <A HREF="../qa2001/qa1306.html">Q&amp;A 1306</A>.</p></div><A NAME="TNT_HISTORY_TAG"></A><H2>Document Revision History</H2><table cellspacing="0" class="graybox" width="680"><tr><th width="100">Date</th><th width="580">Notes</th></tr><tr><td scope="row">2007-02-12</td><td>First Version</td></tr></table><p><b>Posted:</b> 2007-02-12</p>
+<!-- END CONTENTS -->
+</td></tr></table>
+<!-- END WIDE COLUMN -->
+<!-- END MAIN CONTENT -->
+	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/qa/qa2007/qa1513.html%3Fid%3DDTS10004223-1.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/qa/qa2007/qa1513.html%3Fid%3DDTS10004223-1.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/qa/qa2007/qa1513.html%3Fid%3DDTS10004223-1.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+
+<!-- START BOTTOM APPLE NAVIGATION -->
+<!--#include virtual="/includes/footer"-->
+<!-- END BOTTOM APPLE NAVIGATION -->
+<!-- START CENTER CLOSE -->
+</center>
+<!-- END CENTER CLOSE -->
+</body></html>

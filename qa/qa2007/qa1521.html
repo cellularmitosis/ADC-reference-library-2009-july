@@ -1,0 +1,95 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/1999/REC-html401-19991224/loose.dtd">
+<html><head>
+<!-- BEGIN META TAG INFO -->
+<link rel="home" href="http://developer.apple.com/">
+<link rel="find" href="http://developer.apple.com/search/">
+<link rel="stylesheet" type="text/css" href="../../documentation/css/adcstyle.css" title="fonts">
+<script language="JavaScript" type="text/javascript" src="../../documentation/js/busnav.js"></script>
+<script language="JavaScript" src="../../documentation/js/adc.js" type="text/javascript"></script>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<!-- END META TAG INFO -->
+<!-- BEGIN TITLE -->
+<title>Technical Q&amp;A QA1521: Synchronizing OpenGL rendering updates to the vertical refresh of the display</title>
+<!-- END TITLE -->
+</head>
+<!-- BEGIN BODY OPEN -->
+<body bgcolor="#ffffff"><a name="//apple_ref/doc/uid/DTS10004262" title="Synchronizing OpenGL rendering updates to the vertical refresh of the display"></a>
+<!--END BODY OPEN -->
+<!-- START CENTER OPEN -->
+<center>
+<!-- END CENTER OPEN -->
+<a name="top"></a>
+<!-- BEGIN LOGO AND SEARCH -->
+<!--#include virtual="/includes/adcnavbar"-->
+<!-- END LOGO AND SEARCH -->
+<!-- START BREADCRUMB -->
+<div id="breadcrumb"><table width="680" border="0" cellpadding="0" cellspacing="0"><tr>
+<td scope="row"><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+<td><img width="340" height="10" src="images/1dot.gif" alt=""></td></tr><tr valign="middle"><td align="left" colspan="2">
+<a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../technicalqas/index.html">Technical Q&As</a> &gt; <a href="../../technicalqas/GraphicsImaging/index.html">Graphics & Imaging</a> &gt; <a href="../../technicalqas/GraphicsImaging/idxOpenGL-date.html">OpenGL</a> &gt; 
+</td></tr><tr><td colspan="2" scope="row"><img width="680" height="35" src="images/1dot.gif" alt=""></td></tr></table></div>
+<!-- END BREADCRUMB -->
+
+<!-- START MAIN CONTENT -->
+<!-- START TITLE GRAPHIC AND INTRO-->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top">
+<td><h1>
+<div id="pagehead">Technical Q&amp;A QA1521</div>
+<div id="pageheadsub">Synchronizing OpenGL rendering updates to the vertical refresh of the display</div>
+</h1></td></tr></table>
+<!-- END TITLE GRAPHIC AND INTRO -->
+<!-- BEGIN WIDE COLUMN -->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td align="left" width="680">
+<!-- BEGIN CONTENTS -->
+<h2>Q: How do I avoid tearing in OpenGL?</h2><p>A: Tearing is a visual artifact that occurs when the display begins reading from a buffer before your application's rendering to that buffer has completed.</p><p>You can use the swap interval context parameter to avoid tearing. This parameter is zero by default. If you set it to a non-zero value, OpenGL will synchronize buffer swaps with a vertical retrace event.</p><p>One potential reason to have a zero swap interval is to measure the maximum possible number of frames that can be rendered within a given time. This is because setting swap interval to a non-zero value caps the effective frame rate of your application to an integer divisor of the display's refresh rate. For instance, if your application can complete its rendering within one display refresh period, the frame rate will be capped at the refresh rate. If, however, your application takes longer than one refresh period, then the buffer swap will have to wait until the next refresh event. This effectively drops your frame rate to 1 / [time to render a frame rounded up to nearest vertical retrace period].</p><div class="notebox"><p><strong>Note:</strong> Although LCD displays don't have a vertical blanking period as such; they have a fixed refresh frequency of around 60Hz.</p></div><A NAME="TNTAG3"></A><H2>NSOpenGLContexts</H2><p>Listing 1 shows how to enable and disable synchronization in an NSOpenGLContext.</p><p class="smalltext"><strong>Listing 1:</strong> Synchronizing buffer swaps to VBL in an NSOpenGLView.</p><pre class="sourcecodebox">
+long swapInterval = 1; // request synchronization
+//long swapInterval = 0; // disable synchronization
+
+[[self openGLContext] setValues:&amp;swapInterval forParameter: NSOpenGLCPSwapInterval];
+</pre><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG2"></A><H2>AGL Contexts</H2><p>Listing 2 shows how to enable and disable synchronization using the AGL API.</p><p class="smalltext"><strong>Listing 2:</strong> Synchronizing buffer swaps to VBL in the current AGL Context.</p><pre class="sourcecodebox">
+long swapInterval = 1;   // request synchronization
+//long swapInterval =0;  // disable synchronization
+
+AGLContext ctx = aglGetCurrentContext();
+if (NULL != ctx) aglSetInteger(ctx, AGL_SWAP_INTERVAL, &amp;swapInterval);
+</pre><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG5"></A><H2>CGL Contexts</H2><p>Listing 3 shows how to enable and disable synchronization using the CGL API.</p><p class="smalltext"><strong>Listing 3:</strong> Synchronizing buffer swaps to VBL in the current CGL Context</p><pre class="sourcecodebox">
+long swapInterval = 1; // request synchronization
+//long swapInterval = 0; // disable synchronization
+
+CGLContextObj ctx = CGLGetCurrentContext();
+if (NULL != ctx) CGLSetParameter(ctx, kCGLCPSwapInterval, &amp;swapInterval);
+</pre><div class="notebox"><p><strong>Note:</strong> You can use CGLSetParameter to set the swap interval for AGLContext and NSOpenGLContext objects because each of these contexts are built on the CGLContextObj opaque type.</p></div><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG7"></A><H2>GLUT Defaults</H2><p>GLUT based programs have the additional convenience of a default setting. The default setting is only evaluated during application launch, so for the change to take effect the application must be restarted.</p><p>GLUT defaults can be accessed on their application menus:</p><p class="caption"><strong>Figure 1:</strong> Accessing the preferences of a GLUT application</p><p><img  src="images/qa1521_GlutMainMenu.png" width="409" height="218" alt="Figure 1, Accessing the preferences of a GLUT application"></p><p>To enable synchronization to VBL by default select &quot;Default Synchronize to Vertical Blank&quot; and restart the application.</p><p class="caption"><strong>Figure 2:</strong> Selecting synchronization default.</p><p><img  src="images/qa1521_GlutPreferences2.png" width="368" height="380" alt="Figure 2, Selecting synchronization default."></p><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG10"></A><H2>References</H2><p>The <A HREF="../../documentation/GraphicsImaging/Conceptual/OpenGL-MacProgGuide/">OpenGL Programming Guide for Mac OS X</A> has a section about this topic under the best practices area of improving performance.</p><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNT_HISTORY_TAG"></A><H2>Document Revision History</H2><table cellspacing="0" class="graybox" width="680"><tr><th width="100">Date</th><th width="580">Notes</th></tr><tr><td scope="row">2007-07-16</td><td>First Version</td></tr></table><p><b>Posted:</b> 2007-07-16</p>
+<!-- END CONTENTS -->
+</td></tr></table>
+<!-- END WIDE COLUMN -->
+<!-- END MAIN CONTENT -->
+	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/qa/qa2007/qa1521.html%3Fid%3DDTS10004262-1.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/qa/qa2007/qa1521.html%3Fid%3DDTS10004262-1.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/qa/qa2007/qa1521.html%3Fid%3DDTS10004262-1.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+
+<!-- START BOTTOM APPLE NAVIGATION -->
+<!--#include virtual="/includes/footer"-->
+<!-- END BOTTOM APPLE NAVIGATION -->
+<!-- START CENTER CLOSE -->
+</center>
+<!-- END CENTER CLOSE -->
+</body></html>

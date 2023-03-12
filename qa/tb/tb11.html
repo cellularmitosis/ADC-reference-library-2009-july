@@ -1,0 +1,42 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN"			"http://www.w3.org/TR/REC-html40/loose.dtd"><html><HEAD><LINK REL="stylesheet" HREF="../../adcstyle.css" TYPE="text/css"><LINK REL="stylesheet" HREF="../../style.css" TYPE="text/css"><title>Technical Q&amp;A TB11: Native App Slowdown</title><meta name="keywords" content="Mac OS 8 PowerPC drawing icons slowdown native calls"><meta name="Description" content="Technical Q&amp;A TB11: Q&amp;A explains why an application drawingpalette icons (in a loop) may observe a drastic performanceslowdown while running on a PowerPC. Q&amp;A also provides severalalternatives for improving performance by not using the resourcemanager and by not calling CopyBits."><meta name="categories" content="Human Interface Toolbox"><meta name="week-posted" content="May 1, 1995 - May 5, 1995"><LINK REL="stylesheet" HREF="../../css/adcstyle.css" TYPE="text/css"><script language="JavaScript" type="text/javascript" src="../../js/adc.js"></script></HEAD><BODY BGCOLOR="#FFFFFF" TEXT="#000000"><a name="//apple_ref/doc/uid/DTS10002197" title="Native App Slowdown"></a> <!-- white background --><!-- top_of_header_marker_comment --><!-- begin_header_information --><!--#include virtual="/adcnavbar" --><p><a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../technicalqas/index.html">Technical Q&As</a> &gt; <a href="../../technicalqas/LegacyTechnologies/index.html">Legacy Documents</a> &gt; <a href="../../technicalqas/LegacyTechnologies/idxMacOS9Earlier-date.html">Mac OS 9 & Earlier</a> &gt; </p><div style="width:100%; position:fixed;"><div align="center" id="watermark" style="position: relative; margin-left:auto; margin-right:auto; z-index:20; width:500px;"><div class="legacybox"><h1>Legacy Document<span class=closebutton><a href="javascript:closeWatermark()"><img src="../../images/closebutton.png" width="14" height="14" border="0"  alt="close button"></a></span></h1>
+
+<p><strong>Important: </strong>This document is part of the Legacy section of the ADC Reference Library. This information should not be used for new development.</p>
+
+<div class="reflibtopic">
+	<p>Current information on this Reference Library topic can be found here:</p>
+	<ul>
+				<li><a href="http://developer.apple.com/referencelibrary/index.html" target="_blank">Reference Library</a></li>
+	</ul>
+</div>
+
+
+
+
+</div></div></div><!-- end_header_information --><!-- bottom_of_header_marker_comment --><!-- top_of_titles_marker_comment --><CENTER><table width="600" cellpadding="0" cellspacing="0" border="0">
+<tr><td align="left" scope="row">
+<h1>
+<div id="pagehead">Technical Q&amp;A TB11</div>
+<div id="pageheadsub">Native App Slowdown</div>
+</h1>
+</td></tr></table></CENTER><!-- bottom_of_titles_marker_comment --><CENTER>			<!-- -->						<!-- Document Body --><table cellspacing="0" cellpadding="0" border="0" WIDTH="600"><tr><td align="left" scope="row"><font size="+4">Q</font>  We are drawing palette icons using a loop which contains the following:<pre>     GetIcon     HLock     CopyBits     ReleaseResource</pre><p>Our native PowerMacintosh version seems to draw these palettes slower than our68K version running under emulation, which suggests a Mixed Mode Managerslowdown. All of the routines we call, however, are documented as native on thePowerMac.</p><p>Here are some rough but representative timings:</p><pre>Timings on 8100/80 - 8 bit screen - System 7.5                   microseconds    percent of loopGetIcon                  2000us          38%CopyBits                  400us           7%ReleaseResource           2850us         54%</pre><p>Is it reasonable for CopyBits from a 1-bit bitmap to an 8-bit screen to takeless than 10% of the time of this loop? I have verified that all of the iconresources are in memory when this takes place, so the GetIcon &amp;ReleaseResource just need to deal with the resource map.</p> <p>Aren't all the Resource Manager calls native? These timings seem to indicatethey are calling emulated routines.</p><font size="+4">A</font>  It is not really surprising that you're seeing these numbers, since the Resource Manager calls you are using are not native, and they generally callFile Manager routines, which aren't native either. In a way, what you're askingis, which routines are native and which are not? Unfortunately, this is thewrong question: just because something is not native now doesn't mean it neverwill be. Designing your application based on assumptions you think are validtoday is a dangerous thing to do, because your workaround won't necessarilycontinue to be faster in the future. <p>Relying on the Resource Manager to be fast is generally not a good idea.Resource files slow down drastically once they reach a certain size.  (See the <A HREF = "../../technotes/ov/ov_08.html" target="_blank">Technical Note "OV 8 Managerial Abuse"</A>.) Also, if the resource chain islong, you'll have problems. Since these are icons in a palette, you'll probablywant to cache them somewhere, because you'll continually need them as youupdate your palette.</p><p>One approach you can take is to load your icons in one of the first fewoperations in your initialization code, just after calling MaxApplZone(possibly moving them high and locking them, since you don't want them to moveduring a CopyBits operation). This technique yields very good performance onthe redraws that the palette needs, in exchange for a few kilobytes of memory.Don't forget to mark the resources as non-purgeable, just for good measure.</p> <p>Rather than using CopyBits, you might want to use the IconUtilities package toobtain and draw your icons (this is documented in <i>Inside Macintosh: MoreMacintosh Toolbox</i>), either to load an icon family, or to build an iconcache. Using the Icon utilities helps your application to do the right thingfor different screen depths. Also, the icon drawing routines are optimized toperform well under a variety of conditions.</p> <p>Finally, if you need to get at Icons for documents and applications, check outthe MoreFiles sample. This is on the Developer CD Series as sample code.DTGetIcon is a useful utility for obtaining Icons.</p><!-- begin_date --><H4 ALIGN=center>[May 01 1995]</H4><!-- end_date --></td></tr></table></CENTER><!-- begin_footer_information -->	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/qa/tb/tb11.html%3Fid%3DDTS10002197-1.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/qa/tb/tb11.html%3Fid%3DDTS10002197-1.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/qa/tb/tb11.html%3Fid%3DDTS10002197-1.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+<!--#include virtual="/includes/footer"--><!-- end_footer_information --></BODY></HTML>

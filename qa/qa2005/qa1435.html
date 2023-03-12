@@ -1,0 +1,252 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/1999/REC-html401-19991224/loose.dtd">
+<html><head>
+<!-- BEGIN META TAG INFO -->
+<link rel="home" href="http://developer.apple.com/">
+<link rel="find" href="http://developer.apple.com/search/">
+<link rel="stylesheet" type="text/css" href="../../documentation/css/adcstyle.css" title="fonts">
+<script language="JavaScript" type="text/javascript" src="../../documentation/js/busnav.js"></script>
+<script language="JavaScript" src="../../documentation/js/adc.js" type="text/javascript"></script>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<!-- END META TAG INFO -->
+<!-- BEGIN TITLE -->
+<title>Technical Q&amp;A QA1435: Carbon Drawer problem in Mac OS X v10.4 and v10.4.1</title>
+<!-- END TITLE -->
+</head>
+<!-- BEGIN BODY OPEN -->
+<body bgcolor="#ffffff"><a name="//apple_ref/doc/uid/DTS10003735" title="Carbon Drawer problem in Mac OS X v10.4 and v10.4.1"></a>
+<!--END BODY OPEN -->
+<!-- START CENTER OPEN -->
+<center>
+<!-- END CENTER OPEN -->
+<a name="top"></a>
+<!-- BEGIN LOGO AND SEARCH -->
+<!--#include virtual="/includes/adcnavbar"-->
+<!-- END LOGO AND SEARCH -->
+<!-- START BREADCRUMB -->
+<div id="breadcrumb"><table width="680" border="0" cellpadding="0" cellspacing="0"><tr>
+<td scope="row"><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+<td><img width="340" height="10" src="images/1dot.gif" alt=""></td></tr><tr valign="middle"><td align="left" colspan="2">
+<a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../technicalqas/index.html">Technical Q&As</a> &gt; <a href="../../technicalqas/Carbon/index.html">Carbon</a> &gt; <a href="../../technicalqas/Carbon/idxHumanInterfaceToolbox-date.html">Human Interface Toolbox</a> &gt; 
+</td></tr><tr><td colspan="2" scope="row"><img width="680" height="35" src="images/1dot.gif" alt=""></td></tr></table></div>
+<!-- END BREADCRUMB -->
+
+<!-- START MAIN CONTENT -->
+<!-- START TITLE GRAPHIC AND INTRO-->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top">
+<td><h1>
+<div id="pagehead">Technical Q&amp;A QA1435</div>
+<div id="pageheadsub">Carbon Drawer problem in Mac OS X v10.4 and v10.4.1</div>
+</h1></td></tr></table>
+<!-- END TITLE GRAPHIC AND INTRO -->
+<!-- BEGIN WIDE COLUMN -->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td align="left" width="680">
+<!-- BEGIN CONTENTS -->
+<h2>Q: Why did my drawer separate from its parent window? Why did all my windows stick together?</h2><p>A: On Mac OS X v10.4 and v10.4.1, there is a drawer problem which has two sets of symptoms:</p><ul><li><p>Collapsing a window with a visible drawer and expanding this window from the Dock separates the drawer from its parent window.</p></li><li><p>Closing a drawer with the mouse makes all document windows stick together.</p></li></ul><p>This problem has been fixed in Mac OS X v10.4.2 but if you need a workaround for users who wouldn't or couldn't upgrade their system, you can use the following code.</p><p>In a typical window with a drawer creation code, you would have:</p><p class="smalltext"><strong>Listing 1:</strong> Creating a window with a drawer.</p><pre class="sourcecodebox">
+void CreateANewWindow()
+{
+  IBNibRef  nibRef;
+  WindowRef window;
+  WindowRef drawer;
+  OSStatus  status;
+
+  // Create a Nib reference passing the name of the nib file (without the .nib extension)
+  // CreateNibReference only searches into the application bundle.
+  status = CreateNibReference(CFSTR(&quot;main&quot;), &amp;nibRef);
+  require_noerr( status, CantGetNibRef );
+
+  // Then create a window. &quot;MainWindow&quot; is the name of the window object. This name is set in
+  // InterfaceBuilder when the nib is created.
+  status = CreateWindowFromNib(nibRef, CFSTR(&quot;MainWindow&quot;), &amp;window);
+  require_noerr(status, MainWindow);
+
+  // Then create a drawer window. &quot;Drawer&quot; is the name of the window object. This name is set in
+  // InterfaceBuilder when the nib is created.
+  status = CreateWindowFromNib(nibRef, CFSTR(&quot;Drawer&quot;), &amp;drawer);
+  require_noerr(status, Drawer);
+
+  // We don't need the nib reference anymore.
+  DisposeNibReference(nibRef);
+
+  // The window was created hidden so show it.
+  ShowWindow( window );
+
+  // Associating the windows
+  status = SetDrawerParent( drawer, window );
+  require_noerr(status, SetDrawerParent);
+
+  // And showing the drawer
+  status = ToggleDrawer( drawer );
+  require_noerr(status, ToggleDrawer);
+
+ToggleDrawer:
+SetDrawerParent:
+InstallWindowEventHandler:
+MainWindow:
+Drawer:
+CantGetNibRef:
+
+  return;
+}
+</pre><p>The first step for working around the bug is to add an event handler on the drawer window to intercept the two events kEventWindowConstrain and kEventWindowDrawerClosed. But you need to install this workaround only on Mac OS X v10.4 and v10.4.1 (if the workaround is applied on other versions of Mac OS X, it is unnecessary but harmless since the code checks for the presence of the problem (see the second comment in the FixDrawerBugTimer function)), thus:</p><p class="smalltext"><strong>Listing 2:</strong> Creating a window with a drawer with the workaround.</p><pre class="sourcecodebox">
+void CreateANewWindow()
+{
+  IBNibRef  nibRef;
+  WindowRef window;
+  WindowRef drawer;
+  OSStatus  status;
+
+  // Create a Nib reference passing the name of the nib file (without the .nib extension)
+  // CreateNibReference only searches into the application bundle.
+  status = CreateNibReference(CFSTR(&quot;main&quot;), &amp;nibRef);
+  require_noerr( status, CantGetNibRef );
+
+  // Then create a window. &quot;MainWindow&quot; is the name of the window object. This name is set in
+  // InterfaceBuilder when the nib is created.
+  status = CreateWindowFromNib(nibRef, CFSTR(&quot;MainWindow&quot;), &amp;window);
+  require_noerr(status, MainWindow);
+
+  // Then create a drawer window. &quot;Drawer&quot; is the name of the window object. This name is set in
+  // InterfaceBuilder when the nib is created.
+  status = CreateWindowFromNib(nibRef, CFSTR(&quot;Drawer&quot;), &amp;drawer);
+  require_noerr(status, Drawer);
+
+  // We don't need the nib reference anymore.
+  DisposeNibReference(nibRef);
+
+  // We don't have predefined constants for version numbers yet so...
+  if ((kHIToolboxVersionNumber &gt;= 219) &amp;&amp; ((kHIToolboxVersionNumber &lt; 220))
+  {
+    const EventTypeSpec eventFixDrawerBugs[] =
+    {
+       { kEventClassWindow, kEventWindowConstrain },
+       { kEventClassWindow, kEventWindowDrawerClosed }
+    };
+    status = InstallWindowEventHandler( drawer, FixDrawerBugHandler,
+      GetEventTypeCount( eventFixDrawerBugs ), eventFixDrawerBugs, 0, NULL );
+    require_noerr(status, InstallWindowEventHandler);
+  }
+
+  // The window was created hidden so show it.
+  ShowWindow( window );
+
+  // Associating the windows
+  status = SetDrawerParent( drawer, window );
+  require_noerr(status, SetDrawerParent);
+
+  // And showing the drawer
+  status = ToggleDrawer( drawer );
+  require_noerr(status, ToggleDrawer);
+
+ToggleDrawer:
+SetDrawerParent:
+InstallWindowEventHandler:
+MainWindow:
+Drawer:
+CantGetNibRef:
+
+  return;
+}
+</pre><p>And the second step is to provide the event handler function and the actual workaround code function. This function is called by a one-time Carbon Event Timer function to ensure that the workaround code will be called after the HIToolbox has finished closing the drawer.</p><p class="smalltext"><strong>Listing 3:</strong> Workaround functions.</p><pre class="sourcecodebox">
+void FixDrawerBugTimer( EventLoopTimerRef inTimer, void* inRefcon )
+{
+  WindowGroupRef        documentGroup = GetWindowGroupOfClass( kDocumentWindowClass );
+  ItemCount             childCount;
+  WindowGroupAttributes attr;
+
+  // Now that the timer has fired, we don't need it any more
+  RemoveEventLoopTimer( inTimer );
+
+  //
+  // If the document group does not have the MoveTogether attribute, then we're running
+  // on an OS release that has fixed this bug, and we don't need to do anything else.
+  //
+  verify_noerr( GetWindowGroupAttributes( documentGroup, &amp;attr ) );
+  if ( ( attr &amp; kWindowGroupAttrMoveTogether ) == 0 )
+    return;
+
+  // Clear the MoveTogether attribute from the document group
+  verify_noerr( ChangeWindowGroupAttributes( documentGroup, 0, kWindowGroupAttrMoveTogether ) );
+
+  // Count the groups that are immediate children of the document group
+  childCount = CountWindowGroupContents( documentGroup, kNilOptions );
+  if ( childCount &gt; 0 )
+  {
+    WindowGroupRef* groups = (WindowGroupRef*) calloc( sizeof( WindowGroupRef ), childCount );
+    if ( groups != NULL )
+    {
+      ItemCount i;
+      verify_noerr( GetWindowGroupContents( documentGroup, kNilOptions, childCount, NULL, (void**) groups ) );
+
+      //
+      // For each child of the document group, if that child group has the MoveTogether attribute itself,
+      // then clear and then reset the attribute. This will fix the binding between windows in the group.
+      //
+      for ( i = 0; i &lt; childCount; i++ )
+      {
+        WindowGroupRef group = groups[i];
+
+        verify_noerr( GetWindowGroupAttributes( group, &amp;attr ) );
+        if ( ( attr &amp; kWindowGroupAttrMoveTogether ) != 0 )
+        {
+          ChangeWindowGroupAttributes( group, 0, kWindowGroupAttrMoveTogether );
+          ChangeWindowGroupAttributes( group, kWindowGroupAttrMoveTogether, 0 );
+        }
+      }
+
+      free( groups );
+    }
+  }
+}
+
+pascal OSStatus FixDrawerBugHandler(EventHandlerCallRef inHandlerCallRef, EventRef inEvent, void *inUserData)
+{
+  check( GetEventClass( inEvent ) == kEventClassWindow );
+
+  switch ( GetEventKind( inEvent ) )
+  {
+    case kEventWindowConstrain:
+      return noErr;
+
+    case kEventWindowDrawerClosed:
+      // Use a one-shot timer to postpone our fixup code
+      // until after the toolbox has finished closing the drawer
+      return InstallEventLoopTimer( GetCurrentEventLoop(), 0, 0, FixDrawerBugTimer, 0, NULL );
+  }
+
+  return eventNotHandledErr;
+}
+</pre><A NAME="TNT_HISTORY_TAG"></A><H2>Document Revision History</H2><table cellspacing="0" class="graybox" width="680"><tr><th width="100">Date</th><th width="580">Notes</th></tr><tr><td scope="row">2005-06-21</td><td>Workaround for a drawer problem present in Mac OS X v10.4 but fixed in v10.4.2</td></tr></table><p><b>Posted:</b> 2005-06-21</p>
+<!-- END CONTENTS -->
+</td></tr></table>
+<!-- END WIDE COLUMN -->
+<!-- END MAIN CONTENT -->
+	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/qa/qa2005/qa1435.html%3Fid%3DDTS10003735-1.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/qa/qa2005/qa1435.html%3Fid%3DDTS10003735-1.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/qa/qa2005/qa1435.html%3Fid%3DDTS10003735-1.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+
+<!-- START BOTTOM APPLE NAVIGATION -->
+<!--#include virtual="/includes/footer"-->
+<!-- END BOTTOM APPLE NAVIGATION -->
+<!-- START CENTER CLOSE -->
+</center>
+<!-- END CENTER CLOSE -->
+</body></html>

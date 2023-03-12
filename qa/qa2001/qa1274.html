@@ -1,0 +1,414 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN"
+"http://www.w3.org/TR/REC-html40/loose.dtd">
+<HTML>
+<HEAD>
+
+<title>Technical Q&amp;A QA1274: Filtering QuickTime media types in Navigation Services</title>
+
+<LINK REL="stylesheet" HREF="../../adcstyle.css" TYPE="text/css">
+<LINK REL="stylesheet" HREF="../../style.css" TYPE="text/css">
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+<meta name="keywords" content="QuickTime Navigation Services filter procedure CanQuickTimeOpenFile MovieImportGetDestinationMediaType movieImportMustGetDestinationMediaType">
+<meta name="Description" content="This Q&amp;A describes how to filter QuickTime media types in a Navigation Services filter procedure.">
+
+<LINK REL="stylesheet" HREF="../../css/adcstyle.css" TYPE="text/css"><script language="JavaScript" type="text/javascript" src="../../js/adc.js"></script></HEAD>
+
+
+<BODY BGCOLOR=WHITE><a name="//apple_ref/doc/uid/DTS10002307" title="Filtering QuickTime media types in Navigation Services"></a>
+
+<!-- begin_header_information --><!--#include virtual="/adcnavbar" --><p><a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../technicalqas/index.html">Technical Q&As</a> &gt; <a href="../../technicalqas/Carbon/index.html">Carbon</a> &gt; <a href="../../technicalqas/Carbon/idxHumanInterfaceToolbox-date.html">Human Interface Toolbox</a> &gt; </p><!-- end_header_information -->
+
+<!-- begin_titles_information --><CENTER><table width="600" cellpadding="0" cellspacing="0" border="0">
+<tr><td align="left" scope="row">
+<h1>
+<div id="pagehead">Technical Q&amp;A QA1274</div>
+<div id="pageheadsub">Filtering QuickTime media types in Navigation Services</div>
+</h1>
+</td></tr></table></CENTER><!-- end_titles_information -->
+
+<CENTER><TABLE BORDER=0 CELLSPACING=1 WIDTH=600> <TR> <TD align="left">
+
+
+<hr width=500 align=center>
+
+<!-- begin_document_contents --><P id=p2> Q: I'm using the <CODE>CanQuickTimeOpenFile</CODE>  function in my Navigation Services filter procedure as described in <A HREF="http://developer.apple.com/qa/qa2001/qa1152.html">Q&amp;A QA1152</A>  to filter all files QuickTime is able to open. However, now I'd like to also restrict this list to files of a certain media type, such as audio files. Is there any easy way to do this?</P>
+
+<P id=p4>A: Yes. You can restrict this list of files to those of a certain media type (Flash, Sound, Music, 
+MPEG, and so on) with the <CODE>GetMovieIndTrackType</CODE> function, specifying the desired media type in the <CODE>trackType</CODE> field.</p>
+
+<P id=p4>Using <CODE>GetMovieIndTrackType</CODE> is best for detecting whether or not a movie contains tracks of a given media type. If you are looking to do additional processing, you might need to also look for any specific media types your application supports.</p>
+
+<P id=p4>Note the <CODE>GetMovieIndTrackType</CODE> function requires you to actually open the file, which of course can slow down the filtering process. One technique that can help avoid having to open all files is to find the appropriate movie import component using the <CODE>GetMovieImporterForDataRef</CODE> function, and look at the destination media type - this is an indication of the kind of media track the importer creates (or a null media type to indicated multiple media types are contained in the file). This approach doesn't necessarily involve importing or even opening the file.</p>
+
+<P id=p4>The destination media type information can be found in one of two places: in the four-character code used as the manufacturer field of the component registration information (in the <CODE>ComponentDescription</CODE> record), or if the importer component supports the component flag <CODE>movieImportMustGetDestinationMediaType</CODE>, the destination media type can be obtained by calling the component's <CODE>MovieImportGetDestinationMediaType</CODE> function (Note there is a bug (r. 3328291) which prevents this from being called from a Carbon application). The <CODE>MovieImportGetDestinationMediaType</CODE> technique may only be used with newer (QuickTime 6 or better) components.</p>
+
+<P id=p4>If the destination media type is non-zero, it indicates the importer creates a movie only with a particular media (track) type. If the destination media type is 0, as it is for AVI and DV, it indicates the importer creates files that are a mix of media types. In the latter case, the file might contain audio, but you just can't know without actually importing the file and inspecting the various tracks.</p>
+
+<P id=p4>Here's a sample Navigation Services filter function which demonstrates how to use the <CODE>CanQuickTimeOpenFile</CODE> API to check for all files which QuickTime is able to open, and how to use <CODE>GetMovieImporterForDataRef</CODE> and <CODE>MovieImportGetDestinationMediaType</CODE> to query the movie importer for the destination media type which can be used to filter files of a certain media type:</P>
+
+<BR><BR>
+
+<!-- listing starts here -->
+<CENTER><TABLE BORDER=0 CELLPADDING=0 WIDTH=550><TR><TD>
+<P><B>Listing 1</B>. Filtering QuickTime media types in a Navigation Services filter procedure.</P>
+</TD></TR><TR><TD BGCOLOR="#E6E6E6"><PRE>
+
+
+#define kAliasDataRefType FOUR_CHAR_CODE('alis')
+
+#define SHOW_ONLY_AUDIO_FILES   1 
+#define SHOW_ONLY_VIDEO_FILES   0
+
+
+OSStatus    GetFSSpecFromAEDesc( FSSpec *fsspec, AEDesc* theItem )
+{
+    OSStatus    err           = noErr;
+    AEDesc      coerceDesc    = { NULL, NULL };
+
+    /* If the AEDesc isn't already an FSSpec, convert it to one... */
+    if (theItem-&gt;descriptorType != typeFSS)
+    {
+        err = AECoerceDesc( theItem, typeFSS, &amp;coerceDesc );
+        /* Get the FSSpec out of the AEDesc */
+        if ( err == noErr )
+        {
+            err = AEGetDescData( &amp;coerceDesc, fsspec, sizeof(FSSpec) );
+            AEDisposeDesc( &amp;coerceDesc );
+        }
+    }
+    else
+    {
+        err = AEGetDescData( theItem, fsspec, sizeof(FSSpec) );
+    }
+
+    return( err );
+}
+
+
+
+pascal Boolean NavLaunchServicesFilterProc(AEDesc* theItem,
+                                            void* info,
+                                            NavCallBackUserData ioUserData,
+                                            NavFilterModes filterMode)
+    {
+    #pragma unused(ioUserData)
+
+    NavFileOrFolderInfo *myInfo     = (NavFileOrFolderInfo *)info;
+    OSStatus            err         = noErr;
+    Boolean             showItem    = false;
+    FSSpec              fsspec;
+
+
+    if ( filterMode == kNavFilteringBrowserList )
+    {
+        if (theItem-&gt;descriptorType == typeFSS)
+        {
+            /* file or folder? */
+            if (myInfo-&gt;isFolder)
+            {
+                /* show all folders */
+                showItem = true;
+            }
+            else    /* we have a file, not a folder */ 
+            {
+                Boolean outCanOpenWithGraphicsImporter  = false;
+                Boolean outCanOpenAsMovie               = false;
+
+                err = GetFSSpecFromAEDesc( &amp;fsspec, theItem );
+                if ( err != noErr ) goto BailWithError;
+/*
+A reference to the documentation for the CanQuickTimeOpenFile function
+is provided at the end of this document.
+
+We simply pass an FSSpec for the file of interest, and QuickTime will return
+to us in the outCanOpenWithGraphicsImporter and outCanOpenAsMovie parameters
+a value indicating whether or not the file can be opened using a graphics
+importer or in place as a movie.
+
+Of particular interest are the various flags you can pass for the inFlags
+parameter. These affect the way QuickTime performs its search. Here's a
+list of the flags:
+
+-inFlags Constants-
+
+kQTDontUseDataToFindImporter
+
+Tells QuickTime not to use the data in the file to help in the search.
+This will speed up the search, especially in cases where a negative
+result is returned, but it will cause QuickTime to report that it
+cannot open files that aren't identified by a recognized file type
+or file name suffix.
+
+kQTDontLookForMovieImporterIfGraphicsImporterFound
+
+Tells QuickTime to short-circuit its search as soon as it finds one
+way to open the file. Pass this flag if you want to know whether a
+file can be opened with a graphics importer or as a movie, but you
+don't care which.
+
+kQTAllowOpeningStillImagesAsMovies
+
+Tells QuickTime to consider opening still images as movies. If
+this flag is set, if a file can be opened using a graphics importer
+QuickTime will automatically say it can be opened as a movie.
+
+kQTAllowImportersThatWouldCreateNewFile
+
+Tells QuickTime to include importers which would create new files.
+If this flag is clear, QuickTime only includes importers which can
+import in place without needing to create new files.
+
+kQTAllowAggressiveImporters
+
+Tells QuickTime to include movie importers for file types like PICT
+and TEXT that aren't traditionally thought of as movies. If this
+flag is clear, QuickTime excludes these movie importers.
+
+We recommend using the kQTDontLookForMovieImporterIfGraphicsImporterFound
+flag, as it makes the search faster, since you don't care how the file
+is opened.  In certain situations if may be useful to use the
+kQTDontUseDataToFindImporter flag, as it will also speed-up the
+search. However, the drawback is it will skip files with no
+suffix or file type.
+
+*/
+
+                err = CanQuickTimeOpenFile(
+                    &amp;fsspec,
+                        /* fileType */
+                    myInfo-&gt;fileAndFolder.fileInfo.finderInfo.fdType,
+                        /* filename suffix, or 0 if not known */
+                    0,
+                        /* returns true if file can be opened with a
+                            graphics importer */
+            #if SHOW_ONLY_VIDEO_FILES
+                    &amp;outCanOpenWithGraphicsImporter,
+            #elif SHOW_ONLY_AUDIO_FILES
+                    0,
+            #endif
+                        /* returns true if file can be opened with a
+                            movie importer */
+                    &amp;outCanOpenAsMovie,
+                        /* returns true if file can be opened both with
+                        a graphics importer and movie importer, but
+                        QT would prefer to use a graphics importer */
+                    nil,
+                        /* inFlags, we'll specify
+                        kQTDontLookForMovieImporterIfGraphicsImporterFound
+                        to tell QuickTime to short-circuit its search as
+                        soon as it finds one way to open the file. We
+                        don't care if the file can be opened with a
+                        graphics importer or as a movie. */
+                    kQTDontLookForMovieImporterIfGraphicsImporterFound);
+
+                if ( err != noErr ) goto BailWithError;
+
+                if (outCanOpenAsMovie)
+                {
+                    OSErr                   err = noErr;
+                        // MovieImport component associated with the 
+                        // file type
+                    Component               theImporter = nil;
+                        // Used to look at componentManufacturer
+                    ComponentDescription    cd;                         
+                    OSType                  destinationMediaType = 0;
+                    long                    myFlags = 0;                
+                    AliasHandle             theAliasHandle;
+
+                    // create an alias data reference
+
+                    err = NewAlias(nil, &amp;fsspec, &amp;theAliasHandle);
+                    if (err == noErr)
+                    {
+                        // Try to find the importer component (it's not a 
+                        // ComponentInstance so doesn't need to be closed
+                        // afterward)
+
+                        err = GetMovieImporterForDataRef(kAliasDataRefType,
+                                                    (Handle)theAliasHandle,
+                                                    myFlags,
+                                                    &amp;theImporter);
+
+                        if (noErr == err) 
+                        {
+                            // We'll look at the description's flags and 
+                            // manufacturer type field
+                            GetComponentInfo(theImporter, 
+                                &amp;cd, nil, nil, nil);
+
+                        // If the movieImportMustGetDestinationMediaType 
+                        // flag is set by the component it indicates the 
+                        // destination media type can be queried by
+                        // making a MovieImportGetDestinationMediaType
+                        // call to the component
+
+                            if (cd.componentFlags &amp;
+                                    movieImportMustGetDestinationMediaType)
+                            {
+
+                                // Ask importer for destination media type 
+                                // (note: you don't need to open the 
+                                // importer component, it happens for you)
+
+                                MovieImportGetDestinationMediaType(
+                                    (MovieImportComponent)theImporter,
+                                    &amp;destinationMediaType);
+                            }
+
+                            else    // Use manufacturer type from
+                                    // GetComponentInfo.
+                                    // The manufacturer field indicates the 
+                                    // QuickTime media type that is 
+                                    // supported by the component (e.g. 
+                                    // Sound 'soun'). The subtype value 
+                                    // indicates the type of data the 
+                                    // component can import (e.g. 'AIFF')
+                            {
+                                destinationMediaType = 
+                                    cd.componentManufacturer;
+                            }
+                        }
+
+                        // else
+
+                        // Either an importer doesn't exist for the format 
+                        // but QuickTime still can open the format 
+                        // (QuickTime Movie files) or there's no importer. 
+                        // In both cases, destinationMediaType is still 0
+
+                        // At this point, use the destinationMediaType 
+                        // (possibly 0) to ask our question.
+                        //
+
+                        // We know the media type and can check it against 
+                        // track types we support. If we don't recognize 
+                        // it, we should fall back to opening and testing
+                        // the file with GetMovieIndTrackType.
+
+                        if (destinationMediaType)
+                        {
+                        
+                    #if SHOW_ONLY_AUDIO_FILES
+                            // check for Sound ('soun') media type
+                            if (destinationMediaType == SoundMediaType)
+                    #elif SHOW_ONLY_VIDEO_FILES
+                            // check for Video ('vide') media type
+                            if (destinationMediaType == VideoMediaType)
+                    #endif
+                    
+                            {
+                                showItem = true;
+                            }
+                        }
+                        else    // no useful information, so perform the 
+                                // open and then use GetMovieIndTrackType 
+                                // to check the movie's tracks, making 
+                                // sure to close the movie afterwards
+                        {
+                            OSErr err = noErr;
+                            short fileRefNum = 0;
+
+                            err = OpenMovieFile(&amp;fsspec, 
+                                                &amp;fileRefNum,
+                                                fsRdPerm);
+                            if (err == noErr)
+                            {
+                                // We want the first movie.
+                                short   resID = 0;
+                                Movie   theMovie = nil;
+
+                                err = NewMovieFromFile(&amp;theMovie,
+                                                        fileRefNum,
+                                                        &amp;resID,
+                                                        NULL,
+                                                        newMovieActive,
+                                                        NULL);
+                                if (err == noErr)
+                                {
+                                    // check track (media) type
+
+                                    if(GetMovieIndTrackType(theMovie,
+                                                1L,
+                                    #if SHOW_ONLY_AUDIO_FILES
+                                                SoundMediaType,
+                                    #elif SHOW_ONLY_VIDEO_FILES
+                                                VideoMediaType,
+                                    #endif
+                                                movieTrackMediaType))
+                                        {
+                                            // movie has desired media 
+                                            // type!
+
+                                            showItem = true;
+                                        }
+                                    DisposeMovie(theMovie);
+                                }
+                                CloseMovieFile(fileRefNum);
+                            }
+                        }
+                        DisposeHandle((Handle)theAliasHandle);
+                    }
+                }
+                else if (outCanOpenWithGraphicsImporter)
+                {
+                    showItem = true;
+                }
+            }
+        }
+    }
+
+    return (showItem);
+
+BailWithError:
+    return( false );
+
+}
+
+
+</PRE></TD></TR></TABLE></CENTER>
+<!-- listing ends here -->
+<BR><BR>  
+
+<P><B>References:</B><BR><BR>
+
+<A HREF="http://developer.apple.com/documentation/Carbon/Reference/Navigation_Services_Ref/index.html">Navigation Services Reference</A><BR><BR>
+
+<A HREF="http://developer.apple.com/documentation/QuickTime/APIREF/SOURCESI/canquicktimeopenfile.htm">CanQuickTimeOpenFile API</A><BR><BR>
+
+<A HREF="http://developer.apple.com/documentation/QuickTime/APIREF/SOURCESI/getmovieindtracktype.htm">GetMovieIndTrackType API</A><BR><BR>
+
+<A HREF="http://developer.apple.com/documentation/QuickTime/APIREF/SOURCESII/movieimpgetdestmediatype.htm">MovieImportGetDestinationMediaType API</A><BR><BR>
+
+<A HREF="http://developer.apple.com/documentation/QuickTime/RM/ImportExport/DataExchange/index.html">Movie Data Exchange Components Reference</A></P><BR>
+
+
+<hr width=500 align=center><!-- begin_date --><H4 ALIGN=center>[Jul 23, 2003]</H4><!-- end_date --><!-- end_document_contents -->
+
+<BR>
+</TD></TR></TABLE></CENTER>
+
+<!-- begin_footer_information -->	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/qa/qa2001/qa1274.html%3Fid%3DDTS10002307-1.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/qa/qa2001/qa1274.html%3Fid%3DDTS10002307-1.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/qa/qa2001/qa1274.html%3Fid%3DDTS10002307-1.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+<!--#include virtual="/includes/footer"--><!-- end_footer_information -->
+
+</BODY>
+</HTML>

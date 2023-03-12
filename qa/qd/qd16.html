@@ -1,0 +1,42 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN"			"http://www.w3.org/TR/REC-html40/loose.dtd"><HTML><!--Template 06-20-02--><HEAD><LINK REL="stylesheet" HREF="../../adcstyle.css" TYPE="text/css"><LINK REL="stylesheet" HREF="../../style.css" TYPE="text/css"><TITLE>Technical Q&amp;A QD16: CopyBits and Background Printing</TITLE>	<meta name="keywords" content="Mac OS 8 QuickDraw CopyBits move CGrafPort portpixMap Background printing"><meta name="Description" content="Q&amp;A explains why using CopyBits to move a cGrafPort's portpixMap to another cGrafPort only works when background printing is turned on and otherwise doesn't work with a LaserWriter driver."><LINK REL="stylesheet" HREF="../../css/adcstyle.css" TYPE="text/css"><script language="JavaScript" type="text/javascript" src="../../js/adc.js"></script></HEAD><BODY BGCOLOR="#FFFFFF"><a name="//apple_ref/doc/uid/DTS10001775" title="CopyBits and Background Printing"></a><!-- top_of_header_marker_comment --><!-- begin_header_information --><!--#include virtual="/adcnavbar" --><p><a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../technicalqas/index.html">Technical Q&As</a> &gt; <a href="../../technicalqas/LegacyTechnologies/index.html">Legacy Documents</a> &gt; <a href="../../technicalqas/LegacyTechnologies/idxGraphicsImaging-date.html">Graphics & Imaging</a> &gt; </p><div style="width:100%; position:fixed;"><div align="center" id="watermark" style="position: relative; margin-left:auto; margin-right:auto; z-index:20; width:500px;"><div class="legacybox"><h1>Legacy Document<span class=closebutton><a href="javascript:closeWatermark()"><img src="../../images/closebutton.png" width="14" height="14" border="0"  alt="close button"></a></span></h1>
+
+<p><strong>Important: </strong>This document is part of the Legacy section of the ADC Reference Library. This information should not be used for new development.</p>
+
+<div class="reflibtopic">
+	<p>Current information on this Reference Library topic can be found here:</p>
+	<ul>
+				<li><a href="http://developer.apple.com/referencelibrary/GraphicsImaging/index.html" target="_blank">Reference Library > Graphics & Imaging</a></li>
+	</ul>
+</div>
+
+
+
+
+</div></div></div><!-- end_header_information --><!-- bottom_of_header_marker_comment --><!-- top_of_titles_marker_comment --><CENTER><table width="600" cellpadding="0" cellspacing="0" border="0">
+<tr><td align="left" scope="row">
+<h1>
+<div id="pagehead">Technical Q&amp;A QD16</div>
+<div id="pageheadsub">CopyBits and Background Printing</div>
+</h1>
+</td></tr></table></CENTER><!-- bottom_of_titles_marker_comment -->						<!-- begin_content --> <CENTER><TABLE BORDER=0 CELLPADDING=0 WIDTH=600><TR> <TD align="left"><HR ALIGN="center" WIDTH="550"><p id = p2>Q:  When I use <code>CopyBits</code> to move a <code>cGrafPort</code>'s <code>portPixMap</code> to another <code>cGrafPort</code> (my printing port), it works like a charm when background printing is turned on, but when <code>CopyBits</code> gets called with background printing turned off, the image that printsisn't the image at all. Why is this happening?</p><p id=p4>A:  You should be aware that since you're copying the pixels directly from the screen, the <code>baseAddr</code> pointer for the screen's <code>pixMap</code> may be 32-bit addressed.In fact, with 32-Bit QuickDraw, this is the case. This in itself isn't aproblem, since <code>CopyBits</code> knows enough to access the <code>baseAddr</code> of the port'spixMap in 32-bit mode, as follows:</p><CENTER><TABLE BORDER=0 CELLPADDING=5 WIDTH=550><TR>	<TD BGCOLOR="#E6E6E6" align="left"><PRE>mode = true32b;             // Make sure we're in 32-bit addressing mode.                             // Access pixels directly; make no other system calls. SwapMMUMode(&amp;mode);         // Restore the current mode.</PRE>	</TD></TR></TABLE></CENTER><p id=p4>That's how you'd normally handle things if you were accessing the pixels directlyyourself. Unfortunately, the LaserWriter driver doesn't know enough to do the<code>SwapMMUMode</code> and instead ends up copying garbage (from a 32-bit pointer strippedto a 24-bit pointer).</p><p id=p4>So why does background printing work? Because when you print in the background,everything is rolled into a PICT, which the driver saves off for PrintMonitor.Since the driver is using the standard QuickDraw picture bottlenecks to dothis, and <code>CopyBits</code> knows to swap the MMU mode before copying the data into thepicture, everything works great. Later, at PrintMonitor time, the picture isplayed back. Since the data is no longer 32-bit addressed, the LaserWriterdriver doesn't have to call <code>SwapMMUMode</code> to do the right thing; it can just playthe picture back.</p><p id=p4>The solution we propose for you is something similar. At print time (beforeyour <code>PrOpenPage</code> call), call <code>OpenPicture</code>, copy the data from the screen with<code>CopyBits</code>, call <code>ClosePicture</code>, and then call <code>DrawPicture</code> within your<code>PrOpenPage/PrClosePage</code> loop. That should do the trick.</p><p id=p4>Note that copying bits directly from the screen is not something we recommend.Unless you have no alternative, you should always copy from the original sourceof the data instead.</p></td></tr></table></CENTER><!-- end_content --><!-- begin_date --><H4 ALIGN=center>[Sep 15 1995]</H4><!-- end_date --><!-- begin_footer_information -->	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/qa/qd/qd16.html%3Fid%3DDTS10001775-1.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/qa/qd/qd16.html%3Fid%3DDTS10001775-1.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/qa/qd/qd16.html%3Fid%3DDTS10001775-1.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+<!--#include virtual="/includes/footer"--><!-- end_footer_information --> <HR width=550 align=center> </BODY> </HTML>

@@ -1,0 +1,191 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN"
+			"http://www.w3.org/TR/REC-html40/loose.dtd">
+<HTML>
+<HEAD>
+
+
+<LINK REL="stylesheet" HREF="../../adcstyle.css" TYPE="text/css">
+<LINK REL="stylesheet" HREF="../../style.css" TYPE="text/css">
+
+
+
+
+
+<TITLE>Technical Q&amp;A QA1234: Accessing HTTPS Proxy Settings</TITLE>
+
+<meta name="keywords" content="Internet Config, System Configuration framework, HTTP, HTTPS, proxy, secure web proxy">
+
+<meta name="Description" content="This Q&amp;A describes how to access the HTTPS proxy settings
+on Mac OS X 10.2 and later.">
+
+<LINK REL="stylesheet" HREF="../../css/adcstyle.css" TYPE="text/css"><script language="JavaScript" type="text/javascript" src="../../js/adc.js"></script></HEAD>
+
+
+<BODY BGCOLOR="#FFFFFF"><a name="//apple_ref/doc/uid/DTS10001756" title="Accessing HTTPS Proxy Settings"></a>
+
+<!-- top_of_header_marker_comment -->
+<!-- begin_header_information --><!--#include virtual="/adcnavbar" --><p><a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../technicalqas/index.html">Technical Q&As</a> &gt; <a href="../../technicalqas/InternetWeb/index.html">Internet & Web</a> &gt; <a href="../../technicalqas/InternetWeb/idxWebServices-date.html">Web Services</a> &gt; </p><!-- end_header_information -->
+<!-- bottom_of_header_marker_comment -->
+
+<!-- top_of_titles_marker_comment --><CENTER><table width="600" cellpadding="0" cellspacing="0" border="0">
+<tr><td align="left" scope="row">
+<h1>
+<div id="pagehead">Technical Q&amp;A QA1234</div>
+<div id="pageheadsub">Accessing HTTPS Proxy Settings</div>
+</h1>
+</td></tr></table></CENTER><!-- bottom_of_titles_marker_comment -->
+
+
+
+
+
+
+<CENTER><TABLE BORDER=0 CELLSPACING=1 WIDTH=600> <TR> <TD align="left">
+
+<!-- begin_content -->
+
+<HR width="500" align=center>
+         
+
+<P id=p2>Q: In Mac OS X 10.2, the Network preferences panel has new fields to set the Secure Web Proxy (HTTPS). There does not seem to be any way to get at these settings via the Internet Config API. How do I access these settings?</p>
+						<P id=p4>A: At this point there is no way to get information about the HTTPS proxy via the Internet Config API. Instead, you will need to read this information from System Configuration framework.</p>
+						<center>
+							<table border=0 cellpadding=3 width=550>
+								<tr>
+									<td bgcolor="#E6E6E6" align="left" scope="row">
+										<p><b>Note:</b><br>
+											In many respects the Internet Config API on Mac OS X is a compatibility API. As such, when new features are added to the underlying API (in this case, System Configuration framework), they don't necessarily make it into a compatibility API (Internet Config). This is acceptable because no existing Internet Config-based application expects to use those features.</p>
+									</td>
+								</tr>
+							</table>
+						</center>
+						<P id=p4>You can get this information directly from System Configuration framework. In fact, there's a nice high-level API to do this, namely <code>SCDynamicStoreCopyProxies</code>. To use this API in your program, add &quot;SystemConfiguration.framework&quot; to your project and include the &lt;SystemConfiguration/SystemConfiguration.h&gt; header. You can then call <code>SCDynamicStoreCopyProxies</code> as shown in Listing 1.</p>
+						<div align="center">
+							<table border=0 cellpadding=4 width=550>
+								<tr>
+									<td align="left" scope="row">
+										<p><b>Listing 1</b>. Using <code>SCDynamicStoreCopyProxies</code></p>
+									</td>
+								</tr>
+								<tr>
+									<td bgcolor="#E6E6E6" align="left" scope="row">
+										<pre>
+Boolean GetHTTPSProxySetting(char *host, size_t hostSize, UInt16 *port)
+    // Returns the current HTTPS proxy settings as a C string 
+    // (in the buffer specified by host and hostSize) and 
+    // a port number.
+{
+    Boolean             result;
+    CFDictionaryRef     proxyDict;
+    CFNumberRef         enableNum;
+    int                 enable;
+    CFStringRef         hostStr;
+    CFNumberRef         portNum;
+    int                 portInt;
+
+    assert(host != NULL);
+    assert(port != NULL);
+    
+    // Get the dictionary.
+    
+    proxyDict = SCDynamicStoreCopyProxies(NULL);
+    result = (proxyDict != NULL);
+
+    // Get the enable flag.  This isn't a CFBoolean, but a CFNumber.
+    
+    if (result) {
+        enableNum = (CFNumberRef) CFDictionaryGetValue(proxyDict,
+                kSCPropNetProxiesHTTPSEnable);
+
+        result = (enableNum != NULL)
+                &amp;&amp; (CFGetTypeID(enableNum) == CFNumberGetTypeID());
+    }
+    if (result) {
+        result = CFNumberGetValue(enableNum, kCFNumberIntType,
+                    &amp;enable) &amp;&amp; (enable != 0);
+    }
+    
+    // Get the proxy host.  DNS names must be in ASCII.  If you 
+    // put a non-ASCII character  in the &quot;Secure Web Proxy&quot;
+    // field in the Network preferences panel, the CFStringGetCString
+    // function will fail and this function will return false.
+    
+    if (result) {
+        hostStr = (CFStringRef) CFDictionaryGetValue(proxyDict,
+                    kSCPropNetProxiesHTTPSProxy);
+
+        result = (hostStr != NULL)
+            &amp;&amp; (CFGetTypeID(hostStr) == CFStringGetTypeID());
+    }
+    if (result) {
+        result = CFStringGetCString(hostStr, host,
+            (CFIndex) hostSize, kCFStringEncodingASCII);
+    }
+    
+    // Get the proxy port.
+    
+    if (result) {
+        portNum = (CFNumberRef) CFDictionaryGetValue(proxyDict,
+                kSCPropNetProxiesHTTPSPort);
+
+        result = (portNum != NULL)
+            &amp;&amp; (CFGetTypeID(portNum) == CFNumberGetTypeID());
+    }
+    if (result) {
+        result = CFNumberGetValue(portNum, kCFNumberIntType, &amp;portInt);
+    }
+    if (result) {
+        *port = (UInt16) portInt;
+    }
+
+    // Clean up.
+    
+    if (proxyDict != NULL) {
+        CFRelease(proxyDict);
+    }
+    if ( ! result ) {
+        *host = 0;
+        *port = 0;
+    }
+    return result;
+}
+
+</pre>
+									</td>
+								</tr>
+							</table>
+						</div>
+						<p>Listing 1 only shows how to get the HTTPS proxy setting. You can get the other proxies settings by examining different keys in the <code>proxyDict</code> dictionary. For more information about these settings, see the comments in the &lt;SystemConfiguration/SCSchemaDefinitions.h&gt; header file.</p>
+						<div align="center">
+							
+						</div>
+						<HR width="500" align=center>
+						<!-- begin_date --><H4 ALIGN=center>[Feb 06 2003]</H4><!-- end_date -->
+
+</TD> </TR> </TABLE></CENTER>
+
+<!-- begin_footer_information -->	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/qa/qa2001/qa1234.html%3Fid%3DDTS10001756-1.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/qa/qa2001/qa1234.html%3Fid%3DDTS10001756-1.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/qa/qa2001/qa1234.html%3Fid%3DDTS10001756-1.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+<!--#include virtual="/includes/footer"--><!-- end_footer_information -->
+
+</BODY>
+</HTML>

@@ -1,0 +1,42 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN"			"http://www.w3.org/TR/REC-html40/loose.dtd"><html><HEAD><LINK REL="stylesheet" HREF="../../adcstyle.css" TYPE="text/css"><LINK REL="stylesheet" HREF="../../style.css" TYPE="text/css"><title>Technical Q&amp;A QTMTB20: QuickTime CFM PowerPlug Libraries, Availability, Weak Links</title><meta name="keywords" content="Mac OS 8 QuickTime Code Fragment Manager weak linking MakePEF"><meta name="Description" content="Technical Q&amp;A QTMTB20: Q&amp;A discusses the subject of weaklinking and detecting if weak-linked libraries are presentor have been moved. Q&amp;A also supplies a code sample the usesthe QuickTime gestalt selector to determine whether it'ssafe to call the weak linked library."><meta name="categories" content="QuickTime Movie Toolbox"><meta name="week-posted" content="May 1, 1995 - May 5, 1995"><LINK REL="stylesheet" HREF="../../css/adcstyle.css" TYPE="text/css"><script language="JavaScript" type="text/javascript" src="../../js/adc.js"></script></HEAD><BODY BGCOLOR="#FFFFFF" TEXT="#000000"><a name="//apple_ref/doc/uid/DTS10001990" title="QuickTime CFM PowerPlug Libraries, Availability, Weak Links"></a> <!-- white background --><!-- top_of_header_marker_comment --><!-- begin_header_information --><!--#include virtual="/adcnavbar" --><p><a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../technicalqas/index.html">Technical Q&As</a> &gt; <a href="../../technicalqas/LegacyTechnologies/index.html">Legacy Documents</a> &gt; <a href="../../technicalqas/LegacyTechnologies/idxQuickTime-date.html">QuickTime</a> &gt; </p><div style="width:100%; position:fixed;"><div align="center" id="watermark" style="position: relative; margin-left:auto; margin-right:auto; z-index:20; width:500px;"><div class="legacybox"><h1>Legacy Document<span class=closebutton><a href="javascript:closeWatermark()"><img src="../../images/closebutton.png" width="14" height="14" border="0"  alt="close button"></a></span></h1>
+
+<p><strong>Important: </strong>This document is part of the Legacy section of the ADC Reference Library. This information should not be used for new development.</p>
+
+<div class="reflibtopic">
+	<p>Current information on this Reference Library topic can be found here:</p>
+	<ul>
+				<li><a href="http://developer.apple.com/referencelibrary/QuickTime/index.html" target="_blank">Reference Library > QuickTime</a></li>
+	</ul>
+</div>
+
+
+
+
+</div></div></div><!-- end_header_information --><!-- bottom_of_header_marker_comment --><!-- top_of_titles_marker_comment --><CENTER><table width="600" cellpadding="0" cellspacing="0" border="0">
+<tr><td align="left" scope="row">
+<h1>
+<div id="pagehead">Technical Q&amp;A QTMTB20</div>
+<div id="pageheadsub">QuickTime CFM PowerPlug Libraries, Availability, Weak Links</div>
+</h1>
+</td></tr></table></CENTER><!-- bottom_of_titles_marker_comment --><CENTER>			<!-- -->						<!-- Document Body --><table cellspacing="0" cellpadding="0" border="0" WIDTH="600"><tr><td align="left" scope="row"><p>The Code Fragment Manager supports the concept of "soft" or "weak" linking. Ifa library is soft-linked, the Process Manager runs your application, even ifthe library is missing. This means that the application does not die, even if aparticular library is not installed, and the application can disablefunctionality based on library availability.</p><p>MPW PowerPC tools include the MakePEF tool with an additional flag thatspecifies that the exported symbols are weak. In this case the runtimearchitecture will try to resolve the CFM library, but won't fail if it can't.You can define that the library has weak linking by adding a magic tilde (~)character at the end of the -l option to MakePEF. For example, to soft link toQuickTimeLib you would do the following:</p><pre>    MakePEF -l QuickTimeLib.xcoff=QuickTimeLib~ ...</pre><p>You could also mark CFM libraries as weak using the Metrowerks PowerPCenvironment.</p><p>In the client program you can test that the CFM library was not loaded and forinstance disable all functionality that depends on the CFM library (forexample, no QuickTime CFM libraries present so "play movies" gets disabled).</p><p>Since the library only registers itself with Gestalt once, there's no way tounregister it if the user moves the library.  This particular problem does nothave any direct solutions, but there's an alternative way to determine if thelibrary is loaded.</p><p>The solution is to check the address of one of the functions in the librarybefore calling the library.  The PowerPC Inside Macintosh documentationillustrates the technique:</p><pre>extern int printf (char *, ...);// ...if (printf == kUnresolvedSymbolAddress)        DebugStr(&quot;\printf is not available.&quot;);else    printf(&quot;Hello, world!\n&quot;);</pre><p>QuickTime has a new Gestalt selector to determine whether it's safe tocall the weak-linked library (gestaltQuickTimeFeatures). This function showshow to  initialize QuickTime, for 68k and PowerPC:</p><pre>Boolean    InitQuickTime(void){    long         qtVersion;    OSErr         anErr;#ifdef powerc    long         qtFeatures;#endif    anErr = Gestalt(gestaltQuickTime, &amp;qtVersion);    if (anErr != noErr)        return false;        // no QT present#ifdef powerc// Test if the library is registered.    anErr = Gestalt(gestaltQuickTimeFeatures, &amp;qtFeatures);    if ( !( (anErr == noErr)  &amp;&amp;  (qtFeatures        &amp; (1 &lt;&lt; gestaltPPCQuickTimeLibPresent))  )) // not true          return false;#endif    anErr = EnterMovies();    if ( anErr == noErr)        return true;    else        return false;        // problems initializing QuickTime}</pre><p>Both QuickTime Gestalt selectors are being tested for in the PowerPC case. Youneed to test both that QuickTime is present and that the QuickTime library is present.</p><p>A simple test to verify that things work properly is to exclude the PowerPlugCFM library from the extension file, or move it out from the folder while theapplication that needs the library is running.</p><p>If the application is unable to load the CFM library due to lack of space, theapplication might mysteriously die later, so it's important to always checkthat the libraries are loaded and available.</p><!-- begin_date --><H4 ALIGN=center>[May 01 1995]</H4><!-- end_date --></td></tr></table></CENTER><!-- begin_footer_information -->	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/qa/qtmtb/qtmtb20.html%3Fid%3DDTS10001990-1.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/qa/qtmtb/qtmtb20.html%3Fid%3DDTS10001990-1.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/qa/qtmtb/qtmtb20.html%3Fid%3DDTS10001990-1.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+<!--#include virtual="/includes/footer"--><!-- end_footer_information --></BODY></HTML>

@@ -1,0 +1,299 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/1999/REC-html401-19991224/loose.dtd">
+<html><head>
+<!-- BEGIN META TAG INFO -->
+<link rel="home" href="http://developer.apple.com/">
+<link rel="find" href="http://developer.apple.com/search/">
+<link rel="stylesheet" type="text/css" href="../../documentation/css/adcstyle.css" title="fonts">
+<script language="JavaScript" type="text/javascript" src="../../documentation/js/busnav.js"></script>
+<script language="JavaScript" src="../../documentation/js/adc.js" type="text/javascript"></script>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<!-- END META TAG INFO -->
+<!-- BEGIN TITLE -->
+<title>Technical Q&amp;A QA1539: How do I create a QuickTime movie from PCM audio samples in memory?</title>
+<!-- END TITLE -->
+</head>
+<!-- BEGIN BODY OPEN -->
+<body bgcolor="#ffffff"><a name="//apple_ref/doc/uid/DTS10004420" title="How do I create a QuickTime movie from PCM audio samples in memory?"></a>
+<!--END BODY OPEN -->
+<!-- START CENTER OPEN -->
+<center>
+<!-- END CENTER OPEN -->
+<a name="top"></a>
+<!-- BEGIN LOGO AND SEARCH -->
+<!--#include virtual="/includes/adcnavbar"-->
+<!-- END LOGO AND SEARCH -->
+<!-- START BREADCRUMB -->
+<div id="breadcrumb"><table width="680" border="0" cellpadding="0" cellspacing="0"><tr>
+<td scope="row"><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+<td><img width="340" height="10" src="images/1dot.gif" alt=""></td></tr><tr valign="middle"><td align="left" colspan="2">
+<a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../technicalqas/index.html">Technical Q&As</a> &gt; <a href="../../technicalqas/QuickTime/index.html">QuickTime</a> &gt; <a href="../../technicalqas/QuickTime/idxMusicAudio-date.html">Audio</a> &gt; 
+</td></tr><tr><td colspan="2" scope="row"><img width="680" height="35" src="images/1dot.gif" alt=""></td></tr></table></div>
+<!-- END BREADCRUMB -->
+
+<!-- START MAIN CONTENT -->
+<!-- START TITLE GRAPHIC AND INTRO-->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top">
+<td><h1>
+<div id="pagehead">Technical Q&amp;A QA1539</div>
+<div id="pageheadsub">How do I create a QuickTime movie from PCM audio samples in memory?</div>
+</h1></td></tr></table>
+<!-- END TITLE GRAPHIC AND INTRO -->
+<!-- BEGIN WIDE COLUMN -->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td align="left" width="680">
+<!-- BEGIN CONTENTS -->
+<h2>Q: I'm trying to create a QuickTime movie from a memory buffer of PCM audio samples (Stereo, 22.050 kHz) but I'm not having any luck. When I play the resulting movie all I get is silence. Also, how do I properly fill out a <code>SoundDescription</code> structure to describe my audio?</h2><p>A: There are a couple of different ways in which to take an in-memory buffer of audio samples and convert them into an audio track of a movie. One way is to create an empty movie, create a new movie track and track media as defined by a <code>SoundDescription</code> structure, and insert your audio samples into the track media using <code>AddMediaSample2</code>. The code snippet in <A HREF="#TNTAG1">Listing 1</A> shows this technique.</p><p>In order to create a <code>SoundDescription</code> correctly you should first construct an <code>AudioStreamBasicDescription</code> structure (the fundamental descriptive structure in Core Audio) with the fields set correctly for your encoding, and then use the <code>QTSoundDescriptionCreate</code> function to translate these settings into a proper <code>SoundDescription</code>.</p><div class="notebox"><p><strong>WARNING:</strong> Do not attempt to fill out the fields of the <code>SoundDescription</code> yourself, as there are now 3 different versions of the <code>SoundDescription</code> structure. Use the <code>QTSoundDescriptionCreate</code> function to create one, and use the accessor functions (<code>QTSoundDescriptionSet</code>/<code>QTSoundDescriptionGetProperty</code>/<code>QTSoundDescriptionGetPropertyInfo</code>) to query one. Manually filling out the fields in the <code>SoundDescription</code> is strongly discouraged because it is easy to make mistakes when trying to describe your audio data with this structure.</p></div><A NAME="TNTAG1"></A><p class="smalltext"><strong>Listing 1:</strong> Creating a movie from PCM audio data in memory.</p><pre class="sourcecodebox">
+#import &lt;QuickTime/QuickTime.h&gt;
+
+// Constants for use when creating our movie track and media
+
+static const TimeValue  kSoundSampleDuration    = 1;
+static const TimeValue  kTrackStart             = 0;
+static const TimeValue  kMediaStart             = 0;
+
+// These are custom settings which describe our audio samples.
+// You'll want to change these to properly describe your own audio.
+
+static const UInt32                 kNumChannels            = 2;
+static const Float64                kSampleRate             = 22050.;
+static const AudioChannelLayoutTag  kMyAudioChannelLayout   = kAudioChannelLayoutTag_Stereo;
+static const long                   kNumSamples             = 11025; // .5 seconds of 22050
+
+/*
+
+createSoundDescription
+
+Creates a sound description structure of the requested kind
+from an AudioStreamBasicDescription, optional audio channel
+layout, and optional magic cookie.
+
+outDescHndl - pointer to a handle (empty) in which to copy
+the new sound description
+
+*/
+
+-(OSErr) createSoundDescription: (SoundDescriptionHandle *)outDescHndl
+{
+    assert(outDescHndl != NULL);
+
+    AudioStreamBasicDescription asbd = {0}; //see CoreAudioTypes.h
+
+    asbd.mSampleRate           = kSampleRate;
+    asbd.mFormatID             = kAudioFormatLinearPCM;
+    asbd.mFormatFlags          = kAudioFormatFlagsNativeFloatPacked;
+    // if multi-channel, the data format must be interleaved (non-interleaved is not allowed),
+    // and you should set up the asbd accordingly
+    asbd.mChannelsPerFrame     = kNumChannels;  // 2 (Stereo)
+    // mBitsPerChannel = number of bits of sample data for each channel in a frame of data
+    asbd.mBitsPerChannel       = sizeof (Float32) * 8; // 32-bit floating point PCM
+    // mBytesPerFrame = number of bytes in a single sample frame of data
+    //     (bytes per channel) * (channels per frame) = 4 * 2 = 8
+    asbd.mBytesPerFrame        = (asbd.mBitsPerChannel&gt;&gt;3) // number of *bytes* per channel
+                                  * asbd.mChannelsPerFrame; // channels per frame
+    asbd.mFramesPerPacket      = 1; // For PCM, frames per packet is always 1
+    // mBytesPerPacket = (bytes per frame) * (frames per packet) = 8 * 1 = 8
+    asbd.mBytesPerPacket       = asbd.mBytesPerFrame * asbd.mFramesPerPacket;
+
+    // The AudioChannelLayout is used to specify channel layouts
+    // (see CoreAudioTypes.h) and consists of the following:
+    //     - a tag that indicates the layout
+    //     - channel usage bitmap (used if a &quot;named&quot; tag can't be found
+    //        to describe the layout)
+    //     - a variable length array of AudioChannelDescriptions
+    //        that describe the layout/position of a speaker (but if the
+    //        tag field is non-zero it refers to one of the standard
+    //        &quot;named&quot; layout tags, so the individual channel descriptions
+    //        are just there to be more descriptive.
+
+    UInt32 layoutSize;
+    layoutSize = offsetof(AudioChannelLayout, mChannelDescriptions[0]);
+
+    AudioChannelLayout *layout = NULL;
+    layout = calloc(layoutSize, 1); // make sure all fields start cleared
+    OSErr err = -1;
+    if (layout != NULL)
+    {
+        // You must specify a tag identifying a particular pre-defined
+        // channel layout as there are many different layouts to choose.
+        // In this case we are specifying the following:
+        //    kAudioChannelLayoutTag_Stereo
+        //     - a standard stereo stream (L R) - implied playback
+        layout-&gt;mChannelLayoutTag = kMyAudioChannelLayout;
+
+        err = QTSoundDescriptionCreate(
+                    &amp;asbd,              // format description
+                    layout, layoutSize, // channel layout
+                    NULL, 0,            // magic cookie (compression parameters)
+                    kQTSoundDescriptionKind_Movie_LowestPossibleVersion,
+                    outDescHndl);        // SoundDescriptionHandle returned here
+        free(layout);
+    }
+
+    return err;
+}
+
+
+/*
+
+createMovieFromAudioData
+
+Create a movie with a sound track containing the specified
+audio data.
+
+inAudioData - pointer to your audio data
+inAudioDataSize - size of your audio data
+inMovieFilePath - path to the desired movie file to
+be created
+
+*/
+
+-(OSErr) createMovieFromAudioData:(const void *)inAudioData
+                                  dataSize:(long)inAudioDataSize
+                                  movie:(Movie *)outMovie
+{
+    assert(inAudioData != NULL);
+    assert(inAudioDataSize != 0);
+    assert(outMovie != nil);
+
+    *outMovie = NULL;
+
+    // create an empty movie to which we'll add out audio data
+    // as a sound track
+    *outMovie = NewMovie(0);
+    if (*outMovie == NULL) goto bail;
+
+    SoundDescriptionHandle hSoundDesc = NULL;
+    // Create a sound description for our audio data
+    OSErr err = [self createSoundDescription:&amp;hSoundDesc];
+    if (err != noErr) goto bail;
+
+    Track track = NULL;
+    // create a movie track to hold our sound media
+    track = NewMovieTrack(*outMovie, 0, 0, kFullVolume);
+    err = GetMoviesError();
+    if (err != noErr) goto bail;
+
+    // create a data reference for storage to hold our media
+    // data, because when you create an &quot;empty&quot; movie with
+    // NewMovie() there is no designated storage for the movie
+    // media.
+    Handle dataRef = nil;
+    Handle hMovieData = NewHandle(0);
+    err = PtrToHand( &amp;hMovieData, &amp;dataRef, sizeof(Handle));
+    if (err != noErr) goto bail;
+
+    // get the sample rate value for our data from the asbd so
+    // we can use it when creating our track media
+    AudioStreamBasicDescription asbd = {0};
+    OSStatus status = QTSoundDescriptionGetProperty (
+                hSoundDesc,
+                kQTPropertyClass_SoundDescription,
+                kQTSoundDescriptionPropertyID_AudioStreamBasicDescription,
+                sizeof(asbd), &amp;asbd, NULL);
+    if (status != 0) goto bail;
+
+    Media media = NULL;
+    // create a media for our new track, well add our audio
+    // samples to this media
+    media = NewTrackMedia(track, SoundMediaType,
+                asbd.mSampleRate, // media time scale
+                dataRef, HandleDataHandlerSubType); // movie data reference
+    err = GetMoviesError();
+    if (err != noErr) goto bail;
+
+    err = BeginMediaEdits(media);
+    if (err != noErr) goto bail;
+
+    // Add sample data and sample description for our audio data
+    // to the track media.
+    err = AddMediaSample2 (media,
+                           inAudioData, // ptr to our audio data
+                           inAudioDataSize, // audio data size
+                           /*
+                              decodeDurationPerSample
+                              The duration of each sample to be added,
+                              representing the amount of time (in the
+                              media's time scale) that passes while
+                              the sample data is being displayed.  Since
+                              we are adding sound that was sampled at
+                              22 kHz to media that contains a sound track
+                              with the same time scale we set
+                              durationPerSample to 1.
+
+                              In CoreAudio, sample = frame.  A frame is
+                              an individually accessible uncompressed
+                              pcm sample of data.  When dealing with PCM,
+                              1 packet = 1 frame.  But for compressed
+                              formats, 1 packet often equals a lot of frames.
+                              For instance, 1 AAC packet = 1024 frames.
+                              */
+                           kSoundSampleDuration, // duration per sample = 1
+                           0,
+                           (SampleDescriptionHandle)hSoundDesc,
+                           kNumSamples,
+                           0, // 0 = no flags
+                           nil);
+
+    EndMediaEdits(media);
+    if (err != noErr) goto bail;
+
+    // Insert a reference to the media segment into the track.
+    err = InsertMediaIntoTrack(track,
+                            kTrackStart,    // track start time
+                            kMediaStart,    // media start time
+                            GetMediaDuration(media),
+                            fixed1);
+
+bail:
+    if (hSoundDesc != NULL)
+    {
+        DisposeHandle((Handle)hSoundDesc);
+    }
+    if (err != noErr)
+    {
+        if (*outMovie != NULL)
+        {
+            DisposeMovie(*outMovie);
+        }
+        if (hMovieData != NULL)
+        {
+            DisposeHandle(hMovieData);
+        }
+    }
+
+    return err;
+}
+</pre><A NAME="TNTAG2"></A><H2>References</H2><ul><li><p><A HREF="../../documentation/MusicAudio/Reference/CoreAudio/core_audio_types/chapter_6_section_8.html">Core Audio: Audio Channel Layouts</A></p></li><li><p><A HREF="../../documentation/MusicAudio/Reference/CoreAudio/core_audio_types/chapter_6_section_4.html">Core Audio: Audio Stream Basic Description</A></p></li><li><p><A HREF="../../documentation/QuickTime/Conceptual/QT7UpdateGuide/Chapter03/chapter_3_section_1.html">QuickTime 7 API Reference</A></p></li><li><p><A HREF="../../samplecode/QTExtractAndConvertToAIFF/index.html">QTExtractAndConvertToAIFF sample code</A></p></li><li><p><A HREF="../../samplecode/QTExtractAndConvertToMovieFile/index.htmll">QTExtractAndConvertToMovieFile sample code</A></p></li></ul><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNT_HISTORY_TAG"></A><H2>Document Revision History</H2><table cellspacing="0" class="graybox" width="680"><tr><th width="100">Date</th><th width="580">Notes</th></tr><tr><td scope="row">2007-08-29</td><td>First Version</td></tr></table><p><b>Posted:</b> 2007-08-29</p>
+<!-- END CONTENTS -->
+</td></tr></table>
+<!-- END WIDE COLUMN -->
+<!-- END MAIN CONTENT -->
+	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/qa/qa2007/qa1539.html%3Fid%3DDTS10004420-1.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/qa/qa2007/qa1539.html%3Fid%3DDTS10004420-1.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/qa/qa2007/qa1539.html%3Fid%3DDTS10004420-1.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+
+<!-- START BOTTOM APPLE NAVIGATION -->
+<!--#include virtual="/includes/footer"-->
+<!-- END BOTTOM APPLE NAVIGATION -->
+<!-- START CENTER CLOSE -->
+</center>
+<!-- END CENTER CLOSE -->
+</body></html>

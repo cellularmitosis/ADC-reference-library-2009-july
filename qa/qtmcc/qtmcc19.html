@@ -1,0 +1,207 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN"
+			"http://www.w3.org/TR/REC-html40/loose.dtd">
+
+<HTML>
+<!--Template 8-10-00-->
+<HEAD>
+
+
+<LINK REL="stylesheet" HREF="../../adcstyle.css" TYPE="text/css">
+<LINK REL="stylesheet" HREF="../../style.css" TYPE="text/css">
+
+
+    <title>Technical Q&amp;A QTMCC19: Image Decompressor Data-loading Procs</title>
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN"
+			"http://www.w3.org/TR/REC-html40/loose.dtd">
+
+<meta name="keywords" content="Image Decompression components data loading">
+<meta name="Description" content="Technical Q&amp;A QTMCC19: A description of some details relating
+to the correct way to call the data loading procedure from
+inside of a decompressor component.">
+
+
+<meta name="categories" content="QuickTime Image Compression Manager and QuickTime Components">
+
+
+<meta name="week-posted" content="Nov 27, 2000 - Dec 1, 2000">
+
+<LINK REL="stylesheet" HREF="../../css/adcstyle.css" TYPE="text/css"><script language="JavaScript" type="text/javascript" src="../../js/adc.js"></script></HEAD>
+
+<BODY BGCOLOR="#FFFFFF"><a name="//apple_ref/doc/uid/DTS10001962" title="Image Decompressor Data-loading Procs"></a>
+
+<!-- top_of_header_marker_comment -->
+<!-- begin_header_information --><!--#include virtual="/adcnavbar" --><p><a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../technicalqas/index.html">Technical Q&As</a> &gt; <a href="../../technicalqas/QuickTime/index.html">QuickTime</a> &gt; <a href="../../technicalqas/QuickTime/idxQuickTimeComponentCreation-date.html">QuickTime Component Creation</a> &gt; </p><!-- end_header_information -->
+
+
+<!-- top_of_titles_marker_comment --><CENTER><table width="600" cellpadding="0" cellspacing="0" border="0">
+<tr><td align="left" scope="row">
+<h1>
+<div id="pagehead">Technical Q&amp;A QTMCC19</div>
+<div id="pageheadsub">Image Decompressor Data-loading Procs</div>
+</h1>
+</td></tr></table></CENTER><!-- bottom_of_titles_marker_comment -->
+<CENTER>
+
+
+  <!-- --> <!-- Document Body -->
+
+<CENTER><TABLE BORDER=0 CELLSPACING=1 WIDTH=600>
+    <TR>
+       <td align="left">
+
+          <hr width=500 align=center>
+
+
+<P id=p2>Q: I'm writing a decompressor component to work with my graphics importer and I need to load all my image data into a single buffer before decompression. In implementing <CODE>ImageCodecPreflight</CODE> I've made sure to set <CODE>bandMin</CODE> to the full height of my image. However, I am finding the buffer size that I am passed in <CODE>ImageCodecBeginBand</CODE> is set to 32K, and not the size of the image on disk. Can you explain why that is and how I can call the data-loading proc correctly?
+</p>
+
+<P id=p4>A: The caller of <CODE>FDecompressImage</CODE> (or one of the related functions in the Image Compression Manager) has a choice: they can provide all of the compressed data in a single buffer, or provide a smaller buffer and a data-loading proc.</p>
+
+<P id=p4>A data-loading function's buffer will be at least 32K - <CODE>codecMinimumDataSize</CODE> is defined as 32K.</p>
+
+<P id=p4>Image decompressor components should support both modes, since both modes are likely to occur.  In current versions of QuickTime the video media handler will never use a data-loading proc, while the base graphics importer always does.</p>
+
+<P id=p4>The data-loading proc interface is designed for ease of use by image decompressor components that only need to make a single pass through their input data.  If a data-loading proc is supplied, you will need to call it regularly with the pointer you're reading data from and indicate the maximum read-ahead you might need. If necessary, the data-loading proc updates your pointer to make sure there's enough data ahead of you.</p>
+
+<P id=p4>However, sometimes there are reasons why you can't integrate calls to the data-loading proc into your decompressor -- for example, if the actual decompression work is done by code or hardware you cannot modify.  In these cases, you may need to copy the whole frame into a buffer by calling the data-loading proc multiple times, asking for <CODE>p-&gt;bufferSize</CODE> bytes each time.</p>
+
+<P id=p4>The base graphics importer always ensures that the image description's <CODE>dataSize</CODE> contains the actual size of the entire compressed data.</p>
+
+<P id=p4>Let's take a look at how this works:</p>
+
+
+    <CENTER><TABLE BORDER=0 CELLPADDING=4 width=500> <TR> <td bgcolor="#e6e6e6" align=left>
+<pre>
+OSErr ICMDataProcPtr(Ptr *dataP, long bytesNeeded, long refcon);
+</pre>
+    </TD></TR></TABLE></CENTER>
+    <BR><BR>
+
+
+<OL TYPE="1" START="1">
+	<LI>When you call a data-loading proc, you pass it the address of your pointer into the data-loading proc's buffer.  The data-loading proc may check that your pointer still points into its buffer, and it will use the pointer's current value to calculate how much data you have consumed.</li>
+</OL>
+
+    <CENTER><TABLE BORDER=0 CELLPADDING=4 width=500> <TR> <td bgcolor="#e6e6e6" align=left>
+<pre>
+Ptr dataPtr = drp-&gt;codecData;
+Size bytesConsumed;
+Boolean done = false;
+
+while(! done) {
+  if(dataProc) {
+    err = CallICMDataProc(dataProc, &amp;dataPtr, 10000, dataRefCon);
+    if(err) goto bail;
+  }
+    err = consumeUpTo10000Bytes(..., dataPtr, &amp;bytesConsumed, &amp;done);
+    if(err) goto bail;
+    dataPtr += bytesConsumed;
+}
+</pre>
+    </TD></TR></TABLE></CENTER>
+    <BR><BR>
+
+
+<OL TYPE="1" START="2">
+	<LI>Passing NULL instead of the address of your pointer has a special meaning: if the <CODE>bytesNeeded</CODE> parameter is zero, it requests a reset to the start of the data-stream; if the <CODE>bytesNeeded</CODE> parameter is non-zero, it requests a relative seek by that many bytes.  Before doing a relative seek, you should make sure the data-loading proc knows the location of your pointer in its buffer. You can do this by calling the data-proc to ask for zero bytes:</li>
+</OL>
+
+
+<P id=p4>Reset to Start of Data-Stream:</p>
+
+    <CENTER><TABLE BORDER=0 CELLPADDING=4 width=500> <TR> <td bgcolor="#e6e6e6" align=left>
+<pre>
+  err = CallICMDataProc(dataProc, NULL, 0, dataRefCon);
+</pre>
+    </TD></TR></TABLE></CENTER>
+    <BR><BR>
+
+
+
+<P id=p4>Relative Seek:</p>
+
+    <CENTER><TABLE BORDER=0 CELLPADDING=4 width=500> <TR> <td bgcolor="#e6e6e6" align=left>
+<pre>
+  err = CallICMDataProc(dataProc, &amp;dataPtr, 0, dataRefCon);
+  err = CallICMDataProc(dataProc, NULL, relativeSeekAmount, dataRefCon);
+</pre>
+    </TD></TR></TABLE></CENTER>
+    <BR><BR>
+
+
+<P id=p4>followed by read:</p>
+
+    <CENTER><TABLE BORDER=0 CELLPADDING=4 width=500> <TR> <td bgcolor="#e6e6e6" align=left>
+<pre>
+  err = CallICMDataProc(dataProc, &amp;dataPtr, bytesNeeded, dataRefCon);
+</pre>
+    </TD></TR></TABLE></CENTER>
+    <BR><BR>
+
+ 
+<OL TYPE="1" START="3">
+	<LI>To load the data into a block of memory you've allocated, you could do this in your <CODE>BeginBand</CODE> routine:</li>
+</OL>
+
+
+    <CENTER><TABLE BORDER=0 CELLPADDING=4 width=500> <TR> <td bgcolor="#e6e6e6" align=left>
+<pre>
+Ptr dataPtr = drp-&gt;codecData;
+Ptr bufferPtr = myBuffer;
+Size bytesRemaining = myBufferSize;
+
+while(bytesRemaining &gt; 0) {
+  Size bytesToRequest;
+  if(bytesRemaining &lt; codecMinimumDataSize)
+    bytesToRequest = bytesRemaining;
+  else
+    bytesToRequest = codecMinimumDataSize;
+
+  err = CallICMDataProc(dataProc, &amp;dataPtr, bytesToRequest, dataRefCon);
+  if(err) goto bail;
+  BlockMoveData(dataPtr, bufferPtr, bytesToRequest);
+  dataPtr += bytesToRequest;
+  bufferPtr += bytesToRequest;
+  bytesRemaining -= bytesToRequest;
+}
+</pre>
+    </TD></TR></TABLE></CENTER>
+    <BR><BR>
+
+
+
+<!-- begin_date --><H4 ALIGN=center>[Jul 10, 2003]</H4><!-- end_date -->
+
+</td>
+</tr>
+</table></CENTER>
+
+
+
+</CENTER>
+<!-- begin_footer_information -->	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/qa/qtmcc/qtmcc19.html%3Fid%3DDTS10001962-1.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/qa/qtmcc/qtmcc19.html%3Fid%3DDTS10001962-1.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/qa/qtmcc/qtmcc19.html%3Fid%3DDTS10001962-1.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+<!--#include virtual="/includes/footer"--><!-- end_footer_information -->
+
+
+</BODY>
+</HTML>

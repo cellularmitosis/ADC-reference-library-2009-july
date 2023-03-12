@@ -1,0 +1,124 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/1999/REC-html401-19991224/loose.dtd">
+<html><head>
+<!-- BEGIN META TAG INFO -->
+<link rel="home" href="http://developer.apple.com/">
+<link rel="find" href="http://developer.apple.com/search/">
+<link rel="stylesheet" type="text/css" href="../../documentation/css/adcstyle.css" title="fonts">
+<script language="JavaScript" type="text/javascript" src="../../documentation/js/busnav.js"></script>
+<script language="JavaScript" src="../../documentation/js/adc.js" type="text/javascript"></script>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<!-- END META TAG INFO -->
+<!-- BEGIN TITLE -->
+<title>Technical Q&amp;A QA1503: Preventing column reordering in NSTableView</title>
+<!-- END TITLE -->
+</head>
+<!-- BEGIN BODY OPEN -->
+<body bgcolor="#ffffff"><a name="//apple_ref/doc/uid/DTS10004187" title="Preventing column reordering in NSTableView"></a>
+<!--END BODY OPEN -->
+<!-- START CENTER OPEN -->
+<center>
+<!-- END CENTER OPEN -->
+<a name="top"></a>
+<!-- BEGIN LOGO AND SEARCH -->
+<!--#include virtual="/includes/adcnavbar"-->
+<!-- END LOGO AND SEARCH -->
+<!-- START BREADCRUMB -->
+<div id="breadcrumb"><table width="680" border="0" cellpadding="0" cellspacing="0"><tr>
+<td scope="row"><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+<td><img width="340" height="10" src="images/1dot.gif" alt=""></td></tr><tr valign="middle"><td align="left" colspan="2">
+<a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../technicalqas/index.html">Technical Q&As</a> &gt; <a href="../../technicalqas/Cocoa/index.html">Cocoa</a> &gt; <a href="../../technicalqas/Cocoa/idxUserExperience-date.html">User Experience</a> &gt; 
+</td></tr><tr><td colspan="2" scope="row"><img width="680" height="35" src="images/1dot.gif" alt=""></td></tr></table></div>
+<!-- END BREADCRUMB -->
+
+<!-- START MAIN CONTENT -->
+<!-- START TITLE GRAPHIC AND INTRO-->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top">
+<td><h1>
+<div id="pagehead">Technical Q&amp;A QA1503</div>
+<div id="pageheadsub">Preventing column reordering in NSTableView</div>
+</h1></td></tr></table>
+<!-- END TITLE GRAPHIC AND INTRO -->
+<!-- BEGIN WIDE COLUMN -->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td align="left" width="680">
+<!-- BEGIN CONTENTS -->
+<h2>Q: How do I prevent a particular column from being reordered or moved in my <code>NSTableView</code>?</h2><p>A: You can prevent the moving of a column by implementing the <code>NSTableView</code> delegate method <code>tableView:mouseDownInHeaderOfTableColumn:</code> and responding to <code>NSTableViewColumnDidMoveNotification</code>.  The method <code>tableView:mouseDownInHeaderOfTableColumn:</code> will prevent the first column from being dragged, and <code>tableViewColumnDidMove:</code> can be written to restore the original order of the columns if the user attempts to move any column to the left of column 0.</p><p>For example, assume the first <code>NSTableColumn</code> (column 0) identifier is set to &quot;<code>FirstName</code>&quot;.</p><p class="smalltext"><strong>Listing 1:</strong> Block the NSTableView from dragging the first column using the NSTableView delegate method.</p><pre class="sourcecodebox">
+-(void)tableView: (NSTableView*)inTableView mouseDownInHeaderOfTableColumn:(NSTableColumn*)tableColumn
+{
+    if ([[tableColumn identifier] isEqualToString:@&quot;FirstName&quot;])
+    {
+        [inTableView setAllowsColumnReordering:NO];
+    }
+    else
+    {
+        [inTableView setAllowsColumnReordering:YES];
+    }
+}
+</pre><p>In your <code>awakeFromNib</code> or <code>init</code> method use the following:</p><p><code>[[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(<code>tableViewColumnDidMove:</code>) name:<code>NSTableViewColumnDidMoveNotification</code> object:nil];</code></p><p class="smalltext"><strong>Listing 2:</strong> Reorder the columns after a drag reorder by responding to NSTableViewColumnDidMoveNotification.</p><pre class="sourcecodebox">
+- (void)tableViewColumnDidMove:(NSNotification*)aNotification
+{
+    NSDictionary* userInfo = [aNotification userInfo];
+
+    // if the user tries to move the first column out, move it back
+    if ([[userInfo objectForKey:@&quot;NSOldColumn&quot;] intValue] == 0)
+    {
+         // temporarily stop listening to column moves to prevent recursion
+         [[NSNotificationCenter defaultCenter] removeObserver:self
+                name:NSTableViewColumnDidMoveNotification object:nil];
+
+         // move the column
+         [tableView moveColumn:[[userInfo objectForKey:@&quot;NSNewColumn&quot;] intValue] toColumn:0];
+
+         // listen again for column moves
+         [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(tableViewColumnDidMove:)
+                name:NSTableViewColumnDidMoveNotification object:nil];
+    }
+    // if the user tries to move a column in front of the first column, move it back
+    else if ([[userInfo objectForKey:@&quot;NSNewColumn&quot;] intValue] == 0)
+    {
+         // temporarily stop listening to column moves to prevent recursion
+         [[NSNotificationCenter defaultCenter] removeObserver:self
+                name:NSTableViewColumnDidMoveNotification object:nil];
+
+         // move the column
+         [tableView moveColumn:0 toColumn:[[userInfo objectForKey:@&quot;NSOldColumn&quot;] intValue]];
+
+         // listen again for column moves
+         [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(tableViewColumnDidMove:)
+                name:NSTableViewColumnDidMoveNotification object:nil];
+    }
+}
+</pre><A NAME="TNT_HISTORY_TAG"></A><H2>Document Revision History</H2><table cellspacing="0" class="graybox" width="680"><tr><th width="100">Date</th><th width="580">Notes</th></tr><tr><td scope="row">2007-01-24</td><td>First Version</td></tr></table><p><b>Posted:</b> 2007-01-24</p>
+<!-- END CONTENTS -->
+</td></tr></table>
+<!-- END WIDE COLUMN -->
+<!-- END MAIN CONTENT -->
+	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/qa/qa2006/qa1503.html%3Fid%3DDTS10004187-1.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/qa/qa2006/qa1503.html%3Fid%3DDTS10004187-1.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/qa/qa2006/qa1503.html%3Fid%3DDTS10004187-1.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+
+<!-- START BOTTOM APPLE NAVIGATION -->
+<!--#include virtual="/includes/footer"-->
+<!-- END BOTTOM APPLE NAVIGATION -->
+<!-- START CENTER CLOSE -->
+</center>
+<!-- END CENTER CLOSE -->
+</body></html>

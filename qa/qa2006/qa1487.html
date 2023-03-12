@@ -1,0 +1,132 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/1999/REC-html401-19991224/loose.dtd">
+<html><head>
+<!-- BEGIN META TAG INFO -->
+<link rel="home" href="http://developer.apple.com/">
+<link rel="find" href="http://developer.apple.com/search/">
+<link rel="stylesheet" type="text/css" href="../../documentation/css/adcstyle.css" title="fonts">
+<script language="JavaScript" type="text/javascript" src="../../documentation/js/busnav.js"></script>
+<script language="JavaScript" src="../../documentation/js/adc.js" type="text/javascript"></script>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<!-- END META TAG INFO -->
+<!-- BEGIN TITLE -->
+<title>Technical Q&amp;A QA1487: Embedding Hyperlinks in NSTextField and NSTextView</title>
+<!-- END TITLE -->
+</head>
+<!-- BEGIN BODY OPEN -->
+<body bgcolor="#ffffff"><a name="//apple_ref/doc/uid/DTS10004085" title="Embedding Hyperlinks in NSTextField and NSTextView"></a>
+<!--END BODY OPEN -->
+<!-- START CENTER OPEN -->
+<center>
+<!-- END CENTER OPEN -->
+<a name="top"></a>
+<!-- BEGIN LOGO AND SEARCH -->
+<!--#include virtual="/includes/adcnavbar"-->
+<!-- END LOGO AND SEARCH -->
+<!-- START BREADCRUMB -->
+<div id="breadcrumb"><table width="680" border="0" cellpadding="0" cellspacing="0"><tr>
+<td scope="row"><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+<td><img width="340" height="10" src="images/1dot.gif" alt=""></td></tr><tr valign="middle"><td align="left" colspan="2">
+<a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../technicalqas/index.html">Technical Q&As</a> &gt; <a href="../../technicalqas/Cocoa/index.html">Cocoa</a> &gt; <a href="../../technicalqas/Cocoa/idxTextFonts-date.html">Text & Fonts</a> &gt; 
+</td></tr><tr><td colspan="2" scope="row"><img width="680" height="35" src="images/1dot.gif" alt=""></td></tr></table></div>
+<!-- END BREADCRUMB -->
+
+<!-- START MAIN CONTENT -->
+<!-- START TITLE GRAPHIC AND INTRO-->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top">
+<td><h1>
+<div id="pagehead">Technical Q&amp;A QA1487</div>
+<div id="pageheadsub">Embedding Hyperlinks in NSTextField and NSTextView</div>
+</h1></td></tr></table>
+<!-- END TITLE GRAPHIC AND INTRO -->
+<!-- BEGIN WIDE COLUMN -->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td align="left" width="680">
+<!-- BEGIN CONTENTS -->
+<h2>Q: How do I embed a hyperlink inside an NSTextField or NSTextView?</h2><p>A: You can embed a hyperlink using an <code>NSAttributedString</code>.  The resultant attributed string will contain the url, style and color for display.</p><p class="caption"><strong>Figure 1:</strong> An example illustration of an NSTextField with a hyperlink.</p><p><img  src="images/qa1487_linkexample.png" width="192" height="85" alt="Figure 1, An example illustration of an NSTextField with a hyperlink."></p><A NAME="TNTAG2"></A><H2>Extending NSAttributedString</H2><p>An easy way to factor this in your application is to add a &quot;category&quot; to the NSAttributedString class.  By adding an additional class method to this category, you allow other classes to benefit from this extended feature.</p><p class="smalltext"><strong>Listing 1:</strong> Adding a category to NSAttributedString.</p><pre class="sourcecodebox">
+@interface NSAttributedString (Hyperlink)
+  +(id)hyperlinkFromString:(NSString*)inString withURL:(NSURL*)aURL;
+@end
+
+@implementation NSAttributedString (Hyperlink)
++(id)hyperlinkFromString:(NSString*)inString withURL:(NSURL*)aURL
+{
+    NSMutableAttributedString* attrString = [[NSMutableAttributedString alloc] initWithString: inString];
+    NSRange range = NSMakeRange(0, [attrString length]);
+
+    [attrString beginEditing];
+    [attrString addAttribute:NSLinkAttributeName value:[aURL absoluteString] range:range];
+
+    // make the text appear in blue
+    [attrString addAttribute:NSForegroundColorAttributeName value:[NSColor blueColor] range:range];
+
+    // next make the text appear with an underline
+    [attrString addAttribute:
+            NSUnderlineStyleAttributeName value:[NSNumber numberWithInt:NSSingleUnderlineStyle] range:range];
+
+    [attrString endEditing];
+
+    return [attrString autorelease];
+}
+@end
+</pre><div class="notebox"><p><strong>IMPORTANT:</strong> Notice in Listing 1, in an NSTextView (as of Mac OS X 10.3) <code>NSLinkAttributeName</code> is all you need to achieve the look and feel of a hyperlink.  The two additional attributes: <code>NSForegroundColorAttributeName</code> and <code> NSUnderlineStyleAttributeName</code> are redundant, but however are necessary for NSTextField.</p></div><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG4"></A><H2>Hyperlink in an NSTextField</H2><p class="smalltext"><strong>Listing 2:</strong> Creating a hyperlink attributed string inside an NSTextField.</p><pre class="sourcecodebox">
+-(void)setHyperlinkWithTextField:(NSTextField*)inTextField
+{
+    // both are needed, otherwise hyperlink won't accept mousedown
+    [inTextField setAllowsEditingTextAttributes: YES];
+    [inTextField setSelectable: YES];
+
+    NSURL* url = [NSURL URLWithString:@&quot;http://www.apple.com&quot;];
+
+    NSMutableAttributedString* string = [[NSMutableAttributedString alloc] init];
+    [string appendAttributedString: [NSAttributedString hyperlinkFromString:@&quot;Apple Computer&quot; withURL:url]];
+
+    // set the attributed string to the NSTextField
+    [inTextField setAttributedStringValue: string];
+}
+</pre><p>As you can see, <code>setHyperlinkWithTextField:</code> can reside in your class, which can be called from your class's <code>-awakeFromNib</code> or NSDocument's <code>-windowControllerDidLoadNib:</code>, for example.</p><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNTAG6"></A><H2>Hyperlink in an NSTextView</H2><p class="smalltext"><strong>Listing 3:</strong> Creating a hyperlink attributed string inside an NSTextView.</p><pre class="sourcecodebox">
+-(void)setHyperlinkWithTextView:(NSTextView*)inTextView
+{
+    // create the attributed string
+    NSMutableAttributedString *string = [[NSMutableAttributedString alloc] init];
+
+    // create the url and use it for our attributed string
+    NSURL* url = [NSURL URLWithString: @&quot;http://www.apple.com&quot;];
+    [string appendAttributedString:[NSAttributedString hyperlinkFromString:@&quot;Apple Computer&quot; withURL:url]];
+
+    // apply it to the NSTextView's text storage
+    [[inTextView textStorage] setAttributedString: string];
+}
+</pre><p>Note that Listing 3 sets the attributed string a little differently for NSTextView.  You must set the text using the <code>NSTextStorage</code> object.  NSTextStorage is a subclass of NSAttributedString that is the backing store for an NSTextView object.</p><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNT_HISTORY_TAG"></A><H2>Document Revision History</H2><table cellspacing="0" class="graybox" width="680"><tr><th width="100">Date</th><th width="580">Notes</th></tr><tr><td scope="row">2006-10-02</td><td>First Version</td></tr></table><p><b>Posted:</b> 2006-10-02</p>
+<!-- END CONTENTS -->
+</td></tr></table>
+<!-- END WIDE COLUMN -->
+<!-- END MAIN CONTENT -->
+	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/qa/qa2006/qa1487.html%3Fid%3DDTS10004085-1.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/qa/qa2006/qa1487.html%3Fid%3DDTS10004085-1.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/qa/qa2006/qa1487.html%3Fid%3DDTS10004085-1.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+
+<!-- START BOTTOM APPLE NAVIGATION -->
+<!--#include virtual="/includes/footer"-->
+<!-- END BOTTOM APPLE NAVIGATION -->
+<!-- START CENTER CLOSE -->
+</center>
+<!-- END CENTER CLOSE -->
+</body></html>

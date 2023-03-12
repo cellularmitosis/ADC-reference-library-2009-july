@@ -1,0 +1,214 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/1999/REC-html401-19991224/loose.dtd">
+<html><head>
+<!-- BEGIN META TAG INFO -->
+<link rel="home" href="http://developer.apple.com/">
+<link rel="find" href="http://developer.apple.com/search/">
+<link rel="stylesheet" type="text/css" href="../../documentation/css/adcstyle.css" title="fonts">
+<script language="JavaScript" type="text/javascript" src="../../documentation/js/busnav.js"></script>
+<script language="JavaScript" src="../../documentation/js/adc.js" type="text/javascript"></script>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<!-- END META TAG INFO -->
+<!-- BEGIN TITLE -->
+<title>Technical Q&amp;A QA1133: Determining console user login status</title>
+<!-- END TITLE -->
+</head>
+<!-- BEGIN BODY OPEN -->
+<body bgcolor="#ffffff"><a name="//apple_ref/doc/uid/DTS10001680" title="Determining console user login status"></a>
+<!--END BODY OPEN -->
+<!-- START CENTER OPEN -->
+<center>
+<!-- END CENTER OPEN -->
+<a name="top"></a>
+<!-- BEGIN LOGO AND SEARCH -->
+<!--#include virtual="/includes/adcnavbar"-->
+<!-- END LOGO AND SEARCH -->
+<!-- START BREADCRUMB -->
+<div id="breadcrumb"><table width="680" border="0" cellpadding="0" cellspacing="0"><tr>
+<td scope="row"><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+<td><img width="340" height="10" src="images/1dot.gif" alt=""></td></tr><tr valign="middle"><td align="left" colspan="2">
+<a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../technicalqas/index.html">Technical Q&As</a> &gt; <a href="../../technicalqas/Darwin/index.html">Darwin</a> &gt; <a href="../../technicalqas/Darwin/idxProcessManagement-date.html">Process Management</a> &gt; 
+</td></tr><tr><td colspan="2" scope="row"><img width="680" height="35" src="images/1dot.gif" alt=""></td></tr></table></div>
+<!-- END BREADCRUMB -->
+
+<!-- START MAIN CONTENT -->
+<!-- START TITLE GRAPHIC AND INTRO-->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top">
+<td><h1>
+<div id="pagehead">Technical Q&amp;A QA1133</div>
+<div id="pageheadsub">Determining console user login status</div>
+</h1></td></tr></table>
+<!-- END TITLE GRAPHIC AND INTRO -->
+<!-- BEGIN WIDE COLUMN -->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td align="left" width="680">
+<!-- BEGIN CONTENTS -->
+<h2>Q: How do I tell whether a console user is currently logged in?</h2><p>A: It really depends on what you mean by &quot;currently logged in&quot;.  With the introduction of fast user switching in Mac OS X 10.3, multiple users can be logged into the system at the same time.  So, you have to split the question in two:</p><ol><li><p>How do I get a list of GUI login sessions?</p></li><li><p>Which GUI login session, if any, is currently using the console?</p></li></ol><p>These are clear questions with clear answers (see below).  However, it's likely that, if you're asking these questions, you need to rethink your architecture.</p><p>One of the fundamental design principles of the Mac OS X is that high-level services can depend on low-level services, but not the other way around.  For example, it's fine for an application to depend on the kernel, but it's a problem if the kernel depends on an application.</p><p>The question of determining the current console user typically arises when you break this design principle.  Only application-level services should care whether a user's session is currently active on the console, and it's easy for such services to <A HREF="../../documentation/MacOSX/Conceptual/BPMultipleUsers/BPMultipleUsers.html">determine that</A>.  On the other hand, a daemon should not be concerned about whether a user is logged in on the console, and thus it's tricky to get this information from that context.</p><p>This issue is discussed in great depth in <A HREF="../../technotes/tn2005/tn2083.html">Technical Note TN2083, 'Daemons and Agents'</A> and, specifically, in the &quot;Design Considerations&quot; section of that technote.  So, before you read the rest of this document, I strongly recommend that you read that technote and think about how you can align your architecture with the overall Mac OS X architecture.</p><div class="notebox"><p><strong>WARNING:</strong> The System Configuration framework mechanism for determining the current console user has a number of important caveats:</p><ul><li><p>It assumes that the computer has a single GUI console.  While that's true currently, it may not be true forever.  If you use this technique you will have to change your code if this situation changes.</p></li><li><p>It has no way of indicating that multiple users are logged in.</p></li><li><p>It has no way of indicating that a user is logged in but has switched to the login window.</p></li></ul><p>Because of these issues, routines like <code>SCDynamicStoreCopyConsoleUser</code> exist only for compatibility purposes.  It's likely that they will be formally deprecated in a future version of Mac OS X.</p></div><p>If you choose to ignore all of the warnings above, here are the answers to your questions:</p><ol><li><p>How do I get a list of GUI login sessions? &mdash; In Mac OS X 10.5 and later you can use the <A HREF="x-man-page://3/getutxent">utmpx</A> API to get this information.  For an example of this, see <A HREF="../../samplecode/UTXplorer/index.html">Sample Code Project 'UTXplorer'</A>.</p><p>Prior to Mac OS X 10.5 there was no supported way to get this information directly.  <A HREF="../../technotes/tn2005/tn2083.html">Technical Note TN2083, 'Daemons and Agents'</A> suggests an indirect way to do it, based a central daemon with a set of cooperating agents.  This design will work on all versions of Mac OS X and is generally aligned with the overall Mac OS X design principle described earlier.</p></li><li><p>Which GUI login session, if any, is currently using the console? &mdash; This is answered below.</p></li></ol><p>You can get the user name of the current console user by calling the <code>SCDynamicStoreCopyConsoleUser</code> function (from the System Configuration framework).  <A HREF="#LISTCURRENTCONSOLEUSER">Listing 1</A> shows how to do this.</p><A NAME="LISTCURRENTCONSOLEUSER"></A><p class="smalltext"><strong>Listing 1:</strong> Getting the current console user</p><pre class="sourcecodebox">
+static CFStringRef CopyCurrentConsoleUsername(SCDynamicStoreRef store)
+    // Returns the name of the current console user, or NULL if there is
+    // none.  store may be NULL, in which case a transient dynamic store
+    // session is used.
+{
+    CFStringRef result;
+
+    result = SCDynamicStoreCopyConsoleUser(store, NULL, NULL);
+
+    // If the current console user is &quot;loginwindow&quot;, treat that as equivalent
+    // to none.
+
+    if ( (result != NULL) &amp;&amp; CFEqual(result, CFSTR(&quot;loginwindow&quot;)) ) {
+        CFRelease(result);
+        result = NULL;
+    }
+
+    return result;
+}
+</pre><p>The System Configuration framework also makes it easy to be notified when this setting changes.  <A HREF="#LISTNOTIFICATION">Listing 2</A> shows how to do that.</p><A NAME="LISTNOTIFICATION"></A><p class="smalltext"><strong>Listing 2:</strong> Discovering when that setting changes</p><pre class="sourcecodebox">
+#include &lt;assert.h&gt;
+
+#include &lt;SystemConfiguration/SystemConfiguration.h&gt;
+
+static CFStringRef CopyCurrentConsoleUsername(SCDynamicStoreRef store);
+    // defined above
+
+static CFStringRef gCurrentConsoleUser;
+
+static void MyNotificationProc(
+    SCDynamicStoreRef  store,
+    CFArrayRef          changedKeys,
+    void *              info
+)
+    // Called out of our runloop when the current console user value
+    // changes in the dynamic store.  It's possible to get multiple
+    // redundant notifications, so we debounce the notification by checking
+    // for changes relative to gCurrentConsoleUser.
+{
+    #pragma unused(changedKeys)
+    #pragma unused(info)
+    CFStringRef         currentConsoleUser;
+    Boolean             didChange;
+
+    // Get the current console user.
+
+    currentConsoleUser = CopyCurrentConsoleUsername(store);
+
+    // See if it changed.
+
+    didChange = (gCurrentConsoleUser != NULL) != (currentConsoleUser != NULL);
+    if ( ! didChange &amp;&amp; (gCurrentConsoleUser != NULL) ) {
+        assert(currentConsoleUser != NULL); // because if it was NULL,
+                                            // didChange would already be true
+        didChange = ! CFEqual(gCurrentConsoleUser, currentConsoleUser);
+    }
+
+    // If it did, log that fact and remember the current value.
+
+    if (didChange) {
+        if (gCurrentConsoleUser != NULL) {
+            CFRelease(gCurrentConsoleUser);
+        }
+        gCurrentConsoleUser = currentConsoleUser;
+        if (gCurrentConsoleUser != NULL) {
+            CFRetain(gCurrentConsoleUser);
+        }
+
+        CFShow(gCurrentConsoleUser);
+    }
+}
+
+int main(int argc, char **argv)
+{
+    #pragma unused(argc)
+    #pragma unused(argv)
+    Boolean             success;
+    SCDynamicStoreRef   store;
+    CFStringRef         key;
+    CFArrayRef          keys;
+    CFRunLoopSourceRef  rls;
+
+    // Set up our connection to the dynamic store so that notifications are
+    // delivered by calling MyNotificationProc.
+
+    store = SCDynamicStoreCreate(
+        NULL,
+        CFSTR(&quot;com.apple.dts.ConsoleUser&quot;),
+        MyNotificationProc,
+        NULL
+    );
+    assert(store != NULL);
+
+    // Set it up to notify us when the console user value changes.
+
+    key = SCDynamicStoreKeyCreateConsoleUser(NULL);
+    assert(key != NULL);
+
+    keys = CFArrayCreate(NULL, (const void **) &amp;key, 1, &amp;kCFTypeArrayCallBacks);
+    assert(keys != NULL);
+
+    success = SCDynamicStoreSetNotificationKeys(store, keys, NULL);
+    assert(success);
+
+    // Add it to the runloop.
+
+    rls = SCDynamicStoreCreateRunLoopSource(NULL, store, 0);
+    assert(rls != NULL);
+
+    CFRunLoopAddSource(CFRunLoopGetCurrent(), rls, kCFRunLoopDefaultMode);
+
+    // Print the current value.
+
+    gCurrentConsoleUser = CopyCurrentConsoleUsername(store);
+    CFShow(gCurrentConsoleUser);
+
+    // Run forever printing any changes.
+
+    CFRunLoopRun();
+
+    // Clean up code.  This simple tool will never execute this code
+    // (because CFRunLoopRun will never return), but I've left it here
+    // in case you adapt the code for a more complex situation.
+
+    if (gCurrentConsoleUser != NULL) {
+        CFRelease(gCurrentConsoleUser);
+    }
+    CFRunLoopSourceInvalidate(rls);
+    CFRelease(rls);
+    CFRelease(keys);
+    CFRelease(key);
+    CFRelease(store);
+
+    return EXIT_SUCCESS;
+}
+</pre><A NAME="TNT_HISTORY_TAG"></A><H2>Document Revision History</H2><table cellspacing="0" class="graybox" width="680"><tr><th width="100">Date</th><th width="580">Notes</th></tr><tr><td scope="row">2008-04-14</td><td>A complete rewrite to account for fast user switching, and to simplify the code.</td></tr><tr><td scope="row">2002-04-08</td><td>How to determine whether a user is logged in on the console, and be notified of changes.</td></tr></table><p><b>Posted:</b> 2008-04-14</p>
+<!-- END CONTENTS -->
+</td></tr></table>
+<!-- END WIDE COLUMN -->
+<!-- END MAIN CONTENT -->
+	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/qa/qa2001/qa1133.html%3Fid%3DDTS10001680-1.1&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/qa/qa2001/qa1133.html%3Fid%3DDTS10001680-1.1&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/qa/qa2001/qa1133.html%3Fid%3DDTS10001680-1.1&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+
+<!-- START BOTTOM APPLE NAVIGATION -->
+<!--#include virtual="/includes/footer"-->
+<!-- END BOTTOM APPLE NAVIGATION -->
+<!-- START CENTER CLOSE -->
+</center>
+<!-- END CENTER CLOSE -->
+</body></html>

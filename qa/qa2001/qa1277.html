@@ -1,0 +1,81 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN"
+"http://www.w3.org/TR/REC-html40/loose.dtd">
+<HTML>
+<HEAD>
+
+<title>Technical Q&amp;A QA1277: Security Credentials</title>
+
+<LINK REL="stylesheet" HREF="../../adcstyle.css" TYPE="text/css">
+<LINK REL="stylesheet" HREF="../../style.css" TYPE="text/css">
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+<meta name="keywords" content="security, Authorization Services, AuthorizationExecuteWithPrivileges, AuthorizationCopyRights, credentials, AuthorizationRef">
+<meta name="Description" content="This Q&amp;A describes how the relationship between Authorization Services, authorization sessions, the Security Server, credentials, and the credentials cache.">
+
+<LINK REL="stylesheet" HREF="../../css/adcstyle.css" TYPE="text/css"><script language="JavaScript" type="text/javascript" src="../../js/adc.js"></script></HEAD>
+
+
+<BODY BGCOLOR=WHITE><a name="//apple_ref/doc/uid/DTS10002309" title="Security Credentials"></a>
+
+<!-- begin_header_information --><!--#include virtual="/adcnavbar" --><p><a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../technicalqas/index.html">Technical Q&As</a> &gt; <a href="../../technicalqas/Security/index.html">Security</a> &gt; <a href="../../technicalqas/Security/idxAuthorization-date.html">Authorization</a> &gt; </p><!-- end_header_information -->
+
+<!-- begin_titles_information --><CENTER><table width="600" cellpadding="0" cellspacing="0" border="0">
+<tr><td align="left" scope="row">
+<h1>
+<div id="pagehead">Technical Q&amp;A QA1277</div>
+<div id="pageheadsub">Security Credentials</div>
+</h1>
+</td></tr></table></CENTER><!-- end_titles_information -->
+
+<CENTER><TABLE BORDER=0 CELLSPACING=1 WIDTH=600> <TR> <TD align="left">
+
+
+<hr width=500 align=center>
+
+<!-- begin_document_contents --><P id=p2>Q: I'm writing a program that uses Authorization Services. When I call <code>AuthorizationCopyRights</code>, sometimes I get a password dialog and sometimes I don't. What's going on?.</P>
+						<P id=p4>A: This relates to a poorly understood aspect of Authorization Services and the Security Server. To understand what's going on, you need to understand how the Security Server implements authorization.</P>
+						<p id=p4>A credential is something that the Security Server knows about a particular user. The standard example of a credential is the knowledge that a particular user has entered a valid user name and password.</p>
+						<p>The Security Server maintains a global (per-login session) credentials cache, and a credentials cache per authorization instance [1]. When you request authorization for a particular right, the right specification (found in the authorization policy database in &quot;/etc/authorization&quot;) indicates the list of credentials that must be obtained to grant the right. It may also include a <code>shared</code> key, which determines whether the credentials are shared. For each credential in the right specification, the Security Server attempts to obtain the credential from a credentials cache. It first looks in the credentials cache associated with the authorization instance. If the credential isn't there and credentials are shared, it then looks in the global credentials cache. If the Security Server can't find the credential in a cache, it tries to acquire the credential. Typically this involves putting up an authentication dialog, where the user must enter a user name and password. However, on some configurations of Mac OS X, it may acquire the credential from other places (such as a smart card).</p>
+						<p>If the Security Server successfully obtains a credential, it remembers it in the credentials cache associated with the authorization instance and, if the right specifies that credentials are shared, in the global credentials cache.</p>
+						<p>If the right specification has a <code>timeout</code> key, its value indicates how long (in seconds) a cached credential is applicable for this right. A value of 0 means that the credential can only be used once (that is, it times out immediately). If the <code>timeout</code> key is missing, the credential can always be used to grant the right (unless the credential is destroyed, see below).</p>
+						<p>The above seems like security-geek trivia, until you understand some important consequences.</p>
+						<ul>
+							<li>When you log in, <code>loginwindow</code> acquires the right <code>system.login.console</code>. As a side effect, this acquires the credential indicating that you know your user name and password, and stores that credential in the global credentials cache.
+							<li>Most other right specifications (for example, <code>system.preferences</code>, which controls whether you can modify settings in System Preferences) require that you prove that you know the user name and password of an administrator. If you're in the <code>admin</code> group, the act of logging in acquires this credential and stores it in the global credentials cache. Thus, if you're in the <code>admin</code> group, you don't need to enter your password to make changes in System Preferences.
+							<li>If an applications requests a right and the right specification in the policy database indicates that any newly acquired credentials should be shared and you enter your user name and password, that credential goes into the global credentials cache. If another application (that is, another authorization instance) requests a right and the right specification dictates that your user name and password credential is required, Security Server will use the credential from the global credential cache. Thus, entering your user name and password in one application will allow other applications to use the credential.					</ul>
+						<p>The end result is that in many cases a call to <code>AuthorizationCopyRights</code> does not require you to enter a user name and password because the Security Server already has cached the required credentials.</p>
+						<p>The only way to guarantee that a credential acquired when you request a right is not shared with other authorization instances is to destroy that credential. You do this by calling <code>AuthorizationFree</code> and passing in the flag <code>kAuthorizationFlagDestroyRights</code>.</p>
+						<p><b>Notes:</b></p>
+						<ol>
+							<li>An authorization instance is more-or-less equivalent to an <code>AuthorizationRef</code>, although you can have multiple processes sharing the same authorization instance if you externalize the AuthorizationRef and pass it between the processes.
+						</ol>
+						<hr width=500 align=center>
+						<!-- begin_date --><H4 ALIGN=center>[Aug 06, 2003]</H4><!-- end_date --><!-- end_document_contents -->
+
+
+</TD></TR></TABLE></CENTER>
+
+<!-- begin_footer_information -->	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/qa/qa2001/qa1277.html%3Fid%3DDTS10002309-1.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/qa/qa2001/qa1277.html%3Fid%3DDTS10002309-1.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/qa/qa2001/qa1277.html%3Fid%3DDTS10002309-1.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+<!--#include virtual="/includes/footer"--><!-- end_footer_information -->
+
+</BODY>
+</HTML>

@@ -1,0 +1,57 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN"
+"http://www.w3.org/TR/REC-html40/loose.dtd"><HTML><HEAD><title>Technical Q&amp;A QA1319: Installing an I/O Kit KEXT Without Rebooting</title><LINK REL="stylesheet" HREF="../../adcstyle.css" TYPE="text/css"><LINK REL="stylesheet" HREF="../../style.css" TYPE="text/css"><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1"><meta name="keywords" content="KEXT,install,restart,driver,I/O Kit,kernel extension"><meta name="Description" content="Rebooting is an expensive operation, so developers are exploring ways of installing I/O Kit kernel extensions (KEXTs) without requiring a restart. This Technical Q&amp;A outlines what is possible to achieve in this area today."><LINK REL="stylesheet" HREF="../../css/adcstyle.css" TYPE="text/css"><script language="JavaScript" type="text/javascript" src="../../js/adc.js"></script></HEAD><BODY BGCOLOR=WHITE><a name="//apple_ref/doc/uid/DTS10002355" title="Installing an I/O Kit KEXT Without Rebooting"></a><!-- begin_header_information --><!--#include virtual="/adcnavbar" --><p><a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../technicalqas/index.html">Technical Q&As</a> &gt; <a href="../../technicalqas/Darwin/index.html">Darwin</a> &gt; <a href="../../technicalqas/Darwin/idxHardwareDrivers-date.html">Hardware & Drivers</a> &gt; </p><!-- end_header_information --><!-- begin_titles_information --><CENTER><table width="600" cellpadding="0" cellspacing="0" border="0">
+<tr><td align="left" scope="row">
+<h1>
+<div id="pagehead">Technical Q&amp;A QA1319</div>
+<div id="pageheadsub">Installing an I/O Kit KEXT Without Rebooting</div>
+</h1>
+</td></tr></table></CENTER><!-- end_titles_information --><CENTER><TABLE BORDER=0 CELLSPACING=1 WIDTH=600> <TR> <TD align="left"><hr width=500 align=center><!-- begin_document_contents --><P id=p2> Q: Is it possible to install an I/O Kit KEXT without requiring a restart?</P><P id=p4> A: There is no easy solution to this problem. Currently, even Apple's own installers require restarting after a KEXT installation. Here's why this is more complicated than it may seem.</P>
+
+<P id=p4>If another driver is currently matched to your device, that driver has to be unloaded first. This in turn means that the device can't be in use. Plus, the preferred mechanism for updating the system's list of known KEXTs does not exist in older releases of Mac OS X.</P>
+
+<P id=p4>Given those considerations, here is the logic you should use: <OL>
+<LI> If the release is &lt; 10.3 (prior to Panther), require a restart.</LI><LI> If the release is &gt;= 10.3 and <CODE>kextd</CODE>  is NOT running, require a restart. A shell script can determine whether<CODE>kextd</CODE>  is running using the code in <A HREF="#TAN36">Listing 1</A> . This code will return the PID of <CODE>kextd</CODE>  if it is running, or return nothing if it isn't.</LI><LI> If the release is &gt;= 10.3 AND <CODE>kextd</CODE>  is running, send <CODE>kextd</CODE>  a <CODE>SIGHUP</CODE>  signal as shown in <A HREF="#TAN39">Listing 2</A> :</LI></OL></P><BR><BR>
+<!-- listing starts here -->
+<A NAME="TAN36"></A>
+<CENTER><TABLE BORDER=0 CELLPADDING=0 WIDTH=550><TR><TD>
+<P><B>Listing 1</B>. Determining whether kextd is running.</P>
+</TD></TR><TR><TD BGCOLOR="#E6E6E6"><PRE>
+ps -ax | awk '{print $1&quot; &quot;$5}' | grep kextd | awk '{print $1}'
+
+</PRE></TD></TR></TABLE></CENTER>
+<!-- listing ends here -->
+<BR><BR>  
+<BR><BR>
+<!-- listing starts here -->
+<A NAME="TAN39"></A>
+<CENTER><TABLE BORDER=0 CELLPADDING=0 WIDTH=550><TR><TD>
+<P><B>Listing 2</B>. Sending a SIGHUP to kextd.</P>
+</TD></TR><TR><TD BGCOLOR="#E6E6E6"><PRE>
+/bin/kill -1 `ps -ax | awk '{print $1&quot; &quot;$5}' | grep kextd | \
+awk '{print $1}'`
+
+</PRE></TD></TR></TABLE></CENTER>
+<!-- listing ends here -->
+<BR><BR>  
+<P id=p4> In the future we may have a formal API for this, so there may eventually be an option 4, but the logic above will continue to function correctly even in that case. It is important that your install script cope with the case where <CODE>kextd</CODE>  is not running.</P><P id=p2> Q: Can't I just <CODE>fork/exec kextload</CODE>  to load my KEXT?</P><P id=p4> A: This approach has its own pitfalls. If you run <CODE>kextload</CODE>  but the user waits longer than about a minute to plug in the device, your driver will be unloaded and another matching driver will be loaded for your device instead. And, even if the user plugs in the device promptly, if they unplug the device later, your driver will still be unloaded after a minute. You're now back to the first situation because <CODE>kextd</CODE>  isn't aware of your KEXT if you've loaded it by hand using <CODE>kextload.</CODE><CODE>kextd</CODE>  enumerates available KEXTs only at startup or in response to a <CODE>SIGHUP</CODE>  in those versions that support that signal.</P><hr width=500 align=center><!-- begin_date --><H4 ALIGN=center>[Oct 28, 2003]</H4><!-- end_date --><!-- end_document_contents --></TD></TR></TABLE></CENTER><!-- begin_footer_information -->	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/qa/qa2001/qa1319.html%3Fid%3DDTS10002355-1.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/qa/qa2001/qa1319.html%3Fid%3DDTS10002355-1.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/qa/qa2001/qa1319.html%3Fid%3DDTS10002355-1.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+<!--#include virtual="/includes/footer"--><!-- end_footer_information --></BODY></HTML>

@@ -1,0 +1,44 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN"			"http://www.w3.org/TR/REC-html40/loose.dtd"><HTML><!--Template 06-20-02--><HEAD><LINK REL="stylesheet" HREF="../../adcstyle.css" TYPE="text/css"><LINK REL="stylesheet" HREF="../../style.css" TYPE="text/css"><title>Technical Q&amp;A HW30: Making the ADBOp call from CFM-68K</title><meta name="keywords" content="Mac OS 8 CFM-68k ADBOp call bus error"><meta name="Description" content="Technical Q&amp;A HW30: Q&amp;A identifies problem with the gluecode implemented in the CFM-68k InterfaceLib file that causesa bus error when ADBop is called. Q&amp;A provides revised gluecode to correct the error."><meta name="categories" content="Hardware"><meta name="week-posted" content="May 11, 1998 - May 15, 1998"><LINK REL="stylesheet" HREF="../../css/adcstyle.css" TYPE="text/css"><script language="JavaScript" type="text/javascript" src="../../js/adc.js"></script></HEAD><BODY BGCOLOR="#FFFFFF"><a name="//apple_ref/doc/uid/DTS10001302" title="Making the ADBOp call from CFM-68K"></a><!-- top_of_header_marker_comment --><!-- begin_header_information --><!--#include virtual="/adcnavbar" --><p><a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../technicalqas/index.html">Technical Q&As</a> &gt; <a href="../../technicalqas/LegacyTechnologies/index.html">Legacy Documents</a> &gt; <a href="../../technicalqas/LegacyTechnologies/idxMacOS9Earlier-date.html">Mac OS 9 & Earlier</a> &gt; </p><div style="width:100%; position:fixed;"><div align="center" id="watermark" style="position: relative; margin-left:auto; margin-right:auto; z-index:20; width:500px;"><div class="legacybox"><h1>Legacy Document<span class=closebutton><a href="javascript:closeWatermark()"><img src="../../images/closebutton.png" width="14" height="14" border="0"  alt="close button"></a></span></h1>
+
+<p><strong>Important: </strong>This document is part of the Legacy section of the ADC Reference Library. This information should not be used for new development.</p>
+
+<div class="reflibtopic">
+	<p>Current information on this Reference Library topic can be found here:</p>
+	<ul>
+				<li><a href="http://developer.apple.com/referencelibrary/HardwareDrivers/idxAccessibility-date.html" target="_blank">Hardware & Drivers > Accessibility</a></li>
+		<li><a href="http://developer.apple.com/referencelibrary/HardwareDrivers/idxAppleHardware-date.html" target="_blank">Hardware & Drivers > Apple Hardware</a></li>
+		<li><a href="http://developer.apple.com/referencelibrary/HardwareDrivers/idxHumanInterfaceDeviceForceFeedback-date.html" target="_blank">Hardware & Drivers > Human Interface Device & Force Feedback</a></li>
+	</ul>
+</div>
+
+
+
+
+</div></div></div><!-- end_header_information --><!-- bottom_of_header_marker_comment --><!-- top_of_titles_marker_comment --><CENTER><table width="600" cellpadding="0" cellspacing="0" border="0">
+<tr><td align="left" scope="row">
+<h1>
+<div id="pagehead">Technical Q&amp;A HW30</div>
+<div id="pageheadsub">Making the ADBOp call from CFM-68K</div>
+</h1>
+</td></tr></table></CENTER><!-- bottom_of_titles_marker_comment -->			<!-- begin_content --> <CENTER><TABLE BORDER=0 CELLPADDING=0 WIDTH=600><TR> <td align="left"><hr width=500 align=center><p id=p2>Q: When I make the <CODE>ADBOp</CODE> call from a CFM-68K process, I crash with a bus error. How can I get around thisproblem?</p><p id=p4>A: This is a known issue with the glue codeimplemented in the CFM-68K <CODE>InterfaceLib</CODE> file. The solution is to implement your own glue code (presented below) to perform the call directly to the 68K trap. You will need to make some minor changes to your program to accommodate the glue code as documented here.</P><ol type="1" >	<li>Include the code below and change your call from <CODE>ADBOp</CODE> to <CODE>MyADBOp</CODE>.</li>	<li>If you implement a completion routine, instead of accessing the register parameters directly (the optional <CODE>refCon</CODE> buffer and the data buffer), you'll need to access them as globals to the fragment. You can find a sample program demonstrating this code on the Developer CD - "SetLED."</li></ol><p id="p4">For more information on implementing glue code for calls fromPowerPC code to 68K code, refer to <a href="http://developer.apple.com/technotes/tn/tn1127.html" target="_blank">Technote 1127: "In Search of Missing Links."</A>This problem was identified with System Software 8.1. The bugreport number is 2227159.</p><CENTER><TABLE BORDER=0 CELLPADDING=5 WIDTH=550><TR>	<td bgcolor="#E6E6E6" align=left><pre>#include &lt;Types.h&gt;#include &lt;DeskBus.h&gt;#include &lt;MixedMode.h&gt;&nbsp;// Instead of making the ADBOp directly, call MyADBOp which makes the appropriate// call depending on the target architecture. For CFM68K, the ADBOpBlock structure// is filled in and the ADBGlue routine above is called. For regular 68K and PPC,// the ADBOp call is made straightaway.&nbsp;pascal OSErr MyADBOp(Ptr refCon,ADBServiceRoutineUPP compRout,Ptr buffer,short commandNum){#if TARGET_CPU_68K &amp;&amp; TARGET_RT_MAC_CFM    ADBOpBlock adbOpBlock;    adbOpBlock.dataBuffPtr = buffer;    adbOpBlock.opServiceRtPtr = compRout;    adbOpBlock.opDataAreaPtr = refCon;    // Important note: In this sample, we declare the adbOpBlock structure    // as a stack variable. Normally this is a bad practice to use a stack    // parameter for any asynchronous call. ADBOp makes a copy of the    // contents of the structure, so the structure does not need to exist    // for the life of the asynchronous call.    // Note that the refCon value is placed into the ADBOpBlock structure    // for completeness. This program sample assumes that a completion    // routine will access the refCon and the data buffer as globals    // to the process, which is possible under CFM.    return (OSErr) CallUniversalProc((UniversalProcPtr)NGetTrapAddress(0xA07C,0),         kRegisterBased |         RESULT_SIZE(SIZE_CODE(sizeof(OSErr))) |        REGISTER_RESULT_LOCATION(kRegisterD0) |        REGISTER_ROUTINE_PARAMETER(1,        kRegisterA0,        SIZE_CODE(sizeof(&amp;gADBOpBlock)))  |        REGISTER_ROUTINE_PARAMETER(2,        kRegisterD0,        SIZE_CODE(sizeof(commandNum))),        &amp;gADBOpBlock,        commandNum);#else // TARGET_CPU_68K &amp;&amp; TARGET_RT_MAC_CFM    return (ADBOp(refCon, compRout, buffer, commandNum));#endif // TARGET_CPU_68K &amp;&amp; TARGET_RT_MAC_CFM}</pre>	</TD></TR></TABLE></CENTER></td></tr></table></center><!-- end_content --><!-- begin_date --><H4 ALIGN=center>[May 11 1998]</H4><!-- end_date --><!-- begin_footer_information -->	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/qa/hw/hw30.html%3Fid%3DDTS10001302-1.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/qa/hw/hw30.html%3Fid%3DDTS10001302-1.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/qa/hw/hw30.html%3Fid%3DDTS10001302-1.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+<!--#include virtual="/includes/footer"--><!-- end_footer_information --> <hr width=500 align=center> </BODY> </HTML>

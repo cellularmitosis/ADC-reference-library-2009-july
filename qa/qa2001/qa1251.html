@@ -1,0 +1,133 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN"
+"http://www.w3.org/TR/REC-html40/loose.dtd">
+<HTML>
+<HEAD>
+
+<title>Technical Q&amp;A QA1251: FSSetCatalogInfo versus UID and GID</title>
+
+<LINK REL="stylesheet" HREF="../../adcstyle.css" TYPE="text/css">
+<LINK REL="stylesheet" HREF="../../style.css" TYPE="text/css">
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+<meta name="keywords" content="Mac OS X, FSSetCatalogInfo, UID, GID, permissions, privileges, FUID, FGID">
+<meta name="Description" content="This Q&amp;A describes why FSSetCatalogInfo does not set the UID and GID of the file, and what you can do to workaround that.">
+
+<LINK REL="stylesheet" HREF="../../css/adcstyle.css" TYPE="text/css"><script language="JavaScript" type="text/javascript" src="../../js/adc.js"></script></HEAD>
+
+
+<BODY BGCOLOR=WHITE><a name="//apple_ref/doc/uid/DTS10002289" title="FSSetCatalogInfo versus UID and GID"></a>
+
+<!-- begin_header_information --><!--#include virtual="/adcnavbar" --><p><a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../technicalqas/index.html">Technical Q&As</a> &gt; <a href="../../technicalqas/Carbon/index.html">Carbon</a> &gt; <a href="../../technicalqas/Carbon/idxFileManagement-date.html">File Management</a> &gt; </p><!-- end_header_information -->
+
+<!-- begin_titles_information --><CENTER><table width="600" cellpadding="0" cellspacing="0" border="0">
+<tr><td align="left" scope="row">
+<h1>
+<div id="pagehead">Technical Q&amp;A QA1251</div>
+<div id="pageheadsub">FSSetCatalogInfo versus UID and GID</div>
+</h1>
+</td></tr></table></CENTER><!-- end_titles_information -->
+
+<CENTER><TABLE BORDER=0 CELLSPACING=1 WIDTH=600> <TR> <TD align="left">
+
+
+<hr width=500 align=center>
+
+<!-- begin_document_contents --><P id=p2>Q: How do I use <code>FSSetCatalogInfo</code> to change the UID and GID of a file?</P><P id=p4>A: Apple specifically chose to ignore the UID and GID values you supply to <code>FSSetCatalogInfo</code> so as to improve compatibility with existing source code. The code in most applications copies a file's metadata by calling <code>FSGetCatalogInfo</code> on the source then calling <code>FSSetCatalogInfo</code> on the destination. However, Mac OS X does not let a non-root program change the UID of a file. Thus, if <code>FSSetCatalogInfo</code> was implemented in the obvious way and you used the standard copy algorithm to copy a file that you did not own, your program would fail with a permissions error.</P>
+						<P id=p4>At this point in time there is <a href="rdar://problem/2631025">no way</a> to set a file's UID or GID using the Carbon File Manager. The recommended workaround is to use the BSD call <code>chown</code>, as shown in Listing 1.</P>
+						<p id=p4><br>
+							<!-- listing starts here --></p>
+						<CENTER><TABLE BORDER=0 CELLPADDING=0 WIDTH=550><TR><TD>
+<P><B>Listing 1</B>. A version of <code>FSSetCatalogInfo</code> that sets the UID and GID</P>
+</TD></TR><TR><TD BGCOLOR="#E6E6E6"><PRE>#include &lt;CoreServices/CoreServices.h&gt;
+#include &lt;sys/param.h&gt;
+#include &lt;unistd.h&gt;
+
+static OSStatus FSSetCatalogInfoIDs(const FSRef *ref, 
+                                    FSCatalogInfoBitmap whichInfo, 
+                                    const FSCatalogInfo *catalogInfo)
+    // A version of FSSetCatalogInfo that actually tries 
+    // to set the FUID and FGID if you supply the 
+    // kFSCatInfoPermissions flag.  This is the current 
+    // recommended workaround for &lt;rdar://problem/2631025&gt;. 
+    // You can supply a userID or groupID value of -1 
+    // to indicate that you don't want to change the value.
+{
+    OSStatus                    err;
+    const FSPermissionInfo *    permInfo;
+    uid_t                       uid;
+    gid_t                       gid;
+    
+    err = FSSetCatalogInfo(ref, whichInfo, catalogInfo);
+    if ( (err == noErr) &amp;&amp; (whichInfo &amp; kFSCatInfoPermissions) ) {
+        permInfo = (const FSPermissionInfo *) catalogInfo-&gt;permissions;
+        uid = (uid_t) permInfo-&gt;userID;
+        gid = (gid_t) permInfo-&gt;groupID;
+        if (uid != -1 || gid != -1 ) {
+            char filePath[MAXPATHLEN];
+            
+            err = FSRefMakePath(ref, (UInt8 *) filePath, sizeof(filePath));
+            if (err == noErr) {
+                err = chown(filePath, uid, gid);
+                if (err == -1) {
+                    err = errno;
+                }
+            }
+        }
+    }
+    return err;
+}
+</PRE></TD></TR></TABLE></CENTER>
+						<!-- listing ends here --><BR>
+						<div align="center">
+							<table border=0 cellpadding=3 width=500>
+								<tr>
+									<td bgcolor="#EEEEE0" scope="row">
+										<p><b>IMPORTANT:</b><br>
+											The above code does not give you any special privileges. If you attempt to perform some operation that is restricted (enter <code>man 2 chown</code> in Terminal for information about those restrictions), <code>FSSetCatalogInfoIDs</code> will fail with an error. For information about how to get additional privileges, see the <a href="http://developer.apple.com/documentation/macosx/CoreTechnologies/securityservices/authorizationservices/authservices.html">Authorization Services</a> documentation.</p>
+									</td>
+								</tr>
+							</table>
+							<p></p>
+							<table border=0 cellpadding=3 width=500>
+								<tr>
+									<td bgcolor="#EEEEE0" scope="row">
+										<p><b>Note:</b><br>
+											If you discovered this problem because you're writing your own code to copy file system objects, you might consider using the code from the DTS sample code <a href="http://developer.apple.com/samplecode/Sample_Code/Files/FSCopyObject.htm">FSCopyObjects</a> instead.</p>
+									</td>
+								</tr>
+							</table>
+						</div>
+						<p></p>
+						<hr width=500 align=center>
+						<!-- begin_date -->
+						<h4 align=center>[Mar 26, 2003]</h4>
+						<p><!-- end_date --><br>
+						</p>
+						<p><!-- end_document_contents --><BR>
+						</p>
+					</TD></TR></TABLE></CENTER>
+
+<!-- begin_footer_information -->	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/qa/qa2001/qa1251.html%3Fid%3DDTS10002289-1.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/qa/qa2001/qa1251.html%3Fid%3DDTS10002289-1.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/qa/qa2001/qa1251.html%3Fid%3DDTS10002289-1.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+<!--#include virtual="/includes/footer"--><!-- end_footer_information -->
+
+</BODY>
+</HTML>

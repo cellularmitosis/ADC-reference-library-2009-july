@@ -1,0 +1,401 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/1999/REC-html401-19991224/loose.dtd">
+<html><head>
+<!-- BEGIN META TAG INFO -->
+<link rel="home" href="http://developer.apple.com/">
+<link rel="find" href="http://developer.apple.com/search/">
+<link rel="stylesheet" type="text/css" href="../../documentation/css/adcstyle.css" title="fonts">
+<script language="JavaScript" type="text/javascript" src="../../documentation/js/busnav.js"></script>
+<script language="JavaScript" src="../../documentation/js/adc.js" type="text/javascript"></script>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<!-- END META TAG INFO -->
+<!-- BEGIN TITLE -->
+<title>Technical Q&amp;A QA1437: Standard Audio - Parsing the kQTSCAudioPropertyID_CodecSpecificSettingsArray property</title>
+<!-- END TITLE -->
+</head>
+<!-- BEGIN BODY OPEN -->
+<body bgcolor="#ffffff"><a name="//apple_ref/doc/uid/DTS10004128" title="Standard Audio - Parsing the kQTSCAudioPropertyID_CodecSpecificSettingsArray property"></a>
+<!--END BODY OPEN -->
+<!-- START CENTER OPEN -->
+<center>
+<!-- END CENTER OPEN -->
+<a name="top"></a>
+<!-- BEGIN LOGO AND SEARCH -->
+<!--#include virtual="/includes/adcnavbar"-->
+<!-- END LOGO AND SEARCH -->
+<!-- START BREADCRUMB -->
+<div id="breadcrumb"><table width="680" border="0" cellpadding="0" cellspacing="0"><tr>
+<td scope="row"><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+<td><img width="340" height="10" src="images/1dot.gif" alt=""></td></tr><tr valign="middle"><td align="left" colspan="2">
+<a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../technicalqas/index.html">Technical Q&As</a> &gt; <a href="../../technicalqas/QuickTime/index.html">QuickTime</a> &gt; <a href="../../technicalqas/QuickTime/idxMusicAudio-date.html">Audio</a> &gt; 
+</td></tr><tr><td colspan="2" scope="row"><img width="680" height="35" src="images/1dot.gif" alt=""></td></tr></table></div>
+<!-- END BREADCRUMB -->
+
+<!-- START MAIN CONTENT -->
+<!-- START TITLE GRAPHIC AND INTRO-->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top">
+<td><h1>
+<div id="pagehead">Technical Q&amp;A QA1437</div>
+<div id="pageheadsub">Standard Audio - Parsing the kQTSCAudioPropertyID_CodecSpecificSettingsArray property</div>
+</h1></td></tr></table>
+<!-- END TITLE GRAPHIC AND INTRO -->
+<!-- BEGIN WIDE COLUMN -->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td align="left" width="680">
+<!-- BEGIN CONTENTS -->
+<h2>Q: I'd like to parse the <code>kQTSCAudioPropertyID_CodecSpecificSettingsArray</code> to provide codec UI, how is this done?</h2><p>A: Some audio codecs publish a <code>CFDictionaryRef</code> of various parameters specific to the configuration of the codec for example, the AAC codec.</p><p>Additionally, every subconverter used by an Audio Converter can potentially have a <code>CFDictionaryRef</code> of settings. For example, when performing a sample rate conversion from PCM to PCM there will be a dictionary exposed by a Rate Converter subconverter.  The <code>AudioConverter</code> used in such a conversion operation will conglomerate the various <code>CFDictionaryRef</code>'s exposed by its subconverters in a <code>CFArrayRef</code> returned as the <code>CodecSpecificSettingsArray</code> property.</p><p>This <code>CodecSpecificSettingsArray</code> property uses standard Core Foundation data types, therefore Core Foundation APIs such as <code>CFArrayGetValueAtIndex</code> and <code>CFDictionaryGetValue</code> are used (along with the appropriate keys listed below) to retrieve all the settings.</p><div class="notebox"><p><strong>IMPORTANT:</strong> The <code>kQTSCAudioPropertyID_CodecSpecificSettingsArray</code> property is also known as the <code>kAudioCodecPropertySettings</code> property when referenced from the Core Audio API.</p></div><p>The keys for the settings property are defined in <code>AudioCodec.h</code></p><pre class="sourcecodebox">
+//=============================================================================
+// Constants for kAudioCodecPropertySettings
+//=============================================================================
+
+#define kAudioSettings_TopLevelKey      &quot;name&quot;
+#define kAudioSettings_Version          &quot;version&quot;
+#define kAudioSettings_Parameters       &quot;parameters&quot;
+#define kAudioSettings_SettingKey       &quot;key&quot;
+#define kAudioSettings_SettingName      &quot;name&quot;
+#define kAudioSettings_ValueType        &quot;value type&quot;
+#define kAudioSettings_AvailableValues  &quot;available values&quot;
+#define kAudioSettings_LimitedValues    &quot;limited values&quot;
+#define kAudioSettings_CurrentValue     &quot;current value&quot;
+#define kAudioSettings_Summary          &quot;summary&quot;
+#define kAudioSettings_Hint             &quot;hint&quot;
+#define kAudioSettings_Unit             &quot;unit&quot; // kHz, kbps, etc.
+
+// constants to be used with kAudioSettings_Hint
+enum {
+  kAudioSettingsFlags_ExpertParameter = (1L &lt;&lt; 0),
+    // If set, then the parameter is an expert parameter.
+  kAudioSettingsFlags_InvisibleParameter = (1L &lt;&lt; 1),
+    // If set, then the parameter should not be displayed.
+  kAudioSettingsFlags_MetaParameter = (1L &lt;&lt; 2),
+    // If set, then changing this parameter may affect the values of other parameters.
+    // If not set, then this parameter can be set without affecting the values of other parameters.
+  kAudioSettingsFlags_UserInterfaceParameter = (1L &lt;&lt; 3)
+    // If set, then this is only a user interface element and not reflected in the codec's bit stream.
+};
+</pre><p class="caption"><strong>Figure 1:</strong> Typical example of AAC configured in StdAudio.</p><p><img  src="images/qa1437_codecsettings.png" width="380" height="478" alt="Figure 1, Typical example of AAC configured in StdAudio."></p><p><strong>Figure 1</strong> shows a typical configuration of the AAC codec using the Standard Audio Dialog, while <strong>Listing 1</strong> demonstrates how to parse the <code>CFArrayRef</code> returned by calling <code>QTGetComponentProperty</code> on an instance of StdAudio and asking for the <code>kQTSCAudioPropertyID_CodecSpecificSettingsArray</code> property. The resulting output for the above codec configuration is shown in <strong>Listing 2</strong>.</p><p class="smalltext"><strong>Listing 1:</strong> A function to parse the settings array and print out the results.</p><pre class="sourcecodebox">
+void DisplayCodecSpecificSettings(CFArrayRef inCodecSpecificSettings)
+{
+    UInt32 i;
+
+    for (i = 0; i &lt; CFArrayGetCount(inCodecSpecificSettings); i++) {
+        CFStringRef name = NULL;
+        CFArrayRef paramsArray = NULL;
+        CFIndex arrayIndex;
+
+        CFDictionaryRef curSettings =
+                                (CFDictionaryRef)CFArrayGetValueAtIndex(inCodecSpecificSettings, i);
+
+        name = (CFStringRef)CFDictionaryGetValue(curSettings, CFSTR(kAudioSettings_TopLevelKey));
+        if (name) {
+            CFStringRef outStr = CFStringCreateWithFormat(kCFAllocatorDefault, NULL,
+                                CFSTR(&quot;\nName - kAudioSettings_TopLevelKey (CFString): %@\n&quot;), name);
+            CFShow(outStr);
+            CFRelease(outStr);
+        }
+
+        paramsArray = (CFArrayRef)CFDictionaryGetValue(curSettings, CFSTR(kAudioSettings_Parameters));
+        if (paramsArray) {
+            printf(&quot;Parameters - kAudioSettings_Parameters (CFArray):\n&quot;);
+
+            for (arrayIndex = 0; arrayIndex &lt; CFArrayGetCount(paramsArray); arrayIndex++) {
+                CFStringRef settingsName = NULL, key = NULL, unit = NULL, summary = NULL;
+                CFNumberRef valueType = NULL, curValue = NULL;
+                CFArrayRef  availableValues = NULL, limitedValues = NULL;
+                CFNumberRef hint = NULL;
+
+                CFDictionaryRef aDictionary = CFArrayGetValueAtIndex(paramsArray, arrayIndex);
+
+                printf(&quot;\n&quot;);
+
+                key = (CFStringRef)CFDictionaryGetValue(aDictionary, CFSTR(kAudioSettings_SettingKey));
+                if (key) {
+                    CFStringRef outStr = CFStringCreateWithFormat(kCFAllocatorDefault, NULL,
+                                    CFSTR(&quot; Settings Key - kAudioSettings_SettingKey: %@\n&quot;), key);
+                    CFShow(outStr);
+                    CFRelease(outStr);
+                }
+
+                settingsName = (CFStringRef)CFDictionaryGetValue(aDictionary,
+                                                                CFSTR(kAudioSettings_SettingName));
+                if (settingsName) {
+                    CFStringRef outStr = CFStringCreateWithFormat(kCFAllocatorDefault, NULL,
+                        CFSTR(&quot; Settings Name - kAudioSettings_SettingName: %@\n&quot;), settingsName);
+                    CFShow(outStr);
+                    CFRelease(outStr);
+                }
+
+                valueType = (CFNumberRef)CFDictionaryGetValue(aDictionary, CFSTR(kAudioSettings_ValueType));
+                if (valueType) {
+                    SInt32 value;
+                    CFStringRef outStr;
+
+                    CFNumberGetValue(valueType, kCFNumberSInt32Type, &amp;value);
+
+                    outStr = CFStringCreateWithFormat(kCFAllocatorDefault, NULL,
+                                CFSTR(&quot; Value Type - kAudioSettings_ValueType (CFNumber): %d\n&quot;), value);
+                    CFShow(outStr);
+                    CFRelease(outStr);
+                }
+
+                curValue = (CFNumberRef)CFDictionaryGetValue(aDictionary, CFSTR(kAudioSettings_CurrentValue));
+                if (curValue) {
+                    SInt32 value;
+                    CFStringRef outStr;
+
+                    CFNumberGetValue(curValue, kCFNumberSInt32Type, &amp;value);
+
+                    outStr = CFStringCreateWithFormat(kCFAllocatorDefault, NULL,
+                        CFSTR(&quot; Current Value - kAudioSettings_CurrentValue (CFNumber): %d\n&quot;), value);
+                    CFShow(outStr);
+                    CFRelease(outStr);
+                }
+
+                availableValues = (CFArrayRef)CFDictionaryGetValue(aDictionary,
+                                                                   CFSTR(kAudioSettings_AvailableValues));
+                if (availableValues) {
+                    CFIndex availableValuesIndex;
+
+                    printf(&quot; Available Values - kAudioSettings_AvailableValues (CFArray):\n&quot;);
+
+                    for (availableValuesIndex = 0; availableValuesIndex &lt;
+                                                  CFArrayGetCount(availableValues); availableValuesIndex++) {
+                        CFStringRef availableValue = NULL;
+
+                        availableValue = CFArrayGetValueAtIndex(availableValues, availableValuesIndex);
+                        if (availableValue) {
+                            CFStringRef outStr = CFStringCreateWithFormat(kCFAllocatorDefault, NULL,
+                                  CFSTR(&quot;  %d Value (CFString): %@\n&quot;), availableValuesIndex, availableValue);
+                            CFShow(outStr);
+                            CFRelease(outStr);
+                        }
+                    }
+                }
+
+                // limitedValues is not a required parameter
+                limitedValues = (CFArrayRef)CFDictionaryGetValue(aDictionary,
+                                                                        CFSTR(kAudioSettings_LimitedValues));
+                if (limitedValues) {
+                    CFIndex limitedValuesIndex;
+
+                    printf(&quot; Limited Values - kAudioSettings_LimitedValues (CFArray):\n&quot;);
+
+                    for (limitedValuesIndex = 0; limitedValuesIndex &lt;
+                                                       CFArrayGetCount(limitedValues); limitedValuesIndex++) {
+                        CFStringRef limitedValue = NULL;
+
+                        limitedValue = CFArrayGetValueAtIndex(limitedValues, limitedValuesIndex);
+                        if (limitedValue) {
+                            CFStringRef outStr = CFStringCreateWithFormat(kCFAllocatorDefault, NULL,
+                                     CFSTR(&quot;  %d Value (CFString): %@\n&quot;), limitedValuesIndex, limitedValue);
+                            CFShow(outStr);
+                            CFRelease(outStr);
+                        }
+                    }
+                }
+
+                // summary is not a required parameter - used for &quot;Tool Tips&quot;
+                summary = (CFStringRef)CFDictionaryGetValue(aDictionary, CFSTR(kAudioSettings_Summary));
+                if (summary) {
+                    CFStringRef outStr = CFStringCreateWithFormat(kCFAllocatorDefault, NULL,
+                                    CFSTR(&quot; Summary - kAudioSettings_Summary (CFString): %@\n&quot;), summary);
+                    CFShow(outStr);
+                    CFRelease(outStr);
+                }
+
+                hint = (CFNumberRef)CFDictionaryGetValue(aDictionary, CFSTR(kAudioSettings_Hint));
+                if (hint) {
+                    SInt32 value;
+                    CFStringRef outStr;
+
+                    CFNumberGetValue(hint, kCFNumberSInt32Type, &amp;value);
+                    outStr = CFStringCreateWithFormat(kCFAllocatorDefault, NULL,
+                                        CFSTR(&quot; Hint Flag - kAudioSettings_Hint (CFNumber): %d\n&quot;), value);
+                    CFShow(outStr);
+                    CFRelease(outStr);
+                }
+
+                // curUnit is not a required parameter
+                unit = (CFStringRef)CFDictionaryGetValue(aDictionary, CFSTR(kAudioSettings_Unit));
+                if (unit) {
+                    CFStringRef outStr = CFStringCreateWithFormat(kCFAllocatorDefault, NULL,
+                                             CFSTR(&quot; Units - kAudioSettings_Unit (CFString): %@\n&quot;), unit);
+                    CFShow(outStr);
+                    CFRelease(outStr);
+                }
+            }
+        }
+    }
+}
+</pre><p class="smalltext"><strong>Listing 2:</strong> Output from calling DisplayCodecSpecificSettings with the configuration shown in Figure 1.</p><pre class="sourcecodebox">
+Name - kAudioSettings_TopLevelKey (CFString): AAC Encoder
+Parameters - kAudioSettings_Parameters (CFArray):
+
+ Settings Key - kAudioSettings_SettingKey: Target Format
+ Settings Name - kAudioSettings_SettingName: Bit Rate Format
+ Value Type - kAudioSettings_ValueType (CFNumber): 10
+ Current Value - kAudioSettings_CurrentValue (CFNumber): 1
+ Available Values - kAudioSettings_AvailableValues (CFArray):
+  0  Value (CFString): Constant Bit Rate
+  1  Value (CFString): Variable Bit Rate
+ Summary - kAudioSettings_Summary (CFString): The bit rate format of the encoded AAC bitstream
+ Hint Flag - kAudioSettings_Hint (CFNumber): 5
+
+ Settings Key - kAudioSettings_SettingKey: Bit Rate
+ Settings Name - kAudioSettings_SettingName: Target Bit Rate
+ Value Type - kAudioSettings_ValueType (CFNumber): 10
+ Current Value - kAudioSettings_CurrentValue (CFNumber): 14
+ Available Values - kAudioSettings_AvailableValues (CFArray):
+  0  Value (CFString): 16
+  1  Value (CFString): 20
+  2  Value (CFString): 24
+  3  Value (CFString): 28
+  4  Value (CFString): 32
+  5  Value (CFString): 40
+  6  Value (CFString): 48
+  7  Value (CFString): 56
+  8  Value (CFString): 64
+  9  Value (CFString): 80
+  10  Value (CFString): 96 - 110
+  11  Value (CFString): 112
+  12  Value (CFString): 128 - 146
+  13  Value (CFString): 160 - 182
+  14  Value (CFString): 192 - 218
+  15  Value (CFString): 224
+  16  Value (CFString): 256 - 292
+  17  Value (CFString): 320
+ Limited Values - kAudioSettings_LimitedValues (CFArray):
+  0 Value (CFString): 96 - 110
+  1 Value (CFString): 128 - 146
+  2 Value (CFString): 160 - 182
+  3 Value (CFString): 192 - 218
+  4 Value (CFString): 256 - 292
+ Summary - kAudioSettings_Summary (CFString): The bit rate of the AAC produced by the encoder
+ Hint Flag - kAudioSettings_Hint (CFNumber): 4
+ Units - kAudioSettings_Unit (CFString): kbps
+
+ Settings Key - kAudioSettings_SettingKey: Sample Rate
+ Settings Name - kAudioSettings_SettingName: Sample Rate
+ Value Type - kAudioSettings_ValueType (CFNumber): 10
+ Current Value - kAudioSettings_CurrentValue (CFNumber): 8
+ Available Values - kAudioSettings_AvailableValues (CFArray):
+  0  Value (CFString): Recommended
+  1  Value (CFString): 8.000
+  2  Value (CFString): 11.025
+  3  Value (CFString): 12.000
+  4  Value (CFString): 16.000
+  5  Value (CFString): 22.050
+  6  Value (CFString): 24.000
+  7  Value (CFString): 32.000
+  8  Value (CFString): 44.100
+  9  Value (CFString): 48.000
+ Limited Values - kAudioSettings_LimitedValues (CFArray):
+  0 Value (CFString): Recommended
+  1 Value (CFString): 44.100
+ Summary - kAudioSettings_Summary (CFString): The sample rate of the AAC produced by the encoder
+ Hint Flag - kAudioSettings_Hint (CFNumber): 6
+ Units - kAudioSettings_Unit (CFString): kHz
+
+ Settings Key - kAudioSettings_SettingKey: Precedence
+ Settings Name - kAudioSettings_SettingName: Precedence
+ Value Type - kAudioSettings_ValueType (CFNumber): 10
+ Current Value - kAudioSettings_CurrentValue (CFNumber): 1
+ Available Values - kAudioSettings_AvailableValues (CFArray):
+  0  Value (CFString): None
+  1  Value (CFString): Bit Rate
+  2  Value (CFString): Sample Rate
+ Summary - kAudioSettings_Summary (CFString): If either the bit rate or sample rate is allowed to
+                                                                                 override the other setting
+ Hint Flag - kAudioSettings_Hint (CFNumber): 13
+
+ Settings Key - kAudioSettings_SettingKey: Quality
+ Settings Name - kAudioSettings_SettingName: Quality
+ Value Type - kAudioSettings_ValueType (CFNumber): 10
+ Current Value - kAudioSettings_CurrentValue (CFNumber): 1
+ Available Values - kAudioSettings_AvailableValues (CFArray):
+  0  Value (CFString): Good
+  1  Value (CFString): Better
+  2  Value (CFString): Best
+ Summary - kAudioSettings_Summary (CFString): The quality of the encoded AAC bitstream
+ Hint Flag - kAudioSettings_Hint (CFNumber): 1
+
+ Settings Key - kAudioSettings_SettingKey: Channel Configuration
+ Settings Name - kAudioSettings_SettingName: Channel Configuration
+ Value Type - kAudioSettings_ValueType (CFNumber): 10
+ Current Value - kAudioSettings_CurrentValue (CFNumber): 1
+ Available Values - kAudioSettings_AvailableValues (CFArray):
+  0  Value (CFString): Mono
+  1  Value (CFString): Stereo
+  2  Value (CFString): Quadraphonic
+  3  Value (CFString): AAC 4.0
+  4  Value (CFString): AAC 5.0
+  5  Value (CFString): AAC 5.1
+  6  Value (CFString): AAC 6.0
+  7  Value (CFString): AAC 6.1
+  8  Value (CFString): AAC 7.0
+  9  Value (CFString): AAC 7.1
+  10  Value (CFString): AAC Octagonal
+ Limited Values - kAudioSettings_LimitedValues (CFArray):
+  0 Value (CFString): Stereo
+ Summary - kAudioSettings_Summary (CFString): The channel layout of the AAC produced by the encoder
+ Hint Flag - kAudioSettings_Hint (CFNumber): 5
+</pre><p><strong>Listing 3</strong> shows the resulting output for a PCM to PCM sample rate conversion operation where a specific &quot;codec&quot; is not involved.</p><p class="smalltext"><strong>Listing 3:</strong> </p><pre class="sourcecodebox">
+Name - kAudioSettings_TopLevelKey (CFString): Sample Rate Converter
+Parameters - kAudioSettings_Parameters (CFArray):
+
+ Settings Key - kAudioSettings_SettingKey: Quality
+ Settings Name - kAudioSettings_SettingName: Quality
+ Value Type - kAudioSettings_ValueType (CFNumber): 10
+ Current Value - kAudioSettings_CurrentValue (CFNumber): 2
+ Available Values - kAudioSettings_AvailableValues (CFArray):
+  0 Value (CFString): Faster
+  1 Value (CFString): Fast
+  2 Value (CFString): Normal
+  3 Value (CFString): Better
+  4 Value (CFString): Best
+ Summary - kAudioSettings_Summary (CFString): Quality setting for the sample rate converter.
+ Hint Flag - kAudioSettings_Hint (CFNumber): 0
+
+ Settings Key - kAudioSettings_SettingKey: Priming Method
+ Settings Name - kAudioSettings_SettingName: Priming Method
+ Value Type - kAudioSettings_ValueType (CFNumber): 10
+ Current Value - kAudioSettings_CurrentValue (CFNumber): 1
+ Available Values - kAudioSettings_AvailableValues (CFArray):
+  0 Value (CFString): Pre
+  1 Value (CFString): Normal
+  2 Value (CFString): None
+ Summary - kAudioSettings_Summary (CFString): Priming method for the sample rate converter.
+ Hint Flag - kAudioSettings_Hint (CFNumber): 2
+</pre><A NAME="TNTAG5"></A><H2>References:</H2><p><A HREF="qa1390.html">Technical Q&amp;A QA1390, 'Standard Audio - The <code>CodecSpecificSettingsArray</code> and MagicCookie properties'</A></p><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNT_HISTORY_TAG"></A><H2>Document Revision History</H2><table cellspacing="0" class="graybox" width="680"><tr><th width="100">Date</th><th width="580">Notes</th></tr><tr><td scope="row">2006-11-30</td><td>First Version</td></tr></table><p><b>Posted:</b> 2006-11-30</p>
+<!-- END CONTENTS -->
+</td></tr></table>
+<!-- END WIDE COLUMN -->
+<!-- END MAIN CONTENT -->
+	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/qa/qa2006/qa1437.html%3Fid%3DDTS10004128-1.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/qa/qa2006/qa1437.html%3Fid%3DDTS10004128-1.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/qa/qa2006/qa1437.html%3Fid%3DDTS10004128-1.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+
+<!-- START BOTTOM APPLE NAVIGATION -->
+<!--#include virtual="/includes/footer"-->
+<!-- END BOTTOM APPLE NAVIGATION -->
+<!-- START CENTER CLOSE -->
+</center>
+<!-- END CENTER CLOSE -->
+</body></html>

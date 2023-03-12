@@ -1,0 +1,42 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN"			"http://www.w3.org/TR/REC-html40/loose.dtd"><HTML><!--Template 06-20-02--><HEAD><LINK REL="stylesheet" HREF="../../adcstyle.css" TYPE="text/css"><LINK REL="stylesheet" HREF="../../style.css" TYPE="text/css"><title>Technical Q&amp;A NW13: Using Deferred Tasks</title><meta name="keywords" content="Mac OS 8 Network socket listener deferrred tasks notification manager"><meta name="Description" content="Technical Q&amp;A NW13: Q&amp;A lists the major limitation of usingdeferred tasks and suggests as an alternative the notificationmanager for processing packets that a DDP socket listenerin a driver gets."><meta name="categories" content="Networking"><meta name="week-posted" content="May 29, 1995 - Jun 2, 1995"><LINK REL="stylesheet" HREF="../../css/adcstyle.css" TYPE="text/css"><script language="JavaScript" type="text/javascript" src="../../js/adc.js"></script></HEAD><BODY BGCOLOR="#FFFFFF"><a name="//apple_ref/doc/uid/DTS10001425" title="Using Deferred Tasks"></a><!-- top_of_header_marker_comment --><!-- begin_header_information --><!--#include virtual="/adcnavbar" --><p><a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../technicalqas/index.html">Technical Q&As</a> &gt; <a href="../../technicalqas/LegacyTechnologies/index.html">Legacy Documents</a> &gt; <a href="../../technicalqas/LegacyTechnologies/idxMacOS9Earlier-date.html">Mac OS 9 & Earlier</a> &gt; </p><div style="width:100%; position:fixed;"><div align="center" id="watermark" style="position: relative; margin-left:auto; margin-right:auto; z-index:20; width:500px;"><div class="legacybox"><h1>Legacy Document<span class=closebutton><a href="javascript:closeWatermark()"><img src="../../images/closebutton.png" width="14" height="14" border="0"  alt="close button"></a></span></h1>
+
+<p><strong>Important: </strong>This document is part of the Legacy section of the ADC Reference Library. This information should not be used for new development.</p>
+
+<div class="reflibtopic">
+	<p>Current information on this Reference Library topic can be found here:</p>
+	<ul>
+				<li><a href="http://developer.apple.com/referencelibrary/index.html" target="_blank">Reference Library</a></li>
+	</ul>
+</div>
+
+
+
+
+</div></div></div><!-- end_header_information --><!-- bottom_of_header_marker_comment --><!-- top_of_titles_marker_comment --><CENTER><table width="600" cellpadding="0" cellspacing="0" border="0">
+<tr><td align="left" scope="row">
+<h1>
+<div id="pagehead">Technical Q&amp;A NW13</div>
+<div id="pageheadsub">Using Deferred Tasks</div>
+</h1>
+</td></tr></table></CENTER><!-- bottom_of_titles_marker_comment -->						<!-- begin_content --> <CENTER><TABLE BORDER=0 CELLPADDING=0 WIDTH=600><TR> <td align="left"><hr width=500 align=center><p id = p2>Q:  I have a DDP socket listener in a driver, and I'd like to process some of the packets that it receives immediately. I know to be careful to avoid having more than one instance of my deferred task. I don't need to allocate memory, but I might have to open and close forks, read and write to and from those forks, andsend a few packets. Can I do these things in a deferred task, or is there abetter way to do this? Are there limitations on deferred tasks when they areperformed due to a slot-manager interrupt (i.e., an incoming packet)?</p><p id=p4>A:  The deferred-task-manager interrupt occurs when the interrupt handler winds down. The only difference between this interrupt and another interrupt is that the level is low enough for Nubus (or other) interrupts to occur while it's taking place. The rules are more or less the same for both types of interrupts-- you can't move memory, and the file manager might be busy when it occurs.</p><p id=p4>However, you can post an Async File Manager call at the time of the interrupt,which would allow you to close or write, assuming you pre-allocated your memory. If the file manager is busy, it will handle yourcall later, and your completion routine can chain to the next operation.</p><p id=p4>There aren't any time limits, but it helps to avoid delaying the system tasksfor long periods. Since deferred tasks run at level 0, other interrupts cantake priority over them.</p><p id=p4>Be sure to set up a semaphore system to handle those times when your task isplaced in a queue during an interrupt that occurs while it's working.</p><p id=p4>As an alternative, you can make use of the Notification Manager by queuing anotification task that has no icon, string, etc. to run at the next systemtasktime. This gives you a good A5 space where you can work with files, dialogs,memory, or whatever else you need. The following sample code should help youdetermine how to do this:</p><CENTER><TABLE BORDER=0 CELLPADDING=5 WIDTH=550><TR>	<td bgcolor="#E6E6E6" align=left><pre>    NMRec                NM;    /* Notification Mgr Block */ NM.qType          = nmType; NM.Icon = nil; NM.Sound = nil; NM.Mark = nil; NM.Str = nil    NM.nmResp      = &amp;YourHandler; NM.nmRefCon    = your globals; NMInstall(&amp;NM);....YourHandler(NMRec * nmP){  globals = nmP-&gt;nmRefCon;... do whatever ...  NMRemove(nmP);}</pre>	</TD></TR></TABLE></CENTER></td></tr></table></center><!-- end_content --><!-- begin_date --><H4 ALIGN=center>[Jun 01 1995]</H4><!-- end_date --><!-- begin_footer_information -->	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/qa/nw/nw13.html%3Fid%3DDTS10001425-1.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/qa/nw/nw13.html%3Fid%3DDTS10001425-1.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/qa/nw/nw13.html%3Fid%3DDTS10001425-1.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+<!--#include virtual="/includes/footer"--><!-- end_footer_information --><hr width=500 align=center> </BODY></HTML>

@@ -1,0 +1,120 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<!-- BEGIN META TAG INFO --><link rel="home" href="http://developer.apple.com/">
+<link rel="find" href="http://developer.apple.com/search/">
+<link rel="stylesheet" type="text/css" href="../../documentation/css/adcstyle.css" title="fonts">
+<script language="JavaScript" type="text/javascript" src="../../documentation/js/busnav.js"></script><script language="JavaScript" src="../../documentation/js/adc.js" type="text/javascript"></script><!-- END META TAG INFO --><!-- BEGIN TITLE --><title>Technical Q&amp;A QA1477: QuickTime Audio - Retrieving the correct audio format bit depth value</title>
+<!-- END TITLE --><style>
+			.sourcecodebox {
+				white-space: pre-wrap;
+				white-space: -moz-pre-wrap !important;
+				white-space: -pre-wrap;
+				white-space: -o-pre-wrap;
+				word-wrap: break-word;
+			}
+			</style>
+</head>
+<!-- BEGIN BODY OPEN --><body bgcolor="#ffffff"><a name="//apple_ref/doc/uid/DTS10003942" title="QuickTime Audio - Retrieving the correct audio format bit depth value"></a>
+<!-- END BODY OPEN --><!-- START CENTER OPEN --><center>
+<!-- END CENTER OPEN --><a name="top"></a><!-- BEGIN LOGO AND SEARCH --><!--#include virtual="/includes/adcnavbar" --><!-- END LOGO AND SEARCH --><!-- START BREADCRUMB --><div id="breadcrumb"><table width="680" border="0" cellpadding="0" cellspacing="0">
+<tr>
+<td scope="row"><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+<td><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+</tr>
+<tr valign="middle"><td align="left" colspan="2">
+<a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../technicalqas/index.html">Technical Q&amp;As</a> &gt; <a href="../../technicalqas/QuickTime/index.html">QuickTime</a> &gt; <a href="../../technicalqas/QuickTime/idxMusicAudio-date.html">Audio</a> &gt; </td></tr>
+<tr><td colspan="2" scope="row"><img width="680" height="35" src="images/1dot.gif" alt=""></td></tr>
+</table></div>
+<!-- END BREADCRUMB --><!-- START MAIN CONTENT --><!-- START TITLE GRAPHIC AND INTRO --><table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td><h1>
+<div id="pagehead">Technical Q&amp;A QA1477</div>
+<div id="pageheadsub">QuickTime Audio - Retrieving the correct audio format bit depth value</div>
+</h1></td></tr></table>
+<!-- END TITLE GRAPHIC AND INTRO --><!-- BEGIN WIDE COLUMN --><table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td align="left" width="680">
+<!-- BEGIN CONTENTS --><h2>Q:
+	
+I'm importing AIFF files containing 24-bit audio ( <code>k24BitFormat</code> ). However, when I examine the sound media <code>SoundDescription</code>, <code>sampleSize</code> always says 16. How can I find the actual audio bit depth without having to check the <code>dataFormat</code> field?
+</h2>
+<p>A: The value reflected in the <code>sampleSize</code> field is a remnant of the old Sound Manager where the native resolution was 16-bit integer samples through the processing chain, and all formats reported a sample size of either 8-bit or 16-bit.</p>
+<p>In order to find the true sample size, you'll need to retrieve the <code>AudioStreamBasicDescription</code> from the <code>SoundDescriptionHandle</code> by calling <code>QTSoundDescriptionGetProperty</code> using the <code>kQTSoundDescriptionPropertyID_AudioStreamBasicDescription</code> property.</p>
+<p class="caption"><strong>Listing 1: </strong>Retrieving the ASBD from a <code>SoundDescriptionHandle</code> snippet.</p>
+<pre class="sourcecodebox"> SoundDescriptionHandle hSoundDescription = (SoundDescriptionHandle)NewHandle(0);
+    AudioStreamBasicDescription asbd = {0};
+    OSStatus err;
+
+    ...
+
+    GetMediaSampleDescription(aSoundMedia, index, (SoundDescriptionHandle)hSoundDescription);
+    if (err = GetMoviesError()) goto bail;
+
+    err = QTSoundDescriptionGetProperty(hSoundDescription, kQTPropertyClass_SoundDescription,
+                  kQTSoundDescriptionPropertyID_AudioStreamBasicDescription, sizeof(asbd), &amp;asbd, NULL);
+
+    ...
+
+bail:
+
+    If (hSoundDescription) DisposeHandle((Handle) hSoundDescription);</pre>
+<p>In the returned <code>AudioStreamBasicDescription</code>, check the <code>mBitsPerChannel</code> field. This is the number of bits of sample data for each channel in a frame of data.</p>
+<p>If <code>mBitsPerChannel</code> is zero, you're dealing with a compressed format. The <code>mFormatID</code> field of the <code>AudioStreamBasicDescription</code> indicates the general kind of data in the stream.</p>
+<p>Some compressed formats have the ability to indicate the precision of the original source data. Apple Lossless for example ( <code>mFormatID</code> field == <code>kAudioFormatAppleLossless</code> ) performs true lossless compression and reports the precision of the original source data though flags set in the <code>mFormatFlags</code> field of the <code>AudioStreamBasicDescription</code>.</p>
+<p>The <code>kAppleLosslessFormatFlags_xxx</code> flags are located in <code>CoreAudioTypes.h</code></p>
+<pre class="sourcecodebox">kAppleLosslessFormatFlag_16BitSourceData - This flag is set for Apple Lossless data that was sourced
+from 16 bit native endian signed integer data.
+
+kAppleLosslessFormatFlag_20BitSourceData - This flag is set for Apple Lossless data that was sourced
+from 20 bit native endian signed integer data aligned high in 24 bits.
+
+kAppleLosslessFormatFlag_24BitSourceData - This flag is set for Apple Lossless data that was sourced
+from 24 bit native endian signed integer data.
+
+kAppleLosslessFormatFlag_32BitSourceData - This flag is set for Apple Lossless data that was sourced
+from 32 bit native endian signed integer data.</pre>
+<a name="TNTAG1"></a><h2>Reference</h2>
+<p><a href="http://developer.apple.com/documentation/MusicAudio/Reference/CoreAudio/core_audio_types/chapter_6_section_4.html"><code>AudioStreamBasicDescription</code> - Contains all the information needed for describing streams of audio data.</a></p>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="document_revision_summary"></a><h2>Document Revision History</h2>
+<table cellspacing="0" class="graybox" width="680">
+<tr>
+<th width="100">Date</th>
+<th width="580">Notes</th>
+</tr>
+<tr>
+<td scope="row">2008-11-05</td>
+<td>editorial</td>
+</tr>
+<tr>
+<td scope="row">2006-05-17</td>
+<td>Discusses how to retrieve accurate audio format bit depth.</td>
+</tr>
+</table>
+<p><b>Posted: </b>2008-11-05</p>
+<!-- END CONTENTS -->
+</td></tr></table>
+<!-- END WIDE COLUMN --><!-- END MAIN CONTENT --><!-- START BOTTOM APPLE NAVIGATION -->	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/qa/qa2006/qa1477.html%3Fid%3DDTS10003942-1.1&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/qa/qa2006/qa1477.html%3Fid%3DDTS10003942-1.1&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/qa/qa2006/qa1477.html%3Fid%3DDTS10003942-1.1&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+<!--#include virtual="/includes/footer" --><!-- END BOTTOM APPLE NAVIGATION --><!-- START CENTER CLOSE -->
+</center>
+<!-- END CENTER CLOSE -->
+</body>
+</html>

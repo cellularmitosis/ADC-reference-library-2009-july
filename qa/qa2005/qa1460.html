@@ -1,0 +1,126 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/1999/REC-html401-19991224/loose.dtd">
+<html><head>
+<!-- BEGIN META TAG INFO -->
+<link rel="home" href="http://developer.apple.com/">
+<link rel="find" href="http://developer.apple.com/search/">
+<link rel="stylesheet" type="text/css" href="../../documentation/css/adcstyle.css" title="fonts">
+<script language="JavaScript" type="text/javascript" src="../../documentation/js/busnav.js"></script>
+<script language="JavaScript" src="../../documentation/js/adc.js" type="text/javascript"></script>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<!-- END META TAG INFO -->
+<!-- BEGIN TITLE -->
+<title>Technical Q&amp;A QA1460: Decompression Sessions - Setting codec accuracy and field mode</title>
+<!-- END TITLE -->
+</head>
+<!-- BEGIN BODY OPEN -->
+<body bgcolor="#ffffff"><a name="//apple_ref/doc/uid/DTS10003837" title="Decompression Sessions - Setting codec accuracy and field mode"></a>
+<!--END BODY OPEN -->
+<!-- START CENTER OPEN -->
+<center>
+<!-- END CENTER OPEN -->
+<a name="top"></a>
+<!-- BEGIN LOGO AND SEARCH -->
+<!--#include virtual="/includes/adcnavbar"-->
+<!-- END LOGO AND SEARCH -->
+<!-- START BREADCRUMB -->
+<div id="breadcrumb"><table width="680" border="0" cellpadding="0" cellspacing="0"><tr>
+<td scope="row"><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+<td><img width="340" height="10" src="images/1dot.gif" alt=""></td></tr><tr valign="middle"><td align="left" colspan="2">
+<a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../technicalqas/index.html">Technical Q&As</a> &gt; <a href="../../technicalqas/QuickTime/index.html">QuickTime</a> &gt; <a href="../../technicalqas/QuickTime/idxCompressionDecompression-date.html">Compression & Decompression</a> &gt; 
+</td></tr><tr><td colspan="2" scope="row"><img width="680" height="35" src="images/1dot.gif" alt=""></td></tr></table></div>
+<!-- END BREADCRUMB -->
+
+<!-- START MAIN CONTENT -->
+<!-- START TITLE GRAPHIC AND INTRO-->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top">
+<td><h1>
+<div id="pagehead">Technical Q&amp;A QA1460</div>
+<div id="pageheadsub">Decompression Sessions - Setting codec accuracy and field mode</div>
+</h1></td></tr></table>
+<!-- END TITLE GRAPHIC AND INTRO -->
+<!-- BEGIN WIDE COLUMN -->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td align="left" width="680">
+<!-- BEGIN CONTENTS -->
+<h2>Q: When transitioning to Decompression Sessions how are codec accuracy and options such as deinterlacing set?</h2><p>A: The older Decompression Sequence APIs had a couple of specific APIs for setting these options. Codec accuracy for example could be set when first creating the sequence by calling <code>DecompressSequenceBeginS</code> or after the sequence was created by calling <code>SetDSequenceAccuracy</code>. Decompression Sequence flags such as <code>codecDSequenceDeinterlaceFields</code> on the other hand would need to be set separately by calling <code>SetDSequenceFlags</code>.</p><p>The <strong>Decompression Session</strong> APIs now present a more unified approach for getting and setting options though the use of properties (this is a trend you can see throughout the entire modern QuickTime API).</p><p>When creating a Decompression Session, one of the parameters you pass to <code>ICMDecompressionSessionCreate</code> is a decompression session options reference (<code>ICMDecompressionSessionOptionsRef</code>). This reference is returned by <code>ICMDecompressionSessionOptionsCreate</code> and the values of specific properties of a decompression session options object are set by calling <code>ICMDecompressionSessionOptionsSetProperty</code>.</p><p>ImageCompression.h contains a list of enumerations for decompression session options (<code>kQTPropertyClass_ICMDecompressionSessionOptions</code>), for example <code>kICMDecompressionSessionOptionsPropertyID_FieldMode</code> for setting special field handling. Field mode options are <code>UInt32</code> values described by the typedef <code>ICMFieldMode</code>. These modes are then used with the <code>kICMDecompressionSessionOptionsPropertyID_FieldMode</code> property.</p><pre class="sourcecodebox">
+kICMFieldMode_BothFields - Both fields should be decompressed.
+
+kICMFieldMode_TopFieldOnly - Only the top field should be decompressed, producing a half-height image.
+
+kICMFieldMode_BottomFieldOnly - Only the bottom field should be decompressed, producing a
+                                half-height image.
+
+kICMFieldMode_DeinterlaceFields - Both fields should be decompressed, and then filtered to reduce
+                                  interlacing artifacts.
+</pre><p>ImageCompression.h also contains a list of <code>CodecQ</code> values specifying decompression accuracy. These values are used with the <code>kICMDecompressionSessionOptionsPropertyID_Accuracy</code> property. If this property hasn't been set in the decompression session options object, the default session accuracy setting is <code>codecNormalQuality</code>.</p><p class="smalltext"><strong>Listing 1:</strong> Setting some Decompression Session options.</p><pre class="sourcecodebox">
+ICMDecompressionSessionOptionsRef sessionOptions = NULL;
+CodecQ codecAccuracy = codecHighQuality;
+ICMFieldMode fieldMode = kICMFieldMode_DeinterlaceFields;
+
+...
+
+// create a decompression session options object
+err = ICMDecompressionSessionOptionsCreate(kCFAllocatorDefault, &amp;sessionOptions);
+if (noErr == err) {
+
+    // set accuracy
+    ICMDecompressionSessionOptionsSetProperty(sessionOptions,
+                                              kQTPropertyClass_ICMDecompressionSessionOptions,
+                                              kICMDecompressionSessionOptionsPropertyID_Accuracy,
+                                              sizeof(CodecQ),
+                                              &amp;codecAccuracy);
+    // set field mode
+    ICMDecompressionSessionOptionsSetProperty(sessionOptions,
+                                              kQTPropertyClass_ICMDecompressionSessionOptions,
+                                              kICMDecompressionSessionOptionsPropertyID_FieldMode,
+                                              sizeof(ICMFieldMode),
+                                              &amp;fieldMode);
+}
+
+...
+
+// create the decompression session passing in the options object
+err = ICMDecompressionSessionCreate(kCFAllocatorDefault, ..., sessionOptions, ...);
+if (err) goto bail;
+
+...
+
+// the session will retain the options object so you can release it
+// you can also change options during the session by modifying the options object
+ICMDecompressionSessionOptionsRelease(sessionOptions);
+
+...
+</pre><div class="notebox"><p><strong>IMPORTANT:</strong> Not all codecs will obey the <code>kICMDecompressionSessionOptionsPropertyID_FieldMode</code> request, and some codecs will only handle it at certain accuracy levels. This request is ignored for non-interlaced content.</p></div><A NAME="TNTAG2"></A><H2>References</H2><ul><li><p><A HREF="../../documentation/QuickTime/APIREF/icmdecompressionsessionoptionssetproperty.htm"><code>ICMDecompressionSessionOptionsSetProperty</code></A></p></li><li><p><A HREF="../../documentation/QuickTime/Conceptual/QT7UpdateGuide/Chapter02/chapter_2_section_7.html#//apple_ref/doc/uid/TP40001163-CH313-BBCGDBDF">Video Enhancements</A></p></li></ul><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNT_HISTORY_TAG"></A><H2>Document Revision History</H2><table cellspacing="0" class="graybox" width="680"><tr><th width="100">Date</th><th width="580">Notes</th></tr><tr><td scope="row">2006-01-12</td><td>Describes how to set codec accuracy and field mode options when creating a decompression sessions.</td></tr></table><p><b>Posted:</b> 2006-01-12</p>
+<!-- END CONTENTS -->
+</td></tr></table>
+<!-- END WIDE COLUMN -->
+<!-- END MAIN CONTENT -->
+	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/qa/qa2005/qa1460.html%3Fid%3DDTS10003837-1.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/qa/qa2005/qa1460.html%3Fid%3DDTS10003837-1.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/qa/qa2005/qa1460.html%3Fid%3DDTS10003837-1.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+
+<!-- START BOTTOM APPLE NAVIGATION -->
+<!--#include virtual="/includes/footer"-->
+<!-- END BOTTOM APPLE NAVIGATION -->
+<!-- START CENTER CLOSE -->
+</center>
+<!-- END CENTER CLOSE -->
+</body></html>

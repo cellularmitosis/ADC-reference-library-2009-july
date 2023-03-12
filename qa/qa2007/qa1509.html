@@ -1,0 +1,202 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<!-- BEGIN META TAG INFO --><link rel="home" href="http://developer.apple.com/">
+<link rel="find" href="http://developer.apple.com/search/">
+<link rel="stylesheet" type="text/css" href="../../documentation/css/adcstyle.css" title="fonts">
+<script language="JavaScript" type="text/javascript" src="../../documentation/js/busnav.js"></script><script language="JavaScript" src="../../documentation/js/adc.js" type="text/javascript"></script><!-- END META TAG INFO --><!-- BEGIN TITLE --><title>Technical Q&amp;A QA1509: Getting the pixel data from a CGImage object</title>
+<!-- END TITLE --><style>
+			.sourcecodebox {
+				white-space: pre-wrap;
+				white-space: -moz-pre-wrap !important;
+				white-space: -pre-wrap;
+				white-space: -o-pre-wrap;
+				word-wrap: break-word;
+			}
+			</style>
+</head>
+<!-- BEGIN BODY OPEN --><body bgcolor="#ffffff"><a name="//apple_ref/doc/uid/DTS10004216" title="Getting the pixel data from a CGImage object"></a>
+<!-- END BODY OPEN --><!-- START CENTER OPEN --><center>
+<!-- END CENTER OPEN --><a name="top"></a><!-- BEGIN LOGO AND SEARCH --><!--#include virtual="/includes/adcnavbar" --><!-- END LOGO AND SEARCH --><!-- START BREADCRUMB --><div id="breadcrumb"><table width="680" border="0" cellpadding="0" cellspacing="0">
+<tr>
+<td scope="row"><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+<td><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+</tr>
+<tr valign="middle"><td align="left" colspan="2">
+<a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../technicalqas/index.html">Technical Q&amp;As</a> &gt; <a href="../../technicalqas/GraphicsImaging/index.html">Graphics &amp; Imaging</a> &gt; <a href="../../technicalqas/GraphicsImaging/idxQuartz-date.html">Quartz</a> &gt; </td></tr>
+<tr><td colspan="2" scope="row"><img width="680" height="35" src="images/1dot.gif" alt=""></td></tr>
+</table></div>
+<!-- END BREADCRUMB --><!-- START MAIN CONTENT --><!-- START TITLE GRAPHIC AND INTRO --><table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td><h1>
+<div id="pagehead">Technical Q&amp;A QA1509</div>
+<div id="pageheadsub">Getting the pixel data from a CGImage object</div>
+</h1></td></tr></table>
+<!-- END TITLE GRAPHIC AND INTRO --><!-- BEGIN WIDE COLUMN --><table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td align="left" width="680">
+<!-- BEGIN CONTENTS --><h2>Q:
+	
+How do I access the pixel data of a <code>CGImage</code> object?
+</h2>
+<p>A: On Mac OS X 10.5 or later, a new call has been added that allows you to obtain the actual pixel data from a <code>CGImage</code> object. This call, <code>CGDataProviderCopyData</code>, returns a CFData object that contains the pixel data from the image in question. An example of using this call to obtain pixel data from a <code>CGImage</code> is shown in <a href="#TNTAG3">Listing 1</a>. Once you have the CFData object with your pixel information, you can call <code>CFDataGetBytePtr</code> to get a pointer to the pixel data, or <code>CFDataGetBytes</code> to copy a subrange of pixel data.</p>
+<a name="TNTAG3"></a><p class="caption"><strong>Listing 1: </strong>Getting raw pixel data from a <code>CGImage</code>.</p>
+<pre class="sourcecodebox">CFDataRef CopyImagePixels(CGImageRef inImage)
+{
+    return CGDataProviderCopyData(CGImageGetDataProvider(inImage));
+}</pre>
+<div class="notebox"><p><strong>Note: </strong><code>CopyImagePixels</code> as written will return <code>NULL</code> if the passed in <code>CGImage</code> object is <code>NULL</code> or if the contents of the image are too large to fit in memory.</p></div>
+<div class="notebox"><p><strong>WARNING: </strong>The pixel data returned by <code>CGDataProviderCopyData</code> has not been color matched and is in the format that the image is in, as described by the various CGImageGet functions (see for <a href="../../documentation/GraphicsImaging/Reference/CGImage/Reference/reference.html#//apple_ref/doc/uid/TP30000956-CH1g-443784" target="_top">Getting Information About an Image</a> more information). If you want the image in a different format, or color matched to a specific color space, then you should draw the image to a bitmap context as described later in this Q&amp;A, with the caveat that alpha information from the image will be multiplied into the color components.</p></div>
+<p>Prior to Mac OS X 10.5 an image's pixels are not as readily available. The only way to guarantee access to the equivalent bits is to create a bitmap context with a memory buffer you specify and then draw the <code>CGImage</code> to the context using <code>CGContextDrawImage</code>. After drawing the <code>CGImage</code> to the context you will have a copy of the data in the buffer you specified (which can also be easily accessed using the <code>CGBitmapContexGetData</code> function). The code in <a href="#TNTAG1">Listing 2</a> demonstrates how to do this.</p>
+<div class="notebox">
+<p><strong>IMPORTANT: </strong><a href="#TNTAG1">Listing 2</a> creates a bitmap context with a 8-bits per component ARGB color space, draws the source image to this context, then retrieves the image bits in this color space from the context. Regardless of what the source image format is (CMYK, 24-bit RGB, Grayscale, and so on) it will be converted over to this color space.</p>
+<p>For more information about creating bitmap contexts for other pixel formats, see the <a href="http://developer.apple.com/documentation/GraphicsImaging/Conceptual/drawingwithquartz2d/index.html">Quartz 2D Programming Guide</a>.</p>
+</div>
+<a name="TNTAG1"></a><p class="caption"><strong>Listing 2: </strong>Accessing the pixel data of a <code>CGImage</code>.</p>
+<pre class="sourcecodebox">void ManipulateImagePixelData(CGImageRef inImage)
+{
+    // Create the bitmap context
+    CGContextRef cgctx = CreateARGBBitmapContext(inImage);
+    if (cgctx == NULL) 
+    { 
+        // error creating context
+        return;
+    }
+
+     // Get image width, height. We'll use the entire image.
+    size_t w = CGImageGetWidth(inImage);
+    size_t h = CGImageGetHeight(inImage);
+    CGRect rect = {{0,0},{w,h}}; 
+
+    // Draw the image to the bitmap context. Once we draw, the memory 
+    // allocated for the context for rendering will then contain the 
+    // raw image data in the specified color space.
+    CGContextDrawImage(cgctx, rect, inImage); 
+
+    // Now we can get a pointer to the image data associated with the bitmap
+    // context.
+    void *data = CGBitmapContextGetData (cgctx);
+    if (data != NULL)
+    {
+
+        // **** You have a pointer to the image data ****
+
+        // **** Do stuff with the data here ****
+
+    }
+
+    // When finished, release the context
+    CGContextRelease(cgctx); 
+    // Free image data memory for the context
+    if (data)
+    {
+        free(data);
+    }
+
+}
+
+CGContextRef CreateARGBBitmapContext (CGImageRef inImage)
+{
+    CGContextRef    context = NULL;
+    CGColorSpaceRef colorSpace;
+    void *          bitmapData;
+    int             bitmapByteCount;
+    int             bitmapBytesPerRow;
+
+     // Get image width, height. We'll use the entire image.
+    size_t pixelsWide = CGImageGetWidth(inImage);
+    size_t pixelsHigh = CGImageGetHeight(inImage);
+
+    // Declare the number of bytes per row. Each pixel in the bitmap in this
+    // example is represented by 4 bytes; 8 bits each of red, green, blue, and
+    // alpha.
+    bitmapBytesPerRow   = (pixelsWide * 4);
+    bitmapByteCount     = (bitmapBytesPerRow * pixelsHigh);
+
+    // Use the generic RGB color space.
+    colorSpace = CGColorSpaceCreateWithName(kCGColorSpaceGenericRGB);
+    if (colorSpace == NULL)
+    {
+        fprintf(stderr, "Error allocating color space\n");
+        return NULL;
+    }
+
+    // Allocate memory for image data. This is the destination in memory
+    // where any drawing to the bitmap context will be rendered.
+    bitmapData = malloc( bitmapByteCount );
+    if (bitmapData == NULL) 
+    {
+        fprintf (stderr, "Memory not allocated!");
+        CGColorSpaceRelease( colorSpace );
+        return NULL;
+    }
+
+    // Create the bitmap context. We want pre-multiplied ARGB, 8-bits 
+    // per component. Regardless of what the source image format is 
+    // (CMYK, Grayscale, and so on) it will be converted over to the format
+    // specified here by CGBitmapContextCreate.
+    context = CGBitmapContextCreate (bitmapData,
+                                    pixelsWide,
+                                    pixelsHigh,
+                                    8,      // bits per component
+                                    bitmapBytesPerRow,
+                                    colorSpace,
+                                    kCGImageAlphaPremultipliedFirst);
+    if (context == NULL)
+    {
+        free (bitmapData);
+        fprintf (stderr, "Context not created!");
+    }
+
+    // Make sure and release colorspace before returning
+    CGColorSpaceRelease( colorSpace );
+
+    return context;
+}</pre>
+<a name="TNTAG2"></a><h2>References</h2>
+<ul>
+<li><p><a href="http://developer.apple.com/documentation/GraphicsImaging/Conceptual/drawingwithquartz2d/index.html">Quartz 2D Programming Guide</a></p></li>
+<li><p><a href="/qa/qa2001/qa1037.html">Technical Q&amp;A QA1037, '<code>CGBitmapContextCreate</code> Supported Color Spaces'</a></p></li>
+</ul>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="document_revision_summary"></a><h2>Document Revision History</h2>
+<table cellspacing="0" class="graybox" width="680">
+<tr>
+<th width="100">Date</th>
+<th width="580">Notes</th>
+</tr>
+<tr>
+<td scope="row">2008-08-27</td>
+<td>Updated to refer to CGDataProviderCopyData(), available as of Mac OS X 10.5.</td>
+</tr>
+<tr>
+<td scope="row">2007-03-05</td>
+<td>Describes how to access the pixel data of a CGImage object</td>
+</tr>
+</table>
+<p><b>Posted: </b>2008-08-27</p>
+<!-- END CONTENTS -->
+</td></tr></table>
+<!-- END WIDE COLUMN --><!-- END MAIN CONTENT --><!-- START BOTTOM APPLE NAVIGATION -->	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/qa/qa2007/qa1509.html%3Fid%3DDTS10004216-2.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/qa/qa2007/qa1509.html%3Fid%3DDTS10004216-2.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/qa/qa2007/qa1509.html%3Fid%3DDTS10004216-2.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+<!--#include virtual="/includes/footer" --><!-- END BOTTOM APPLE NAVIGATION --><!-- START CENTER CLOSE -->
+</center>
+<!-- END CENTER CLOSE -->
+</body>
+</html>

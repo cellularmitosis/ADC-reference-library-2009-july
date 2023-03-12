@@ -1,0 +1,241 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<!-- BEGIN META TAG INFO --><link rel="home" href="http://developer.apple.com/">
+<link rel="find" href="http://developer.apple.com/search/">
+<link rel="stylesheet" type="text/css" href="../../documentation/css/adcstyle.css" title="fonts">
+<script language="JavaScript" type="text/javascript" src="../../documentation/js/busnav.js"></script><script language="JavaScript" src="../../documentation/js/adc.js" type="text/javascript"></script><!-- END META TAG INFO --><!-- BEGIN TITLE --><title>Technical Q&amp;A QA1512: Video Digitizers - Adding Clean Aperture and Pixel Aspect Ratio Information</title>
+<!-- END TITLE --><style>
+			.sourcecodebox {
+				white-space: pre-wrap;
+				white-space: -moz-pre-wrap !important;
+				white-space: -pre-wrap;
+				white-space: -o-pre-wrap;
+				word-wrap: break-word;
+			}
+			</style>
+</head>
+<!-- BEGIN BODY OPEN --><body bgcolor="#ffffff"><a name="//apple_ref/doc/uid/DTS10004221" title="Video Digitizers - Adding Clean Aperture and Pixel Aspect Ratio Information"></a>
+<!-- END BODY OPEN --><!-- START CENTER OPEN --><center>
+<!-- END CENTER OPEN --><a name="top"></a><!-- BEGIN LOGO AND SEARCH --><!--#include virtual="/includes/adcnavbar" --><!-- END LOGO AND SEARCH --><!-- START BREADCRUMB --><div id="breadcrumb"><table width="680" border="0" cellpadding="0" cellspacing="0">
+<tr>
+<td scope="row"><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+<td><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+</tr>
+<tr valign="middle"><td align="left" colspan="2">
+<a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../technicalqas/index.html">Technical Q&amp;As</a> &gt; <a href="../../technicalqas/QuickTime/index.html">QuickTime</a> &gt; <a href="../../technicalqas/QuickTime/idxQuickTimeComponentCreation-date.html">QuickTime Component Creation</a> &gt; </td></tr>
+<tr><td colspan="2" scope="row"><img width="680" height="35" src="images/1dot.gif" alt=""></td></tr>
+</table></div>
+<!-- END BREADCRUMB --><!-- START MAIN CONTENT --><!-- START TITLE GRAPHIC AND INTRO --><table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td><h1>
+<div id="pagehead">Technical Q&amp;A QA1512</div>
+<div id="pageheadsub">Video Digitizers - Adding Clean Aperture and Pixel Aspect Ratio Information</div>
+</h1></td></tr></table>
+<!-- END TITLE GRAPHIC AND INTRO --><!-- BEGIN WIDE COLUMN --><table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td align="left" width="680">
+<!-- BEGIN CONTENTS --><h2>Q:
+	
+Does the Sequence Grabber add clean aperture and aspect ratio information on behalf of a Video Digitizer?
+</h2>
+<p>A: The Sequence Grabber will <strong>always</strong> automatically generate Clean, Production and Encoded dimensions for a captured video track based on the Clean Aperture (<code>kICMImageDescriptionPropertyID_CleanAperture,</code> <code>'clap'</code>) and Pixel Aspect Ratio (<code>kICMImageDescriptionPropertyID_PixelAspectRatio,</code> <code>'pasp'</code>) Image Description extensions returned by the Video Digitizer selector <code>GetImageDescription</code>.</p>
+<p>In some versions of QuickTime since 7.1, when a Video Digitizer <strong>does not</strong> return Clean Aperture and Pixel Aspect Ratio information the Sequence Grabber will <strong>automatically</strong> generated Clean, Production and Encoded dimensions based on the codec type (this is fine when compressing to DV or DVCPRO50 for example). However, specifically in the case of uncompressed video (where this information cannot be determined based only on codec type) the generated Clean, Production and Encoded dimensions assume the Pixel Aspect Ratio is 1:1. This assumption <strong>may not be correct</strong> and can lead to unexpected capture results.</p>
+<p>In future versions of QuickTime, the Sequence Grabber will <strong>only</strong> generate the Clean, Production and Encoded dimensions when a Video Digitizer specifically returns Clean Aperture and Pixel Aspect Ratio Image Description extensions. If the <code>'clap'</code> and <code>'pasp'</code> extensions do not exist, no Clean Aperture or Pixel Aspect Ratio information will be generated for the captured track.</p>
+<a name="TNTAG2"></a><h2>How should I update my Video Digitizer?</h2>
+<p>To ensure consistent behavior for all versions of QuickTime, Video Digitizer developers are encouraged to return Clean Aperture and Pixel Aspect Ratio information as part of the Image Description returned by the <code>GetImageDescription</code> selector.</p>
+<div class="notebox"><p><strong>IMPORTANT: </strong>Developers should consult <a href="http://developer.apple.com/quicktime/icefloe/dispatch019.html">QuickTime Ice Floe 19</a> for a full discussion of Image Descriptions and required extensions.</p></div>
+<p class="caption"><strong>Listing 1: </strong>Adding <code>'pasp'</code> and <code>'clap'</code> image description extensions.</p>
+<pre class="sourcecodebox">pascal VideoDigitizerError MyVDig_GetImageDescription(MyVDigGlobals* glob,
+                                                      ImageDescriptionHandle description)
+{
+    SInt8 savedHState;
+    VideoDigitizerError err = noErr;
+
+    if (0 == description) return qtParamErr;
+
+    savedHState= HGetState((Handle)description);
+    if (err = MemError()) return err;
+
+    err = HUnlock((Handle)description);
+    if (err = MemError()) return err;
+
+    err = SetHandleSize((Handle)description, sizeof(ImageDescription));
+    if (err = MemError()) return err;
+
+    ... 
+
+    // Set up the parts of the ImageDescription that don't vary by input standard or input format
+    (**description).idSize = sizeof(ImageDescription);
+    (**description).resvd1          = 0;
+    (**description).resvd2          = 0;
+    (**description).dataRefIndex    = 0;
+    (**description).vendor          = kMyVDIGManufacturer;
+    (**description).temporalQuality = 0;
+    (**description).spatialQuality  = codecMaxQuality;
+
+    // See note below
+    (**description).width           = glob-&gt;myDigitizerRect.right - glob-&gt; myDigitizerRect.left;
+    (**description).height          = glob-&gt; myDigitizerRect.bottom - glob-&gt; myDigitizerRect.top;
+
+    (**description).hRes            = 72 &lt;&lt; 16;
+    (**description).vRes            = 72 &lt;&lt; 16;
+    (**description).frameCount      = 1;
+    (**description).depth           = 24;
+    (**description).clutID          = -1;
+
+    // Add the ImageDescription properties that don't vary by input standard or input format
+
+    // NOTE: In all cases except DVCPROHD, the Image Description width and height
+    // are the Encoded Dimensions. Setting the height and width properties below negates
+    // having to directly set them in the Image Description above.
+    // Doing both may be redundant, although safe.
+
+    // Encoded width property
+    /*
+     * The width of the encoded image. Usually, but not always, this is
+     * the ImageDescription's width field.
+     */
+    SInt32 width = (**description).width;
+    err = ICMImageDescriptionSetProperty(description, kQTPropertyClass_ImageDescription,
+                                         kICMImageDescriptionPropertyID_EncodedWidth, sizeof(SInt32),
+                                         &amp;width);
+    if (noErr != err) goto bail;
+
+    // Encoded height property
+    /*
+     * The height of the encoded image. Usually, but not always, this is
+     * the ImageDescription's height field.
+     */
+    SInt32 height = (**description).height;
+    err = ICMImageDescriptionSetProperty(description, kQTPropertyClass_ImageDescription,
+                                         kICMImageDescriptionPropertyID_EncodedHeight, sizeof(SInt32),
+                                         &amp;height);
+    if (noErr != err) goto bail;
+
+   // The remaining portions of the Image Description that may vary based on input standard or format
+
+    CleanApertureImageDescriptionExtension    cleanAperture;
+    PixelAspectRatioImageDescriptionExtension pixelAspectRatio;
+
+    if (ntscReallyIn == glob-&gt;myInputStandard) {
+
+        // Setup properties for NTSC 525-line video signals sampled at 13.5 MHz
+        // NOTE: these values will vary depending on your specific format - consult Ice Floe 19
+
+        // http://developer.apple.com/quicktime/icefloe/dispatch019.html#clap
+        cleanAperture.cleanApertureWidthN   = 704; // (640 * 11/10) 
+        cleanAperture.cleanApertureWidthD   = 1;
+        cleanAperture.cleanApertureHeightN  = 480;
+        cleanAperture.cleanApertureHeightD  = 1;
+        cleanAperture.horizOffN             = 0;
+        cleanAperture.horizOffD             = 1;
+        cleanAperture.vertOffN              = 0;
+        cleanAperture.vertOffD              = 1;
+
+        // http://developer.apple.com/quicktime/icefloe/dispatch019.html#pasp
+        if (glob-&gt;myFrameIs4by3) {
+            /* "Non-Square 525"
+                Digital 525 (SMPTE 125M-1995, 13.5 MHz)
+                525-line analog video sampled at 13.5 MHz
+                (e.g., composite NTSC)
+            */
+            pixelAspectRatio.hSpacing       = 10;
+            pixelAspectRatio.vSpacing       = 11;
+        } else {
+            /* Digital 525 (SMPTE 267M-1995, 13.5 MHz)
+               525-line analog video sampled at 13.5 MHz
+               (e.g., composite NTSC)
+               720x483 progressive 16:9 (SMPTE 293M-1996, 13.5 MHz)
+            */
+            pixelAspectRatio.hSpacing       = 40;
+            pixelAspectRatio.vSpacing       = 33;
+        }
+
+        // codec info
+        (**description).cType           = kMyFormat;
+        (**description).version         = glob-&gt;myVersion;
+        (**description).revisionLevel   = glob-&gt;myRevisionLevel;
+        (**description).dataSize        = kFormatBufferSize;
+        PLstrncpy((**description).name, glob-&gt;myFormatTypeName,
+                  glob-&gt;myFormatTypeName[0] &lt; 32 ? storage-&gt;myFormatTypeName[0] : 31);
+
+        // Add the Image Description properties
+
+        // Clean Aperture
+        /*
+         * Describes the clean aperture of the buffer.
+         */
+        err = ICMImageDescriptionSetProperty(description, kQTPropertyClass_ImageDescription,
+                                             kICMImageDescriptionPropertyID_CleanAperture,
+                                             sizeof(CleanApertureImageDescriptionExtension),
+                                             &amp;cleanAperture);
+        if (noErr != err) goto bail; 
+
+        // Pixel Aspect Ratio
+        /*
+         * Describes the pixel aspect ratio.
+         */
+        err = ICMImageDescriptionSetProperty(description, kQTPropertyClass_ImageDescription,
+                                             kICMImageDescriptionPropertyID_PixelAspectRatio,
+                                             sizeof(PixelAspectRatioImageDescriptionExtension),
+                                             &amp;pixelAspectRatio);
+        if (noErr != err) goto bail;
+
+        ... 
+
+    }
+
+    ...
+
+bail:
+
+    HSetState((Handle)description, savedHState);
+
+    return err;
+}</pre>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="TNTAG3"></a><h2>References</h2>
+<ul><li><p><a href="http://developer.apple.com/samplecode/SoftVDigX/index.html">SoftVDigX</a></p></li></ul>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="document_revision_summary"></a><h2>Document Revision History</h2>
+<table cellspacing="0" class="graybox" width="680">
+<tr>
+<th width="100">Date</th>
+<th width="580">Notes</th>
+</tr>
+<tr>
+<td scope="row">2008-11-20</td>
+<td>Editorial</td>
+</tr>
+<tr>
+<td scope="row">2007-02-14</td>
+<td>Discusses the importance of adding 'pasp' and 'clap' image description extensions to the ImageDescription returned by a VDIG.</td>
+</tr>
+</table>
+<p><b>Posted: </b>2008-11-20</p>
+<!-- END CONTENTS -->
+</td></tr></table>
+<!-- END WIDE COLUMN --><!-- END MAIN CONTENT --><!-- START BOTTOM APPLE NAVIGATION -->	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/qa/qa2007/qa1512.html%3Fid%3DDTS10004221-1.1&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/qa/qa2007/qa1512.html%3Fid%3DDTS10004221-1.1&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/qa/qa2007/qa1512.html%3Fid%3DDTS10004221-1.1&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+<!--#include virtual="/includes/footer" --><!-- END BOTTOM APPLE NAVIGATION --><!-- START CENTER CLOSE -->
+</center>
+<!-- END CENTER CLOSE -->
+</body>
+</html>

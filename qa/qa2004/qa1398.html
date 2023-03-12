@@ -1,0 +1,173 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/1999/REC-html401-19991224/loose.dtd">
+<html><head>
+<!-- BEGIN META TAG INFO -->
+<link rel="home" href="http://developer.apple.com/">
+<link rel="find" href="http://developer.apple.com/search/">
+<link rel="stylesheet" type="text/css" href="../../documentation/css/adcstyle.css" title="fonts">
+<script language="JavaScript" type="text/javascript" src="../../documentation/js/busnav.js"></script>
+<script language="JavaScript" src="../../documentation/js/adc.js" type="text/javascript"></script>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<!-- END META TAG INFO -->
+<!-- BEGIN TITLE -->
+<title>Technical Q&amp;A QA1398: Mach Absolute Time Units</title>
+<!-- END TITLE -->
+</head>
+<!-- BEGIN BODY OPEN -->
+<body bgcolor="#ffffff"><a name="//apple_ref/doc/uid/DTS10003470" title="Mach Absolute Time Units"></a>
+<!--END BODY OPEN -->
+<!-- START CENTER OPEN -->
+<center>
+<!-- END CENTER OPEN -->
+<a name="top"></a>
+<!-- BEGIN LOGO AND SEARCH -->
+<!--#include virtual="/includes/adcnavbar"-->
+<!-- END LOGO AND SEARCH -->
+<!-- START BREADCRUMB -->
+<div id="breadcrumb"><table width="680" border="0" cellpadding="0" cellspacing="0"><tr>
+<td scope="row"><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+<td><img width="340" height="10" src="images/1dot.gif" alt=""></td></tr><tr valign="middle"><td align="left" colspan="2">
+<a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../technicalqas/index.html">Technical Q&As</a> &gt; <a href="../../technicalqas/Darwin/index.html">Darwin</a> &gt; <a href="../../technicalqas/Darwin/idxProcessManagement-date.html">Process Management</a> &gt; 
+</td></tr><tr><td colspan="2" scope="row"><img width="680" height="35" src="images/1dot.gif" alt=""></td></tr></table></div>
+<!-- END BREADCRUMB -->
+
+<!-- START MAIN CONTENT -->
+<!-- START TITLE GRAPHIC AND INTRO-->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top">
+<td><h1>
+<div id="pagehead">Technical Q&amp;A QA1398</div>
+<div id="pageheadsub">Mach Absolute Time Units</div>
+</h1></td></tr></table>
+<!-- END TITLE GRAPHIC AND INTRO -->
+<!-- BEGIN WIDE COLUMN -->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td align="left" width="680">
+<!-- BEGIN CONTENTS -->
+<h2>Q: I'm trying to get precise timing measurements using <code>mach_absolute_time</code>.  What time units does it use?  Specifically, if I take two time measurements and subtract the earlier from the later, how do I convert the result to a real world value?</h2><p>A: This function returns its result in terms of the Mach <strong>absolute time unit</strong>.  This unit is CPU dependent, so you can't just multiply it by a constant to get a real world value.  Rather, you should call a system-provided conversion function to convert it to a real world value.</p><p>The easiest conversion functions to use are <code>AbsoluteToNanoseconds</code> and <code>AbsoluteToDuration</code> from the CoreServices framework.  You can also go in the other direction using <code>NanosecondsToAbsolute</code> and <code>DurationToAbsolute</code>.  <A HREF="#LISTCORESERVICES">Listing 1</A> shows an example of how to get real world timing results using <code>mach_absolute_time</code>.</p><A NAME="LISTCORESERVICES"></A><p class="smalltext"><strong>Listing 1:</strong> Converting Mach absolute time to nanoseconds using AbsoluteToNanoseconds</p><pre class="sourcecodebox">
+#include &lt;assert.h&gt;
+#include &lt;CoreServices/CoreServices.h&gt;
+#include &lt;mach/mach.h&gt;
+#include &lt;mach/mach_time.h&gt;
+#include &lt;unistd.h&gt;
+
+uint64_t GetPIDTimeInNanoseconds(void)
+{
+    uint64_t        start;
+    uint64_t        end;
+    uint64_t        elapsed;
+    Nanoseconds     elapsedNano;
+
+    // Start the clock.
+
+    start = mach_absolute_time();
+
+    // Call getpid.  This will produce inaccurate results because
+    // we're only making a single system call.  For more accurate
+    // results you should call getpid multiple times and average
+    // the results.
+
+    (void) getpid();
+
+    // Stop the clock.
+
+    end = mach_absolute_time();
+
+    // Calculate the duration.
+
+    elapsed = end - start;
+
+    // Convert to nanoseconds.
+
+    // Have to do some pointer fun because AbsoluteToNanoseconds
+    // works in terms of UnsignedWide, which is a structure rather
+    // than a proper 64-bit integer.
+
+    elapsedNano = AbsoluteToNanoseconds( *(AbsoluteTime *) &amp;elapsed );
+
+    return * (uint64_t *) &amp;elapsedNano;
+}
+</pre><div class="notebox"><p><strong>Note:</strong> For this code to work, Mach absolute time must be equivalent to CoreServices <code>AbsoluteTime</code>.  This equivalence was previously undocumented, although it is true on all shipping versions of Mac OS X and is expected to be true on all future versions.</p></div><p>If your program cannot use the CoreServices framework, you can perform an equivalent conversion using the information returned by <code>mach_timebase_info</code>, as shown in <A HREF="#LISTMACHTIMEBASEINT">Listing 2</A>.</p><A NAME="LISTMACHTIMEBASEINT"></A><p class="smalltext"><strong>Listing 2:</strong> Converting Mach absolute time to nanoseconds using mach_timebase_info</p><pre class="sourcecodebox">
+#include &lt;assert.h&gt;
+#include &lt;CoreServices/CoreServices.h&gt;
+#include &lt;mach/mach.h&gt;
+#include &lt;mach/mach_time.h&gt;
+#include &lt;unistd.h&gt;
+
+uint64_t GetPIDTimeInNanoseconds(void)
+{
+    uint64_t        start;
+    uint64_t        end;
+    uint64_t        elapsed;
+    uint64_t        elapsedNano;
+    static mach_timebase_info_data_t    sTimebaseInfo;
+
+    // Start the clock.
+
+    start = mach_absolute_time();
+
+    // Call getpid.  This will produce inaccurate results because
+    // we're only making a single system call.  For more accurate
+    // results you should call getpid multiple times and average
+    // the results.
+
+    (void) getpid();
+
+    // Stop the clock.
+
+    end = mach_absolute_time();
+
+    // Calculate the duration.
+
+    elapsed = end - start;
+
+    // Convert to nanoseconds.
+
+    // If this is the first time we've run, get the timebase.
+    // We can use denom == 0 to indicate that sTimebaseInfo is
+    // uninitialised because it makes no sense to have a zero
+    // denominator is a fraction.
+
+    if ( sTimebaseInfo.denom == 0 ) {
+        (void) mach_timebase_info(&amp;sTimebaseInfo);
+    }
+
+    // Do the maths.  We hope that the multiplication doesn't
+    // overflow; the price you pay for working in fixed point.
+
+    elapsedNano = elapsed * sTimebaseInfo.numer / sTimebaseInfo.denom;
+
+    return elapsedNano;
+}
+</pre><div class="notebox"><p><strong>Note:</strong> The ability to convert between real time and Mach absolute time is also useful when calling <code>mach_wait_until</code> and <code>thread_policy_set</code> with the <code>THREAD_TIME_CONSTRAINT_POLICY</code> policy.</p></div><A NAME="TNT_HISTORY_TAG"></A><H2>Document Revision History</H2><table cellspacing="0" class="graybox" width="680"><tr><th width="100">Date</th><th width="580">Notes</th></tr><tr><td scope="row">2005-01-06</td><td>Describes how to convert Mach absolute time units to real time, and vice versa.</td></tr></table><p><b>Posted:</b> 2005-01-06</p>
+<!-- END CONTENTS -->
+</td></tr></table>
+<!-- END WIDE COLUMN -->
+<!-- END MAIN CONTENT -->
+	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/qa/qa2004/qa1398.html%3Fid%3DDTS10003470-1.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/qa/qa2004/qa1398.html%3Fid%3DDTS10003470-1.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/qa/qa2004/qa1398.html%3Fid%3DDTS10003470-1.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+
+<!-- START BOTTOM APPLE NAVIGATION -->
+<!--#include virtual="/includes/footer"-->
+<!-- END BOTTOM APPLE NAVIGATION -->
+<!-- START CENTER CLOSE -->
+</center>
+<!-- END CENTER CLOSE -->
+</body></html>

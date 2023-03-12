@@ -1,0 +1,159 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/1999/REC-html401-19991224/loose.dtd">
+<html><head>
+<!-- BEGIN META TAG INFO -->
+<link rel="home" href="http://developer.apple.com/">
+<link rel="find" href="http://developer.apple.com/search/">
+<link rel="stylesheet" type="text/css" href="../../documentation/css/adcstyle.css" title="fonts">
+<script language="JavaScript" type="text/javascript" src="../../documentation/js/busnav.js"></script>
+<script language="JavaScript" src="../../documentation/js/adc.js" type="text/javascript"></script>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<!-- END META TAG INFO -->
+<!-- BEGIN TITLE -->
+<title>Technical Q&amp;A QA1421: iSight - Configuring gain settings for IIDC cameras</title>
+<!-- END TITLE -->
+</head>
+<!-- BEGIN BODY OPEN -->
+<body bgcolor="#ffffff"><a name="//apple_ref/doc/uid/DTS10003535" title="iSight - Configuring gain settings for IIDC cameras"></a>
+<!--END BODY OPEN -->
+<!-- START CENTER OPEN -->
+<center>
+<!-- END CENTER OPEN -->
+<a name="top"></a>
+<!-- BEGIN LOGO AND SEARCH -->
+<!--#include virtual="/includes/adcnavbar"-->
+<!-- END LOGO AND SEARCH -->
+<!-- START BREADCRUMB -->
+<div id="breadcrumb"><table width="680" border="0" cellpadding="0" cellspacing="0"><tr>
+<td scope="row"><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+<td><img width="340" height="10" src="images/1dot.gif" alt=""></td></tr><tr valign="middle"><td align="left" colspan="2">
+<a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../technicalqas/index.html">Technical Q&As</a> &gt; <a href="../../technicalqas/Carbon/index.html">Carbon</a> &gt; <a href="../../technicalqas/Carbon/idxQuickTime-date.html">QuickTime</a> &gt; 
+</td></tr><tr><td colspan="2" scope="row"><img width="680" height="35" src="images/1dot.gif" alt=""></td></tr></table></div>
+<!-- END BREADCRUMB -->
+
+<!-- START MAIN CONTENT -->
+<!-- START TITLE GRAPHIC AND INTRO-->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top">
+<td><h1>
+<div id="pagehead">Technical Q&amp;A QA1421</div>
+<div id="pageheadsub">iSight - Configuring gain settings for IIDC cameras</div>
+</h1></td></tr></table>
+<!-- END TITLE GRAPHIC AND INTRO -->
+<!-- BEGIN WIDE COLUMN -->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td align="left" width="680">
+<!-- BEGIN CONTENTS -->
+<h2>Q: My application captures video from the iSight camera but in order to process the frames I need to make sure the gain adjustment is turned on and set to a certain value at specific times.<br><br>What's the best way to do this?</h2><p>A: <code>SGSettingsDialog</code> lets you configure a number of IIDC camera specific features via the Adjustments panel, and any IIDC feature you can configure with the Adjustments panel can also be configured using the VDIIDC APIs. Therefore, this gives developers a couple of options:</p><p>The most straight forward approach is to use <A HREF="../../documentation/QuickTime/APIREF/sgsettingsdialog.htm"><code>SGSettingsDialog</code></A> to configure the Video Channel, then save and load those settings as required using <A HREF="../../documentation/QuickTime/APIREF/sggetchannelsettings.htm"><code>SGGetChannelSettings</code></A> and <A HREF="../../documentation/QuickTime/APIREF/sgsetchannelsettings.htm"><code>SGSetChannelSettings</code></A> as discussed in <A HREF="../qa2001/qa1286.html">Q&amp;A1286</A>.</p><p>Alternatively, you can use the VDIIDC APIs directly and while slightly more complex, they may be more appropriate depending on the situation.</p><div class="notebox"><p><strong>Note:</strong> The VDIIDC APIs can only be used with the IIDC Video Digitizer. This component is identified by the subType <code>vdSubtypeIIDC</code>.</p></div><p>Different IIDC cameras can support a number of different features. This feature information can be retrieved using one of the VDIIDCGetFeatures APIs and is returned in a hierarchy of QuickTime Atoms as shown in Figure 1. The Atom Container can then be parsed into the appropriate settings structures.</p><p class="caption"><strong>Figure 1:</strong> IIDC Atom Hierarchy.</p><p><img  src="images/qa1421_iidcatoms.jpg" width="581" height="500" alt="Figure 1, IIDC Atom Hierarchy."></p><p>A full description of Atom types and VDIIDC APIs can be found in the <A HREF="../../documentation/QuickTime/WhatsNewQT6_4/Chap1/chapter_1_section_14.html#//apple_ref/doc/uid/TP30000902-CH240-BBCDAECB">New IIDC Digitizer Functions</A> section of <A HREF="../../documentation/QuickTime/WhatsNewQT6_4/Chap1/chapter_1_section_1.html">What's new in QuickTime 6.4</A>.</p><p class="smalltext"><strong>Listing 1:</strong> Configuring Gain using VDIIDC APIs.</p><pre class="sourcecodebox">
+ComponentResult ConfigureGain(SGChannel inChannel)
+{
+    QTAtomContainer         atomContainer;
+    QTAtom                  featureAtom;
+    VDIIDCFeatureSettings   settings;
+    VideoDigitizerComponent vd;
+    ComponentDescription    desc;
+    ComponentResult         result = paramErr;
+
+    if (NULL == inChannel) goto bail;
+
+    // get the digitizer and make sure it's legit
+    vd = SGGetVideoDigitizerComponent(inChannel);
+    if (NULL == vd) goto bail;
+
+    GetComponentInfo((Component)vd, &amp;desc, NULL, NULL, NULL);
+    if (vdSubtypeIIDC != desc.componentSubType) goto bail;
+
+    // *** now do the real work ***
+
+    // return the gain feature in an atom container
+    result = VDIIDCGetFeaturesForSpecifier(vd, vdIIDCFeatureGain, &amp;atomContainer);
+    if (noErr == result) {
+
+        // find the feature atom
+        featureAtom = QTFindChildByIndex(atomContainer, kParentAtomIsContainer,
+                                         vdIIDCAtomTypeFeature, 1, NULL);
+        if (0 == featureAtom) { result = cannotFindAtomErr; goto bail; }
+
+        // find the gain settings from the feature atom and copy the data
+        // into our settings
+        result = QTCopyAtomDataToPtr(atomContainer,
+                                     QTFindChildByID(atomContainer, featureAtom,
+                                     vdIIDCAtomTypeFeatureSettings,
+                                     vdIIDCAtomIDFeatureSettings, NULL),
+                                     true, sizeof(settings), &amp;settings, NULL);
+        if (noErr == result) {
+            /* When indicating capabilities, the flag being set indicates that the
+               feature can be put into the given state.
+               When indicating/setting state, the flag represents the current/desired
+               state. Note that certain combinations of flags are valid for capabilities
+               (i.e. vdIIDCFeatureFlagOn | vdIIDCFeatureFlagOff) but are mutually
+               exclusive for state.
+             */
+            // is the setting supported?
+            if (settings.capabilities.flags &amp; (vdIIDCFeatureFlagOn |
+                                               vdIIDCFeatureFlagManual |
+                                               vdIIDCFeatureFlagRawControl)) {
+                // set state flags
+                settings.state.flags = (vdIIDCFeatureFlagOn |
+                                        vdIIDCFeatureFlagManual |
+                                        vdIIDCFeatureFlagRawControl);
+
+                // set value - will either be 500 or the max value supported by
+                // the camera represented in a float between 0 and 1.0
+                settings.state.value = (1.0 / settings.capabilities.rawMaximum) *
+                                       ((settings.capabilities.rawMaximum &gt; 500) ? 500 :
+                                       settings.capabilities.rawMaximum);
+
+                // store the result back in the container
+                result = QTSetAtomData(atomContainer,
+                                       QTFindChildByID(atomContainer, featureAtom,
+                                       vdIIDCAtomTypeFeatureSettings,
+                                       vdIIDCAtomIDFeatureSettings, NULL),
+                                       sizeof(settings), &amp;settings);
+                if (noErr == result) {
+                    // set it on the device
+                    result = VDIIDCSetFeatures(vd, atomContainer);
+                }
+            } else {
+                // can't do it!
+                result = featureUnsupported;
+            }
+        }
+    }
+
+bail:
+    return result;
+}
+
+</pre><div class="notebox"><p><strong>IMPORTANT:</strong> Some IIDC settings are tightly coupled and changing one often changes another; this is particularly true for the Gain, Shutter and Exposure settings. In other words, it's incredibly easy to configure the camera with settings that produce a completely unusable picture.</p><p>Different camera models may also behave differently when specific settings are changed and certain cameras may not have certain features available.</p></div><A NAME="TNT_HISTORY_TAG"></A><H2>Document Revision History</H2><table cellspacing="0" class="graybox" width="680"><tr><th width="100">Date</th><th width="580">Notes</th></tr><tr><td scope="row">2005-04-06</td><td>Discusses how to configure features of IIDC cameras, specifically gain for the iSight</td></tr></table><p><b>Posted:</b> 2005-04-06</p>
+<!-- END CONTENTS -->
+</td></tr></table>
+<!-- END WIDE COLUMN -->
+<!-- END MAIN CONTENT -->
+	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/qa/qa2005/qa1421.html%3Fid%3DDTS10003535-1.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/qa/qa2005/qa1421.html%3Fid%3DDTS10003535-1.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/qa/qa2005/qa1421.html%3Fid%3DDTS10003535-1.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+
+<!-- START BOTTOM APPLE NAVIGATION -->
+<!--#include virtual="/includes/footer"-->
+<!-- END BOTTOM APPLE NAVIGATION -->
+<!-- START CENTER CLOSE -->
+</center>
+<!-- END CENTER CLOSE -->
+</body></html>

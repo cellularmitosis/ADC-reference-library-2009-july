@@ -1,0 +1,455 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN"
+"http://www.w3.org/TR/REC-html40/loose.dtd">
+<html>
+	<head>
+		<title>Technical Q&amp;A QA1268: Sharpening Full Scene Anti-Aliasing Details</title>
+		<link rel="stylesheet" href="../../adcstyle.css" type="text/css">
+		<link rel="stylesheet" href="../../style.css" type="text/css">
+		<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+		<meta name="keywords" content="OpenGL, FSAA, anti-aliasing, full scene anti-aliasing">
+		<meta name="Description" content="This Q&amp;A covers the technical details of using full scene anti-aliasing in OpenGL applications">
+	<LINK REL="stylesheet" HREF="../../css/adcstyle.css" TYPE="text/css"><script language="JavaScript" type="text/javascript" src="../../js/adc.js"></script></head>
+	<body bgcolor="WHITE"><a name="//apple_ref/doc/uid/DTS10002336" title="Sharpening Full Scene Anti-Aliasing Details"></a>
+<!-- begin_header_information --><!--#include virtual="/adcnavbar" --><p><a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../technicalqas/index.html">Technical Q&As</a> &gt; <a href="../../technicalqas/GraphicsImaging/index.html">Graphics & Imaging</a> &gt; <a href="../../technicalqas/GraphicsImaging/idxOpenGL-date.html">OpenGL</a> &gt; </p><!-- end_header_information -->
+<!-- begin_titles_information --><CENTER><table width="600" cellpadding="0" cellspacing="0" border="0">
+<tr><td align="left" scope="row">
+<h1>
+<div id="pagehead">Technical Q&amp;A QA1268</div>
+<div id="pageheadsub">Sharpening Full Scene Anti-Aliasing Details</div>
+</h1>
+</td></tr></table></CENTER><!-- end_titles_information -->
+		<center>
+			<table border="0" cellspacing="1" width="600">
+				<tr>
+					<td align="left" scope="row">
+						<hr width="500" align="center">
+<!-- begin_document_contents -->
+						<p id="p2">
+							Q: How can I use OpenGL Full Scene Anti-Aliasing in my Application? 
+						</p>
+						<p id="p4">
+							A: Full scene anti-aliasing (FSAA) on Mac OS X is supported via the 
+							<code>
+								ARB_multisample
+							</code>
+							OpenGL extension. This is the OpenGL Architecture Review Board (ARB) standardized method of doing scene based anti-aliasing which takes multiple samples at a point and combines this with coverage values to arrive at a final fragment. For more general information on the OpenGL extensions see 
+							<a href="http://developer.apple.com/technotes/tn2002/tn2080.html">
+								Technical Note TN2080 "OpenGL Functionality"
+							</a>
+						</p>
+						<div align="center">
+							<table border="0" cellpadding="3" width="550">
+								<tr>
+									<td bgcolor="#E6E6E6">
+										<p>
+											<b>
+												Note:
+											</b>
+											<br>
+											If a client application is looking for just point or line anti-aliasing they may want to use the built in OpenGL point and line aliasing functions. See Section 3.4.2 in the 
+											<a href="http://www.opengl.org/developers/documentation/specs.html">
+												OpenGL Specification</a>. 
+										</p>
+									</td>
+								</tr>
+							</table>
+						</div>
+						<p id="p4">
+							Clients should understand what the multi-sample extension does and does not do. The number of samples of a scene are increased, currently by either 2, 4 or 6 times, depending on supporting hardware and VRAM available. The position of each sample does not change from the standard case but a coverage value is added to aid in determining the final color contribution. This means the edges of polygons are smoothed but the textures are not super-sampled (i.e., sampled at a larger number of locations). The extension does require the creation of a multi-sample buffer which consumes memory equal to: 
+							<i>
+								(number of samples) x (current back buffer size)
+							</i>
+							and the Depth buffer is increased in size to match the multi-sample buffer size thus consuming 
+							<i>
+								(number of samples) x (current depth buffer size in bytes)
+							</i>
+							bytes of memory. 
+						</p>
+						<p id="p4">
+							Set up of FSAA is fairly straight forward but does have a couple of pitfalls. There are 2 required steps and one optional one. First, some additional attributes are added to the pixel format request. Second multi-sample is enabled. Lastly, a client can optionally pass multi-sample filter hints to OpenGL which may allow the graphics card to better achieve the desired results. 
+						</p>
+						<p id="p4">
+							First one must add the "samples" and "sample buffers" attributes to the pixel format request. The samples attribute controls the number of samples to be taken at a single point and thus the general quality of the anti-aliasing. The acceptable values for samples are 2, 4 or 6 currently with VRAM, performance and card capabilities limiting the clients choice. Sample buffers controls the actual number of multi-sample buffers and currently only one is supported. Additionally, almost all clients will want to also specify the "no recovery" attribute, which will eliminate the normal software fallback renderer that would prevent OpenGL from returning a valid pixel format since the software renderer currently does not support multi-sample. Lastly, not all hardware is capable of supporting the ARB multi-sample extension. This can be determined through standard extension checking techniques outlined in 
+							<a href="http://developer.apple.com/technotes/tn2002/tn2080.html">
+								Technical Note TN2080 "OpenGL Functionality"</a>. If this is the case, clients can, if they choose, exclude unsupported hardware from the pixel format search by specifying only the hardware which supports the extension or they can leave unsupported hardware in the search. Excluding hardware is accomplished by specifying only the displays that support 
+							<code>
+								ARB_multisample
+							</code>
+							to the choose pixel format function, either in the pixel format attributes, for CGL and NSGL, or directly in the 
+							<code>
+								aglChoosePixelFormat
+							</code>
+							function call for AGL and will result in these displays not rendering anything when content is using this renderer for display.  Including unsupported hardware in the pixel format selection will result in normal aliased rendering on unsupported displays rather than multi-sampled rendering.  Table 1 lists the exact attribute names called out in this description. For more information on the different OpenGL interface API's see 
+							<a href="http://developer.apple.com/qa/qa2001/qa1269.html">
+								Technical Q&amp;A QA1269 "Mac OS X OpenGL Interfaces"
+							</a>
+						</p>
+						<div align="center">
+							<table border="0" cellpadding="3" width="550">
+								<tr>
+									<td bgcolor="#E6E6E6" scope="row">
+										<p>
+											<b>
+												Note:
+											</b>
+											<br>
+											Even if a multi-sample buffer with the requested number of samples can be created in available VRAM, it may be large enough to affect the ability of OpenGL to maintain a proper working texture set or it could use so much of the graphics cards' available fill rate that considerable performance degradation would occur. It is recommended that developers leave the option of doing FSAA with the user and give the user a simple control, possibly a slider, that controls the quality of the multi-sampling including number of samples and filter hints (see below). 
+										</p>
+									</td>
+								</tr>
+							</table>
+						</div>
+						<br>
+<!-- table starts here -->
+						<center>
+							<table border="0" cellpadding="0" width="550">
+								<tr>
+									<td scope="row">
+<!-- your table title -->
+										<p>
+											<b>
+												Table 1</b>. Pixel Format Constants. 
+										</p>
+<!-- beginning of your table data -->
+										<table width="100%" border="0" cellspacing="4" cellpadding="4">
+											<tr>
+												<td align="left" bgcolor="#c7ced4">
+													<div align="right">
+														<b>
+															&nbsp;
+														</b>
+													</div>
+												</td>
+												<td align="center" bgcolor="#c7ced4" width="165">
+													<b>
+														CGL
+													</b>
+												</td>
+												<td align="center" bgcolor="#c7ced4" width="165">
+													<b>
+														NSOpenGLPixelFormat
+													</b>
+												</td>
+												<td align="center" bgcolor="#c7ced4" width="165">
+													<b>
+														AGL
+													</b>
+												</td>
+											</tr>
+											<tr>
+												<td align="left" bgcolor="#c7ced4" scope="row">
+													<div align="right">
+														<b>
+															Samples
+														</b>
+													</div>
+												</td>
+												<td align="center" bgcolor="#f1f4f9" width="165">
+													<code>
+														kCGLPFASamples
+													</code>
+												</td>
+												<td align="center" bgcolor="#f1f4f9" width="165">
+													<code>
+														NSOpenGLPFASamples
+													</code>
+												</td>
+												<td align="center" bgcolor="#f1f4f9" width="165">
+													<code>
+														AGL_SAMPLES_ARB
+													</code>
+												</td>
+											</tr>
+											<tr>
+												<td align="left" bgcolor="#c7ced4" scope="row">
+													<div align="right">
+														<b>
+															Sample&nbsp;Buffers
+														</b>
+													</div>
+												</td>
+												<td align="center" bgcolor="#f1f4f9" width="165">
+													<code>
+														kCGLPFASampleBuffers
+													</code>
+												</td>
+												<td align="center" bgcolor="#f1f4f9" width="165">
+													<code>
+														NSOpenGLPFASampleBuffers
+													</code>
+												</td>
+												<td align="center" bgcolor="#f1f4f9" width="165">
+													<code>
+														AGL_SAMPLE_BUFFERS_ARB
+													</code>
+												</td>
+											</tr>
+											<tr>
+												<td align="left" bgcolor="#c7ced4" scope="row">
+													<div align="right">
+														<b>
+															No&nbsp;Recovery
+														</b>
+													</div>
+												</td>
+												<td align="center" bgcolor="#f1f4f9" width="165">
+													<code>
+														kCGLPFANoRecovery
+													</code>
+												</td>
+												<td align="center" bgcolor="#f1f4f9" width="165">
+													<code>
+														NSOpenGLPFANoRecovery
+													</code>
+												</td>
+												<td align="center" bgcolor="#f1f4f9" width="165">
+													<code>
+														AGL_NO_RECOVERY
+													</code>
+												</td>
+											</tr>
+										</table>
+<!-- end of your table data -->
+									</td>
+								</tr>
+							</table>
+						</center>
+<!-- table ends here -->
+						<p id="p4">
+							The pixel format and context setup code looks very similar to what clients normally use.  Listing 1 shows pixel format creation code for all three OpenGL interface API's. One sees the attribute handling is the same for all three listings, though with minor function and constant name differences. The context creation is slightly different for the API's thus the method of specifying capable screens is different. The outcome will be the same; a pixel format that contains the valid specified screens and represents the set of renderers on the screens without a software fallback. 
+						</p>
+<!-- listing starts here-->
+						<center>
+							<table border="0" cellpadding="0" width="550">
+								<tr>
+									<td scope="row">
+										<p>
+											<b>
+												Listing 1a</b>. CGL Pixel Format and Context Setup for Anti-Aliasing. 
+										</p>
+									</td>
+								</tr>
+								<tr>
+									<td bgcolor="#E6E6E6" scope="row">
+<pre>#include &lt;OpenGL/OpenGL.h&gt;
+
+CGLPixelFormatAttribute attribs[] = { kCGLPFADisplayMask, 0,
+                                      kCGLPFAFullScreen,
+                                      kCGLPFADoubleBuffer,
+                                      kCGLPFASampleBuffers, 1,
+                                      kCGLPFASamples, 2,
+                                      kCGLPFANoRecovery,
+                                      0 };
+CGLPixelFormatObj pixelFormat = NULL;
+CGLContextObj context = NULL;
+long numPixelFormats = 0;
+ 
+// use main display for demonstration purposes
+// need to capture and set display mode (not shown in this code)
+// set display mask in pixel format attributes
+attribs[1] = CGDisplayIDToOpenGLDisplayMask (CGMainDisplayID ());
+
+CGLChoosePixelFormat (attribs, &amp;pixelFormat, &amp;numPixelFormats));
+
+// build context
+if (pixelFormat) {
+    CGLCreateContext (pixelFormat, NULL, &amp;context);
+    CGLDestroyPixelFormat (pixelFormat);
+}
+</pre> 
+									</td>
+								</tr>
+							</table>
+						</center>
+<!-- listing ends here -->
+						<br>
+<!-- listing starts here-->
+						<center>
+							<table border="0" cellpadding="0" width="550">
+								<tr>
+									<td scope="row">
+										<p>
+											<b>
+												Listing 1b</b>. NSOpenGL Pixel Format and Context Setup for Anti-Aliasing. 
+										</p>
+									</td>
+								</tr>
+								<tr>
+									<td bgcolor="#E6E6E6" scope="row">
+<pre>#import &lt;Cocoa/Cocoa.h&gt;
+
+@implementation BasicOpenGLView
+
++ (NSOpenGLPixelFormat*)defaultPixelFormat
+{
+    NSOpenGLPixelFormatAttribute attributes [] = {
+        NSOpenGLPFAWindow,
+        NSOpenGLPFADoubleBuffer,
+        NSOpenGLPFASampleBuffers, 1, 
+        NSOpenGLPFASamples, 2,
+        NSOpenGLPFANoRecovery,
+        (NSOpenGLPixelFormatAttribute)nil
+    };
+    return [[[NSOpenGLPixelFormat alloc] 
+                        initWithAttributes:attributes] autorelease];
+}
+
+-(id) initWithFrame: (NSRect) frameRect
+{
+    NSOpenGLPixelFormat *pixelFormat = [BasicOpenGLView defaultPixelFormat];
+
+    self = [super initWithFrame: frameRect pixelFormat: pixelFormat];
+    return self;
+}
+
+// other class methods defined here
+
+@end
+</pre> 
+									</td>
+								</tr>
+							</table>
+						</center>
+<!-- listing ends here -->
+						<br>
+<!-- listing starts here-->
+						<center>
+							<table border="0" cellpadding="0" width="550">
+								<tr>
+									<td scope="row">
+										<p>
+											<b>
+												Listing 1c</b>. AGL Pixel Format and Context Setup for Anti-Aliasing. 
+										</p>
+									</td>
+								</tr>
+								<tr>
+									<td bgcolor="#E6E6E6" scope="row">
+<pre>#include &lt;AGL/agl.h&gt;
+
+GLint attribs[] = { AGL_RGBA, AGL_DOUBLEBUFFER, 
+                    AGL_SAMPLE_BUFFERS_ARB, 1, 
+                    AGL_SAMPLES_ARB, 2, 
+                    AGL_NO_RECOVERY, 
+                    AGL_NONE };
+     
+AGLPixelFormat pixelFormat = NULL;
+AGLContext context = NULL;
+
+// could provide a list of GDHandles for supported displays here
+pixelFormat = aglChoosePixelFormat (NULL, 0, attribs);
+
+// build context
+if (pixelFormat) {
+    context = aglCreateContext (pixelFormat, NULL);
+    aglDestroyPixelFormat (pixelFormat);
+}
+</pre> 
+									</td>
+								</tr>
+							</table>
+						</center>
+<!-- listing ends here -->
+						<p id="p4">
+						After a multi-sample capable context has been created, multi-sampling is enabled with <code>glEnable</code> by specifying the <code>GL_MULTISAMPLE_ARB</code> capability. Regardless of the enabled state, rendering always goes through the multi-sample buffer, if one was created with the pixel format.  When multi-sample is disabled, all coverage values will be set to one giving the appearance of non-multi-sample rendering. If the correct buffers have not been created in the pixel format, enabling multi-sample will do nothing. 
+						</p>
+						<div align="center">
+							<table border="0" cellpadding="3" width="550">
+								<tr>
+									<td bgcolor="#E6E6E6" scope="row">
+										<p>
+											<b>
+												Note:
+											</b>
+											<br>
+											Currently, ATI graphics hardware prior to the Radeon 9800 Pro and Radeon 9600 Pro do not support the enable flag for multi-sampling, leaving it enabled in all cases. It is recommended that client correctly set the enable flag for the context as needed but not expect 
+											<code>
+												glDisable
+											</code>
+											to be respected for certain ATI hardware. 
+										</p>
+									</td>
+								</tr>
+							</table>
+						</div>
+						<p id="p4">
+							Rendering hints for multi-sampling are supported through the <code>GL_MULTISAMPLE_FILTER_HINT_NV</code> extension. Hints for either faster or nicer rendering can be added with the standard 
+							<code>
+								glHint
+							</code>
+							API using 
+							<code>
+								GL_MULTISAMPLE_FILTER_HINT_NV
+							</code>
+							as the target. A hint is optional and not all hardware will be able to comply with the hint but it gives OpenGL more information about what path the clients prefer thus clients should issue hints when able and appropriate. Specifically, clients can hint that OpenGL should either the 
+							<code>
+								GL_FASTEST
+							</code>
+							or 
+							<code>
+								GL_NICEST
+							</code>
+							rendering algorithm, allowing the hardware to optimized the output as it is able. There is no penalty for issuing a unsupported hint and no error will be returned. Listing 2 shows code for these final two steps to enable multi-sample and send a rendering hint to OpenGL. 
+						</p>
+<!-- listing starts here-->
+						<center>
+							<table border="0" cellpadding="0" width="550">
+								<tr>
+									<td scope="row">
+										<p>
+											<b>
+												Listing 2</b>. Enabling multi-sampling and setting a rendering hint. 
+										</p>
+									</td>
+								</tr>
+								<tr>
+									<td bgcolor="#E6E6E6" scope="row">
+<pre>#include &lt;OpenGL/gl.h&gt;
+#include &lt;OpenGL/glext.h&gt;
+
+glEnable (GL_MULTISAMPLE_ARB);
+glHint (GL_MULTISAMPLE_FILTER_HINT_NV, GL_NICEST);
+</pre> 
+									</td>
+								</tr>
+							</table>
+						</center>
+<!-- listing ends here -->
+						<p id="p4">
+							This concludes the discussion of using the 
+							<code>
+								ARB_multisample
+							</code>
+							OpenGL extension for full scene anti-aliasing on Mac OS X. Applications can easily provide a enhanced user experience by providing user control over FSAA in their OpenGL application. The set up and support is simple and allowing user interaction optimizes user experience for different system capabilities and user desires. 
+						</p>
+						<hr width="500" align="center">
+<!-- begin_date --><H4 ALIGN=center>[Oct 10, 2003]</H4><!-- end_date -->
+<!-- end_document_contents -->
+					</td>
+				</tr>
+			</table>
+		</center>
+<!-- begin_footer_information -->	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/qa/qa2001/qa1268.html%3Fid%3DDTS10002336-1.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/qa/qa2001/qa1268.html%3Fid%3DDTS10002336-1.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/qa/qa2001/qa1268.html%3Fid%3DDTS10002336-1.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+<!--#include virtual="/includes/footer"--><!-- end_footer_information -->
+	</body>
+</html>

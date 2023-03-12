@@ -1,0 +1,99 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/1999/REC-html401-19991224/loose.dtd">
+<html><head>
+<!-- BEGIN META TAG INFO -->
+<link rel="home" href="http://developer.apple.com/">
+<link rel="find" href="http://developer.apple.com/search/">
+<link rel="stylesheet" type="text/css" href="../../documentation/css/adcstyle.css" title="fonts">
+<script language="JavaScript" type="text/javascript" src="../../documentation/js/busnav.js"></script>
+<script language="JavaScript" src="../../documentation/js/adc.js" type="text/javascript"></script>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<!-- END META TAG INFO -->
+<!-- BEGIN TITLE -->
+<title>Technical Q&amp;A QA1554: Common mistakes with delegation in Cocoa</title>
+<!-- END TITLE -->
+</head>
+<!-- BEGIN BODY OPEN -->
+<body bgcolor="#ffffff"><a name="//apple_ref/doc/uid/DTS10004461" title="Common mistakes with delegation in Cocoa"></a>
+<!--END BODY OPEN -->
+<!-- START CENTER OPEN -->
+<center>
+<!-- END CENTER OPEN -->
+<a name="top"></a>
+<!-- BEGIN LOGO AND SEARCH -->
+<!--#include virtual="/includes/adcnavbar"-->
+<!-- END LOGO AND SEARCH -->
+<!-- START BREADCRUMB -->
+<div id="breadcrumb"><table width="680" border="0" cellpadding="0" cellspacing="0"><tr>
+<td scope="row"><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+<td><img width="340" height="10" src="images/1dot.gif" alt=""></td></tr><tr valign="middle"><td align="left" colspan="2">
+<a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../technicalqas/index.html">Technical Q&As</a> &gt; <a href="../../technicalqas/Cocoa/index.html">Cocoa</a> &gt; <a href="../../technicalqas/Cocoa/idxDesignGuidelines-date.html">Design Guidelines</a> &gt; 
+</td></tr><tr><td colspan="2" scope="row"><img width="680" height="35" src="images/1dot.gif" alt=""></td></tr></table></div>
+<!-- END BREADCRUMB -->
+
+<!-- START MAIN CONTENT -->
+<!-- START TITLE GRAPHIC AND INTRO-->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top">
+<td><h1>
+<div id="pagehead">Technical Q&amp;A QA1554</div>
+<div id="pageheadsub">Common mistakes with delegation in Cocoa</div>
+</h1></td></tr></table>
+<!-- END TITLE GRAPHIC AND INTRO -->
+<!-- BEGIN WIDE COLUMN -->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td align="left" width="680">
+<!-- BEGIN CONTENTS -->
+<h2>Q: One of the delegate methods in my Cocoa application isn't being invoked. What is probably wrong?</h2><p>A: When a delegate message isn't being received as you intended, it is usually a sign of one of two things, either:</p><ol><li><p>the method selectors don't match, often because of capitialization or a missing colon, or</p></li><li><p>the delegate outlet has not been set or is simply set to the wrong object.</p></li></ol><p>To illustrate further, let's say that you want to handle attempts by the user to close the window <code>myWindow</code> in your application. When the user clicks on the close box, the window object will send the equivalent of <code> [delegate <code>respondsToSelector:</code>@selector(<code><code>windowShouldClose</code>:</code>)]</code> to see if it should even send the delegate message. If the receiver is <code>nil</code>, or the <code>respondsToSelector:</code> test returns <code>NO</code>, the delegate message will not be sent.</p><p><strong> Verify that the method signatures match </strong></p><p>Be sure you've implemented the right method. It is not uncommon for a method selector like -<code><code>windowShouldClose</code>:</code>  to either be misspelled (e.g. -<code>windowShoulfClose:</code>), miscapitalized (e.g. -<code>windowShouldclose</code>:) or be missing the colon (-<code>windowShouldClose</code>). These all describe a different method, and the runtime test will fail.</p><p>Perhaps the safest habit to develop is to simply always cut and paste the method selector. In earlier releases of Mac OS X you can find the delegate methods on the Class Reference page. In more recent releases, you'll also find delegate methods grouped together as an informal protocol (a category on NSObject). For example, the window delegate methods are declared in <code>NSWindow.h</code> in the <code>NSObject(NSWindowDelegate)</code> category.</p><div class="notebox"><p><strong>Note:</strong> Capitalization errors are often the hardest to catch. Any of the methods of the NSTableDataSource informal protocol are likely candidates for subtle miscapitalization. For example,  <code>numberOfRowsInTableView:</code> is often mistakenly entered as <code>numberOfRowsInTableview:</code>.</p></div><p><strong> Ensure that the delegate is set properly</strong></p><p>Even if you've implemented the correct method, it can be easy to overlook assigning the delegate object. Sometimes a connection may have become disconnected in the nib file or be made to the wrong object. So be sure to check and make sure that the instance variable (most often an <code>IBOutlet</code> named <code>delegate</code>) is connected correctly in Interface Builder, or alternatively, that the appropriate accessor method is being used to set the instance variable at runtime.</p><p class="smalltext"><strong>Listing 1:</strong> If you don't, or can't, assign a delegate in Interface Builder, you can set it in code.</p><pre class="sourcecodebox">
+- (void) awakeFromNib {
+    [[NSFontManager sharedManager] setDelegate:self];
+}
+</pre><p>Prior to release, consider the use of assertions to ensure connections were established correctly.</p><p class="smalltext"><strong>Listing 2:</strong> Use of NSAssert() during debugging to test for a delegate connection.</p><pre class="sourcecodebox">
+#if ! defined(NDEBUG)  
+
+- (void) awakeFromNib {
+    // let's make sure that connection in Interface Builder was made, and made to us
+    NSAssert([myWindow delegate] == self, @&quot;You forgot to connect the window delegate.!&quot;); 
+   // ...
+}
+
+#endif
+</pre><p><strong> Delegates and memory management </strong></p><p>Note that delegating objects keep a weak reference to their delegates. In other words, delegates are not retained by the objects they respond to: they are free to come and go at any time. When using garbage collection, this weak reference means you don't need to do anything about this relationship when the delegate is collected. However, when using retain counting it is essential to explicitly clear this relationship when the object is deallocated.</p><p class="smalltext"><strong>Listing 3:</strong> When not under garbage-collection, a delegate must clear itself before deallocation.</p><pre class="sourcecodebox">
+
+- (void) dealloc {
+    // unhook ourselves so the window won't try to message us in the future
+    [myWindow setDelegate:nil];
+    [super dealloc];
+}
+</pre><p><strong> For More Information</strong></p><p>See the <A HREF="../../documentation/Cocoa/index.html#//apple_ref/doc/uid/TP30000440-TP30000416">Cocoa documentation</A> for more on <A HREF="../../documentation/Cocoa/Conceptual/CocoaFundamentals/CommunicatingWithObjects/chapter_6_section_4.html">Delegates and Data Sources</A>.</p><A NAME="TNT_HISTORY_TAG"></A><H2>Document Revision History</H2><table cellspacing="0" class="graybox" width="680"><tr><th width="100">Date</th><th width="580">Notes</th></tr><tr><td scope="row">2008-02-27</td><td>First Version</td></tr></table><p><b>Posted:</b> 2008-02-27</p>
+<!-- END CONTENTS -->
+</td></tr></table>
+<!-- END WIDE COLUMN -->
+<!-- END MAIN CONTENT -->
+	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/qa/qa2007/qa1554.html%3Fid%3DDTS10004461-1.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/qa/qa2007/qa1554.html%3Fid%3DDTS10004461-1.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/qa/qa2007/qa1554.html%3Fid%3DDTS10004461-1.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+
+<!-- START BOTTOM APPLE NAVIGATION -->
+<!--#include virtual="/includes/footer"-->
+<!-- END BOTTOM APPLE NAVIGATION -->
+<!-- START CENTER CLOSE -->
+</center>
+<!-- END CENTER CLOSE -->
+</body></html>

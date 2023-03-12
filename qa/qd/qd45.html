@@ -1,0 +1,42 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN"			"http://www.w3.org/TR/REC-html40/loose.dtd"><HTML><!--Template 06-20-02--><HEAD><LINK REL="stylesheet" HREF="../../adcstyle.css" TYPE="text/css"><LINK REL="stylesheet" HREF="../../style.css" TYPE="text/css">   <TITLE>Technical Q&amp;A QD45: Including the Cursor in a Screen Capture when using CopyBits</TITLE>  <meta name="keywords" content="Mac OS 8 QuickDraw showing cursor CopyBits screen capture globals"><meta name="Description" content="Q&amp;A shows how to fool CopyBits into including the cursor when doing a screen capture. Q&amp;A uses low memory globals to manipulate the cursor and provides a code snippet illustrating this."><LINK REL="stylesheet" HREF="../../css/adcstyle.css" TYPE="text/css"><script language="JavaScript" type="text/javascript" src="../../js/adc.js"></script></HEAD><BODY BGCOLOR="#FFFFFF"><a name="//apple_ref/doc/uid/DTS10001898" title="Including the Cursor in a Screen Capture when using CopyBits"></a><!-- top_of_header_marker_comment --><!-- begin_header_information --><!--#include virtual="/adcnavbar" --><p><a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../technicalqas/index.html">Technical Q&As</a> &gt; <a href="../../technicalqas/LegacyTechnologies/index.html">Legacy Documents</a> &gt; <a href="../../technicalqas/LegacyTechnologies/idxGraphicsImaging-date.html">Graphics & Imaging</a> &gt; </p><div style="width:100%; position:fixed;"><div align="center" id="watermark" style="position: relative; margin-left:auto; margin-right:auto; z-index:20; width:500px;"><div class="legacybox"><h1>Legacy Document<span class=closebutton><a href="javascript:closeWatermark()"><img src="../../images/closebutton.png" width="14" height="14" border="0"  alt="close button"></a></span></h1>
+
+<p><strong>Important: </strong>This document is part of the Legacy section of the ADC Reference Library. This information should not be used for new development.</p>
+
+<div class="reflibtopic">
+	<p>Current information on this Reference Library topic can be found here:</p>
+	<ul>
+				<li><a href="http://developer.apple.com/referencelibrary/GraphicsImaging/index.html" target="_blank">Reference Library > Graphics & Imaging</a></li>
+	</ul>
+</div>
+
+
+
+
+</div></div></div><!-- end_header_information --><!-- bottom_of_header_marker_comment --><!-- top_of_titles_marker_comment --><CENTER><table width="600" cellpadding="0" cellspacing="0" border="0">
+<tr><td align="left" scope="row">
+<h1>
+<div id="pagehead">Technical Q&amp;A QD45</div>
+<div id="pageheadsub">Including the Cursor in a Screen Capture when using CopyBits</div>
+</h1>
+</td></tr></table></CENTER><!-- bottom_of_titles_marker_comment -->						<!-- begin_content --> <CENTER><TABLE BORDER=0 CELLPADDING=0 WIDTH=600><TR> <TD align="left"><HR ALIGN="center" WIDTH="550"><p id = p2>Q: When I used <code>CopyBits</code> to do a screen capture,the cursor is not included. What is going on?</p><p id = p4>A: <code>CopyBits</code> calls <code>ShieldCursor</code> to hide the cursorbefore it does its actual work. That is why you never see the cursorin your bitmap. The following bit of code hides the cursor anddecrements the cursor count in the low memory global to fool <code>CopyBits</code>not to call <code>ShieldCursor</code>. Just as a warning, using low memory globalsis dangerous and is subject to future OS changes. Anyway, theOS screen dump behaves similarly.</p><CENTER><TABLE BORDER=0 CELLPADDING=5 WIDTH=550><TR>	<TD BGCOLOR="#E6E6E6" align="left"><PRE>			unsigned char oldCrsrVis;			short oldCrsrState;//// Hide cursor//			oldCrsrVis = GetCrsrVis();			oldCrsrState = GetCrsrState();			SetCrsrVis((unsigned char) 0);			SetCrsrState(oldCrsrState - 1);			CopyBits(.....) //// Restore old cursor//			SetCrsrState(oldCrsrState);			SetCrsrVis(oldCrsrVis);</PRE>	</TD></TR></TABLE></CENTER><p id=p4>The functions are defined as:</P><CENTER><TABLE BORDER=0 CELLPADDING=5 WIDTH=550><TR>	<TD BGCOLOR="#E6E6E6" align="left"><PRE>enum {    CrsrRect = 0x83C,   /*[GLOBAL VAR]  Cursor hit rectangle [8 bytes]*/    TheCrsr  = 0x844,   /*[GLOBAL VAR]  Cursor data, mask &amp; hotspot [68 bytes]*/    CrsrAddr = 0x888,   /*[GLOBAL VAR]  Address of data under cursor [long]*/    CrsrSave = 0x88C,   /*[GLOBAL VAR]  data under the cursor [64 bytes]*/    CrsrVis  = 0x8CC,   /*[GLOBAL VAR]  Cursor visible? [byte]*/    CrsrBusy = 0x8CD,   /*[GLOBAL VAR]  Cursor locked out? [byte]*/    CrsrNew  = 0x8CE,   /*[GLOBAL VAR]  Cursor changed? [byte]*/    CrsrState = 0x8D0,  /*[GLOBAL VAR]  Cursor nesting level [word]*/    CrsrObscure = 0x8D2 /*[GLOBAL VAR]  Cursor obscure semaphore [byte]*/  };int IsCursorHidden(void);void SetCrsrVis(unsigned char cursorVisible);unsigned char GetCrsrVis(void);PicHandle DumpScreenArea(void);void ModCrsrState(short del);short GetCrsrState(void);void SetCrsrState(short val);void SetCrsrVis(unsigned char cursorVisible){    *(unsigned char*)CrsrVis = cursorVisible;}unsigned char GetCrsrVis(void){   return( *(unsigned char*)CrsrVis );}void ModCrsrState(short del){	*(unsigned char*)CrsrState += del;}short GetCrsrState(void){	return ( *(unsigned char*)CrsrState );}void SetCrsrState(short val){	*(unsigned char*)CrsrState = val;}int IsCursorHidden(){	int retVal = 0;    unsigned char cursorVisible;    cursorVisible = *(unsigned char*)CrsrVis;    if (cursorVisible)        retVal = 0;    else        retVal = 1;    return (retVal);}</PRE>	</TD></TR></TABLE></CENTER><p id=p4>You can find a screen dumping sample in the latest Dev. CD. Thecomplete path is:</P><CENTER><TABLE BORDER=0 CELLPADDING=5 WIDTH=550><TR>	<TD BGCOLOR="#E6E6E6" align="left"><PRE>References:     Dev.CD Aug 96 TC          Sample Code               Snippets                    QuickDraw                         ScreenDump                              DumpScreen.c</PRE>	</TD></TR></TABLE></CENTER></td></tr></table></CENTER><!-- end_content --><!-- begin_date --><H4 ALIGN=center>[Sep 27 1996]</H4><!-- end_date --><!-- begin_footer_information -->	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/qa/qd/qd45.html%3Fid%3DDTS10001898-1.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/qa/qd/qd45.html%3Fid%3DDTS10001898-1.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/qa/qd/qd45.html%3Fid%3DDTS10001898-1.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+<!--#include virtual="/includes/footer"--><!-- end_footer_information --> <HR width=550 align=center> </BODY> </HTML>

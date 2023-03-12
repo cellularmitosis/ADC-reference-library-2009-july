@@ -1,0 +1,296 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<!-- BEGIN META TAG INFO --><link rel="home" href="http://developer.apple.com/">
+<link rel="find" href="http://developer.apple.com/search/">
+<link rel="stylesheet" type="text/css" href="../../documentation/css/adcstyle.css" title="fonts">
+<script language="JavaScript" type="text/javascript" src="../../documentation/js/busnav.js"></script><script language="JavaScript" src="../../documentation/js/adc.js" type="text/javascript"></script><!-- END META TAG INFO --><!-- BEGIN TITLE --><title>Technical Q&amp;A QA1443: Using QTPixelBufferContextCreate with NewMovieFromProperties</title>
+<!-- END TITLE -->
+</head>
+<!-- BEGIN BODY OPEN --><body bgcolor="#ffffff"><a name="//apple_ref/doc/uid/DTS10003779" title="Using QTPixelBufferContextCreate with NewMovieFromProperties"></a>
+<!-- END BODY OPEN --><!-- START CENTER OPEN --><center>
+<!-- END CENTER OPEN --><a name="top"></a><!-- BEGIN LOGO AND SEARCH --><!--#include virtual="/includes/adcnavbar" --><!-- END LOGO AND SEARCH --><!-- START BREADCRUMB --><div id="breadcrumb"><table width="680" border="0" cellpadding="0" cellspacing="0">
+<tr>
+<td scope="row"><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+<td><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+</tr>
+<tr valign="middle"><td align="left" colspan="2">
+<a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../technicalqas/index.html">Technical Q&amp;As</a> &gt; <a href="../../technicalqas/Carbon/index.html">Carbon</a> &gt; <a href="../../technicalqas/Carbon/idxQuickTime-date.html">QuickTime</a> &gt; </td></tr>
+<tr><td colspan="2" scope="row"><img width="680" height="35" src="images/1dot.gif" alt=""></td></tr>
+</table></div>
+<!-- END BREADCRUMB --><!-- START MAIN CONTENT --><!-- START TITLE GRAPHIC AND INTRO --><table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td><h1>
+<div id="pagehead">Technical Q&amp;A QA1443</div>
+<div id="pageheadsub">Using QTPixelBufferContextCreate with NewMovieFromProperties</div>
+</h1></td></tr></table>
+<!-- END TITLE GRAPHIC AND INTRO --><!-- BEGIN WIDE COLUMN --><table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td align="left" width="680">
+<!-- BEGIN CONTENTS --><h2>Q:
+	
+How do you use <code>QTPixelBufferContextCreate</code> with <code>NewMovieFromProperties</code>? Specifically, I'm trying to create a 32 ARGB bitmap and extract frames from a QuickTime <code>Movie</code>.
+</h2>
+<p>A: Both these APIs were added in QuickTime 7 allowing developer to decouple QuickTime from the traditional GWorld rendering path. This Q&amp;A first presents some background material then discusses how these APIs can be used together to extract 32 ARGB pixel buffers containing movie frames.</p>
+<p>A companion to this document is the <a href="http://developer.apple.com/samplecode/QTPixelBufferVCToCGImage/QTPixelBufferVCToCGImage.html">QTPixelBufferVCToCGImage</a> sample which uses the APIs discussed herein.</p>
+<a name="TNTAG1"></a><h2>Background</h2>
+<p>A QuickTime pixel buffer context is a kind of QuickTime visual context represented by the opaque type <code>QTVisualContextRef</code>. It can be thought of a drawing destination whose output produces CoreVideo pixel buffers with a given set of attributes. </p>
+<p>A <strong>QuickTime Visual Context</strong> in object-oriented terms is an abstract base class for concrete implementations of visual rendering environments. The output of the visual context depends entirely on the implementation. See Figure 1.</p>
+<p>QuickTime 7 currently implements two types of visual contexts that can produce CoreVideo image buffers. The first produces a series of OpenGL textures and is created by calling <code>QTOpenGLTextureContextCreate</code>, while the second produces CoreVideo pixel buffers and can be created by calling <code>QTPixelBufferContextCreate</code>. See Figure 2.</p>
+<p class="caption"><strong>Figure 1: </strong>QuickTime Visual Context</p>
+<p><img src="images/qa1443_VisualContext.jpg" width="287" height="186" alt="Figure 1, QuickTime Visual Context"></p>
+<p>A <strong>CoreVideo Image Buffer</strong> in object-oriented terms is an abstract base class for concrete implementations of buffer types. There are currently three; Pixel Buffer (represented by the opaque type <code>CVPixelBufferRef</code>), OpenGL Texture (represented by the opaque type <code>CVOpenGLTextureRef</code>) and OpenGL Buffer (a wrapper around the standard OpenGL pbuffer represented by the opaque type CVOpenGLBufferRef).</p>
+<p class="caption"><strong>Figure 2: </strong>CoreVideo Image Buffers</p>
+<p><img src="images/qa1443_ImageBuffer.jpg" width="476" height="193" alt="Figure 2, CoreVideo Image Buffers"></p>
+<div class="notebox"><p><strong>Note: </strong>CVPixelBuffers are CVImageBuffers that hold the pixels in main memory.</p></div>
+<p>The type of image buffer produced is dependent on the type of visual context being used. A QuickTime OpenGL Texture Context assigned to a <code>Movie</code> will have QuickTime produce a series of OpenGL textures, while a QuickTime Pixel Buffer Context assigned to a <code>Movie</code> will have QuickTime produce a series of CoreVideo pixel buffers.</p>
+<div class="notebox"><p><strong>Note: </strong>A QuickTime visual context assigned to a <code>Movie</code> decouples it from any reliance on GWorlds, enabling an independent rendering path.</p></div>
+<p>To have a QuickTime <code>Movie</code> use a visual context to produce its output, instantiate the <code>Movie</code> with <code>NewMovieFromProperties</code> (older <code>NewMovieFrom...</code> APIs do not provide this ability).</p>
+<p><code>SetMovieVisualContext</code> may also be used at a later time if the <code>kQTContextPropertyID_VisualContext</code> property was initially set to <code>NULL</code>.</p>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="TNTAG4"></a><h2>Creating a QuickTime Pixel Buffer Visual Context</h2>
+<p>To create a QuickTime pixel buffer context call <code>QTPixelBufferContextCreate</code>. This API takes two parameters and if successful returns a new visual context reference. The visual context attributes dictionary passed into <code>QTPixelBufferContextCreate</code> should have an entry with the type <code>kQTVisualContextPixelBufferAttributesKey</code>, this is another attributes dictionary containing a list of pixel buffer specific attributes (Pixel Buffer attributes are located in CVPixelBuffer.h). See <a href="#TNTAG6">Listing 1</a>.</p>
+<pre class="sourcecodebox">OSStatus QTPixelBufferContextCreate(CFAllocatorRef allocator,
+                                    CFDictionaryRef attributes,
+                                    QTVisualContextRef *newPixelBufferContext)
+
+allocator - A reference to a CFAllocator used to allocate memory for the new visual
+            context.
+            Use kCFAllocatorDefault to use the current default allocator or create your
+            own CFAllocator object if for example you would like to use shared memory or
+            a specific memory layout for this CoreFoundation object.
+
+attributes - A CFDictionary of visual context attribues (Visual Context attributes are
+              located in ImageCompression.h). 
+
+newPixelBufferContext - A pointer to a QTVisualContextRef variable to receive the new
+                        pixel buffer context.</pre>
+<p>To create a 32bit ARGB QuickTime pixel buffer visual context, use <code>k32ARGBPixelFormat</code> with the function shown in <a href="#TNTAG6">Listing 1</a>. This Pixel Format type is the value for the <code>kCVPixelBufferPixelFormatTypeKey</code> attribute set when building the pixel buffer attributes dictionary. See <a href="#TNTAG8">Listing 2</a>.</p>
+<p>Once the visual context is created, a <code>Movie</code> can be assigned to use it. This is done by instantiating a <code>Movie</code> using <code>NewMovieFromProperties</code> and setting the <code>kQTContextPropertyID_VisualContext</code> property appropriately in the property array passed to this API as shown in <a href="#TNTAG9">Listing 3</a>. It can also be set at a later time by calling <code>SetMovieVisualContext</code>.</p>
+<pre class="sourcecodebox">OSStatus NewMovieFromProperties(ItemCount inputPropertyCount,
+                                QTNewMoviePropertyElement *inputProperties,
+                                ItemCount outputPropertyCount,
+                                QTNewMoviePropertyElement *outputProperties,
+                                Movie *theMovie)
+
+inputPropertyCount - The number of properties in the array passed in inputProperties.
+
+inputProperties - A pointer to an array of property elements (QTNewMoviePropertyElement)
+                  describing how to instantiate the movie.
+
+outputPropertyCount - The number of properties in the array passed in outputProperties.
+
+outputProperties - A pointer to an array of property elements
+                   (QTNewMoviePropertyElement) to receive output parameters. You may
+                   pass NULL if you don't want this information. The caller is
+                   responsible for calling the appropriate routines to dispose of any
+                   property values returned here. Since callers specify the property
+                   classes and IDs, they know who to call to dispose of the property.
+
+theMovie - A pointer to a variable that receives the new movie.</pre>
+<pre class="sourcecodebox">struct QTNewMoviePropertyElement {
+    QTPropertyClass       propClass;
+    QTPropertyID          propID;
+    ByteCount             propValueSize;
+    QTPropertyValuePtr    propValueAddress;
+    OSStatus              propStatus;
+};
+
+propClass - A four-character code designating the class of a movie property. See New Movie Property Codes.
+
+propID - The ID of the property.
+
+propValueSize - The size in bytes of the property passed in propValueAddress.
+
+propValueAddress - A pointer to a movie property. Since the data type is fixed for each
+                   element's property class and ID, these is no ambiguity about the data
+                   type for its property value.
+
+propStatus - Indicates any problems with the property. For example, if a property is not
+             understood by the function it is passed to, this field is set
+             appropriately.</pre>
+<p>Only one visual context can be assigned to a <code>Movie</code> at any one time. To disassociate a <code>Movie</code> from its visual context call <code>SetMovieVisualContext</code> using <code>NULL</code> for the <code>visualContext</code> parameter.</p>
+<div class="notebox">
+<p><strong>Note: </strong>QuickTime Visual Contexts and CoreVideo Image Buffers use standard Core Foundation retain/release semantics.</p>
+<p><code>NewMovieFromProperties</code> and <code>SetMovieVisualContext</code> will retain the QuickTime Visual Context passed in. </p>
+<p><code>QTVisualContextRelease</code> is a convenience function which first checks for <code>NULL</code> before calling <code>CFRelease</code>.</p>
+</div>
+<p>See the <a href="#TNTAG10">References</a> section for links to reference documentation and sample code demonstrating what was discussed in this Q&amp;A.</p>
+<a name="TNTAG6"></a><p class="caption"><strong>Listing 1: </strong>Creating a QTPixelBuffer Visual Context.</p>
+<pre class="sourcecodebox"> /* Create a QuickTime Pixel Buffer Context
+    This function creates a QuickTime Visual Context which will produce CVPixelBuffers.
+
+*/
+OSStatus CreatePixelBufferContext(SInt32 inPixelFormat,
+                                  CGRect *inBounds,
+                                  QTVisualContextRef *outVisualContext)
+{
+    QTVisualContextRef      theContext = NULL;
+    CFMutableDictionaryRef  pixelBufferOptions = NULL;
+    CFMutableDictionaryRef  visualContextOptions = NULL;
+    OSStatus                err = noErr;
+
+    *outVisualContext = NULL;
+
+    if (0 == inPixelFormat || CGRectIsNull(*inBounds)) {err = paramErr; goto bail;}
+
+    // Pixel Buffer attributes
+    pixelBufferOptions = CFDictionaryCreateMutable(kCFAllocatorDefault, 0,
+                                                   &amp;kCFTypeDictionaryKeyCallBacks,
+                                                   &amp;kCFTypeDictionaryValueCallBacks);
+    if (NULL == pixelBufferOptions) {err = coreFoundationUnknownErr; goto bail;}
+
+    // the pixel format we want
+    SetNumberValue(pixelBufferOptions, kCVPixelBufferPixelFormatTypeKey, inPixelFormat);
+
+    // size
+    SetNumberValue(pixelBufferOptions, kCVPixelBufferWidthKey, inBounds-&gt;size.width);
+    SetNumberValue(pixelBufferOptions, kCVPixelBufferHeightKey, inBounds-&gt;size.height);
+
+    // alignment
+    SetNumberValue(pixelBufferOptions, kCVPixelBufferBytesPerRowAlignmentKey, 16);
+
+    // QT Visual Context attributes
+    visualContextOptions = CFDictionaryCreateMutable(kCFAllocatorDefault, 0,
+                                                     &amp;kCFTypeDictionaryKeyCallBacks,
+                                                     &amp;kCFTypeDictionaryValueCallBacks);
+    if (NULL == visualContextOptions) {err = coreFoundationUnknownErr; goto bail; }
+
+    // set the pixel buffer attributes for the visual context
+    CFDictionarySetValue(visualContextOptions,
+                         kQTVisualContextPixelBufferAttributesKey,
+                         pixelBufferOptions);
+
+    // create a Pixel Buffer visual context
+    err = QTPixelBufferContextCreate(kCFAllocatorDefault,
+                                     visualContextOptions,
+                                     &amp;theContext);
+    if (err != noErr) goto bail;
+
+    *outVisualContext = theContext;
+    theContext = NULL;
+
+bail:
+    if (NULL != visualContextOptions) CFRelease(visualContextOptions);
+    if (NULL != pixelBufferOptions) CFRelease(pixelBufferOptions);
+    if (NULL != theContext) QTVisualContextRelease(theContext);
+
+    return err;
+}</pre>
+<a name="TNTAG8"></a><p class="caption"><strong>Listing 2: </strong>Creating a 32 ARGB Pixel Buffer Context</p>
+<pre class="sourcecodebox"> QTVisualContextRef theVisualContext = NULL;
+
+    ...
+
+    status = CreatePixelBufferContext(k32ARGBPixelFormat, &amp;theBounds, &amp;theVisualContext);
+    if (noErr != status &amp;&amp; NULL == theVisualContext) goto bail;</pre>
+<a name="TNTAG9"></a><p class="caption"><strong>Listing 3: </strong>Instantiating a <code>Movie</code> using a Visual Context.</p>
+<pre class="sourcecodebox"> Movie theMovie = NULL;
+    QTVisualContextRef theVisualContext = NULL; 
+    CFStringRef movieLocation = CFSTR("/Users/stumpyjoe/eleven.mov");
+    Boolean trueValue = true;
+    QTNewMoviePropertyElement newMovieProperties[3] = {0};
+
+    // create a visual context
+    ...
+
+    // movie location
+    newMovieProperties[0].propClass = kQTPropertyClass_DataLocation;
+    newMovieProperties[0].propID = kQTDataLocationPropertyID_CFStringPosixPath;
+    newMovieProperties[0].propValueSize = sizeof(CFStringRef);
+    newMovieProperties[0].propValueAddress = &amp;movieLocation;
+
+    // assign the visual context - could also be NULL
+    newMovieProperties[1].propClass = kQTPropertyClass_Context;
+    newMovieProperties[1].propID = kQTContextPropertyID_VisualContext;
+    newMovieProperties[1].propValueSize = sizeof(theVisualContext);
+    newMovieProperties[1].propValueAddress = &amp;theVisualContext;
+
+    // make the movie active
+    newMovieProperties[2].propClass = kQTPropertyClass_NewMovieProperty;
+    newMovieProperties[2].propID = kQTNewMoviePropertyID_Active;
+    newMovieProperties[2].propValueSize = sizeof(trueValue);
+    newMovieProperties[2].propValueAddress = &amp;trueValue;
+
+    status = NewMovieFromProperties(3, newMovieProperties, 0, NULL, &amp;theMovie);
+    if (noErr != status || NULL == theMovie) goto bail; 
+
+    ...
+
+    // release the visual context if you don't need it anymore
+    QTVisualContextRelease(theVisualContext);</pre>
+<p class="caption"><strong>Listing 4: </strong>Utility function for use with Listing 1.</p>
+<pre class="sourcecodebox">/* Utility to set a SInt32 value in a CFDictionary
+*/
+OSStatus SetNumberValue(CFMutableDictionaryRef inDict,
+                        CFStringRef inKey,
+                        SInt32 inValue)
+{
+    CFNumberRef number;
+
+    number = CFNumberCreate(kCFAllocatorDefault, kCFNumberSInt32Type, &amp;inValue);
+    if (NULL == number) return coreFoundationUnknownErr;
+
+    CFDictionarySetValue(inDict, inKey, number);
+
+    CFRelease(number);
+
+    return noErr;
+}</pre>
+<p style="margin-top:-10px"><a href="#top">Back to Top </a><a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p>
+<a name="TNTAG10"></a><h2>References</h2>
+<ul>
+<li><p><a href="http://developer.apple.com/samplecode/QTPixelBufferVCToCGImage/QTPixelBufferVCToCGImage.html">QTPixelBufferVCToCGImage Sample Code</a></p></li>
+<li><p><a href="http://developer.apple.com/documentation/QuickTime/RM/MovieBasics/MTOpenPlayMovies/3openplaymovies_output/chapter_1000_section_2.html">Creating a Visual Context</a></p></li>
+<li><p><a href="http://developer.apple.com/documentation/QuickTime/APIREF/qtpixelbuffercontextcreate.htm"><code>QTPixelBufferContextCreate</code></a></p></li>
+<li><p><a href="http://developer.apple.com/documentation/QuickTime/RM/MovieBasics/MTOpenPlayMovies/4openplaymovies_getmovie/chapter_1000_section_2.html">Getting a <code>Movie</code> in QuickTime 7 or Later</a></p></li>
+<li><p><a href="http://developer.apple.com/documentation/QuickTime/APIREF/newmoviefromproperties.htm"><code>NewMovieFromProperties</code></a></p></li>
+<li><p><a href="http://developer.apple.com/documentation/QuickTime/APIREF/NewMoviePropertyCodes.htm">QTNewMoviePropertyElement QTPropertyClass codes</a></p></li>
+<li><p><a href="http://developer.apple.com/documentation/QuickTime/APIREF/setmovievisualcontext.html"><code>SetMovieVisualContext</code></a></p></li>
+<li><p><a href="http://developer.apple.com/documentation/CoreFoundation/Reference/CFAllocatorRef/index.html">CFAllocator</a></p></li>
+</ul>
+<a name="document_revision_summary"></a><h2>Document Revision History</h2>
+<table cellspacing="0" class="graybox" width="680">
+<tr>
+<th width="100">Date</th>
+<th width="580">Notes</th>
+</tr>
+<tr>
+<td scope="row">2008-08-08</td>
+<td>Editorial</td>
+</tr>
+<tr>
+<td scope="row">2008-04-24</td>
+<td>Editorial</td>
+</tr>
+<tr>
+<td scope="row">2005-09-13</td>
+<td>Discusses using a QuickTime pixel buffer visual context and NewMovieFromProperties to output frames to pixel buffers.</td>
+</tr>
+</table>
+<p><b>Posted: </b>2008-08-08</p>
+<!-- END CONTENTS -->
+</td></tr></table>
+<!-- END WIDE COLUMN --><!-- END MAIN CONTENT --><!-- START BOTTOM APPLE NAVIGATION -->	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/qa/qa2005/qa1443.html%3Fid%3DDTS10003779-1.2&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/qa/qa2005/qa1443.html%3Fid%3DDTS10003779-1.2&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/qa/qa2005/qa1443.html%3Fid%3DDTS10003779-1.2&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+<!--#include virtual="/includes/footer" --><!-- END BOTTOM APPLE NAVIGATION --><!-- START CENTER CLOSE -->
+</center>
+<!-- END CENTER CLOSE -->
+</body>
+</html>

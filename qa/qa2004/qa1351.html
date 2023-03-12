@@ -1,0 +1,81 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/1999/REC-html401-19991224/loose.dtd">
+<html><head>
+<!-- BEGIN META TAG INFO -->
+<link rel="home" href="http://developer.apple.com/">
+<link rel="find" href="http://developer.apple.com/search/">
+<link rel="stylesheet" type="text/css" href="../../documentation/css/adcstyle.css" title="fonts">
+<script language="JavaScript" type="text/javascript" src="../../documentation/js/busnav.js"></script>
+<script language="JavaScript" src="../../documentation/js/adc.js" type="text/javascript"></script>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<!-- END META TAG INFO -->
+<!-- BEGIN TITLE -->
+<title>Technical Q&amp;A QA1351: Directories Appear as Volume Aliases</title>
+<!-- END TITLE -->
+</head>
+<!-- BEGIN BODY OPEN -->
+<body bgcolor="#ffffff"><a name="//apple_ref/doc/uid/DTS10003324" title="Directories Appear as Volume Aliases"></a>
+<!--END BODY OPEN -->
+<!-- START CENTER OPEN -->
+<center>
+<!-- END CENTER OPEN -->
+<a name="top"></a>
+<!-- BEGIN LOGO AND SEARCH -->
+<!--#include virtual="/includes/adcnavbar"-->
+<!-- END LOGO AND SEARCH -->
+<!-- START BREADCRUMB -->
+<div id="breadcrumb"><table width="680" border="0" cellpadding="0" cellspacing="0"><tr>
+<td scope="row"><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+<td><img width="340" height="10" src="images/1dot.gif" alt=""></td></tr><tr valign="middle"><td align="left" colspan="2">
+<a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../technicalqas/index.html">Technical Q&As</a> &gt; <a href="../../technicalqas/Carbon/index.html">Carbon</a> &gt; <a href="../../technicalqas/Carbon/idxFileManagement-date.html">File Management</a> &gt; 
+</td></tr><tr><td colspan="2" scope="row"><img width="680" height="35" src="images/1dot.gif" alt=""></td></tr></table></div>
+<!-- END BREADCRUMB -->
+
+<!-- START MAIN CONTENT -->
+<!-- START TITLE GRAPHIC AND INTRO-->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top">
+<td><h1>
+<div id="pagehead">Technical Q&amp;A QA1351</div>
+<div id="pageheadsub">Directories Appear as Volume Aliases</div>
+</h1></td></tr></table>
+<!-- END TITLE GRAPHIC AND INTRO -->
+<!-- BEGIN WIDE COLUMN -->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td align="left" width="680">
+<!-- BEGIN CONTENTS -->
+<h2>Q: I'm writing a network file system (VFS plug-in KEXT) for Mac OS X. Everything seems to work fine at the BSD layer, but the Finder is very confused, showing every directory on my file system as a volume alias. How can I fix this?</h2><p>A: To fix this problem you must ensure that every object on your volume returns the same value in the <code>st_dev</code> field returned by <code>stat</code>. In addition, this value must match the device number for the volume itself. The system gets the device number for a volume by calling <code>statfs</code> and extracting the device number from the first word of the <code>f_fsid</code> array in the <code>statfs</code> structure. You must make sure that this number matches the value you're returning from <code>stat</code>.</p><div class="notebox"><p><strong>Note:</strong> You might think that the system should get the device information from the <code>f_mntfromname</code> field returned by <code>statfs</code>. However, this field does not contain a device node path if the volume is a network volume.</p></div><p>The typical data flow for this value is as follows.</p><ul><li><p>For a local file system, your mount entry point (<code>examplefs_mount</code>) is called with arguments that contain a path to a device node. Your file system should look up this path (using <code>namei</code>) to find the vnode for the device (let's call this <code>devvp</code>). It should then initialize the volume's <code>f_fsid</code> as follows.</p><pre class="sourcecodebox">
+mp-&gt;mnt_stat.f_fsid.val[0] = (long) devvp-&gt;v_rdev;
+mp-&gt;mnt_stat.f_fsid.val[1] = mp-&gt;mnt_vfc-&gt;vfc_typenum;
+</pre></li><li><p>For a network file system, your mount entry point (<code>examplefs_mount</code>) should initialize the volume's <code>f_fsid</code> by calling <code>vfs_getnewfsid</code>. This sets up the <code>f_fsid</code> to a synthetic value that uniquely identifies the volume.</p></li><li><p>In your <code>statfs</code> entry point (<code>examplefs_statfs</code>), make sure that you return sensible results in the <code>f_fsid</code> field of the <code>statfs</code> structure. In most cases you don't need to do anything here because the system gets the initial value of this structure from your volume's <code>mnt_stat</code> structure.</p></li><li><p>In your getattr entry point (<code>examplefs_getattr</code>), return the device number (<code>mp-&gt;mnt_stat.f_fsid.val[0]</code>) in the <code>vap-&gt;va_fsid</code> so that the kernel can copy that value into the <code>st_dev</code> field of the <code>stat</code> structure that it returns to the caller.</p></li><li><p>If your volume supports the <code>ATTR_CMN_DEVID</code> attribute (see <A HREF="../qa2001/qa1327.html">Technical Q&amp;A QA1327, 'Documentation for <code>getattrlist</code>'</A> for details), its value must match the <code>st_dev</code> value returned via <code>stat</code>.</p></li><li><p>If your volume supports the <code>ATTR_CMN_FSID</code> attribute, its value must match the <code>f_fsid</code> value returned via <code>statfs</code>.</p></li></ul><p>The rest of this document explains how mixing up your device numbers leads to the observed symptoms. If all you want to do is fix this problem and move on to the next bug, you can safely skip it. On the other hand, if you want to learn a little about the interaction between Carbon File Manager and the BSD layer of Mac OS X, by all means read on.</p><p>To understand what's going you need to understand the difference between how BSD and Carbon represent the file system as a whole. Under BSD the file system is a single tree. Each volume is mounted as a directory in the tree (a mount point) and moving through that directory can take you from one volume to another. BSD programs are aware of this and can cope with it just fine.</p><p>On the other hand, Carbon represents the file system as a forest of trees. Each volume has its own root directory, with a tree of directories spread out underneath it. Because each volume is a separate entity, Carbon programs do not expect that moving within a volume's directory structure will take them to a different volume.</p><p>Mac OS X must provide BSD semantics for BSD programs and Carbon semantics for Carbon programs. The BSD semantics are the native file system semantics on Mac OS X, so that part is easy. Providing Carbon semantics is trickier. Carbon File Manager is responsible for emulating Carbon semantics on top of the native BSD API. This involves a number of subtle tricks, some of which can trip up file system implementers. Thus, this is just one example of a general problem: you must carefully code your VFS plug-in in order for Carbon programs to work properly.</p><p>This particular case revolves around mount points. When Carbon File Manager encounters a mount point within a directory, it can't pass the mount point directly back to the program because Carbon programs don't expect to cross volumes when navigating the directory tree. Instead, Carbon File Manager returns what's known as a synthetic alias. To a Carbon program this synthetic alias looks like an alias file (the <code>kIsAlias</code> bit is set in the file's Finder flags). If the Carbon program wants to traverse this 'alias', it calls the Alias Manager to resolve it. The Alias Manager recognizes the synthetic alias and resolves it by returning a reference to the root directory of the destination volume. Thus, to a Carbon program, a mount point looks like an alias to the root directory of the destination volume.</p><div class="notebox"><p><strong>IMPORTANT:</strong> Carbon programs should use the Alias Manager (<code>FSIsAliasFile</code> and <code>FSResolveAliasFile</code>, or their older equivalents) to detect and resolve alias files. Do not try to interpret alias files by hand. Doing so is likely to cause future incompatibilities.</p></div><div class="notebox"><p><strong>Note:</strong> For debugging purposes only, a mount point synthetic alias file has the <code>kIsAlias</code> bit set in the Finder flags and has file type <code>'lcmt'</code> and file creator <code>'rhap'</code>.</p></div><div class="notebox"><p><strong>Note:</strong> Carbon File Manager uses a very similar mechanism to support symbolic links.</p></div><p>In this case, Carbon File Manager is interpreting every directory on your file system as a mount point, and thus Carbon programs (including the Finder) see every directory as an alias to a volume. The key question is why. It turns out that Carbon File Manager uses the device number associated with a file system object (the <code>st_dev</code> field of the <code>stat</code> structure returned by <code>stat</code>) to determine mount point changes. When examining a directory, Carbon File Manager compares the <code>st_dev</code> of the directory with the device number associated with the volume on which the directory resides. If they're different, as is the case with your file system, it assumes that the directory represents a mount point. At that point it returns a synthetic alias for the volume, which the Finder displays as a volume alias. If you make all of the device numbers match (as described above), Carbon File Manager will recognise your directories as directories, and the problem goes away.</p><A NAME="TNT_HISTORY_TAG"></A><H2>Document Revision History</H2><table cellspacing="0" class="graybox" width="680"><tr><th width="100">Date</th><th width="580">Notes</th></tr><tr><td scope="row">2004-05-25</td><td>Discusses how VFS plug-ins should handle device numbers to ensure compatibility with Carbon applications.</td></tr></table><p><b>Posted:</b> 2004-05-25</p>
+<!-- END CONTENTS -->
+</td></tr></table>
+<!-- END WIDE COLUMN -->
+<!-- END MAIN CONTENT -->
+	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/qa/qa2004/qa1351.html%3Fid%3DDTS10003324-1.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/qa/qa2004/qa1351.html%3Fid%3DDTS10003324-1.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/qa/qa2004/qa1351.html%3Fid%3DDTS10003324-1.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+
+<!-- START BOTTOM APPLE NAVIGATION -->
+<!--#include virtual="/includes/footer"-->
+<!-- END BOTTOM APPLE NAVIGATION -->
+<!-- START CENTER CLOSE -->
+</center>
+<!-- END CENTER CLOSE -->
+</body></html>

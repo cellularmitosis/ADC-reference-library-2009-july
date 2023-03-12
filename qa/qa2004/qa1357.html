@@ -1,0 +1,81 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/1999/REC-html401-19991224/loose.dtd">
+<html><head>
+<!-- BEGIN META TAG INFO -->
+<link rel="home" href="http://developer.apple.com/">
+<link rel="find" href="http://developer.apple.com/search/">
+<link rel="stylesheet" type="text/css" href="../../documentation/css/adcstyle.css" title="fonts">
+<script language="JavaScript" type="text/javascript" src="../../documentation/js/busnav.js"></script>
+<script language="JavaScript" src="../../documentation/js/adc.js" type="text/javascript"></script>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<!-- END META TAG INFO -->
+<!-- BEGIN TITLE -->
+<title>Technical Q&amp;A QA1357: Mixing link-local IP addresses and routable IP addresses</title>
+<!-- END TITLE -->
+</head>
+<!-- BEGIN BODY OPEN -->
+<body bgcolor="#ffffff"><a name="//apple_ref/doc/uid/DTS10003346" title="Mixing link-local IP addresses and routable IP addresses"></a>
+<!--END BODY OPEN -->
+<!-- START CENTER OPEN -->
+<center>
+<!-- END CENTER OPEN -->
+<a name="top"></a>
+<!-- BEGIN LOGO AND SEARCH -->
+<!--#include virtual="/includes/adcnavbar"-->
+<!-- END LOGO AND SEARCH -->
+<!-- START BREADCRUMB -->
+<div id="breadcrumb"><table width="680" border="0" cellpadding="0" cellspacing="0"><tr>
+<td scope="row"><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+<td><img width="340" height="10" src="images/1dot.gif" alt=""></td></tr><tr valign="middle"><td align="left" colspan="2">
+<a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../technicalqas/index.html">Technical Q&As</a> &gt; <a href="../../technicalqas/Darwin/index.html">Darwin</a> &gt; <a href="../../technicalqas/Darwin/idxNetworking-date.html">Networking</a> &gt; 
+</td></tr><tr><td colspan="2" scope="row"><img width="680" height="35" src="images/1dot.gif" alt=""></td></tr></table></div>
+<!-- END BREADCRUMB -->
+
+<!-- START MAIN CONTENT -->
+<!-- START TITLE GRAPHIC AND INTRO-->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top">
+<td><h1>
+<div id="pagehead">Technical Q&amp;A QA1357</div>
+<div id="pageheadsub">Mixing link-local IP addresses and routable IP addresses</div>
+</h1></td></tr></table>
+<!-- END TITLE GRAPHIC AND INTRO -->
+<!-- BEGIN WIDE COLUMN -->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td align="left" width="680">
+<!-- BEGIN CONTENTS -->
+<h2>Q: How can I configure my computer to communicate with devices which use link-local IP addresses when my computer is using a routable IP address? How can I configure my computer to communicate with devices which use routable IP addresses when my computer is using a link-local IP address?</h2><p>A: The answer depends on what operating system you're using.</p><p><strong>Mac OS X</strong></p><p>No configuration is necessary. Mac OS X already knows that 169.254/16 is defined to be link-local, and packets addressed to destinations in that range will be sent directly to the device on the local link, not sent to a gateway for forwarding off-link. When Mac OS X is using a link-local address, it ARPs for everything, so a Mac OS X machine using link-local can also communicate with devices using non-link-local addresses. Note however that if you are using multiple interfaces at the same time, link-local addressing is only active on the primary interface (the one that appears first in the list in the Network Preference Panel). This restriction may be lifted in the future, but if the world moves to adopt IPv6 as rapidly as we'd like, questions about IPv4 may become moot, because IPv6 already supports link-local addresses on every interface.</p><p><strong>Windows</strong></p><p>Windows has supported IPv4 link-local addressing since Windows 98, but communication between link-local and routable IP addresses is not automatically enabled as required by <A HREF="http://www.ietf.org/rfc/rfc3927.txt">RFC 3927</A>.  The following commands, typed at a DOS prompt, will enable mixed-network communication on Windows. In place of &quot;put_my_address_here&quot; and &quot;put_my_link_local_address_here&quot;, put the Windows machine's own IP addresses.</p><pre class="sourcecodebox">route add 169.254.0.0 mask 255.255.0.0 put_my_address_here
+route add 0.0.0.0 mask 0.0.0.0 put_my_link_local_address_here</pre><p>Note that because these commands need to include your current routable or link-local IP address, you would have to re-do the commands every time your IP address changes. Therefore, the commands listed here are most useful for developers creating hardware products that use <A HREF="../../networking/bonjour/index.html">Bonjour</A>, not for end users. When you install <A HREF="http://www.apple.com/support/downloads/bonjourforwindows.html">Bonjour for Windows</A>, these routing table settings are automatically installed and maintained for you.</p><p><strong>Linux</strong></p><p>Most modern Linux distributions already include full IPv4 link-local support. Older Linux distributions (and similar Unix systems) that don't know how to route to link-local can be manually configured to send link-local packets directly to local devices with two simple commands, as shown below. If your primary interface is not &quot;eth0&quot; then substitute the name of your primary interface instead.</p><pre class="sourcecodebox">route add -net 169.254.0.0 netmask 255.255.0.0 dev eth0 metric 99
+route add default dev eth0 metric 99</pre><p>The first command says &quot;if you don't know better, route link-local directly to Ethernet&quot;, and the second says, &quot;if you don't know better, then route everything directly to Ethernet&quot;. The &quot;metric 99&quot; means that these routes are low priority.  If there's any routing table entry with a higher priority (for example, metric 0), it takes precedence. That means it's safe to add these to rc.local and have them *always* be active, because they only take effect when there is no higher priority routing table entry to tell the kernel what to do. You can put these two commands in your <code>/etc/rc.local</code> file to execute at startup time.</p><p>For Linux distributions that use the <code>/etc/sysconfig/static-routes</code> file, you can put the following two lines in that file instead of using the route commands above.</p><pre class="sourcecodebox">eth0 net 169.254.0.0 netmask 255.255.0.0 metric 99
+eth0 net 0.0.0.0 netmask 0.0.0.0 metric 99</pre><p>These two lines tell the Linux kernel that 169.254/16 is defined to always be on the local link, no matter what, and if there's some other address that you have no idea how to reach, then it's at least worth a try to see if it's reachable on the local link.</p><A NAME="TNT_HISTORY_TAG"></A><H2>Document Revision History</H2><table cellspacing="0" class="graybox" width="680"><tr><th width="100">Date</th><th width="580">Notes</th></tr><tr><td scope="row">2005-07-06</td><td>Explains how to enable communication between devices with link-local addresses and devices with routable addresses.</td></tr></table><p><b>Posted:</b> 2005-07-06</p>
+<!-- END CONTENTS -->
+</td></tr></table>
+<!-- END WIDE COLUMN -->
+<!-- END MAIN CONTENT -->
+	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/qa/qa2004/qa1357.html%3Fid%3DDTS10003346-1.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/qa/qa2004/qa1357.html%3Fid%3DDTS10003346-1.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/qa/qa2004/qa1357.html%3Fid%3DDTS10003346-1.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+
+<!-- START BOTTOM APPLE NAVIGATION -->
+<!--#include virtual="/includes/footer"-->
+<!-- END BOTTOM APPLE NAVIGATION -->
+<!-- START CENTER CLOSE -->
+</center>
+<!-- END CENTER CLOSE -->
+</body></html>

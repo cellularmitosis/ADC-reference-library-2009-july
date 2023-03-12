@@ -1,0 +1,199 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/1999/REC-html401-19991224/loose.dtd">
+<html><head>
+<!-- BEGIN META TAG INFO -->
+<link rel="home" href="http://developer.apple.com/">
+<link rel="find" href="http://developer.apple.com/search/">
+<link rel="stylesheet" type="text/css" href="../../documentation/css/adcstyle.css" title="fonts">
+<script language="JavaScript" type="text/javascript" src="../../documentation/js/busnav.js"></script>
+<script language="JavaScript" src="../../documentation/js/adc.js" type="text/javascript"></script>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<!-- END META TAG INFO -->
+<!-- BEGIN TITLE -->
+<title>Technical Q&amp;A QA1374: Obtaining the name of an external MIDI Device from a MIDI Endpoint</title>
+<!-- END TITLE -->
+</head>
+<!-- BEGIN BODY OPEN -->
+<body bgcolor="#ffffff"><a name="//apple_ref/doc/uid/DTS10003394" title="Obtaining the name of an external MIDI Device from a MIDI Endpoint"></a>
+<!--END BODY OPEN -->
+<!-- START CENTER OPEN -->
+<center>
+<!-- END CENTER OPEN -->
+<a name="top"></a>
+<!-- BEGIN LOGO AND SEARCH -->
+<!--#include virtual="/includes/adcnavbar"-->
+<!-- END LOGO AND SEARCH -->
+<!-- START BREADCRUMB -->
+<div id="breadcrumb"><table width="680" border="0" cellpadding="0" cellspacing="0"><tr>
+<td scope="row"><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+<td><img width="340" height="10" src="images/1dot.gif" alt=""></td></tr><tr valign="middle"><td align="left" colspan="2">
+<a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../technicalqas/index.html">Technical Q&As</a> &gt; <a href="../../technicalqas/MusicAudio/index.html">Audio</a> &gt; <a href="../../technicalqas/MusicAudio/idxHardwareDrivers-date.html">Hardware & Drivers</a> &gt; 
+</td></tr><tr><td colspan="2" scope="row"><img width="680" height="35" src="images/1dot.gif" alt=""></td></tr></table></div>
+<!-- END BREADCRUMB -->
+
+<!-- START MAIN CONTENT -->
+<!-- START TITLE GRAPHIC AND INTRO-->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top">
+<td><h1>
+<div id="pagehead">Technical Q&amp;A QA1374</div>
+<div id="pageheadsub">Obtaining the name of an external MIDI Device from a MIDI Endpoint</div>
+</h1></td></tr></table>
+<!-- END TITLE GRAPHIC AND INTRO -->
+<!-- BEGIN WIDE COLUMN -->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td align="left" width="680">
+<!-- BEGIN CONTENTS -->
+<h2>Q: In Panther, I am attempting to retrieve the name of an external MIDI device from a MIDI Object, but I get the name of the MIDI port instead.  This seemed to work fine in Jaguar. How do I get the name of an external MIDI Device from a MIDI Endpoint in Panther?</h2><p>A: Panther and Jaguar handle MIDI devices differently.</p><p>In Jaguar (10.2), external MIDI devices were presented to the user with only the device name.   Users were presented the available MIDI devices in the system via the Audio MIDI Setup (AMS) utility, where they can describe the current configuration of MIDI devices.  From within an application, the device name can be obtained from a MIDI object by using the method MIDIObjectGetStringProperty with the constant kMIDIPropertyName.</p><p>In Panther (10.3), the features of CoreMIDI were expanded to support external MIDI devices with multiple ports.  A good example of a device with multiple ports is a synthesizer with more than one MIDI input.  Now external MIDI devices can have multiple endpoints and entities, which requires a bit more work to find the device name.  Instead of querying just the MIDI Object for the device name, MIDI endpoints, entities and external devices must all be checked to obtain the appropriate device name.  This is shown in the code below .</p><p class="smalltext"><strong>Listing 1:</strong> Getting an endpoint name</p><pre class="sourcecodebox">
+
+
+// Obtain the name of an endpoint, following connections.
+// The result should be released by the caller.
+static CFStringRef ConnectedEndpointName(MIDIEndpointRef endpoint)
+{
+  CFMutableStringRef result = CFStringCreateMutable(NULL, 0);
+  CFStringRef str;
+  OSStatus err;
+
+  // Does the endpoint have connections?
+  CFDataRef connections = NULL;
+  int nConnected = 0;
+  bool anyStrings = false;
+  err = MIDIObjectGetDataProperty(endpoint, kMIDIPropertyConnectionUniqueID, &amp;connections);
+  if (connections != NULL) {
+    // It has connections, follow them
+    // Concatenate the names of all connected devices
+    nConnected = CFDataGetLength(connections) / sizeof(MIDIUniqueID);
+    if (nConnected) {
+        const SInt32 *pid = reinterpret_cast&lt;const SInt32 *&gt;(CFDataGetBytePtr(connections));
+      for (int i = 0; i &lt; nConnected; ++i, ++pid) {
+         MIDIUniqueID id = EndianS32_BtoN(*pid);
+         MIDIObjectRef connObject;
+         MIDIObjectType connObjectType;
+         err = MIDIObjectFindByUniqueID(id, &amp;connObject, &amp;connObjectType);
+         if (err == noErr) {
+        if (connObjectType == kMIDIObjectType_ExternalSource  ||
+                                                      connObjectType == kMIDIObjectType_ExternalDestination) {
+           // Connected to an external device's endpoint (10.3 and later).
+           str = EndpointName(static_cast&lt;MIDIEndpointRef&gt;(connObject), true);
+        } else {
+             // Connected to an external device (10.2) (or something else, catch-all)
+          str = NULL;
+          MIDIObjectGetStringProperty(connObject, kMIDIPropertyName, &amp;str);
+        }
+        if (str != NULL) {
+          if (anyStrings)
+            CFStringAppend(result, CFSTR(&quot;, &quot;));
+          else anyStrings = true;
+          CFStringAppend(result, str);
+          CFRelease(str);
+        }
+         }
+      }
+    }
+    CFRelease(connections);
+  }
+  if (anyStrings)
+    return result;
+
+  // Here, either the endpoint had no connections, or we failed to obtain names for any of them.
+  return EndpointName(endpoint, false);
+}
+
+
+
+//////////////////////////////////////
+// Obtain the name of an endpoint without regard for whether it has connections.
+// The result should be released by the caller.
+static CFStringRef EndpointName(MIDIEndpointRef endpoint, bool isExternal)
+{
+  CFMutableStringRef result = CFStringCreateMutable(NULL, 0);
+  CFStringRef str;
+
+  // begin with the endpoint's name
+  str = NULL;
+  MIDIObjectGetStringProperty(endpoint, kMIDIPropertyName, &amp;str);
+  if (str != NULL) {
+    CFStringAppend(result, str);
+    CFRelease(str);
+  }
+
+  MIDIEntityRef entity = NULL;
+  MIDIEndpointGetEntity(endpoint, &amp;entity);
+  if (entity == NULL)
+    // probably virtual
+    return result;
+
+  if (CFStringGetLength(result) == 0) {
+    // endpoint name has zero length -- try the entity
+    str = NULL;
+    MIDIObjectGetStringProperty(entity, kMIDIPropertyName, &amp;str);
+    if (str != NULL) {
+      CFStringAppend(result, str);
+      CFRelease(str);
+    }
+  }
+  // now consider the device's name
+  MIDIDeviceRef device = NULL;
+  MIDIEntityGetDevice(entity, &amp;device);
+  if (device == NULL)
+    return result;
+
+  str = NULL;
+  MIDIObjectGetStringProperty(device, kMIDIPropertyName, &amp;str);
+  if (str != NULL) {
+    // if an external device has only one entity, throw away
+                // the endpoint name and just use the device name
+    if (isExternal &amp;&amp; MIDIDeviceGetNumberOfEntities(device) &lt; 2) {
+      CFRelease(result);
+      return str;
+    } else {
+      // does the entity name already start with the device name?
+                        // (some drivers do this though they shouldn't)
+      // if so, do not prepend
+      if (CFStringCompareWithOptions(str /* device name */,
+                                    result /* endpoint name */,
+                                         CFRangeMake(0, CFStringGetLength(str)), 0) != kCFCompareEqualTo) {
+        // prepend the device name to the entity name
+        if (CFStringGetLength(result) &gt; 0)
+          CFStringInsert(result, 0, CFSTR(&quot; &quot;));
+        CFStringInsert(result, 0, str);
+      }
+      CFRelease(str);
+    }
+  }
+  return result;
+}
+
+</pre><div class="notebox"><p><strong>IMPORTANT:</strong> This code was taken from the CoreAudio SDK file CAMIDIEndpoints.cpp in /Developer/Examples/CoreAudio/PublicUtility.  Developers are encouraged to use the CoreAudio SDK for audio and midi application development.</p></div><A NAME="TNTAG2"></A><H2>Important Links</H2><p>*<A HREF="../../audio/">ADC Audio Developer page</A></p><p>*<A HREF="../../sdk/#CoreAudio">CoreAudio SDK</A></p><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNT_HISTORY_TAG"></A><H2>Document Revision History</H2><table cellspacing="0" class="graybox" width="680"><tr><th width="100">Date</th><th width="580">Notes</th></tr><tr><td scope="row">2004-12-01</td><td>Get the names of external MIDI Devices from MIDI Endpoints.</td></tr></table><p><b>Posted:</b> 2004-12-01</p>
+<!-- END CONTENTS -->
+</td></tr></table>
+<!-- END WIDE COLUMN -->
+<!-- END MAIN CONTENT -->
+	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/qa/qa2004/qa1374.html%3Fid%3DDTS10003394-1.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/qa/qa2004/qa1374.html%3Fid%3DDTS10003394-1.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/qa/qa2004/qa1374.html%3Fid%3DDTS10003394-1.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+
+<!-- START BOTTOM APPLE NAVIGATION -->
+<!--#include virtual="/includes/footer"-->
+<!-- END BOTTOM APPLE NAVIGATION -->
+<!-- START CENTER CLOSE -->
+</center>
+<!-- END CENTER CLOSE -->
+</body></html>

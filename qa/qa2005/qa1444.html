@@ -1,0 +1,120 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/1999/REC-html401-19991224/loose.dtd">
+<html><head>
+<!-- BEGIN META TAG INFO -->
+<link rel="home" href="http://developer.apple.com/">
+<link rel="find" href="http://developer.apple.com/search/">
+<link rel="stylesheet" type="text/css" href="../../documentation/css/adcstyle.css" title="fonts">
+<script language="JavaScript" type="text/javascript" src="../../documentation/js/busnav.js"></script>
+<script language="JavaScript" src="../../documentation/js/adc.js" type="text/javascript"></script>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<!-- END META TAG INFO -->
+<!-- BEGIN TITLE -->
+<title>Technical Q&amp;A QA1444: Compression Sessions - Configuring codec quality settings</title>
+<!-- END TITLE -->
+</head>
+<!-- BEGIN BODY OPEN -->
+<body bgcolor="#ffffff"><a name="//apple_ref/doc/uid/DTS10003796" title="Compression Sessions - Configuring codec quality settings"></a>
+<!--END BODY OPEN -->
+<!-- START CENTER OPEN -->
+<center>
+<!-- END CENTER OPEN -->
+<a name="top"></a>
+<!-- BEGIN LOGO AND SEARCH -->
+<!--#include virtual="/includes/adcnavbar"-->
+<!-- END LOGO AND SEARCH -->
+<!-- START BREADCRUMB -->
+<div id="breadcrumb"><table width="680" border="0" cellpadding="0" cellspacing="0"><tr>
+<td scope="row"><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+<td><img width="340" height="10" src="images/1dot.gif" alt=""></td></tr><tr valign="middle"><td align="left" colspan="2">
+<a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../technicalqas/index.html">Technical Q&As</a> &gt; <a href="../../technicalqas/QuickTime/index.html">QuickTime</a> &gt; <a href="../../technicalqas/QuickTime/idxCarbon-date.html">Carbon</a> &gt; 
+</td></tr><tr><td colspan="2" scope="row"><img width="680" height="35" src="images/1dot.gif" alt=""></td></tr></table></div>
+<!-- END BREADCRUMB -->
+
+<!-- START MAIN CONTENT -->
+<!-- START TITLE GRAPHIC AND INTRO-->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top">
+<td><h1>
+<div id="pagehead">Technical Q&amp;A QA1444</div>
+<div id="pageheadsub">Compression Sessions - Configuring codec quality settings</div>
+</h1></td></tr></table>
+<!-- END TITLE GRAPHIC AND INTRO -->
+<!-- BEGIN WIDE COLUMN -->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td align="left" width="680">
+<!-- BEGIN CONTENTS -->
+<h2>Q: When migrating from Compression Sequences to Compression Sessions how are the Codec Quality settings for Spatial and Temporal quality set for the Session? Can these be changed per frame?</h2><p>A: When using <code>CompressSequenceBegin</code>, the appropriate <code>CodecQ</code> settings for spatial and temporal quality are passed into the API and can be changed for the Sequence by calling <code>SetCSequenceQuality</code>. Passing in 0 for <code>temporalQuality</code> prevents the compressor from applying any temporal compression to the sequence.</p><p>The setup for <strong>Compression Sessions</strong> is a little different. You first create and configure a <code>ICMCompressionSessionOptions</code> object using the <code>ICMCompressionSessionOptionsCreate</code> API, then pass in this configuration to <code>ICMCompressionSessionCreate</code>.</p><p>Configuration of spatial quality for a Compression Session is done using the <code>kICMCompressionSessionOptionsPropertyID_Quality</code> property along with the <code>ICMCompressionSessionOptionsSetProperty</code> API.</p><p>Temporal compression can be enabled or disabled for a session by calling <code>ICMCompressionSessionOptionsSetAllowTemporalCompression</code> and passing in either <code>true</code> or <code>false</code>. See Listing 1.</p><p>If temporal compression is enabled, the <code>kICMCompressionSessionOptionsPropertyID_Quality</code> property is also used to set <code>temporalQuality</code>.</p><div class="notebox"><p><strong>Note:</strong> The Compression Session retains the <code>ICMCompressionSessionOptions</code> object, so you can change the value for the <code>kICMCompressionSessionOptionsPropertyID_Quality</code> property between calls to <code>ICMCompressionSessionEncodeFrame</code>.</p></div><p class="smalltext"><strong>Listing 1:</strong> Configuring Session Options</p><pre class="sourcecodebox">
+CodecQ compressionQuality = codecNormalQuality;
+Boolean allowTemporalCompression = true;
+ICMCompressionSessionOptionsRef sessionOptions = NULL;
+ICMCompressionSessionRef session = NULL;
+
+...
+
+// Create a compression session options token (ICMCompressionSessionOptionsRef).
+err = ICMCompressionSessionOptionsCreate(kCFAllocatorDefault, &amp;sessionOptions);
+if(err || NULL == sessionOptions) goto bail;
+
+// Set temporal compression on/off.
+err = ICMCompressionSessionOptionsSetAllowTemporalCompression(sessionOptions,
+                                                    allowTemporalCompression);
+if (err) goto bail;
+
+// Set the compression quality.
+// kICMCompressionSessionOptionsPropertyID_Quality property is always used to
+// set the spatialQuality; if temporal compression is enabled, it is also used
+// to set temporalQuality.
+// The default quality is codecNormalQuality.
+err = ICMCompressionSessionOptionsSetProperty(sessionOptions,
+                                kQTPropertyClass_ICMCompressionSessionOptions,
+                                kICMCompressionSessionOptionsPropertyID_Quality,
+                                sizeof(compressionQuality),
+                                &amp;compressionQuality );
+if (err) goto bail;
+
+...
+
+err = ICMCompressionSessionCreate(kCFAllocatorDefault, ..., &amp;session);
+if (err) goto bail;
+
+// Encode some frames
+...
+
+bail:
+    // Both of these release calls are NULL safe, so we don't have to do an extra check.
+    ICMCompressionSessionOptionsRelease(sessionOptions);
+    ICMCompressionSessionRelease(session);
+...
+</pre><A NAME="TNTAG1"></A><H2>References:</H2><ul><li><p><A HREF="../../documentation/QuickTime/Conceptual/QT7UpdateGuide/Chapter02/chapter_2_section_7.html">QT 7 Video Enhancements</A></p></li><li><p><A HREF="../../documentation/QuickTime/APIREF/icmcompressionsessionoptionssetallowtemporalcompression.htm"><code>ICMCompressionSessionOptionsSetAllowTemporalCompression</code></A></p></li><li><p><A HREF="../../documentation/QuickTime/APIREF/icmcompressionsessionoptionssetallowframereordering.htm">ICMCompressionSessionOptionsSetAllowFrameReordering</A></p></li><li><p><A HREF="../../documentation/QuickTime/APIREF/icmcompressionsessionoptionssetallowframetimechanges.htm">ICMCompressionSessionOptionsSetAllowFrameTimeChanges</A></p></li><li><p><A HREF="../../documentation/QuickTime/APIREF/icmcompressionsessionoptionscreate.htm"><code>ICMCompressionSessionOptionsCreate</code></A></p></li><li><p><A HREF="../../documentation/QuickTime/APIREF/icmcompressionsessionoptionssetproperty.htm"><code>ICMCompressionSessionOptionsSetProperty</code></A></p></li><li><p><A HREF="../../documentation/QuickTime/APIREF/icmcompressionsessioncreate.htm"><code>ICMCompressionSessionCreate</code></A></p></li><li><p><A HREF="../../documentation/QuickTime/APIREF/ICMPropertyIDs.htm">ICM Property IDs</A></p></li></ul><p>See <code>ImageCompression.h</code> for additional property information.</p><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNT_HISTORY_TAG"></A><H2>Document Revision History</H2><table cellspacing="0" class="graybox" width="680"><tr><th width="100">Date</th><th width="580">Notes</th></tr><tr><td scope="row">2005-10-17</td><td>Discusses how to set encoding quality for a Compression Sequence</td></tr></table><p><b>Posted:</b> 2005-10-17</p>
+<!-- END CONTENTS -->
+</td></tr></table>
+<!-- END WIDE COLUMN -->
+<!-- END MAIN CONTENT -->
+	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/qa/qa2005/qa1444.html%3Fid%3DDTS10003796-1.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/qa/qa2005/qa1444.html%3Fid%3DDTS10003796-1.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/qa/qa2005/qa1444.html%3Fid%3DDTS10003796-1.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+
+<!-- START BOTTOM APPLE NAVIGATION -->
+<!--#include virtual="/includes/footer"-->
+<!-- END BOTTOM APPLE NAVIGATION -->
+<!-- START CENTER CLOSE -->
+</center>
+<!-- END CENTER CLOSE -->
+</body></html>

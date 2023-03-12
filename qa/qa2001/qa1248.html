@@ -1,0 +1,176 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/1999/REC-html401-19991224/loose.dtd">
+<html><head>
+<!-- BEGIN META TAG INFO -->
+<link rel="home" href="http://developer.apple.com/">
+<link rel="find" href="http://developer.apple.com/search/">
+<link rel="stylesheet" type="text/css" href="../../documentation/css/adcstyle.css" title="fonts">
+<script language="JavaScript" type="text/javascript" src="../../documentation/js/busnav.js"></script>
+<script language="JavaScript" src="../../documentation/js/adc.js" type="text/javascript"></script>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<!-- END META TAG INFO -->
+<!-- BEGIN TITLE -->
+<title>Technical Q&amp;A QA1248: Context Sharing Tips</title>
+<!-- END TITLE -->
+</head>
+<!-- BEGIN BODY OPEN -->
+<body bgcolor="#ffffff"><a name="//apple_ref/doc/uid/DTS10002302" title="Context Sharing Tips"></a>
+<!--END BODY OPEN -->
+<!-- START CENTER OPEN -->
+<center>
+<!-- END CENTER OPEN -->
+<a name="top"></a>
+<!-- BEGIN LOGO AND SEARCH -->
+<!--#include virtual="/includes/adcnavbar"-->
+<!-- END LOGO AND SEARCH -->
+<!-- START BREADCRUMB -->
+<div id="breadcrumb"><table width="680" border="0" cellpadding="0" cellspacing="0"><tr>
+<td scope="row"><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+<td><img width="340" height="10" src="images/1dot.gif" alt=""></td></tr><tr valign="middle"><td align="left" colspan="2">
+<a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../technicalqas/index.html">Technical Q&As</a> &gt; <a href="../../technicalqas/Carbon/index.html">Carbon</a> &gt; <a href="../../technicalqas/Carbon/idxGames-date.html">Games</a> &gt; 
+</td></tr><tr><td colspan="2" scope="row"><img width="680" height="35" src="images/1dot.gif" alt=""></td></tr></table></div>
+<!-- END BREADCRUMB -->
+
+<!-- START MAIN CONTENT -->
+<!-- START TITLE GRAPHIC AND INTRO-->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top">
+<td><h1>
+<div id="pagehead">Technical Q&amp;A QA1248</div>
+<div id="pageheadsub">Context Sharing Tips</div>
+</h1></td></tr></table>
+<!-- END TITLE GRAPHIC AND INTRO -->
+<!-- BEGIN WIDE COLUMN -->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td align="left" width="680">
+<!-- BEGIN CONTENTS -->
+<h2>Q: How do I share resources between OpenGL contexts?</h2><p>A: Contexts can share object resources and their associated object state by indicating a shared context at context creation time. Shared contexts will share all texture objects, vertex array objects, display lists, vertex programs, and fragment programs created before and after sharing is initiated. These objects' state are also shared but other context state is not. Not every context can be shared with every other context. Much depends on ensuring the same set of renderers support both contexts. Overall, shared contexts allow less resource duplication, set up costs and coding for the developer.</p><h2>Q: What are the basics?</h2><p>A: When OpenGL contexts are created one can designate a second context to share object resources. All sharing is peer to peer and developers can assume that shared resources are reference counted and thus will be maintained until explicitly released or when the last context sharing resources is itself released. It is helpful to think of this in the simplest terms possible and not to assume excess complication.</p><h2>Q: What is and is not shared?</h2><p>A: Context share &quot;object resources&quot;, which include textures, vertex array objects, display lists, vertex programs and fragment programs. Object state is also shared, such as texture parameters or program environment parameters. Non-object state is not shared, such as texture target enables, or the current fragment/vertex program. Clients will need to duplicate context state changes as required while individual object setup will only need to be done one time.</p><h2>Q: Which contexts can be shared?</h2><p>A: Context sharing is limited to those contexts which have duplicate virtual screen mappings. This means pixels formats, which are set up with the exact same set of renderers, can create contexts which can be shared. There are two simple ways to achieve this goal. First, use the exact same pixel format for all contexts the client wishes to share. This guarantees the same virtual screen mapping and thus the ability to share contexts. In some cases, due to required pixel format differences it may not be simple to ensure the set of renderers is consistent. The easiest solution is to choose a single renderer for all pixel formats.</p><h2>Q: Exactly how are contexts shared?</h2><p>A: Sharing contexts is very simple. The exact form of the function calls depends on which API is in use. Examples of CGL, AGL and NSOpenGL are presented in Listing 1, Listing 2 and Listing 3, respectively..</p><p class="smalltext"><strong>Listing 1:</strong> CGL Context Setup for Sharing</p><pre class="sourcecodebox">
+#include &lt;OpenGL/OpenGL.h&gt;
+
+// Note: for demonstration purposes, normally one would create a CGL pixel
+//format for a single full screen, see Listing 2 for an example of this
+CGLPixelFormatAttribute attrib[] = {kCGLPFADoubleBuffer, 0};
+CGLPixelFormatObj pixelFormat = NULL;
+long numPixelFormats = 0;
+CGLContextObj cglContext1 = NULL;
+CGLContextObj cglContext2 = NULL;
+
+CGLChoosePixelFormat (attribs, &amp;pixelFormat, &amp;numPixelFormats);
+CGLCreateContext(pixelFormat, NULL, &amp;cglContext1);
+
+// create a second context sharing with the first
+CGLCreateContext(pixelFormat, cglContext1, &amp;cglContext2);
+</pre><p class="smalltext"><strong>Listing 2:</strong> AGL Context Setup for Sharing</p><pre class="sourcecodebox">
+#include &lt;AGL/agl.h&gt;
+
+GLint attrib[] = {AGL_RGBA, AGL_DOUBLEBUFFER, AGL_NONE};
+
+AGLPixelFormat aglPixFmt = aglChoosePixelFormat (NULL, 0, attrib);
+AGLContext aglContext1 = aglCreateContext (aglPixFmt, NULL);
+
+// create a second context sharing with the first
+AGLContext aglContext2 = aglCreateContext (aglPixFmt, aglContext1);
+</pre><p class="smalltext"><strong>Listing 3:</strong> Changes to NSOpenGLContext Setup for Sharing</p><pre class="sourcecodebox">
+#import &lt;Cocoa/Cocoa.h&gt;
+
++ (NSOpenGLPixelFormat*)defaultPixelFormat
+{
+  NSOpenGLPixelFormatAttribute attributes [] = {
+                               NSOpenGLPFADoubleBuffer,  // double buffered
+                               (NSOpenGLPixelFormatAttribute)nil };
+
+  return [[(NSOpenGLPixelFormat *)[NSOpenGLPixelFormat alloc]
+                                  initWithAttributes:attribs] autorelease];
+}
+
+- (NSOpenGLContext*)openGLContextWithShareContext:(NSOpenGLContext*)context
+{ // create a context the first time through
+   if (_openGLContext == NULL) {
+    _openGLContext = [[NSOpenGLContext alloc]
+                      initWithFormat:[[self class] defaultPixelFormat]
+                      shareContext:context];
+    [_openGLContext makeCurrentContext];
+    [self prepareOpenGL]; // call to initialize OpenGL state here
+  }
+  return _openGLContext;
+}
+
+- (void)prepareOpenGL
+{
+  // for overriding to initialize OpenGL state,
+  // occurs after context creation
+}
+</pre><p>Setting contexts to use a single renderer for a specific display screen is reasonably straight forward also. Since the OpenGL framework will normally provide a software fall back renderer, one should explicitly prevent this by specifying no recovery in the pixel format attributes if not already specifying full screen (since full screen implies no recovery). Listing 4, Listing 5 and Listing 6 show examples of how to set up pixel formats that are single display only.</p><p class="smalltext"><strong>Listing 4:</strong> CGL Single Screen Pixel Format</p><pre class="sourcecodebox">
+#include &lt;OpenGL/OpenGL.h&gt;
+
+// a full screen single drawable set of pixel attributes
+CGLPixelFormatAttribute attribs[] = { kCGLPFADisplayMask, 0,
+                                      kCGLPFAFullScreen,
+                                      kCGLPFADoubleBuffer,
+                                      0 };
+CGLPixelFormatObj pixelFormat = NULL;
+long numPixelFormats = 0;
+CGLContextObj cglContext = NULL;
+
+// fill in display mask attrib for selected display
+CGDirectDisplayID display = CGMainDisplayID ();
+attribs[1] = CGDisplayIDToOpenGLDisplayMask (display);
+CGLChoosePixelFormat (attribs, &amp;pixelFormat, &amp;numPixelFormats);
+</pre><p class="smalltext"><strong>Listing 5:</strong> AGL Single Screen Pixel Format</p><pre class="sourcecodebox">
+#include &lt;AGL/agl.h&gt;
+
+GLint attrib[] = {AGL_RGBA, GL_DOUBLEBUFFER, AGL_NO_RECOVERY, AGL_NONE};
+
+GDHandle display = GetMainDevice ();
+AGLPixelFormat aglPixFmt = aglChoosePixelFormat (&amp;display, 1, attrib);
+</pre><p class="smalltext"><strong>Listing 6:</strong> NSOpenGL Single Screen Pixel Format</p><pre class="sourcecodebox">
+#import &lt;Cocoa/Cocoa.h&gt;
+
++ (NSOpenGLPixelFormat*)defaultPixelFormat
+{
+  NSOpenGLPixelFormatAttribute attributes [] = {
+                               NSOpenGLPFAScreenMask,
+                               0,
+                               NSOpenGLPFANoRecovery,
+                               NSOpenGLPFADoubleBuffer,  // double buffered
+                               (NSOpenGLPixelFormatAttribute)nil };
+
+// fill in display mask attrib for selected display
+CGDirectDisplayID display = CGMainDisplayID ();
+attributes[1] = (NSOpenGLPixelFormatAttribute)
+                                  CGDisplayIDToOpenGLDisplayMask (display);
+return [[(NSOpenGLPixelFormat *)[NSOpenGLPixelFormat alloc]
+                                  initWithAttributes:attribs] autorelease];
+}
+</pre><h2>Q: Any additional notes?</h2><p>A: If your pixel format is specified to support a single display, thus a single renderer, understand that dragging a windowed drawable to another screen or attaching a full screen context to another display will likely result in failed rendering or rendering on the specified renderer with a copy across to the newly resident display. Neither of which are likely desirable. Developers should code defensively to detect and handle renderer changes.</p><h2>Q: How about windowed drawables with full screen pixel formats?</h2><p>A: To further simplify the sharing of windowed and full screen contexts, the ability to use full screen pixel formats to create windowed drawables has been added to Mac OS X v10.3 Panther. This means a client can create one pixel format with full screen specified and use it to support both windowed and full screen contexts. However, the requirements for a full screen pixel format to explicitly support a single display and for shared pixel formats to support the exact same screen configuration have not been relaxed and must still be satisfied.</p><p><b>Posted:</b> 2005-02-07</p><A NAME="TNT_HISTORY_TAG"></A><H2>Document Revision History</H2><table cellspacing="0" class="graybox" width="680"><tr><th width="100">Date</th><th width="580">Notes</th></tr><tr><td scope="row">2005-02-07</td><td>Updated and reformatted text. Changed information in the last paragraph according to radr://problem/3968679</td></tr><tr><td scope="row">2003-06-24</td><td>How to correctly share OpenGL contexts and what the limits on this sharing are.</td></tr></table><p><b>Posted:</b> 2005-02-07</p>
+<!-- END CONTENTS -->
+</td></tr></table>
+<!-- END WIDE COLUMN -->
+<!-- END MAIN CONTENT -->
+	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/qa/qa2001/qa1248.html%3Fid%3DDTS10002302-1.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/qa/qa2001/qa1248.html%3Fid%3DDTS10002302-1.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/qa/qa2001/qa1248.html%3Fid%3DDTS10002302-1.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+
+<!-- START BOTTOM APPLE NAVIGATION -->
+<!--#include virtual="/includes/footer"-->
+<!-- END BOTTOM APPLE NAVIGATION -->
+<!-- START CENTER CLOSE -->
+</center>
+<!-- END CENTER CLOSE -->
+</body></html>

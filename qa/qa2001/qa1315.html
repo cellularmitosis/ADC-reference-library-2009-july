@@ -1,0 +1,112 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN"
+"http://www.w3.org/TR/REC-html40/loose.dtd"><HTML><HEAD><title>Technical Q&amp;A QA1315: Why isn't my edit text box in my Navigation dialog's custom area working on 10.3?</title><LINK REL="stylesheet" HREF="../../adcstyle.css" TYPE="text/css"><LINK REL="stylesheet" HREF="../../style.css" TYPE="text/css"><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1"><meta name="keywords" content="Navigation Services custom area Edit Text Unicode callBackParms NavCustomControl kNavCtlAddControl"><meta name="Description" content="Navigation dialogs are compositing in Mac OS X 10.3 and adding controls in the custom area has become more error-prone and buggy. This QA gives a workaround to a bug involving an Edit Text box in the custom area."><LINK REL="stylesheet" HREF="../../css/adcstyle.css" TYPE="text/css"><script language="JavaScript" type="text/javascript" src="../../js/adc.js"></script></HEAD><BODY BGCOLOR=WHITE><a name="//apple_ref/doc/uid/DTS10002353" title="Why isn't my edit text box in my Navigation dialog's custom area working on 10.3?"></a><!-- begin_header_information --><!--#include virtual="/adcnavbar" --><p><a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../technicalqas/index.html">Technical Q&As</a> &gt; <a href="../../technicalqas/Carbon/index.html">Carbon</a> &gt; <a href="../../technicalqas/Carbon/idxHumanInterfaceToolbox-date.html">Human Interface Toolbox</a> &gt; </p><!-- end_header_information --><!-- begin_titles_information --><CENTER><table width="600" cellpadding="0" cellspacing="0" border="0">
+<tr><td align="left" scope="row">
+<h1>
+<div id="pagehead">Technical Q&amp;A QA1315</div>
+<div id="pageheadsub">Why isn't my edit text box in my Navigation dialog's custom area working on 10.3?</div>
+</h1>
+</td></tr></table></CENTER><!-- end_titles_information --><CENTER><TABLE BORDER=0 CELLSPACING=1 WIDTH=600> <TR> <TD align="left"><hr width=500 align=center><!-- begin_document_contents --><P id=p2> Q: Why isn't my edit text box in my Navigation dialog's custom area working on 10.3?</P><P id=p4> A: Navigation Services dialogs are now compositing on Mac OS X 10.3. The NavCustomControl / kNavCtlAddControl call now adds (or moves) the control or HIView in the dialog's control list. Previously, the control had to be in the control list already.</P>
+
+<P id=p4>Due to a bug, which will be fixed, this NavCustomControl call mishandles the Edit Text control if it was already in the control list. The symptoms are an empty box (even if a string was provided at creation) which doesn't accept typed characters even when the edit box has the focus. There is a simple workaround to this bug which is given below.</P>
+
+<P id=p4>Thus, the code which was correct previously:</P><BR><BR>
+<!-- listing starts here -->
+<CENTER><TABLE BORDER=0 CELLPADDING=0 WIDTH=550><TR><TD>
+<P><B>Listing 1</B>. Previous Code.</P>
+</TD></TR><TR><TD BGCOLOR="#E6E6E6"><PRE>
+
+CreateEditUnicodeTextControl(callBackParms-&gt;window, &amp;bounds,
+                    CFSTR(&quot;Some Text&quot;), false, NULL, &amp;editText);
+NavCustomControl(callBackParms-&gt;context, kNavCtlAddControl, editText);
+
+</PRE></TD></TR></TABLE></CENTER>
+<!-- listing ends here -->
+<BR><BR>  
+<P id=p4> should be changed, for Mac OS X 10.3, into:</P><BR><BR>
+<!-- listing starts here -->
+<CENTER><TABLE BORDER=0 CELLPADDING=0 WIDTH=550><TR><TD>
+<P><B>Listing 2</B>. New Code.</P>
+</TD></TR><TR><TD BGCOLOR="#E6E6E6"><PRE>
+
+CreateEditUnicodeTextControl(NULL, &amp;bounds,
+                    CFSTR(&quot;Some Text&quot;), false, NULL, &amp;editText);
+NavCustomControl(callBackParms-&gt;context, kNavCtlAddControl, editText);
+
+</PRE></TD></TR></TABLE></CENTER>
+<!-- listing ends here -->
+<BR><BR>  
+<P id=p4> You may add a check for the version this way:</P><BR><BR>
+<!-- listing starts here -->
+<CENTER><TABLE BORDER=0 CELLPADDING=0 WIDTH=550><TR><TD>
+<P><B>Listing 3</B>. Checking HIToolbox version.</P>
+</TD></TR><TR><TD BGCOLOR="#E6E6E6"><PRE>
+
+WindowRef inWindow;
+if (GetHIToolboxVersion() &lt; 0x130)
+   inWindow = callBackParms-&gt;window;
+else
+   inWindow = NULL;
+CreateEditUnicodeTextControl(inWindow, &amp;bounds,
+                    CFSTR(&quot;Some Text&quot;), false, NULL, &amp;editText);
+
+</PRE></TD></TR></TABLE></CENTER>
+<!-- listing ends here -->
+<BR><BR>  
+<P id=p4> And you can use the following code to retrieve the HIToolbox version:</P><BR><BR>
+<!-- listing starts here -->
+<CENTER><TABLE BORDER=0 CELLPADDING=0 WIDTH=550><TR><TD>
+<P><B>Listing 4</B>. Retrieving HIToolbox version.</P>
+</TD></TR><TR><TD BGCOLOR="#E6E6E6"><PRE>
+
+UInt32 GetHIToolboxVersion()
+   {
+   CFBundleRef bundle;
+   CFStringRef versStr = NULL;
+   static UInt32 version = 0;
+
+   // let's do the heavy following code only once...
+   if (version != 0) return version;
+
+   bundle = CFBundleGetBundleWithIdentifier(CFSTR(&quot;com.apple.HIToolbox&quot;));
+   if ( bundle != NULL )
+      versStr = (CFStringRef)CFBundleGetValueForInfoDictionaryKey(bundle,
+                    CFSTR(&quot;CFBundleShortVersionString&quot;));
+      if (  versStr != NULL &amp;&amp;
+            CFGetTypeID(versStr) == CFStringGetTypeID())
+         {
+         int major = 0, minor = 0, bugfix = 0;
+         char sz[20];
+
+         CFStringGetCString(versStr, sz, sizeof(sz), kCFStringEncodingUTF8);
+         sscanf(sz, &quot;%d.%d.%d&quot;, &amp;major, &amp;minor, &amp;bugfix);
+         version = ( major &lt;&lt; 8 ) + ( minor &lt;&lt; 4 ) + bugfix;
+         }
+
+   return version;
+   }
+
+</PRE></TD></TR></TABLE></CENTER>
+<!-- listing ends here -->
+<BR><BR>  
+<P id=p4> After the bug is fixed, once again enabling the use of callBackParms-&gt;window as first parameter of the CreateEditUnicodeTextControl call, the workaround of passing NULL as first parameter will also still work as expected on Mac OS X 10.3 and later.</P><hr width=500 align=center><!-- begin_date --><H4 ALIGN=center>[Oct 28, 2003]</H4><!-- end_date --><!-- end_document_contents --></TD></TR></TABLE></CENTER><!-- begin_footer_information -->	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/qa/qa2001/qa1315.html%3Fid%3DDTS10002353-1.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/qa/qa2001/qa1315.html%3Fid%3DDTS10002353-1.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/qa/qa2001/qa1315.html%3Fid%3DDTS10002353-1.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+<!--#include virtual="/includes/footer"--><!-- end_footer_information --></BODY></HTML>

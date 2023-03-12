@@ -1,0 +1,105 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<!-- BEGIN META TAG INFO --><link rel="home" href="http://developer.apple.com/">
+<link rel="find" href="http://developer.apple.com/search/">
+<link rel="stylesheet" type="text/css" href="../../documentation/css/adcstyle.css" title="fonts">
+<script language="JavaScript" type="text/javascript" src="../../documentation/js/busnav.js"></script><script language="JavaScript" src="../../documentation/js/adc.js" type="text/javascript"></script><!-- END META TAG INFO --><!-- BEGIN TITLE --><title>Technical Q&amp;A QA1365: Video capture with multiple IIDC cameras</title>
+<!-- END TITLE -->
+</head>
+<!-- BEGIN BODY OPEN --><body bgcolor="#ffffff"><a name="//apple_ref/doc/uid/DTS10003381" title="Video capture with multiple IIDC cameras"></a>
+<!-- END BODY OPEN --><!-- START CENTER OPEN --><center>
+<!-- END CENTER OPEN --><a name="top"></a><!-- BEGIN LOGO AND SEARCH --><!--#include virtual="/includes/adcnavbar" --><!-- END LOGO AND SEARCH --><!-- START BREADCRUMB --><div id="breadcrumb"><table width="680" border="0" cellpadding="0" cellspacing="0">
+<tr>
+<td scope="row"><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+<td><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+</tr>
+<tr valign="middle"><td align="left" colspan="2">
+<a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../technicalqas/index.html">Technical Q&amp;As</a> &gt; <a href="../../technicalqas/QuickTime/index.html">QuickTime</a> &gt; <a href="../../technicalqas/QuickTime/idxHardwareDrivers-date.html">Hardware &amp; Drivers</a> &gt; </td></tr>
+<tr><td colspan="2" scope="row"><img width="680" height="35" src="images/1dot.gif" alt=""></td></tr>
+</table></div>
+<!-- END BREADCRUMB --><!-- START MAIN CONTENT --><!-- START TITLE GRAPHIC AND INTRO --><table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td><h1>
+<div id="pagehead">Technical Q&amp;A QA1365</div>
+<div id="pageheadsub">Video capture with multiple IIDC cameras</div>
+</h1></td></tr></table>
+<!-- END TITLE GRAPHIC AND INTRO --><!-- BEGIN WIDE COLUMN --><table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td align="left" width="680">
+<!-- BEGIN CONTENTS --><h2>Q:
+	
+My QTKit Capture application uses multiple IIDC cameras to capture video with a frame size of 640x480 @ 30 fps, but I've found I can only capture with three cameras. Is this a known limitation?
+</h2>
+<p>A: The limitation you're encountering comes from the bandwidth each camera is using on the FireWire bus.</p>
+<p>In general, the FireWire bus that IIDC cameras connect to can run at a maximum speed of 400Mb/sec.</p>
+<p>The FireWire spec allows up to 80% of the total bandwidth to be used for isochronous traffic, like video. IIDC cameras can operate at different frame rates, different frame sizes and can also produce different flavors of YUV data -- YUV 4:1:1 and YUV 4:2:2. Depending on these factors the amount of bandwidth consumed will vary.</p>
+<div class="notebox"><p><strong>Note: </strong>You can also connect IIDC cameras to an 800Mb/sec FireWire bus but they will operate at slower speeds.</p></div>
+<p>Multiple IIDC streams can be active simultaneously. The number of active streams is only limited by the number of cameras present and the amount of FireWire bus bandwidth available. If there is insufficient bandwidth for a given setting (pixel format / frame size / frame rate), QuickTime will attempt to use a smaller frame size. If that fails, it will try a slower frame rate.</p>
+<p>The solution is to work with smaller frame sizes, lower frame rates or to add an additional FireWire bus using a 3rd party PCI card giving you more bandwidth to play with. </p>
+<p>See <a href="http://developer.apple.com/qa/qa2008/qa1586.html">QA1586 QTKit Capture - Specifying Media Compression Settings</a> to learn how to configure media compression settings (format, frame size, and so on) for the QTKit Capture <code>QTCaptureMovieFileOutput</code> object.</p>
+<p>QTKit Capture will send you the <code>QTCaptureSessionRuntimeErrorNotification</code> when you are trying to record to multiple cameras simultaneously and you've exceeded the bandwidth limitations. This will allow you to detect this condition (in the absence of any error code being returned). The notification user info dictionary <code>QTCaptureSessionErrorKey</code> entry contains an <code>NSError</code> object that describes the error that prevented the session from running properly.</p>
+<p>Here's how to setup to receive this notification:</p>
+<p class="caption"><strong>Listing 1: </strong>How to receive the <code>QTCaptureSessionRuntimeErrorNotification</code> notification.</p>
+<pre class="sourcecodebox">// handle the QTCaptureSessionRuntimeErrorNotification
+
+-(void)handleNotification:(NSNotification *)theNotification
+{
+    // your code to handle notification here
+}
+
+...
+
+// setup to receive the QTCaptureSessionRuntimeErrorNotification
+
+NSNotificationCenter *nc;
+nc = [NSNotificationCenter defaultCenter];
+[nc addObserver:self
+        selector:@selector(handleNotification:)
+        name:QTCaptureSessionRuntimeErrorNotification
+        object:nil];</pre>
+<a name="VIDEO_CAPTURE_WITH_SEQUENCE_GRABBER"></a><h2>Video Capture with Sequence Grabber</h2>
+<p>The limitations described above also apply for Sequence Grabber, i.e. the number of active streams is limited by the number of cameras present and the amount of FireWire bus bandwidth available. The solution is to work with smaller frame sizes, lower frame rates or to add an additional FireWire bus using a 3rd party PCI card giving you more bandwidth to play with. </p>
+<p>To configure the sequence grabber settings, use <code>SGSettingsDialog</code>, <code>SGSetSettings</code> and <code>SGSetChannelSettings</code>. See the <a href="http://developer.apple.com/documentation/QuickTime/RM/CreatingMovies/MTCreateMovies/A-Intro/chapter_1000_section_1.html#//apple_ref/doc/uid/TP40000906-IntroductiontoQuickTimeMovieCreationGuide-DontLinkElementID_142">Movie Creation Guide</a> for additional information.</p>
+<div class="notebox"><p><strong>Note: </strong>For developers working with DV, simultaneous recording from multiple DV cameras is not supported. The current implementation of the DV Video Digitizer (QuickTime 7.5) only supports a single connection. This is a known limitation.</p></div>
+<a name="document_revision_summary"></a><h2>Document Revision History</h2>
+<table cellspacing="0" class="graybox" width="680">
+<tr>
+<th width="100">Date</th>
+<th width="580">Notes</th>
+</tr>
+<tr>
+<td scope="row">2008-08-08</td>
+<td>Updated for QTKit Capture.</td>
+</tr>
+<tr>
+<td scope="row">2004-08-25</td>
+<td>Discusses factors which influence the number of IIDC cameras that can simultaniously be used for capture.</td>
+</tr>
+</table>
+<p><b>Posted: </b>2008-08-08</p>
+<!-- END CONTENTS -->
+</td></tr></table>
+<!-- END WIDE COLUMN --><!-- END MAIN CONTENT --><!-- START BOTTOM APPLE NAVIGATION -->	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/qa/qa2004/qa1365.html%3Fid%3DDTS10003381-2.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/qa/qa2004/qa1365.html%3Fid%3DDTS10003381-2.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/qa/qa2004/qa1365.html%3Fid%3DDTS10003381-2.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+<!--#include virtual="/includes/footer" --><!-- END BOTTOM APPLE NAVIGATION --><!-- START CENTER CLOSE -->
+</center>
+<!-- END CENTER CLOSE -->
+</body>
+</html>

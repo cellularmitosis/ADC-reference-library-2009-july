@@ -1,0 +1,114 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/1999/REC-html401-19991224/loose.dtd">
+<html><head>
+<!-- BEGIN META TAG INFO -->
+<link rel="home" href="http://developer.apple.com/">
+<link rel="find" href="http://developer.apple.com/search/">
+<link rel="stylesheet" type="text/css" href="../../documentation/css/adcstyle.css" title="fonts">
+<script language="JavaScript" type="text/javascript" src="../../documentation/js/busnav.js"></script>
+<script language="JavaScript" src="../../documentation/js/adc.js" type="text/javascript"></script>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<!-- END META TAG INFO -->
+<!-- BEGIN TITLE -->
+<title>Technical Q&amp;A QA1573: Debugging Process Startup</title>
+<!-- END TITLE -->
+</head>
+<!-- BEGIN BODY OPEN -->
+<body bgcolor="#ffffff"><a name="//apple_ref/doc/uid/DTS10004557" title="Debugging Process Startup"></a>
+<!--END BODY OPEN -->
+<!-- START CENTER OPEN -->
+<center>
+<!-- END CENTER OPEN -->
+<a name="top"></a>
+<!-- BEGIN LOGO AND SEARCH -->
+<!--#include virtual="/includes/adcnavbar"-->
+<!-- END LOGO AND SEARCH -->
+<!-- START BREADCRUMB -->
+<div id="breadcrumb"><table width="680" border="0" cellpadding="0" cellspacing="0"><tr>
+<td scope="row"><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+<td><img width="340" height="10" src="images/1dot.gif" alt=""></td></tr><tr valign="middle"><td align="left" colspan="2">
+<a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../technicalqas/index.html">Technical Q&As</a> &gt; <a href="../../technicalqas/DeveloperTools/index.html">Tools</a> &gt; <a href="../../technicalqas/DeveloperTools/idxCompilersDebuggers-date.html">Compiling & Debugging</a> &gt; 
+</td></tr><tr><td colspan="2" scope="row"><img width="680" height="35" src="images/1dot.gif" alt=""></td></tr></table></div>
+<!-- END BREADCRUMB -->
+
+<!-- START MAIN CONTENT -->
+<!-- START TITLE GRAPHIC AND INTRO-->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top">
+<td><h1>
+<div id="pagehead">Technical Q&amp;A QA1573</div>
+<div id="pageheadsub">Debugging Process Startup</div>
+</h1></td></tr></table>
+<!-- END TITLE GRAPHIC AND INTRO -->
+<!-- BEGIN WIDE COLUMN -->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td align="left" width="680">
+<!-- BEGIN CONTENTS -->
+<h2>Q: How do I debug a process's startup code?</h2><p>A: This depends on how the process is launched.  For a typical application-level process, you can debug the startup code by launching it from within the debugger in Xcode.  However, there may be circumstances where that's not an option.  For example:</p><ul><li><p>if the problem is masked by starting the application in the debugger</p></li><li><p>if the program isn't a typical application (for example it might be a CUPS filter)</p></li></ul><p>The following sections describe various ways to debug a process's startup code.</p><A NAME="SECSOURCECHANGE"></A><H2>Write Code To Stop</H2><p>If you can build the program from source, it's trivial to add code to stop the program at the first line of main.  <A HREF="#LISTSTOPATMAIN">Listing 1</A> shows an example of this.</p><A NAME="LISTSTOPATMAIN"></A><p class="smalltext"><strong>Listing 1:</strong> Code to stop at startup</p><pre class="sourcecodebox">
+#include &lt;signal.h&gt;
+#include &lt;unistd.h&gt;
+int main(int argc, char **argv)
+{
+    (void) raise(SIGSTOP);
+    /// rest of your code here
+}
+</pre><p>This sends a <code>SIGSTOP</code> to the process, which stops its execution so that you can attach using GDB.  Alternatively, you can resume execution by sending the process a <code>SIGCONT</code> using <A HREF="x-man-page://1/kill">kill</A>.</p><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="SECLAUNCHD"></A><H2>launchd</H2><p>If it's not convenient to build the program from source, you can use a variety of other techniques.  If your program is managed by <code>launchd</code>, you can add the <code>WaitForDebugger</code> property to your property list file to have <code>launchd</code> stop your program before it it executes a single instruction.  See the <A HREF="x-man-page://5/launchd.plist">man page</A> for details.</p><div class="notebox"><p><strong>IMPORTANT:</strong> Support for this property was introduced in Mac OS X 10.5.</p></div><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="SECGDBWAITFOR"></A><H2>GDB</H2><p>If your program is not managed by <code>launchd</code>, you can use GDB's <code>--waitfor</code> option.  GDB will poll the process list waiting for a matching process to be launched.  You can supply the option either on the command line or as an argument to GDB's <code>attach</code> command.</p><p>The fact that GDB polls the process list has two drawbacks.  Firstly, it consumes a lot of CPU while waiting for the process to be launched.  Secondly, the program stops in an indeterminate state.  If you're running on Mac OS X 10.5 or later, it's probably better to use <A HREF="#SECDTRACE">DTrace</A> instead.</p><div class="notebox"><p><strong>IMPORTANT:</strong> This option is supported by the GDB that's included in Xcode 2.5 and later.</p></div><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="SECDTRACE"></A><H2>DTrace</H2><p><A HREF="#LISTDTRACE">Listing 2</A> shows an example DTrace script that sets a probe on a commonly used system call (<code>getpid</code>) and, when that probe is hit, stops the process and invokes GDB on it.  <A HREF="#LISTDTRACE2">Listing 3</A> shows an example of its use.</p><A NAME="LISTDTRACE"></A><p class="smalltext"><strong>Listing 2:</strong> WaitAttach.d</p><pre class="sourcecodebox">
+#! /usr/sbin/dtrace -w -q -s
+
+syscall::getpid:entry
+/ execname == $$1 /
+{
+    stop();
+    system(
+        &quot;echo attach %d &gt; /tmp/WaitAttach.gdb ; gdb -x /tmp/WaitAttach.gdb&quot;,
+        pid
+    );
+    exit(0);
+}
+</pre><A NAME="LISTDTRACE2"></A><p class="smalltext"><strong>Listing 3:</strong> Using WaitAttach.d</p><pre class="sourcecodebox">
+$ # Make the script executable
+$ chmod ugo+x WaitAttach.d
+$ # Run it
+$ sudo ./WaitAttach.d TextEdit
+GNU gdb 6.3.50-20050815 [...]
+[... now launch TextEdit ...]
+Attaching to process 3723.
+Reading symbols for shared libraries . done
+0x8fe21a25 in __dyld_getpid ()
+(gdb) bt
+#0  0x8fe21a25 in __dyld_getpid ()
+#1  0x8fe07139 in __dyld__ZN4dyld5_mainEPK11mach_headermiPPKcS5_S5_ ()
+#2  0x8fe01872 in __dyld__ZN13dyldbootstrap5startEPK11mach_headeriPPKcl ()
+#3  0x8fe01037 in __dyld__dyld_start ()
+</pre><p>You can modify this script to meet your particular needs.  For example:</p><ul><li><p>The script sets the probe on <code>getpid</code>, which is currently the first system call made by a process.  You can change this to any other system call (by changing &quot;getpid&quot; to something else), or to match all system calls (by deleting &quot;getpid&quot; entirely).</p></li><li><p>The script currently matches the process by its executable name.  This is an exact string match.  You can use a fuzzy match by invoking DTrace functions like <code>strstr</code>.</p></li><li><p>You can also extend the match to look for other criteria.  For example, you can use the DTrace built in variable <code>ppid</code> to filter on the parent process ID.</p></li><li><p>As it stands the script runs GDB as root.  If that's a problem, you can change the script to invoke the <A HREF="x-man-page://8/chroot">chroot</A> command to set the user and group ID of GDB to whatever you desire.</p></li></ul><div class="notebox"><p><strong>IMPORTANT:</strong> DTrace was introduced in Mac OS X 10.5.</p></div><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNT_HISTORY_TAG"></A><H2>Document Revision History</H2><table cellspacing="0" class="graybox" width="680"><tr><th width="100">Date</th><th width="580">Notes</th></tr><tr><td scope="row">2007-12-21</td><td>First Version</td></tr></table><p><b>Posted:</b> 2007-12-21</p>
+<!-- END CONTENTS -->
+</td></tr></table>
+<!-- END WIDE COLUMN -->
+<!-- END MAIN CONTENT -->
+	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/qa/qa2007/qa1573.html%3Fid%3DDTS10004557-1.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/qa/qa2007/qa1573.html%3Fid%3DDTS10004557-1.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/qa/qa2007/qa1573.html%3Fid%3DDTS10004557-1.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+
+<!-- START BOTTOM APPLE NAVIGATION -->
+<!--#include virtual="/includes/footer"-->
+<!-- END BOTTOM APPLE NAVIGATION -->
+<!-- START CENTER CLOSE -->
+</center>
+<!-- END CENTER CLOSE -->
+</body></html>

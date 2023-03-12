@@ -1,0 +1,42 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN"			"http://www.w3.org/TR/REC-html40/loose.dtd"><HTML><!--Template 06-20-02--><HEAD><LINK REL="stylesheet" HREF="../../adcstyle.css" TYPE="text/css"><LINK REL="stylesheet" HREF="../../style.css" TYPE="text/css"><title>Technical Q&amp;A JAVA11: Java File Paths are not Unix File Paths</title><meta name="keywords" content="Mac OS 8 MRJ Java file paths unix"><meta name="Description" content="Technical Q&amp;A JAVA11: Q&amp;A explains why UNIX file paths arenot the same as Java file paths and presents sample classesthat resolve these differences, such as  a class that locatesthe temporary file folder and a replacement class for /dev/null."><meta name="categories" content="Java"><meta name="week-posted" content="Mar 20, 2000 - Mar 24, 2000"><LINK REL="stylesheet" HREF="../../css/adcstyle.css" TYPE="text/css"><script language="JavaScript" type="text/javascript" src="../../js/adc.js"></script></HEAD><BODY BGCOLOR="#FFFFFF"><a name="//apple_ref/doc/uid/DTS10001386" title="Java File Paths are not Unix File Paths"></a><!-- top_of_header_marker_comment --><!-- begin_header_information --><!--#include virtual="/adcnavbar" --><p><a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../technicalqas/index.html">Technical Q&As</a> &gt; <a href="../../technicalqas/LegacyTechnologies/index.html">Legacy Documents</a> &gt; <a href="../../technicalqas/LegacyTechnologies/idxJava-date.html">Java</a> &gt; </p><div style="width:100%; position:fixed;"><div align="center" id="watermark" style="position: relative; margin-left:auto; margin-right:auto; z-index:20; width:500px;"><div class="legacybox"><h1>Legacy Document<span class=closebutton><a href="javascript:closeWatermark()"><img src="../../images/closebutton.png" width="14" height="14" border="0"  alt="close button"></a></span></h1>
+
+<p><strong>Important: </strong>This document is part of the Legacy section of the ADC Reference Library. This information should not be used for new development.</p>
+
+<div class="reflibtopic">
+	<p>Current information on this Reference Library topic can be found here:</p>
+	<ul>
+				<li><a href="http://developer.apple.com/referencelibrary/Java/idxPorting-date.html" target="_blank">Java > Porting</a></li>
+	</ul>
+</div>
+
+
+
+
+</div></div></div><!-- end_header_information --><!-- bottom_of_header_marker_comment --><!-- top_of_titles_marker_comment --><CENTER><table width="600" cellpadding="0" cellspacing="0" border="0">
+<tr><td align="left" scope="row">
+<h1>
+<div id="pagehead">Technical Q&amp;A JAVA11</div>
+<div id="pageheadsub">Java File Paths are not Unix File Paths</div>
+</h1>
+</td></tr></table></CENTER><!-- bottom_of_titles_marker_comment -->						<!-- begin_content --> <CENTER><TABLE BORDER=0 CELLPADDING=0 WIDTH=600><TR> <td align="left"><hr width=500 align=center>			<P id="p2">Q: Why does my Java code dealing with files run perfectly on my Unix system,			but it breaks when I move it to the Macintosh?</P>			<P id="p4">A: The file path specification in Java is different than Unix. Keep your			Java code platform independent by avoiding the use of any of the following common			Unix-isms:</p>			<UL>				<LI>Do not assume a directory "<CODE>/tmp</CODE>" exists and is writable. As				an alternative, when using MRJ, you can use the MRJToolkit to locate the Temporary				Items Folder. See the sample class below:</li>			</UL>						<TABLE BORDER="0">				<TR>					<td bgcolor="#DDDDDD" align=left>						<pre><B>import</B> java.io.File;<B>import</B> java.io.FileNotFoundException;<B>import</B> com.apple.mrj.MRJFileUtils;<B>public</B> <B>class</B> MRJTempFolder{    /**     * Returns the Temporary Items Folder on the Mac OS.     * @return a File object representing the Temporary Items Folder,     * or null, if it could not be found.     */    <B>public</B> <B>static</B> File getTempFolder()    {        File tempFolder = <B>null</B>;        <B>try</B>        {            tempFolder = MRJFileUtils.findFolder(MRJFileUtils.kTemporaryFolderType);        }        <B>catch</B> (FileNotFoundException exc) { }        <B>return</B> tempFolder;    }}</pre>					</TD>				</TR>			</TABLE><BR>			<UL>				<LI>Do not assume "<CODE>/dev/null</CODE>" exists as a way to write to the bit				bucket. Instead, subclass <CODE>java.io.OutputStream</CODE> and implement <CODE>write(int)</CODE>				as an empty method, then pass an instance of the subclass to <CODE>System.setOut</CODE>				via the <CODE>java.io.PrintStream</CODE> constructor. See the example class below:</li>			</UL>						<TABLE BORDER="0">				<TR>					<td bgcolor="#DDDDDD" align=left>						<pre><B>import</B> java.io.*;/** * A repository for unwanted bytes. * Basically a replacement for &lt;code&gt;/dev/null&lt;/code&gt; */<B>public</B> <B>class</B> BitBucketOutputStream <B>extends</B> OutputStream{    /**     * Sets System.out to use the BitBucketOutputStream as the output     * stream.  In effect, redirecting standard out to oblivion.     * @see restoreSystemOut     */    <B>public</B> <B>static</B> <B>void</B> nullSystemOut()    {        System.setOut(<B>new</B> PrintStream(<B>new</B> BitBucketOutputStream(), <B>true</B>));    }    /**     * Recreates a System.out similar to the default System.out, and restores     * the default behavior.     * @see #nullSystemOut     */    <B>public</B> <B>static</B> <B>void</B> restoreSystemOut()    {        FileOutputStream fdOut = <B>new</B> FileOutputStream(FileDescriptor.out);        System.setOut(<B>new</B> PrintStream(<B>new</B> BufferedOutputStream(fdOut, 128), <B>true</B>));    }    /**     * Sets System.err to use the BitBucketOutputStream as the output     * stream.  In effect redirecting standard error to oblivion.     * @see restoreSystemErr     */    <B>public</B> <B>static</B> <B>void</B> nullSystemErr()    {        System.setErr(<B>new</B> PrintStream(<B>new</B> BitBucketOutputStream(), <B>true</B>));    }    /**     * Recreates a System.err similar to the default System.err, and restores     * the default behavior.     * @see #nullSystemErr     */    <B>public</B> <B>static</B> <B>void</B> restoreSystemErr()    {        FileOutputStream fdErr = <B>new</B> FileOutputStream(FileDescriptor.err);        System.setErr(<B>new</B> PrintStream(<B>new</B> BufferedOutputStream(fdErr, 128), <B>true</B>));    }    /**     * Does nothing with the specified byte.     *     * @param      b the &lt;code&gt;byte&lt;/code&gt; to ignore.     * @exception  IOException  if an I/O error occurs.     */    <B>public</B> <B>void</B> write(<B>int</B> b) <B>throws</B> IOException    { }}</pre></td></tr></table></td></tr></table></center><!-- end_content --><!-- begin_date --><H4 ALIGN=center>[Mar 20 2000]</H4><!-- end_date --><!-- begin_footer_information -->	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/qa/java/java11.html%3Fid%3DDTS10001386-1.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/qa/java/java11.html%3Fid%3DDTS10001386-1.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/qa/java/java11.html%3Fid%3DDTS10001386-1.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+<!--#include virtual="/includes/footer"--><!-- end_footer_information --> <hr width=500 align=center> </BODY> </HTML>

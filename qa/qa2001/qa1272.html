@@ -1,0 +1,135 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN"
+"http://www.w3.org/TR/REC-html40/loose.dtd"><HTML><HEAD><title>Technical Q&amp;A QA1272: Customizing Component Border Colors</title><LINK REL="stylesheet" HREF="../../adcstyle.css" TYPE="text/css"><LINK REL="stylesheet" HREF="../../style.css" TYPE="text/css"><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1"><meta name="keywords" content="java JComboBox menu backgroud border"><meta name="Description" content="Retaining Aqua background for JComboBox menus in spite of custom control borders."><LINK REL="stylesheet" HREF="../../css/adcstyle.css" TYPE="text/css"><script language="JavaScript" type="text/javascript" src="../../js/adc.js"></script></HEAD><BODY BGCOLOR=WHITE><a name="//apple_ref/doc/uid/DTS10002308" title="Customizing Component Border Colors"></a><!-- begin_header_information --><!--#include virtual="/adcnavbar" --><p><a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../technicalqas/index.html">Technical Q&As</a> &gt; <a href="../../technicalqas/Java/index.html">Java</a> &gt; <a href="../../technicalqas/Java/idxUserExperience-date.html">User Experience</a> &gt; </p><!-- end_header_information --><!-- begin_titles_information --><CENTER><table width="600" cellpadding="0" cellspacing="0" border="0">
+<tr><td align="left" scope="row">
+<h1>
+<div id="pagehead">Technical Q&amp;A QA1272</div>
+<div id="pageheadsub">Customizing Component Border Colors</div>
+</h1>
+</td></tr></table></CENTER><!-- end_titles_information --><CENTER><TABLE BORDER=0 CELLSPACING=1 WIDTH=600> <TR> <TD align="left"><hr width=500 align=center><!-- begin_document_contents --><P id=p2> Q: I have changed the background color of a JFrame, and noticed that certain JComponents still paint their borders with the standard Aqua striped background.  How do I make them match the JFrame containing them?</P><P id=p4> A: In Java 1.4.1, various JComponents need to paint a minimal border to fill the square bounds that are left over by the control.  For example, a JButton under Aqua has rounded edges, but square bounds need to be filled when adding any Component to a Container.  The extraneous space is drawn in the Aqua striped pattern.</P>
+
+<P id=p4>To change this, you simply set the component's background to the desired color:
+<P>&nbsp;&nbsp;&nbsp;&nbsp;<CODE>JButton jb =  new JButton("Push Me!");</CODE>
+<BR>&nbsp;&nbsp;&nbsp;&nbsp;<CODE>jb.setBackground(Color.red);</CODE></P>
+ The result should be an aqua button that appears to have no square border, blending with the background color of its container.</P>
+
+<P id=p4>The problem that arises is with components that produce secondary components, such as a JComboBox.  Embedded in a container, JComboBoxes appear as special buttons and have the same border problem that can be solved using the simple technique above.  However, when clicked, JComboBoxes show a menu which will also conform to the background color set for the JComboBox.  This is typically not in line with what developers wanted when trying to eliminate the borders on their controls in Aqua.  </P>
+
+<P id=p4>The code listing below demonstrates how one can work around this problem with JComboBoxes in particular.  The simple solution involves use of a custom ListCellRenderer that fortifies the default renderer's behavior to replace the custom border background with the default Aqua striped background.  The TestRenderer class does the dirty work of overriding the custom background color for cells in the JComboBox menu; the ComboBoxOverride class is the test harness to demonstrate the functionality.</P><BR><BR>
+<!-- listing starts here -->
+<CENTER><TABLE BORDER=0 CELLPADDING=0 WIDTH=550><TR><TD>
+<P><B>Listing 1</B>. TestRenderer.java</P>
+</TD></TR><TR><TD BGCOLOR="#E6E6E6"><PRE>
+
+// TestRenderer class allows you to paste Aqua striped background 
+// over whatever had been set as a border background
+
+import javax.swing.*;
+import java.awt.*;
+
+public class TestRenderer implements ListCellRenderer {
+    // The original ListCellRenderer we want to override
+    ListCellRenderer std;
+    
+    public TestRenderer (ListCellRenderer override) {
+        if (override == null) {
+            throw new NullPointerException(
+                &quot;TestRenderer constructor: default renderer is null&quot;);
+        }
+        std = override;   
+    }
+    
+    // Override of getListCellRendererComponent.  
+    // This is called by the AWT event thread to paint components. 
+    public Component getListCellRendererComponent(JList list,
+            Object value,
+            int index,
+            boolean isSelected,
+            boolean cellHasFocus) {
+        // Ask the standard renderer for what it thinks is right
+        Component c = std.getListCellRendererComponent(list,
+                        value,
+                        index,
+                        isSelected,
+                        cellHasFocus);
+        if (!isSelected) {
+                // Set the background of the returned component to Aqua
+                // striped background, but only for unselected cells;
+                // The standard renderer functions as desired for 
+                // highlighted cells.
+            c.setBackground((Color)UIManager.get(&quot;ComboBox.background&quot;));
+        }
+        return c;
+    }
+}
+
+</PRE></TD></TR></TABLE></CENTER>
+<!-- listing ends here -->
+<BR><BR>  
+<BR><BR>
+<!-- listing starts here -->
+<CENTER><TABLE BORDER=0 CELLPADDING=0 WIDTH=550><TR><TD>
+<P><B>Listing 2</B>. ComboBoxOverride.java</P>
+</TD></TR><TR><TD BGCOLOR="#E6E6E6"><PRE>
+
+// Test case to demonstrate TestRenderer functionality
+
+import java.awt.*;
+import javax.swing.*;
+
+
+public class ComboBoxOverride extends JFrame {
+
+    public ComboBoxOverride)( {    
+        Color bgColor = Color.red;
+        this.getContentPane().setLayout(new BorderLayout());
+
+        this.getContentPane().setBackground(bgColor);
+        JButton b = new JButton(&quot;Hello&quot;);
+        JComboBox line = new JComboBox( new Object []{
+            &quot;Option One&quot;,
+            &quot;Option Two&quot;,
+            &quot;Option Three&quot;});             
+        // Replace the JComboBox's renderer
+        // Our TestRenderer holds onto the original renderer 
+        line.setRenderer(new TestRenderer(line.getRenderer()));
+        b.setBackground(bgColor);
+        line.setBackground(bgColor);
+        this.getContentPane().add(b, BorderLayout.SOUTH);
+        this.getContentPane().add(line, BorderLayout.NORTH);
+        
+        setSize(320, 240);
+        setLocation(500, 500);
+        setVisible(true);
+    }
+
+     public static void main(String args[]) {
+         new ComboBoxOverride(true);
+     }
+
+}
+
+</PRE></TD></TR></TABLE></CENTER>
+<!-- listing ends here -->
+<BR><BR>  
+<hr width=500 align=center><!-- begin_date --><H4 ALIGN=center>[Jul 31, 2003]</H4><!-- end_date --><!-- end_document_contents --></TD></TR></TABLE></CENTER><!-- begin_footer_information -->	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/qa/qa2001/qa1272.html%3Fid%3DDTS10002308-1.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/qa/qa2001/qa1272.html%3Fid%3DDTS10002308-1.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/qa/qa2001/qa1272.html%3Fid%3DDTS10002308-1.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+<!--#include virtual="/includes/footer"--><!-- end_footer_information --></BODY></HTML>

@@ -1,0 +1,129 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/1999/REC-html401-19991224/loose.dtd">
+<html><head>
+<!-- BEGIN META TAG INFO -->
+<link rel="home" href="http://developer.apple.com/">
+<link rel="find" href="http://developer.apple.com/search/">
+<link rel="stylesheet" type="text/css" href="../../documentation/css/adcstyle.css" title="fonts">
+<script language="JavaScript" type="text/javascript" src="../../documentation/js/busnav.js"></script>
+<script language="JavaScript" src="../../documentation/js/adc.js" type="text/javascript"></script>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<!-- END META TAG INFO -->
+<!-- BEGIN TITLE -->
+<title>Technical Q&amp;A QA1462: Programmatically Performing an Open Directory Search</title>
+<!-- END TITLE -->
+</head>
+<!-- BEGIN BODY OPEN -->
+<body bgcolor="#ffffff"><a name="//apple_ref/doc/uid/DTS10004080" title="Programmatically Performing an Open Directory Search"></a>
+<!--END BODY OPEN -->
+<!-- START CENTER OPEN -->
+<center>
+<!-- END CENTER OPEN -->
+<a name="top"></a>
+<!-- BEGIN LOGO AND SEARCH -->
+<!--#include virtual="/includes/adcnavbar"-->
+<!-- END LOGO AND SEARCH -->
+<!-- START BREADCRUMB -->
+<div id="breadcrumb"><table width="680" border="0" cellpadding="0" cellspacing="0"><tr>
+<td scope="row"><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+<td><img width="340" height="10" src="images/1dot.gif" alt=""></td></tr><tr valign="middle"><td align="left" colspan="2">
+<a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../technicalqas/index.html">Technical Q&As</a> &gt; <a href="../../technicalqas/MacOSXServer/index.html">Mac OS X Server</a> &gt; <a href="../../technicalqas/MacOSXServer/idxDirectoryServices-date.html">Directory Services</a> &gt; 
+</td></tr><tr><td colspan="2" scope="row"><img width="680" height="35" src="images/1dot.gif" alt=""></td></tr></table></div>
+<!-- END BREADCRUMB -->
+
+<!-- START MAIN CONTENT -->
+<!-- START TITLE GRAPHIC AND INTRO-->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top">
+<td><h1>
+<div id="pagehead">Technical Q&amp;A QA1462</div>
+<div id="pageheadsub">Programmatically Performing an Open Directory Search</div>
+</h1></td></tr></table>
+<!-- END TITLE GRAPHIC AND INTRO -->
+<!-- BEGIN WIDE COLUMN -->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td align="left" width="680">
+<!-- BEGIN CONTENTS -->
+<h2>Q: How do I programmatically search for specific records by matching attributes via the Open Directory API?</h2><p>A: You'll need to use the Directory Services Framework, more specifically, the <code>dsDoAttributeValueSearchWithData</code> function found within it.</p><p>Listing 1 below gives an example:</p><p class="smalltext"><strong>Listing 1:</strong> Executing a trivial Open Directory Search.</p><pre class="sourcecodebox">
+//  Begin variable declaration.
+tDirReference                 dirRef;
+long                          status = eDSNoErr;
+unsigned long                 numResults = 0;
+tDataListPtr                  nodePath = NULL;
+tDirNodeReference             nodeRef;
+tDataList                     recordTypesToSearchFor;
+tDataNodePtr                  patternToMatch = NULL;
+tDataNodePtr                  matchType;
+tDataListPtr                  requestedAttributes = NULL;
+tDataBufferPtr                dataBuff = NULL;
+tContextData                  context = NULL;
+
+//  Initiate the Open Directory Service.
+status = dsOpenDirService(&amp;dirRef);
+
+//  Allocate a buffer.
+dataBuff = dsDataBufferAllocate(dirRef, 2*1024);
+
+//  Find the default search node.
+status = dsFindDirNodes(dirRef, dataBuff, NULL, eDSSearchNodeName, &amp;numResults, &amp;context);
+
+//  Acquire a reference to the default search node.
+status = dsGetDirNodeName(dirRef, dataBuff, 1, &amp;nodePath);
+
+//  Do some cleaning up.
+dsDataBufferDeAllocate(dirRef, dataBuff);
+dataBuff = NULL;
+dataBuff = dsDataBufferAllocate(dirRef, 2*1024);
+
+//  Open root level node for search.
+status = dsOpenDirNode(dirRef, nodePath, &amp;nodeRef);
+
+//  Build the tDataList containing the record type that you are searching for;
+//  in this case, the record type is &quot;Users&quot;.
+status = dsBuildListFromStringsAlloc (dirRef, &amp;recordTypesToSearchFor, kDSStdRecordTypeUsers, NULL);
+//  Return Records of Users.
+
+//  tDataNodePtr containing the string value to search for within all records.
+patternToMatch = dsDataNodeAllocateString(dirRef, &quot;Michael&quot;);
+
+//  tDataNodePtr containing the constant value that pertains to the scope of the search.
+matchType = dsDataNodeAllocateString(dirRef, kDSAttributesAll);
+
+//  Build a list to contain the requested attributes of the records returned from your search.
+requestedAttributes = dsBuildListFromStrings(dirRef, kDS1AttrDistinguishedName, NULL);
+
+//  The actual query.
+status = dsDoAttributeValueSearchWithData(nodeRef, dataBuff, &amp;recordTypesToSearchFor, matchType, eDSContains,
+          patternToMatch, requestedAttributes, FALSE, &amp;numResults, &amp;context);
+</pre><div class="notebox"><p><strong>Note:</strong> A complete listing of constant values, which can be passed into <code>dsBuildListFromStringsAlloc, dsDataNodeAllocateString, </code><code>dsBuildListFromStrings, </code>and <code>dsDoAttributeValueSearchWithData</code>, that correspond to your desired input/output can be found in the <A HREF="../../documentation/Networking/Reference/Open_Directory_Ref/index.html">Open Directory Reference Guide</A>.</p></div><p>You will also have to check the return <code>status</code> and <code>context</code> variables from the <code>dsFindDirNodes</code> and <code>dsDoAttributeValueSearchWithData</code> calls since:</p><ul><li><p>If <code>status</code> is <code>eDSBufferTooSmall</code> then the buffer size needs to be increased. For other return values please refer to the <A HREF="../../documentation/Networking/Reference/Open_Directory_Ref/index.html">documentation</A>.</p></li><li><p>If <code>context</code> is not <code>NULL</code> then there are more items needing to be returned, in which case, you'll need to make subsequent calls to <code>dsDoAttributeValueSearchWithData</code> passing in the <code>context</code> variable. When you no longer need <code>context</code>, call <code>dsReleaseContinueData</code> to release the memory associated with it.</p></li></ul><p>It would be wise to check that <code>numResults</code> is larger than <code>0</code> after the <code>dsFindDirNodes</code> call since it is possible that no search node could be returned. Once the above code is executed you'll need to pass <code>dataBuff</code> and the appropriate parameters to <code>dsGetRecordEntry,</code><code> dsGetAttributeEntry, </code> and <code>dsGetAttributeValue</code> in order to acquire the information that you need.</p><div class="notebox"><p><strong>IMPORTANT:</strong> When searching a directory, keep in mind that <strong>not all</strong> nodes support <strong>all</strong> meta attribute type constants. For example, Meta Attribute Type Constants: <code>kDSAttributesAll</code>, <code>kDSAttributesStandardAll</code>, and <code> kDSAttributesNativeAll </code> are not supported for Active Directory.</p></div><A NAME="TNT_HISTORY_TAG"></A><H2>Document Revision History</H2><table cellspacing="0" class="graybox" width="680"><tr><th width="100">Date</th><th width="580">Notes</th></tr><tr><td scope="row">2006-09-11</td><td>First Version</td></tr></table><p><b>Posted:</b> 2006-09-11</p>
+<!-- END CONTENTS -->
+</td></tr></table>
+<!-- END WIDE COLUMN -->
+<!-- END MAIN CONTENT -->
+	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/qa/qa2006/qa1462.html%3Fid%3DDTS10004080-1.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/qa/qa2006/qa1462.html%3Fid%3DDTS10004080-1.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/qa/qa2006/qa1462.html%3Fid%3DDTS10004080-1.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+
+<!-- START BOTTOM APPLE NAVIGATION -->
+<!--#include virtual="/includes/footer"-->
+<!-- END BOTTOM APPLE NAVIGATION -->
+<!-- START CENTER CLOSE -->
+</center>
+<!-- END CENTER CLOSE -->
+</body></html>

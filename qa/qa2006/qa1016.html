@@ -1,0 +1,132 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/1999/REC-html401-19991224/loose.dtd">
+<html><head>
+<!-- BEGIN META TAG INFO -->
+<link rel="home" href="http://developer.apple.com/">
+<link rel="find" href="http://developer.apple.com/search/">
+<link rel="stylesheet" type="text/css" href="../../documentation/css/adcstyle.css" title="fonts">
+<script language="JavaScript" type="text/javascript" src="../../documentation/js/busnav.js"></script>
+<script language="JavaScript" src="../../documentation/js/adc.js" type="text/javascript"></script>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<!-- END META TAG INFO -->
+<!-- BEGIN TITLE -->
+<title>Technical Q&amp;A QA1016: Changing the volume of audio devices</title>
+<!-- END TITLE -->
+</head>
+<!-- BEGIN BODY OPEN -->
+<body bgcolor="#ffffff"><a name="//apple_ref/doc/uid/DTS10003929" title="Changing the volume of audio devices"></a>
+<!--END BODY OPEN -->
+<!-- START CENTER OPEN -->
+<center>
+<!-- END CENTER OPEN -->
+<a name="top"></a>
+<!-- BEGIN LOGO AND SEARCH -->
+<!--#include virtual="/includes/adcnavbar"-->
+<!-- END LOGO AND SEARCH -->
+<!-- START BREADCRUMB -->
+<div id="breadcrumb"><table width="680" border="0" cellpadding="0" cellspacing="0"><tr>
+<td scope="row"><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+<td><img width="340" height="10" src="images/1dot.gif" alt=""></td></tr><tr valign="middle"><td align="left" colspan="2">
+<a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../technicalqas/index.html">Technical Q&As</a> &gt; <a href="../../technicalqas/MusicAudio/index.html">Audio</a> &gt; <a href="../../technicalqas/MusicAudio/idxCoreAudio-date.html">Core Audio</a> &gt; 
+</td></tr><tr><td colspan="2" scope="row"><img width="680" height="35" src="images/1dot.gif" alt=""></td></tr></table></div>
+<!-- END BREADCRUMB -->
+
+<!-- START MAIN CONTENT -->
+<!-- START TITLE GRAPHIC AND INTRO-->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top">
+<td><h1>
+<div id="pagehead">Technical Q&amp;A QA1016</div>
+<div id="pageheadsub">Changing the volume of audio devices</div>
+</h1></td></tr></table>
+<!-- END TITLE GRAPHIC AND INTRO -->
+<!-- BEGIN WIDE COLUMN -->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td align="left" width="680">
+<!-- BEGIN CONTENTS -->
+<h2>Q: How do I change the volume of an audio device?</h2><p>A: To change the volume of audio hardware you must first obtain an AudioDevice and determine if the device has volume control that is settable.  You can get the default output device or the system output device by using the method AudioHardwareGetProperty and the constants <code>kAudioHardwarePropertyDefaultOutputDevice</code> and <code>kAudioHardwarePropertyDefaultSystemOutputDevice </code>.</p><div class="notebox"><p><strong>Note:</strong> Every device may not support master volume control or individual channel control.</p></div><p class="smalltext"><strong>Listing 1:</strong> Getting the default output device</p><pre class="sourcecodebox">
+    UInt32 size;
+    AudioDeviceID outputDevice;
+    AudioHardwareGetProperty(kAudioHardwarePropertyDefaultOuputDevice,
+                                              &amp;size,
+                                              &amp;outputDevice);
+</pre><p>After obtaining the device,  you must check if it has volume control and if this property is writeable.</p><p class="smalltext"><strong>Listing 2:</strong> Getting the device capabilities</p><pre class="sourcecodebox">
+bool CAAudioHardwareDevice::HasProperty(
+    UInt32 inChannel,
+    CAAudioHardwareDeviceSectionID inSection,
+    AudioHardwarePropertyID inPropertyID) const
+{
+    OSStatus theError = AudioDeviceGetPropertyInfo(mAudioDeviceID,
+            inChannel, inSection, inPropertyID, NULL, NULL);
+    return theError == 0;
+}
+
+bool CAAudioHardwareDevice::PropertyIsSettable(
+    UInt32 inChannel,
+    CAAudioHardwareDeviceSectionID inSection,
+    AudioHardwarePropertyID inPropertyID) const
+{
+    Boolean isWritable = false;
+    OSStatus theError = AudioDeviceGetPropertyInfo(mAudioDeviceID, inChannel,
+        inSection, inPropertyID, NULL, &amp;isWritable);
+    ThrowIfError(theError, CAException(theError),
+        &quot;CAAudioHardwareDevice::PropertyIsSettable: got &quot;
+        &quot;an error getting info about a property&quot;);
+    return isWritable != 0;
+}
+
+bool CAAudioHardwareDevice::HasVolumeControl(
+    UInt32 inChannel,
+    CAAudioHardwareDeviceSectionID inSection) const
+{
+    return HasProperty(inChannel, inSection, kAudioDevicePropertyVolumeScalar);
+}
+
+bool CAAudioHardwareDevice::VolumeControlIsSettable(
+    UInt32 inChannel,
+    CAAudioHardwareDeviceSectionID inSection) const
+{
+    return PropertyIsSettable(inChannel, inSection, kAudioDevicePropertyVolumeScalar);
+}
+</pre><p>Then you can set the volume of the device by using the constant <code>kAudioDevicePropertyVolumeScalar</code> within AudioDeviceSetProperty. You must specify a Float32 value between 0 and 1 that will scale the volume of the device.</p><p class="smalltext"><strong>Listing 3:</strong> Setting the volume on master channel</p><pre class="sourcecodebox">
+
+AudioDeviceSetProperty(theDevice,
+                         NULL, //time stamp not needed
+                         0, //channel 0 is master channel
+                         false,  //for an output device
+                         kAudioDevicePropertyVolumeScalar,
+                         sizeof(Float32),
+                         &amp;theValue );
+
+</pre><A NAME="TNTAG1"></A><H2>References</H2><ul><li><p><A HREF="../../documentation/MusicAudio/CoreAudio-date.html">CoreAudio Documentation</A></p></li><li><p><A HREF="http://lists.apple.com/mailman/listinfo/coreaudio-api">CoreAudio Mailing List</A></p></li><li><p>CAAudioHardwareDevice - /Developer/Examples/CoreAudio/PublicUtility/CAAudioHardwareDevice</p></li><li><p>PublicUtility - /Developer/Examples/CoreAudio/PublicUtility/</p></li></ul><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNT_HISTORY_TAG"></A><H2>Document Revision History</H2><table cellspacing="0" class="graybox" width="680"><tr><th width="100">Date</th><th width="580">Notes</th></tr><tr><td scope="row">2006-05-02</td><td>First Version</td></tr></table><p><b>Posted:</b> 2006-05-02</p>
+<!-- END CONTENTS -->
+</td></tr></table>
+<!-- END WIDE COLUMN -->
+<!-- END MAIN CONTENT -->
+	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/qa/qa2006/qa1016.html%3Fid%3DDTS10003929-1.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/qa/qa2006/qa1016.html%3Fid%3DDTS10003929-1.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/qa/qa2006/qa1016.html%3Fid%3DDTS10003929-1.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+
+<!-- START BOTTOM APPLE NAVIGATION -->
+<!--#include virtual="/includes/footer"-->
+<!-- END BOTTOM APPLE NAVIGATION -->
+<!-- START CENTER CLOSE -->
+</center>
+<!-- END CENTER CLOSE -->
+</body></html>

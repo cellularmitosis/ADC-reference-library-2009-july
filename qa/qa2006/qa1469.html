@@ -1,0 +1,106 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/1999/REC-html401-19991224/loose.dtd">
+<html><head>
+<!-- BEGIN META TAG INFO -->
+<link rel="home" href="http://developer.apple.com/">
+<link rel="find" href="http://developer.apple.com/search/">
+<link rel="stylesheet" type="text/css" href="../../documentation/css/adcstyle.css" title="fonts">
+<script language="JavaScript" type="text/javascript" src="../../documentation/js/busnav.js"></script>
+<script language="JavaScript" src="../../documentation/js/adc.js" type="text/javascript"></script>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<!-- END META TAG INFO -->
+<!-- BEGIN TITLE -->
+<title>Technical Q&amp;A QA1469: MovieAudioExtraction - Ensure a Movie is fully loaded before starting an extraction session</title>
+<!-- END TITLE -->
+</head>
+<!-- BEGIN BODY OPEN -->
+<body bgcolor="#ffffff"><a name="//apple_ref/doc/uid/DTS10003914" title="MovieAudioExtraction - Ensure a Movie is fully loaded before starting an extraction session"></a>
+<!--END BODY OPEN -->
+<!-- START CENTER OPEN -->
+<center>
+<!-- END CENTER OPEN -->
+<a name="top"></a>
+<!-- BEGIN LOGO AND SEARCH -->
+<!--#include virtual="/includes/adcnavbar"-->
+<!-- END LOGO AND SEARCH -->
+<!-- START BREADCRUMB -->
+<div id="breadcrumb"><table width="680" border="0" cellpadding="0" cellspacing="0"><tr>
+<td scope="row"><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+<td><img width="340" height="10" src="images/1dot.gif" alt=""></td></tr><tr valign="middle"><td align="left" colspan="2">
+<a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../technicalqas/index.html">Technical Q&As</a> &gt; <a href="../../technicalqas/MusicAudio/index.html">Audio</a> &gt; <a href="../../technicalqas/MusicAudio/idxQuickTime-date.html">QuickTime</a> &gt; 
+</td></tr><tr><td colspan="2" scope="row"><img width="680" height="35" src="images/1dot.gif" alt=""></td></tr></table></div>
+<!-- END BREADCRUMB -->
+
+<!-- START MAIN CONTENT -->
+<!-- START TITLE GRAPHIC AND INTRO-->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top">
+<td><h1>
+<div id="pagehead">Technical Q&amp;A QA1469</div>
+<div id="pageheadsub">MovieAudioExtraction - Ensure a Movie is fully loaded before starting an extraction session</div>
+</h1></td></tr></table>
+<!-- END TITLE GRAPHIC AND INTRO -->
+<!-- BEGIN WIDE COLUMN -->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td align="left" width="680">
+<!-- BEGIN CONTENTS -->
+<h2>Q: I'm using the QuickTime MovieAudioExtraction APIs to extract audio from MP3 files opened with QTKit. This seems to work for some MP3 files but for others I get the first few minutes of audio extracted then silence. What's going on?</h2><p>A: Before any audio can be extracted from a QuickTime Movie, you must ensure that the Movie's load state is <code>kMovieLoadStateComplete</code>.</p><p>If QuickTime detects a VBR header in an MP3 file, or finds variable packet sizes in the first second's worth of data, it will scan the entire file in order to create an accurate sample table. The larger the MP3 file, the longer QuickTime will take to complete the scan. If your application is using QTKit, this import scan operation is happening asynchronously and the Movie's load state will not be set to <code>kMovieLoadStateComplete</code> until the entire sample table has been built.</p><p>While you may be able to play the Movie once the load state has transitioned to <code>kMovieLoadStatePlayable</code>, other operations such as saving or conversion will not be possible or may yield unexpected results.</p><A NAME="TNTAG2"></A><H2>Asynchronous Movie Loading</H2><p>Since the release of QuickTime 4.1 the asynchronous Movie loading model has been the preferred import method for QuickTime. Instead of a fully formed Movie being immediately available and playable, the returned Movie will transition though a number of different load states depending on the type of import operation being performed.</p><p>A Movie may transition from <code>kMovieLoadStateLoading</code> directly to <code>kMovieLoadStateComplete</code> while other times (over a slow network connection for example) may explicitly transition through each load state over time.</p><pre class="sourcecodebox">
+enum {
+  kMovieLoadStateError          = -1L,
+  kMovieLoadStateLoading        = 1000,
+  kMovieLoadStateLoaded         = 2000,
+  kMovieLoadStatePlayable       = 10000,
+  kMovieLoadStatePlaythroughOK  = 20000,
+  kMovieLoadStateComplete       = 100000L
+};
+</pre><p>Instead of applications being blocked waiting on the availability of a fully formed Movie (<code>kMovieLoadStateComplete</code>), they can use the time during media loading to perform other operations creating a more responsive user experience.</p><p>Asynchronous Movie Loading is an opt-in behavior. Applications choose to opt-in by setting the <code>newMovieAsyncOK</code> flag when calling any of the <code>NewMovieFrom...</code> APIs. One of the responsibilities of applications setting the <code>newMovieAsyncOK</code> flag is to preflight operations by checking the load state and to prevent certain operations if the load state has not passed a specific threshold. For example, prevent playing if the movie load state is not at least <code>kMovieLoadStatePlayable</code> and prevent saving or exporting if the movie load state is not <code>kMovieLoadStateComplete</code>.</p><p>By default, the higher level QTKit framework opts-in to the asynchronous Movie loading model on behalf of its client and therefore takes on the responsibility of preflighting saving, flattening, and conversion operations by checking the Movie's load state when <code>writeToFile:withAttributes</code> is invoked.</p><p>When extending QTKit through direct use of Movie Toolbox APIs, it is your responsibility to do likewise. Audio extraction is a conversion operation and as such cannot be performed before a Movie returns the <code>kMovieLoadStateComplete</code> load state.</p><p class="smalltext"><strong>Listing 1:</strong> Checking load state with QTKit.</p><pre class="sourcecodebox">
+long movieLoadState = [[myQTMovie attributeForKey:QTMovieLoadStateAttribute] longValue];
+</pre><p class="smalltext"><strong>Listing 2:</strong> Checking load state with the Movie Toolbox.</p><pre class="sourcecodebox">
+long movieLoadState = GetMovieLoadState(myMovie);
+</pre><p class="smalltext"><strong>Listing 3:</strong> Installing a QTKit notification for Movie load state changes.</p><pre class="sourcecodebox">
+// install a QTMovieLoadStateDidChangeNotification notification
+-(void)installMovieLoadStateDidChangeNotification
+{
+&nbsp; &nbsp; NSNotificationCenter *nc = [NSNotificationCenter defaultCenter];
+
+&nbsp; &nbsp; [nc addObserver:self selector:@selector(movieLoadStateDidChange:)&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; name:@&quot;QTMovieLoadStateDidChangeNotification&quot; object:nil];
+}
+
+// movieLoadStateDidChange is called for QTMovieLoadStateDidChangeNotification notifications.
+- (void) movieLoadStateDidChange:(NSNotification *)notification
+{
+    movieLoadState = [[myQTMovie attributeForKey:QTMovieLoadStateAttribute] longValue];
+}
+</pre><p>It is possible to avoid asynchronous loading when using QTKit by invoking <code>initWithAttributes:error:</code> and passing in an <code>NSDictionary</code> that has the <code>QTMovieOpenAsyncOKAttribute</code>  attribute set to <code>NO</code>. You may want to do this if for example, you were writing a simple command line tool that exports audio immediately after a movie file is imported and you are not concerned about user interface or waiting for QuickTime to synchronously import the file.</p><A NAME="TNTAG5"></A><H3>References</H3><ul><li><p><A HREF="../../documentation/QuickTime/REF/QT41_HTML/QT41WhatsNew-81.html">Introduction of Asynchronous Movie Loading</A></p></li><li><p><A HREF="../../documentation/QuickTime/RM/MovieBasics/MTOpenPlayMovies/5openplaymovies_loadstate/chapter_1000_section_1.html">Monitoring the Load State</A></p></li><li><p><A HREF="../../documentation/QuickTime/Reference/QTCocoaObjCKit/Classes/QTMovie.html#//apple_ref/occ/instm/QTMovie/initWithAttributes:error:">QTKit <code>initWithAttributes:error:</code> method.</A></p></li><li><p><A HREF="../../documentation/QuickTime/APIREF/getmovieloadstate.htm">GetMovieLoadState</A></p></li></ul><p><a href="#top">Back to Top</a>&nbsp;<a href="#top"><img src="images/arrow_linkup.gif" height="7" width="10" border="0" alt=""></a></p><A NAME="TNT_HISTORY_TAG"></A><H2>Document Revision History</H2><table cellspacing="0" class="graybox" width="680"><tr><th width="100">Date</th><th width="580">Notes</th></tr><tr><td scope="row">2006-03-29</td><td>First Version</td></tr></table><p><b>Posted:</b> 2006-03-29</p>
+<!-- END CONTENTS -->
+</td></tr></table>
+<!-- END WIDE COLUMN -->
+<!-- END MAIN CONTENT -->
+	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/qa/qa2006/qa1469.html%3Fid%3DDTS10003914-1.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/qa/qa2006/qa1469.html%3Fid%3DDTS10003914-1.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/qa/qa2006/qa1469.html%3Fid%3DDTS10003914-1.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+
+<!-- START BOTTOM APPLE NAVIGATION -->
+<!--#include virtual="/includes/footer"-->
+<!-- END BOTTOM APPLE NAVIGATION -->
+<!-- START CENTER CLOSE -->
+</center>
+<!-- END CENTER CLOSE -->
+</body></html>

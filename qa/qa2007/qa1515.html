@@ -1,0 +1,234 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<!-- BEGIN META TAG INFO --><link rel="home" href="http://developer.apple.com/">
+<link rel="find" href="http://developer.apple.com/search/">
+<link rel="stylesheet" type="text/css" href="../../documentation/css/adcstyle.css" title="fonts">
+<script language="JavaScript" type="text/javascript" src="../../documentation/js/busnav.js"></script><script language="JavaScript" src="../../documentation/js/adc.js" type="text/javascript"></script><!-- END META TAG INFO --><!-- BEGIN TITLE --><title>Technical Q&amp;A QA1515: Adding metadata to a QuickTime movie using the QuickTime MetaData APIs</title>
+<!-- END TITLE -->
+</head>
+<!-- BEGIN BODY OPEN --><body bgcolor="#ffffff"><a name="//apple_ref/doc/uid/DTS10004227" title="Adding metadata to a QuickTime movie using the QuickTime MetaData APIs"></a>
+<!-- END BODY OPEN --><!-- START CENTER OPEN --><center>
+<!-- END CENTER OPEN --><a name="top"></a><!-- BEGIN LOGO AND SEARCH --><!--#include virtual="/includes/adcnavbar" --><!-- END LOGO AND SEARCH --><!-- START BREADCRUMB --><div id="breadcrumb"><table width="680" border="0" cellpadding="0" cellspacing="0">
+<tr>
+<td scope="row"><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+<td><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+</tr>
+<tr valign="middle"><td align="left" colspan="2">
+<a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../technicalqas/index.html">Technical Q&amp;As</a> &gt; <a href="../../technicalqas/QuickTime/index.html">QuickTime</a> &gt; <a href="../../technicalqas/QuickTime/idxMovieBasics-date.html">Movie Basics</a> &gt; </td></tr>
+<tr><td colspan="2" scope="row"><img width="680" height="35" src="images/1dot.gif" alt=""></td></tr>
+</table></div>
+<!-- END BREADCRUMB --><!-- START MAIN CONTENT --><!-- START TITLE GRAPHIC AND INTRO --><table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td><h1>
+<div id="pagehead">Technical Q&amp;A QA1515</div>
+<div id="pageheadsub">Adding metadata to a QuickTime movie using the QuickTime MetaData APIs</div>
+</h1></td></tr></table>
+<!-- END TITLE GRAPHIC AND INTRO --><!-- BEGIN WIDE COLUMN --><table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td align="left" width="680">
+<!-- BEGIN CONTENTS --><h2>Q:
+	
+How do I add metadata (such as album art, artist name, and so on) to a QuickTime movie file using the QuickTime MetaData APIs? I'm not sure which parameters to pass to <code>QTMetaDataAddItem</code> for the various metadata items. Please help.
+</h2>
+<p>A: <a href="#TNTAG2">Listing 1</a> shows how to add the album art (<code>kQTMetaDataCommonKeyArtwork</code>) metadata item to a movie using QTKit and the QuickTime Metadata APIs. </p>
+<p>You must first get the movieâs metadata object using the <code>QTCopyMovieMetaData</code> function, and then pass this metadata object to the <code>QTMetaDataAddItem</code> function to add the actual item. </p>
+<p>Here's a short description of the parameters that are passed to <code>QTMetaDataAddItem</code>:</p>
+<p>The actual album art file data is passed in the <code>inValuePtr</code> parameter as an <code>NSData</code> object reference, and the size of the data is passed in the <code>inValueSize</code> parameter. </p>
+<p>Since the album art file in this case is a JPEG file you must specify <code>kQTMetaDataTypeJPEGImage</code> for the <code>inDataType</code> parameter. </p>
+<p>The album art items are being added as QuickTime native metadata format items so you must pass <code>kQTMetaDataStorageFormatQuickTime</code> for the <code>inMetaDataFormat</code> storage format parameter. And to allow unified access across the different QuickTime metadata container formats for your metadata item specify the <code>kQTMetaDataKeyFormatCommon</code> key format for the <code>inKeyFormat</code> parameter.</p>
+<p>You get the movie's metadata object using the <code>QTCopyMovieMetaData</code> as described above. This value is passed in the <code>inMetaData</code> parameter.</p>
+<p>Use <code>kQTMetaDataCommonKeyArtwork</code> to specify the album art metadata key in the <code>inKeyPtr</code> parameter.</p>
+<p>Also, it is also a good idea to assign locale information to your metadata (using the <code>kQTMetaDataItemPropertyID_Locale</code> identifier property). The locale information designates a particular language or country, in case your file is opened on a system which is using a different language than yours. Use the <code>QTMetaDataSetItemProperty</code> function to set the metadata item locale property.</p>
+<p>Lastly, call the <code>updateMovieFile</code> method to save your changes to the <code>QTMovie</code>.</p>
+<a name="TNTAG2"></a><p class="caption"><strong>Listing 1: </strong>Adding the artwork metadata item to a movie.</p>
+<pre class="sourcecodebox">// Add the artwork metadata item to a movie file
+-(void) addMovieJPEGArtworkMetaData:(QTMovie *)aQTMovie 
+                        artworkFile:(NSString *)filePath
+{
+    QTMetaDataRef   metaDataRef;
+    Movie           theMovie;
+    OSStatus        status;
+
+    theMovie = [aQTMovie quickTimeMovie];
+    status = QTCopyMovieMetaData (theMovie, &amp;metaDataRef );
+    NSAssert(status == noErr,@"QTCopyMovieMetaData failed!");
+
+    if (status == noErr)
+    {
+        NSFileManager *fileMgr = [NSFileManager defaultManager];
+        NSData *artworkData = [fileMgr contentsAtPath:filePath];
+        NSAssert(artworkData != NULL,@"contentsAtPath failed!");
+
+        if (artworkData)
+        {
+            OSType key = kQTMetaDataCommonKeyArtwork;
+            QTMetaDataItem outItem;
+            status = QTMetaDataAddItem(metaDataRef,
+                                      kQTMetaDataStorageFormatQuickTime,
+                                      kQTMetaDataKeyFormatCommon,
+                                      (const UInt8 *)&amp;key,
+                                      sizeof(key),
+                                      (const UInt8 *)artworkData,
+                                      [artworkData length],
+                                      kQTMetaDataTypeJPEGImage, // jpeg data
+                                      &amp;outItem);
+            NSAssert(status == noErr,@"QTMetaDataAddItem failed!");
+
+            const char *langCodeStr = [self langCode];
+            status = QTMetaDataSetItemProperty(
+                                              metaDataRef,
+                                              outItem,
+                                              kPropertyClass_MetaDataItem,
+                                              kQTMetaDataItemPropertyID_Locale,
+                                              strlen(langCodeStr) + 1,
+                                              langCodeStr);
+            NSAssert(status == noErr,@"QTMetaDataSetItemProperty failed!");
+
+            if (status == noErr)
+            {
+                // we must update the movie file to save the
+                // metadata items that were added
+                BOOL success = [aQTMovie updateMovieFile];
+                NSAssert(success == YES,@"updateMovieFile failed!");
+            }
+
+        }
+
+        QTMetaDataRelease(metaDataRef);
+    }
+}
+
+// Return the default language set by the user 
+// in the language tab of the International preference
+// pane.
+-(const char *)langCode
+{
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    NSAssert(defaults != NULL,@"standardUserDefaults failed!");
+
+    NSArray *languages = [defaults objectForKey:@"AppleLanguages"];
+    NSAssert(languages != NULL,@"objectForKey failed!");
+
+    NSString *langStr = [languages objectAtIndex:0];
+
+    return ([langStr cStringUsingEncoding:NSMacOSRomanStringEncoding]);
+}</pre>
+<p>Similarly, <a href="#TNTAG1">Listing 2</a> shows how to add the artist name (<code>kQTMetaDataCommonKeyArtist</code>) metadata item to a movie using QTKit and the Metadata APIs. The code for adding the artist name metadata is quite similar to the code in <a href="#TNTAG2">Listing 1</a> for adding the album art -- except the artist name metadata is specified as a C-string.</p>
+<a name="TNTAG1"></a><p class="caption"><strong>Listing 2: </strong>Adding the artist name metadata item to a movie.</p>
+<pre class="sourcecodebox">// Add the artist name metadata item to a movie file
+-(void) addMovieArtistMetaData:(QTMovie *)aQTMovie artistName:(NSString *)aNameStr
+{
+    QTMetaDataRef   metaDataRef;
+    Movie           theMovie;
+    OSStatus        status;
+
+    theMovie = [aQTMovie quickTimeMovie];
+    status = QTCopyMovieMetaData (theMovie, &amp;metaDataRef );
+    NSAssert(status == noErr,@"QTCopyMovieMetaData failed!");
+
+    if (status == noErr)
+    {
+        const char *nameCStringPtr = [aNameStr UTF8String];
+        NSAssert(nameCStringPtr != nil,@"UTF8String failed!");
+
+        if (nameCStringPtr)
+        {
+            OSType key = kQTMetaDataCommonKeyArtist;
+            QTMetaDataItem outItem;
+            status = QTMetaDataAddItem(metaDataRef,
+                                        kQTMetaDataStorageFormatQuickTime, 
+                                        kQTMetaDataKeyFormatCommon,
+                                        (const UInt8 *)&amp;key,
+                                        sizeof(key),
+                                        (const UInt8 *)nameCStringPtr,
+                                        strlen(nameCStringPtr),
+                                        kQTMetaDataTypeUTF8,
+                                        &amp;outItem);
+            NSAssert(status == noErr,@"QTMetaDataAddItem failed!");
+
+            // it is also recommended you set the locale identifier
+            const char *langCodeStr = [self langCode];
+            status = QTMetaDataSetItemProperty(
+                                              metaDataRef,
+                                              outItem,
+                                              kPropertyClass_MetaDataItem,
+                                              kQTMetaDataItemPropertyID_Locale,
+                                              strlen(langCodeStr) + 1,
+                                              langCodeStr);
+
+            if (status == noErr)
+            {
+                // we must update the movie file to save the
+                // metadata items that were added
+                BOOL success = [aQTMovie updateMovieFile];
+                NSAssert(success == YES,@"updateMovieFile failed!");
+            }
+        }
+
+        QTMetaDataRelease(metaDataRef);
+    }
+}
+
+// Return the default language set by the user 
+// in the language tab of the International preference
+// pane.
+-(const char *)langCode
+{
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    NSAssert(defaults != NULL,@"standardUserDefaults failed!");
+
+    NSArray *languages = [defaults objectForKey:@"AppleLanguages"];
+    NSAssert(languages != NULL,@"objectForKey failed!");
+
+    NSString *langStr = [languages objectAtIndex:0];
+
+    return ([langStr cStringUsingEncoding:NSMacOSRomanStringEncoding]);
+}</pre>
+<a name="TNTAG3"></a><h2>References</h2>
+<ul>
+<li><p><a href="http://developer.apple.com/documentation/QuickTime/Conceptual/QT7UpdateGuide/index.html">QuickTime 7 Update Guide</a></p></li>
+<li><p><a href="http://developer.apple.com/documentation/QuickTime/Reference/QTRef_MovieProperties/Reference/reference.html">QuickTime Movies Properties Reference</a></p></li>
+<li><p><a href="http://developer.apple.com/samplecode/QTMetadataEditor/index.html">QTMetadataEditor sample code</a></p></li>
+</ul>
+<a name="document_revision_summary"></a><h2>Document Revision History</h2>
+<table cellspacing="0" class="graybox" width="680">
+<tr>
+<th width="100">Date</th>
+<th width="580">Notes</th>
+</tr>
+<tr>
+<td scope="row">2008-08-08</td>
+<td>Miscellaneous code fixes.</td>
+</tr>
+<tr>
+<td scope="row">2007-02-08</td>
+<td>Adding metadata to a QuickTime movie using the QuickTime MetaData APIs</td>
+</tr>
+</table>
+<p><b>Posted: </b>2008-08-08</p>
+<!-- END CONTENTS -->
+</td></tr></table>
+<!-- END WIDE COLUMN --><!-- END MAIN CONTENT --><!-- START BOTTOM APPLE NAVIGATION -->	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/qa/qa2007/qa1515.html%3Fid%3DDTS10004227-1.1&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/qa/qa2007/qa1515.html%3Fid%3DDTS10004227-1.1&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/qa/qa2007/qa1515.html%3Fid%3DDTS10004227-1.1&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+<!--#include virtual="/includes/footer" --><!-- END BOTTOM APPLE NAVIGATION --><!-- START CENTER CLOSE -->
+</center>
+<!-- END CENTER CLOSE -->
+</body>
+</html>

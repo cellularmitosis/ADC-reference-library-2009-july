@@ -1,0 +1,133 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/1999/REC-html401-19991224/loose.dtd">
+<html><head>
+<!-- BEGIN META TAG INFO -->
+<link rel="home" href="http://developer.apple.com/">
+<link rel="find" href="http://developer.apple.com/search/">
+<link rel="stylesheet" type="text/css" href="../../documentation/css/adcstyle.css" title="fonts">
+<script language="JavaScript" type="text/javascript" src="../../documentation/js/busnav.js"></script>
+<script language="JavaScript" src="../../documentation/js/adc.js" type="text/javascript"></script>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<!-- END META TAG INFO -->
+<!-- BEGIN TITLE -->
+<title>Technical Q&amp;A QA1476: Using the kQTPropertyClass_DRM properties with QuickTime</title>
+<!-- END TITLE -->
+</head>
+<!-- BEGIN BODY OPEN -->
+<body bgcolor="#ffffff"><a name="//apple_ref/doc/uid/DTS10003924" title="Using the kQTPropertyClass_DRM properties with QuickTime"></a>
+<!--END BODY OPEN -->
+<!-- START CENTER OPEN -->
+<center>
+<!-- END CENTER OPEN -->
+<a name="top"></a>
+<!-- BEGIN LOGO AND SEARCH -->
+<!--#include virtual="/includes/adcnavbar"-->
+<!-- END LOGO AND SEARCH -->
+<!-- START BREADCRUMB -->
+<div id="breadcrumb"><table width="680" border="0" cellpadding="0" cellspacing="0"><tr>
+<td scope="row"><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+<td><img width="340" height="10" src="images/1dot.gif" alt=""></td></tr><tr valign="middle"><td align="left" colspan="2">
+<a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../technicalqas/index.html">Technical Q&As</a> &gt; <a href="../../technicalqas/QuickTime/index.html">QuickTime</a> &gt; <a href="../../technicalqas/QuickTime/idxMovieBasics-date.html">Movie Basics</a> &gt; 
+</td></tr><tr><td colspan="2" scope="row"><img width="680" height="35" src="images/1dot.gif" alt=""></td></tr></table></div>
+<!-- END BREADCRUMB -->
+
+<!-- START MAIN CONTENT -->
+<!-- START TITLE GRAPHIC AND INTRO-->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top">
+<td><h1>
+<div id="pagehead">Technical Q&amp;A QA1476</div>
+<div id="pageheadsub">Using the kQTPropertyClass_DRM properties with QuickTime</div>
+</h1></td></tr></table>
+<!-- END TITLE GRAPHIC AND INTRO -->
+<!-- BEGIN WIDE COLUMN -->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td align="left" width="680">
+<!-- BEGIN CONTENTS -->
+<h2>Q: How can an application determine if some QuickTime media (such as an imported music file) is DRM-protected and if so, find out if the current machine is authorized to play it?</h2><p>A: QuickTime defines a number of DRM properties in ImageCompression.h. Media Handlers may be queried to determine the value of the <code>kQTDRMPropertyID_IsProtected</code> and <code>kQTDRMPropertyID_IsAuthorized</code> properties, and may query or set the <code>kQTDRMPropertyID_InteractWithUser</code> property.</p><pre class="sourcecodebox">
+/* DRM properties*/
+
+enum {
+    kQTPropertyClass_DRM = 'drm '
+};
+
+enum {
+    kQTDRMPropertyID_InteractWithUser = 'shui', /* Boolean* */
+    kQTDRMPropertyID_IsProtected  = 'prot',     /* Boolean* */
+    kQTDRMPropertyID_IsAuthorized = 'auth'      /* Boolean* */
+};
+</pre><p>Applications query a Media Handler Component for properties of the class <code>kQTPropertyClass_DRM</code> by calling <code>QTGetComponentProperty</code> and passing in a <code>MediaHandler</code> (an instance of the media handler component for the media the application is interested in) as the first parameter. Applications may also set the <code>kQTDRMPropertyID_InteractWithUser</code> property by calling <code>QTSetComponentProperty</code>. See Listing 1.</p><p>If the property does not exist a <code>kQTPropertyNotSupportedErr</code> (-2195) is returned.</p><p class="smalltext"><strong>Listing 1:</strong> Example use of kQTPropertyClass_DRM properties.</p><pre class="sourcecodebox">
+OSStatus CheckSoundMediaIsAuthorized(Movie inMovie,
+                                     UInt32 inSoundTrackIndex,
+                                     Boolean inInteractWithUser,
+                                     Boolean *outIsAuthorized)
+{
+    Track aTrack;
+    Media aMedia;
+    MediaHandler mh;
+    Boolean isProtected;
+
+    OSStatus err = paramErr;
+
+    // get n sound track
+    aTrack = GetMovieIndTrackType(inMovie, inSoundTrackIndex, SoundMediaType,
+                                  movieTrackMediaType | movieTrackEnabledOnly);
+    if (aTrack) {
+        // get the track media
+        aMedia = GetTrackMedia(aTrack);
+        if (aMedia) {
+            // get the media handler we can query
+            mh = GetMediaHandler(aMedia);
+            if (mh) {
+                // is this media protected?
+                err = QTGetComponentProperty(mh, kQTPropertyClass_DRM, kQTDRMPropertyID_IsProtected,
+                                             sizeof(isProtected), &amp;isProtected, NULL);
+                if ((noErr == err) &amp;&amp; isProtected) {
+                    // if so, is this media authorized on this machine?
+                    // user interaction may be turned off so no automatic dialog will pop up
+                    // if the machine is not authorized -- an application may therefore choose
+                    // to show their own custom UI and direct the user appropriately
+                    QTSetComponentProperty(mh, kQTPropertyClass_DRM, kQTDRMPropertyID_InteractWithUser,
+                                           sizeof(inInteractWithUser), &amp;inInteractWithUser);
+
+                    err = QTGetComponentProperty(mh, kQTPropertyClass_DRM, kQTDRMPropertyID_IsAuthorized,
+                                                 sizeof(*outIsAuthorized), outIsAuthorized, NULL);
+                }
+            }
+        }
+    }
+
+    return err;
+}
+</pre><A NAME="TNT_HISTORY_TAG"></A><H2>Document Revision History</H2><table cellspacing="0" class="graybox" width="680"><tr><th width="100">Date</th><th width="580">Notes</th></tr><tr><td scope="row">2006-04-11</td><td>First Version</td></tr></table><p><b>Posted:</b> 2006-04-11</p>
+<!-- END CONTENTS -->
+</td></tr></table>
+<!-- END WIDE COLUMN -->
+<!-- END MAIN CONTENT -->
+	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/qa/qa2006/qa1476.html%3Fid%3DDTS10003924-1.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/qa/qa2006/qa1476.html%3Fid%3DDTS10003924-1.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/qa/qa2006/qa1476.html%3Fid%3DDTS10003924-1.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+
+<!-- START BOTTOM APPLE NAVIGATION -->
+<!--#include virtual="/includes/footer"-->
+<!-- END BOTTOM APPLE NAVIGATION -->
+<!-- START CENTER CLOSE -->
+</center>
+<!-- END CENTER CLOSE -->
+</body></html>

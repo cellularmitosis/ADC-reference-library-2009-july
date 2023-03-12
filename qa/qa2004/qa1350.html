@@ -1,0 +1,158 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/1999/REC-html401-19991224/loose.dtd">
+<html><head>
+<!-- BEGIN META TAG INFO -->
+<link rel="home" href="http://developer.apple.com/">
+<link rel="find" href="http://developer.apple.com/search/">
+<link rel="stylesheet" type="text/css" href="../../documentation/css/adcstyle.css" title="fonts">
+<script language="JavaScript" type="text/javascript" src="../../documentation/js/busnav.js"></script>
+<script language="JavaScript" src="../../documentation/js/adc.js" type="text/javascript"></script>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<!-- END META TAG INFO -->
+<!-- BEGIN TITLE -->
+<title>Technical Q&amp;A QA1350: Storing file references in CFPreferences</title>
+<!-- END TITLE -->
+</head>
+<!-- BEGIN BODY OPEN -->
+<body bgcolor="#ffffff"><a name="//apple_ref/doc/uid/DTS10003323" title="Storing file references in CFPreferences"></a>
+<!--END BODY OPEN -->
+<!-- START CENTER OPEN -->
+<center>
+<!-- END CENTER OPEN -->
+<a name="top"></a>
+<!-- BEGIN LOGO AND SEARCH -->
+<!--#include virtual="/includes/adcnavbar"-->
+<!-- END LOGO AND SEARCH -->
+<!-- START BREADCRUMB -->
+<div id="breadcrumb"><table width="680" border="0" cellpadding="0" cellspacing="0"><tr>
+<td scope="row"><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+<td><img width="340" height="10" src="images/1dot.gif" alt=""></td></tr><tr valign="middle"><td align="left" colspan="2">
+<a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../technicalqas/index.html">Technical Q&As</a> &gt; <a href="../../technicalqas/Carbon/index.html">Carbon</a> &gt; <a href="../../technicalqas/Carbon/idxRuntimeArchitecture-date.html">Runtime Architecture</a> &gt; 
+</td></tr><tr><td colspan="2" scope="row"><img width="680" height="35" src="images/1dot.gif" alt=""></td></tr></table></div>
+<!-- END BREADCRUMB -->
+
+<!-- START MAIN CONTENT -->
+<!-- START TITLE GRAPHIC AND INTRO-->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top">
+<td><h1>
+<div id="pagehead">Technical Q&amp;A QA1350</div>
+<div id="pageheadsub">Storing file references in CFPreferences</div>
+</h1></td></tr></table>
+<!-- END TITLE GRAPHIC AND INTRO -->
+<!-- BEGIN WIDE COLUMN -->
+<table width="680" border="0" cellpadding="0" cellspacing="0"><tr align="left" valign="top"><td align="left" width="680">
+<!-- BEGIN CONTENTS -->
+<h2>Q: What is the most robust way to store a file reference into a CFPreference?</h2><p>A: Convert your file reference into an Alias handle; create a CFData with the contents of that Alias handle and then use CFPreferencesSetAppValue and CFPreferencesAppSynchronize to store it into your preferences file.</p><p>The first listing shows how to save a File Reference to a Preference file, and the second how to reload the File Reference from the Preference File.</p><p class="smalltext"><strong>Listing 1:</strong> Saving a file reference into a CFPreference:</p><pre class="sourcecodebox">/*****************************************************
+*
+* SaveFSRefToPref(inFSRef, inKey)
+*
+* Purpose:  Saves a file reference in an application preference
+*
+* Inputs:   inFSRef     - The file reference
+*           inKey       - the preference key
+*
+* Returns:  none
+*/
+void SaveFSRefToPref(const FSRef* inFSRef,
+                     const CFStringRef inKey)
+{
+    AliasHandle tAliasHdl;
+    OSErr err = FSNewAlias(NULL, inFSRef, &amp;tAliasHdl);
+    require_noerr(err, CantCreateAlias);
+
+    CFDataRef tCFDataRef;
+    tCFDataRef = CFDataCreate(kCFAllocatorDefault,
+                              (UInt8*) *tAliasHdl,
+                              GetHandleSize((Handle) tAliasHdl));
+    require(NULL != tCFDataRef, CantCreateCFData);
+
+    // set the preferences
+    CFPreferencesSetAppValue( inKey,
+                              tCFDataRef,
+                              kCFPreferencesCurrentApplication);
+    // sync to disk
+    CFPreferencesAppSynchronize(kCFPreferencesCurrentApplication);
+
+    CFRelease(tCFDataRef);
+CantCreateCFData:
+        DisposeHandle((Handle) tAliasHdl);
+CantCreateAlias:
+        return;
+}
+</pre><p>To restore your file reference from the preference:</p><p class="smalltext"><strong>Listing 2:</strong> Restoring the file reference:</p><pre class="sourcecodebox">/*****************************************************
+*
+* LoadFSRefFromPref(inFSRef, inKey)
+*
+* Purpose:  Loads a file reference from an application preference
+*
+* Inputs:   outFSRef    - Address where to store the file reference
+*           inKey       - the preference key
+*
+* Returns:  Boolean     - true if the load was successful
+*/
+Boolean LoadFSRefFromPref(FSRef* outFSRef, CFStringRef inKey)
+{
+    Boolean result = false; // assume failure (pessimist!)
+
+    CFDataRef tCFDataRef;
+    tCFDataRef = (CFDataRef) CFPreferencesCopyAppValue(
+                       inKey,
+                       kCFPreferencesCurrentApplication);
+    require(NULL != tCFDataRef, CantGetPreference);
+
+    CFIndex dataSize = CFDataGetLength(tCFDataRef);
+    AliasHandle tAliasHdl = (AliasHandle) NewHandle(dataSize);
+    require(NULL != tAliasHdl, CantAllocateAlias);
+
+    CFDataGetBytes(tCFDataRef,
+                   CFRangeMake(0, dataSize),
+                   (UInt8*) *tAliasHdl);
+
+    FSRef tFSRef;
+    Boolean wasChanged;
+    OSErr err = FSResolveAlias(NULL,
+                                tAliasHdl,
+                                outFSRef,
+                                &amp;wasChanged);
+    if (noErr == err) result = true;
+
+    DisposeHandle((Handle) tAliasHdl);
+
+CantAllocateAlias:
+    CFRelease(tCFDataRef);
+CantGetPreference:
+    return result;
+}</pre><p><b>Posted:</b> 2005-02-23</p><A NAME="TNT_HISTORY_TAG"></A><H2>Document Revision History</H2><table cellspacing="0" class="graybox" width="680"><tr><th width="100">Date</th><th width="580">Notes</th></tr><tr><td scope="row">2005-02-23</td><td>The third parameter to &quot;FSResolveAlias(NULL, tAliasHdl, &amp;outFSRef, &amp;wasChanged);&quot; doesn't require the &quot;&amp;&quot;: &quot;FSResolveAlias(NULL, tAliasHdl, outFSRef, &amp;wasChanged);&quot;</td></tr><tr><td scope="row">2004-10-01</td><td>Storing file references in CFPreferences</td></tr></table><p><b>Posted:</b> 2005-02-23</p>
+<!-- END CONTENTS -->
+</td></tr></table>
+<!-- END WIDE COLUMN -->
+<!-- END MAIN CONTENT -->
+	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/qa/qa2004/qa1350.html%3Fid%3DDTS10003323-1.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/qa/qa2004/qa1350.html%3Fid%3DDTS10003323-1.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/qa/qa2004/qa1350.html%3Fid%3DDTS10003323-1.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+
+<!-- START BOTTOM APPLE NAVIGATION -->
+<!--#include virtual="/includes/footer"-->
+<!-- END BOTTOM APPLE NAVIGATION -->
+<!-- START CENTER CLOSE -->
+</center>
+<!-- END CENTER CLOSE -->
+</body></html>

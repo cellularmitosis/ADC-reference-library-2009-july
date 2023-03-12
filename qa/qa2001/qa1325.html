@@ -1,0 +1,160 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN"
+"http://www.w3.org/TR/REC-html40/loose.dtd">
+<html>
+<head>
+    <title>Technical Q&amp;A QA1325: Creating an OpenGL texture from an NSView</title> 
+    <link rel="stylesheet" href="../../adcstyle.css" type="text/css">
+    <link rel="stylesheet" href="../../style.css" type="text/css">
+    <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+    <meta name="keywords" content="Cocoa OpenGL texture NSView">
+    <meta name="Description" content="This Q&amp;A addresses the issues involved with using an NSView as the source data for an OpenGL texture.">
+<LINK REL="stylesheet" HREF="../../css/adcstyle.css" TYPE="text/css"><script language="JavaScript" type="text/javascript" src="../../js/adc.js"></script></head>
+<body bgcolor="WHITE"><a name="//apple_ref/doc/uid/DTS10003180" title="Creating an OpenGL texture from an NSView"></a>
+<!-- begin_header_information --><!--#include virtual="/adcnavbar" --><p><a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../technicalqas/index.html">Technical Q&As</a> &gt; <a href="../../technicalqas/GraphicsImaging/index.html">Graphics & Imaging</a> &gt; <a href="../../technicalqas/GraphicsImaging/idxOpenGL-date.html">OpenGL</a> &gt; </p><!-- end_header_information -->
+<!-- begin_titles_information --><CENTER><table width="600" cellpadding="0" cellspacing="0" border="0">
+<tr><td align="left" scope="row">
+<h1>
+<div id="pagehead">Technical Q&amp;A QA1325</div>
+<div id="pageheadsub">Creating an OpenGL texture from an NSView</div>
+</h1>
+</td></tr></table></CENTER><!-- end_titles_information -->
+<center>
+    <table border="0" cellspacing="1" width="600">
+        <tr>
+            <td align="left" scope="row">
+                <hr width="500" align="center">
+<!-- begin_document_contents -->
+                <p id="p2">
+                    Q: How do I create an OpenGL texture from an NSView?
+                </p>
+                <p id="p4">
+                    A: Virtually any NSView or subclass thereof can be used as a texture in OpenGL. The basic process involves using an NSBitmapImageRep to store the NSView's image data in a format that can be readily used as texture data by OpenGL. The following steps more specifically define this methodology: 
+                </p>
+                <ul>
+                    <li>
+                        Allocate an <code>NSBitmapImageRep</code> to use for storing the texture data.
+                    </li>
+                    <li>
+                        Initialize the <code>NSBitmapImageRep</code> using the <code>-initWithFocusedViewRect:</code> method and the NSView <code>-bounds</code> method.
+                    </li>
+                    <li>
+                        Use the <code>NSBitmapImageRep</code> method <code>-bitmapData</code> to retrieve the actual pixel data and pass this to OpenGL as a texture with the appropriate parameters.
+                    </li>
+                    </ul>
+                    <p id="p4">
+                    Listing 1 demonstrates a self-contained Cocoa method showing this technique in practice.
+                    </p>
+<!-- listing starts here -->
+                <center>
+                    <table border="0" cellpadding="0" width="550">
+                        <tr>
+                            <td>
+                                <p>
+                                    <b>Listing 1</b>. Building an OpenGL texture from an NSView
+                                </p>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td bgcolor="#E6E6E6" scope="row">
+<pre>// Generate texture 'texName' from 'theView' in current OpenGL context
+-(void)textureFromView:(NSView*)theView textureName:(GLuint*)texName
+{
+    // Bitmap generation from source view
+    NSBitmapImageRep * bitmap = [NSBitmapImageRep alloc];
+    int samplesPerPixel = 0;
+    
+    [theView lockFocus];
+    [bitmap initWithFocusedViewRect:[theView bounds]];
+    [theView unlockFocus];
+
+    // Set proper unpacking row length for bitmap
+    glPixelStorei(GL_UNPACK_ROW_LENGTH, [bitmap pixelsWide]);
+
+    // Set byte aligned unpacking (needed for 3 byte per pixel bitmaps)
+    glPixelStorei (GL_UNPACK_ALIGNMENT, 1);
+    // Generate new texture object if none passed in
+    if (*texName == 0)
+         glGenTextures (1, texName);
+     glBindTexture (GL_TEXTURE_RECTANGLE_EXT, *texName);
+    // Non-mipmap filtering (redundant for texture_rectangle)
+    glTexParameteri(GL_TEXTURE_RECTANGLE_EXT, 
+                    GL_TEXTURE_MIN_FILTER, GL_LINEAR); 
+    samplesPerPixel = [bitmap samplesPerPixel];
+
+    // Non-planar, RGB 24 bit bitmap, or RGBA 32 bit bitmap
+    if(![bitmap isPlanar] && 
+       (samplesPerPixel == 3 || samplesPerPixel == 4)) { 
+         glTexImage2D(GL_TEXTURE_RECTANGLE_EXT, 
+                      0, 
+                      samplesPerPixel == 4 ? GL_RGBA8 : GL_RGB8,
+                      [bitmap pixelsWide], 
+                      [bitmap pixelsHigh], 
+                      0, 
+                      samplesPerPixel == 4 ? GL_RGBA : GL_RGB,
+                      GL_UNSIGNED_BYTE, 
+                      [bitmap bitmapData]);
+    } else {
+    /*
+        Error condition...
+        The above code handles 2 cases (24 bit RGB and 32 bit RGBA),
+        it is possible to support other bitmap formats if desired.
+        
+        So we'll log out some useful information.
+    */
+        NSLog (@&quot;-textureFromView: Unsupported bitmap data
+        format: isPlanar:%d, samplesPerPixel:%d, bitsPerPixel:%d,
+        bytesPerRow:%d, bytesPerPlane:%d&quot;,
+            [bitmap isPlanar], 
+            [bitmap samplesPerPixel], 
+            [bitmap bitsPerPixel], 
+            [bitmap bytesPerRow], 
+            [bitmap bytesPerPlane]);
+    }
+    // Clean up
+    [bitmap release];
+}</pre>
+                            </td>
+                        </tr>
+                    </table>
+                </center>
+<!-- listing ends here -->
+            <p id="p4">
+                The following are some important notes to keep in mind when reviewing the above code: 
+            </p>
+            <ul>
+                <li><code>GL_EXT_texture_rectangle</code> is used for non-power of two texture support, which is not supported on the Rage128.</li>
+                <li><code>gluScaleImage()</code> can be used to scale non-PoT textures into PoT dimensions for hardware that doesn't support <code>GL_EXT_texture_rectangle</code>.</li>
+                <li>A valid current OpenGL context is required. </li>
+				<li> There are certain views that do not work with this type of operation. At the present time, those views are <code>NSProgressIndicator</code>, <code>NSMovieView</code> and <code>NSOpenGLView</code>. <code>initWithFocusedViewRect:</code> reads from the window backing store which these particular views do not use. These views use a separate surface for drawing that is not read by <code>initWithFocusedViewRect:<code>.</li>
+</ul>
+    <hr width="500" align="center">
+<!-- begin_date --><H4 ALIGN=center>[Feb 13, 2004]</H4><!-- end_date -->
+<!-- end_document_contents -->
+</td>
+</tr>
+</table>
+</center>
+<!-- begin_footer_information -->	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/qa/qa2001/qa1325.html%3Fid%3DDTS10003180-1.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/qa/qa2001/qa1325.html%3Fid%3DDTS10003180-1.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/qa/qa2001/qa1325.html%3Fid%3DDTS10003180-1.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+<!--#include virtual="/includes/footer"--><!-- end_footer_information -->
+</body>
+</html>

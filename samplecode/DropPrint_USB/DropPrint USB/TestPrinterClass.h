@@ -1,0 +1,1 @@
+//	File TestPrinterClass.hOSErr sendusb( char *printer_name, char *sourcefile, long blocksize, int repeat_count );// eof

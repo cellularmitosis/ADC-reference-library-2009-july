@@ -1,0 +1,1 @@
+pascal void HiliteItemProc(WindowPtr wp, short item);void AboutBox(){	DialogPtr dp;	short	  itemHit;		dp = GetNewDialog(129,nil,(WindowPtr)-1);	SetUserItemProc(dp, 3, HiliteItemProc);	ModalDialog(nil,&itemHit);	DisposDialog(dp);}

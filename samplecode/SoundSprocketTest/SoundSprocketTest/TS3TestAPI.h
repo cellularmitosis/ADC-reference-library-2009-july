@@ -1,0 +1,1 @@
+/* *	File:		TS3TestAPI.h * *	Copyright © 1996 Apple Computer, Inc. */#ifndef __TS3TestAPI__#define __TS3TestAPI__void TestAPI_Init(	void);void TestAPI_Exit(	void);void TestAPI_Execute(	void);#endif /* __TS3TestAPI__ */

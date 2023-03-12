@@ -1,0 +1,1 @@
+#   File:       VoxII.make#   Target:     VoxII#   Sources:    VoxII.c#   Created:    Thursday, October 10, 1991 1:58:31 PMOBJECTS = VoxII.c.oVoxII ÄÄ VoxII.make {OBJECTS}	Link -t APPL -c '????' ¶		{OBJECTS} ¶		"{Libraries}"Runtime.o ¶		"{Libraries}"Interface.o ¶		-o VoxIIVoxII.c.o Ä VoxII.make VoxII.c	 C -r  VoxII.c

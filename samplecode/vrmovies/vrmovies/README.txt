@@ -1,0 +1,1 @@
+README - VRMoviesVRMovies uses the QuickTime VR API to provide support for playing QuickTime movies in a panorama. PowerPC, 680x0, and Windows versions are provided.Enjoy,QuickTime Team

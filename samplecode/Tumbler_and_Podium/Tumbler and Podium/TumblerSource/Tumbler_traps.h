@@ -1,0 +1,1 @@
+// Simple framework for Macintosh sample code//// Nick Thompson, DEVSUPPORT//// This file contains the trap detection related code code for the framework.// // 9/16/94	nick	first cut#ifndef _Tumbler_TRAPS_H_#define _Tumbler_TRAPS_H_Boolean	myTrapAvailable(short theTrap) ;#endif

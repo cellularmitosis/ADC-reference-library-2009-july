@@ -1,0 +1,1 @@
+public class ForwardButton extends RolloverButton{	protected void initImages()	{		//Initialize images for the ForwardButton		//Insert "ForwardButton initImages"		addImage("images/FFF.jpg", upImage);		addImage("images/FFFa.jpg", downImage);		addImage("images/FFFb.jpg", rolloverImage);	}}

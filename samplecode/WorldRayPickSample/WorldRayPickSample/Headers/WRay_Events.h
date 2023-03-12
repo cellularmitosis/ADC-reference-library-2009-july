@@ -1,0 +1,1 @@
+/*   *	WRay_Events.h * *	QuickDraw 3D 1.6 Sample *	Robert Dierkes * *	 07/28/98	RDD		Created. */#ifndef _HWRay_Events#define _HWRay_Events#include <Events.h>Boolean Events_Initialize(			void);void	Events_Process (			void);Boolean	Events_Update (			EventRecord			*pEvent);#endif /* _HWRay_Events */

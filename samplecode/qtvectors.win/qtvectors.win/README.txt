@@ -1,0 +1,25 @@
+README - QTVectors
+
+QTVectors is a simple application that constructs a QuickTime 
+vector movie. It shows how to create a new movie, construct a 
+series of QTAtoms that describe a vector picture, and then save 
+the QTAtoms in the new movie. You can then open the movie to see 
+what was drawn.
+
+Currently, QTVectors creates the atoms by using one of two methods: 
+(1) It can build the atoms by "brute force", just stuffing the data 
+into a handle, long word after long word. (Ouch!) (2) It can also 
+build an atom stream using the Curve Utilities described in the 
+"QuickTime Vectors" chapter of the developer documentation. 
+This second method is higher-level and far more readable in 
+the source code.
+
+QTVectors can be compiled and run under the MacOS and under Windows. 
+The main vector code is found in the file QTVectors.c. 
+The remaining files in this folder are part of the general 
+Mac and Windows support code.
+
+
+Enjoy,
+QuickTime Team
+

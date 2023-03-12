@@ -1,0 +1,1 @@
+#define BUILDING_FOR_SYSTEM7 1

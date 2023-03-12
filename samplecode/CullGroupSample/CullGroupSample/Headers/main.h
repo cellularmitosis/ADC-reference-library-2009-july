@@ -1,0 +1,1 @@
+//// main.h////=================================================extern	void main(void);extern	void BatchProcess(void);extern	void SavePrefs(void);extern	void LoadPrefs(void);

@@ -1,0 +1,1 @@
+/* *	File:		DZEvents.h * *	Copyright © 1996 Apple Computer, Inc. */#ifndef __DZEvents__#define __DZEvents__void Events_Init(	void);void Events_Exit(	void);void Events_Process(	void);#endif /* __DZEvents__ */

@@ -1,0 +1,1 @@
+extern	Boolean							gDone;extern	AEAddressDesc					pSelfAddress;			// A self-addressed address descriptor recordextern	ProcessSerialNumber				pSelfPSN;				// This application's psnextern	AEDesc							pnilDesc;	extern	PrefInfo						gPrefInf;extern	FSSpec 							gPrefSpec;

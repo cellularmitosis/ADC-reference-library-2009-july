@@ -1,0 +1,1 @@
+include "::Resources:MenuScripter.rsrc";include "::Resources:MenuScripterAETE.rsrc";include "::Resources:ScriptEditor.rsrc";

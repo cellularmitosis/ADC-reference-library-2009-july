@@ -1,0 +1,1 @@
+java -classpath %CLASSPATH%;DetachedController.zip DetachedController

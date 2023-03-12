@@ -1,0 +1,1 @@
+long GetBackTime(void){	return	0L;}

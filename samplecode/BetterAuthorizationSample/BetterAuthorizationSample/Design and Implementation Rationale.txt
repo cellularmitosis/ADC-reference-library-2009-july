@@ -1,0 +1,445 @@
+BetterAuthorizationSampleLib Design and Implementation Rationale
+================================================================
+16 Nov 2007
+
+Introduction
+------------
+This document describes some of the design and implementation decisions taken while implementing BetterAuthorizationSampleLib (BAS).  If you just want to perform privileged operations and don't care about how it works, you can safely ignore this document.  On the other hand, if you want to know how BetterAuthorizationSampleLib works and why it was designed the way it is, this documentation is for you.
+
+
+Goals and Non-Goals 
+-------------------
+The primary motivation for creating BetterAuthorizationSampleLib was to improve security compared to MoreAuthSample (and the earlier AuthSample).  MoreAuthSample uses a setuid root helper tool.  While that approach was reasonable given the constraints of the time, we knew we could do better on current systems.
+
+Because that primary goal would require a completely new code base, we decide to take the opportunity to improve other aspects of the design.  The final set of goals for BetterAuthorizationSampleLib is:
+
+1. Security
+   - eliminate the setuid root helper tool
+   - integrate with Authorization Services
+   - defend against relatively sophisticated attacks, like malformed input, 
+     denial of service attacks, and resource leaks
+2. Easy developer adoption
+   - supports goal 1: no point having new tools if no one uses them
+3. Simplicity
+   - supports goal 1: simple code is easier to audit for security
+   - supports goal 2: simple code is easier for developers to understand 
+     and adopt
+4. On demand
+   - MoreAuthSample is "on demand", in the sense that the privileged helper 
+     tool only runs while it's needed; BAS needs to maintain this feature; 
+     we can't have a gazillion helper tools running all the time
+5. "Try, then handle failure" model
+   - supports goal 1: once a BAS privileged helper tool is installed, 
+     the system admin can tweak the setup without tripping any 
+     preflight checks
+   - supports goal 3: no need for BAS to do version checking
+   - supports goal 3: preflighting is hard
+
+BAS also has some non-goals:
+
+1. Line-for-line compatibility with MoreAuthSample
+   - not possible given goal 1
+
+2. More than one tool per bundle
+   - contradicts goal 3: we considered this to be unnecessarily complex
+
+3. Security at install time (that is, no code signing)
+   - In current versions of Mac OS X there is no way to truly protect 
+     yourself from malicious code running on the system at the time you  
+     enter the admin password (which is what the user is going to do 
+     at install time).  Thus, our goal is to protect the system from 
+     attacks once everything has been installed.  Attackers that are 
+     running at install time can still compromise the system.
+
+4. Versioning
+   - contradicts goal 3
+   - contradicts goal 5
+   - We leave it up to the developer to figure out if the installed version 
+     of their helper tool is adequate for their needs.  We do, however, 
+     provide features that make it easy for the developer to do this 
+     (for example, kBASFailNeedsUpdate).
+
+
+launchd and IPC Choice
+----------------------
+The first step in the design of BetterAuthorizationSampleLib (BAS) was to choose a mechanism to launch the helper tool that avoids the need for a setuid binary.  It turns out that there is really only one choice, <x-man-page://8/launchd>.  A launchd daemon that publishes a UNIX domain socket is the only non-networking, launch-on-demand daemon that's supported for third party development.
+
+    Note:
+    Earlier versions of Mac OS X supported launch-on-demand TCP/IP daemons 
+    via inetd (and, later, <x-man-page://8/xinetd>).  However, we didn't 
+    want to use a TCP/IP daemon because of the possibility that it might 
+    be vulnerable to attacks over the network.  While it is possible to 
+    prevent these attacks by binding your listening socket to the 
+    loopback address (on 10.4.x, both NetInfo and CUPS use this 
+    technique), it's still worrisome.
+
+One issue with launchd is that its UNIX domain sockets support has only recently started working.  Specifically, the UNIX domain socket support is not useful without support for the "SockPathMode" key, and that only works on Intel-based Macintosh computers, and on PowerPC-based computers since Mac OS X 10.4.6.  However, these requirements were not prohibitive for BAS.
+
+One nice feature of UNIX domain sockets is that it's possible to pass a file descriptor across a socket.  This is helpful if, say, the privileged operation is networking related.  Rather than put all of the networking code into the helper tool, you can just have the tool open and configure the relevant socket and pass the descriptor back to the application.
+
+The only serious competitor to UNIX domain sockets was Mach messaging.  The main interest in Mach messaging is its (relatively) nice RPC generator ("/usr/bin/mig").  However, this advantage was outweighed by the following disadvantages:
+
+o While Mach messaging is used extensively in the implementation of Mac OS X, Apple recommends against its use by third party developers.
+
+o There's no launch-on-demand mechanism that's supported for third party development on Mac OS X 10.4.  Specifically, things like "/etc/mach_init[_per_user].d" are not supported for third party development.  See DTS Technote 2083 "Daemons and Agents" for more details on this.
+
+<http://developer.apple.com/technotes/tn2005/tn2083.html>
+
+Using a launchd daemon does present some interesting complications.  Firstly, the daemon runs in the daemon context.  Thus, the developer must not do things that rely on the user's context (like use GUI frameworks).  This typically isn't a problem because most developers are creating a privileged helper tool to bypass a system restriction on a privileged operation, and these operations are generally implemented at the lowest levels within the system.  For example, if the reason you need a privileged helper tool is to open a low-numbered TCP port, running in the daemon context isn't a problem.
+
+Another interesting issue with running as a launchd daemon is that the daemon is shared between all users.  There's no specific gotcha here, just a general concern that it might be possible for one user to deny service to another user by interfering with the daemon.
+
+Both of these launchd issues could be resolved by using a launchd agent, but that's not possible because launchd agents don't work properly on Mac OS X 10.4.x <rdar://problem/4255854>.  Even when that's fixed, launchd agents won't be appropriate because, by definition, the agent runs on behalf of a specific user, and thus is not privileged.
+
+
+Logging
+-------
+When you're using a setuid root helper tool, it makes sense to log error information to stderr.  This is inherited from the program that invoked your tool, and typically ends up on the console.
+
+When using launchd, printing to stderr no longer makes sense; by default a launchd daemon's stderr goes to /dev/null.  BAS could have worked around this, but we decided that it was better to anticipate the future by integrating support for the Apple system log (ASL) facility.  ASL is rather rudimentary on current systems, but it's Apple's preferred logging facility and it will be the subject of significant future enhancements.  Thus, BAS makes it easy for developers to log information from their privileged helper tool to ASL.
+
+
+File System Notes
+-----------------
+There's some concern that "/Library/PrivilegedHelperTools/" is not secure because of the permissions of "/Library".  Specifically, because "/Library" is owned by the "admin" group, an admin user can move and rename items in the directory.  However, it isn't possible because "/Library" is sticky, and "/Library/PrivilegedHelperTools/" is owned by root, and thus only root can delete or rename it.  Also, as "/Library/LaunchDaemons/" is protected by the same mechanism, there's no point trying to apply greater security to "/Library/PrivilegedHelperTools/".
+
+When setting the permissions for "/Library/PrivilegedHelperTools/", we left "w" on for root because, if you're running as root, not being able to write to a file is /not/ going to stop you (-:  Also, this mirrors "/Library/LaunchDaemons".
+
+We fail if standard directories (like "/Library/LaunchDaemons" and "/var/run") are not present.  This is probably safer, in the long term, that trying to recreate them.  In contrast, we create our custom directory ("/Library/PrivilegedHelperTools/") if it's not present.
+
+We do not check whether standard directories have the 'right' permissions.  The main reason for this is that we don't want to fail unnecessarily as the system's default permissions evolve.
+
+An alternative file system layout that we considered was:
+
+  /Library/LaunchDaemons/<bundleID>.plist    rw-r--r-- root:wheel
+  /Library/LaunchDaemons/<bundleID>          rwxr-xr-x root:wheel
+  /var/run/<bundleID>.socket                 rw-rw-rw- root:daemon
+
+The nice feature of this approach is that all of the directories already exist, so we don't need to worry about creating any directories (and their associated permissions).  However, after consulting launchd engineering, we decided that mixing the tools in with the plists is a bad idea.
+
+Another option we considered was to put the sockets in their own directory:
+
+  /var/run/PrivilegedHelperTools/                    rwxr-xr-x root:daemon
+  /var/run/PrivilegedHelperTools/<bundleID>.socket   rw-rw-rw- root:daemon
+
+We decided that this wasn't really worth the effort.  It seems unlikely that even an advanced user is going to have more than, say, 100 helper tools, and "/var/run" can handle that just fine.
+
+
+Protocol
+--------
+There were some concerns about using CFDictionaries for the request/response protocol because it requires that you bring CF into the privileged helper tool (and, by definition, the less code in the helper tool the better).  However, we used CF because a) it makes it easy to define a BAS interface that's arbitrarily extensible, b) it naturally supports different architectures in the application and the tool, c) it's an easy upgrade path for MoreAuthSample users (and thus supports goal 2), and d) chances are the helper tool will be using CF anyway.
+
+Each special key is special for a reason:
+
+o kBASCommandKey -- We define a command key so that BAS can automatically integrate with Authorization Services, as described in the "Common Data Structures" section below.
+
+o kBASErrorKey -- We want to clearly separate IPC errors from errors in the command itself.  The easiest way to do this is to place the error result from the helper tool callback routine into the response dictionary.  If that dictionary makes it back to the application, there was no IPC error and the error code is significant.  On the other hand, if there's an IPC error then, by definition, you don't get a response dictionary and you don't have to worry about its value.
+
+o kBASDescriptorArray -- This allows the privileged helper tool to create descriptors on behalf of the client.  This is a common approach to code factoring for privilege separation, so we want to support it directly in BAS.  We couldn't think of a reason for the client to pass descriptors to the privileged helper tool, so we don't currently support that.  This avoids the need for us to check whether incoming commands have descriptors when they're not supposed to.  Failing to check this would result in a descriptor leak within the privileged helper tool, which could cause security problems.
+
+
+Coding Conventions
+------------------
+The privileged code in BAS only needs to link with the CoreFoundation and Security frameworks.  We deliberately restricted our framework use to these very low-level frameworks in order to make the code easier to audit for security (part of goal 3).
+
+If you look carefully at the code, you'll see that it #includes CoreServices.  We need to include CoreServices at compile time to get access to the error codes in "MacErrors.h".  However, we don't use anything in that umbrella framework at runtime.
+
+Finally, we chose to use OSStatus error codes (rather than errno-style error codes) because they're more expressive.  Specifically, there is a defined way to represent an errno-style error in an OSStatus, but not the other way around.
+
+
+Common Data Structures
+----------------------
+We want to actively promote the use of Authorization Services.  That is, a developer who adopts BAS should be using Authorization Services by default; all they need to do is decide on the names of the custom rights that they want to use and the default specification for those rights.
+
+So, we need a way to a) tell the application-side code what authorization right specifications to create, and b) tell the helper tool what commands map to what authorization rights.  That's what the BASCommandSpec array is all about.
+
+We specifically allow for commands with no associated authorization right so that a developer can do the following:
+
+o Implement a "get version" command, as described in the "Versioning" section of the "Performing Privileged Operations With BetterAuthorizationSampleLib" document.  This gets us out of the business of version management, which directly supports goals 3 and 5.
+
+o Implement a "no operation" command, as described in the "Preflighting" section of the "Performing Privileged Operations With BetterAuthorizationSampleLib" document.  This directly supports goal 5.
+
+o Implement commands with custom authorization -- In this case the developer's callback routine can do its own authorization checks.  Because we want developers to use Authorization Services, we don't provide any specific infrastructure for this (for example, there's no easy way to access the per-session socket so that they can use the LOCAL_PEERCRED socket option to get the EUID of the client process).
+
+The command callback routines aren't in this data structure because the commands array is shared, at a source level, between the application and the helper tool, and the functions that implement the commands should only be in the helper tool.  Thus, we have to supply a separate parallel array of callbacks to BASHelperToolMain.  This is less than ideal, but better than numerous other alternatives that I considered.
+
+The rightDefaultRule field of the BASCommandSpec structure represents an interesting design choice.  It must be a rule name (that is, a string), whereas the underlying Authorization Services routine (AuthorizationRightSet) lets you pass in either a rule name (a CFString) or a CFDictionary that specifies the right in more detail.  We decided to just go with a string it satisfies the majority of needs and there's no easy way to include a dictionary in a static const data structure.
+
+
+Helper Tool Structure
+---------------------
+The overall structure of the helper tool is follows:
+
+on BASHelperToolMain(...)
+  disable SIGPIPE
+  check in with launchd
+  get listening socket
+  loop [3]
+      accept connection on socket
+      exit if accept timed out
+
+      read authorization ref external form
+      internalize
+      read request [1]
+      authorize request [2]
+      create empty response
+      call client callback with auth, request, and response
+      write response
+      close connection
+  end loop
+end BASHelperToolMain
+
+Notes:
+
+[1] We must limit the amount of data that we can read to prevent clients using us to exhaust system resources.  See the definition and use of kBASMaxNumberOfKBytes in "BetterAuthorizationSample.c".
+
+[2] Get the command name from the request; look for it in the command array; if it's present, call AuthorizationCopyRights to get the associated right.
+
+[3] We originally contemplated only supporting a single request per loop; but if we run for less than 60 seconds, launchd will think that we're failing and throttle the rate that it launches us.
+
+This design is single threaded.  This makes things a lot simpler, but it could cause problems.  For example, consider what happens if you run the same app in the context of two different users (via fast user switching) and user A issues a command that requires authorization, then you switch to user B, and run another command that requires authorization.  Because we're blocked processing user A's authorization request (in AuthorizationCopyRights), user B's request won't even get started.  But user B won't know what the problem is because there's no indication of user A's authorization visible on their screen.
+
+Ultimately the solution to this may lie in launchd itself.  If we could launch a privileged process once per login session (much like an launchd agent, but privileged), this wouldn't be a problem.  Pending that solution, we don't intend to complicate this code unnecessarily by trying to handle concurrent requests.  However, we do ameliorate the problem by pre-authorizing the authorization rights in the client-side code.  This means that, most times, you get blocked in the client-side call to AuthorizationCopyRights rather than in the server.
+
+MoreAuthSample runs the command proc with EUID == RUID and SUID == 0.  This means that the developer has to explicitly switch EUID == 0 to do privileged stuff.  That's a good design.  However, we can't replicate it in BAS because our RUID will always be 0 (we're launched by launchd after all) and there's no obvious alternative value to set it to.
+
+
+Signals and Timeouts
+--------------------
+BAS uses three different types of signals:
+
+o SIGPIPE -- In the helper tool BAS disables SIGPIPE so that writing to a closed socket returns an error rather than quitting the process.  On the client side we don't want to disable SIGIPE because our host application might be using it for something.  So, we use the SO_NOSIGPIPE socket option to disable SIGPIPE on just our socket.
+
+o SIGTERM -- When launchd wants the helper tool to quit, it sends it a SIGTERM.  For the sake of simplicity BAS ignores the signal and the default behavior occurs (the process terminates asynchronously).  This won't cause any problems for the reusable BAS code; it's quite happy to let the system clean up.  OTOH, if the developer's callback does bad things under asynchronous termination, they'll have to handle it themselves (perhaps temporarily disabling SIGTERM).
+
+o SIGALRM -- BAS uses SIGALRM as its watchdog timer, as described below.  Again, because BAS can handle asynchronous termination just fine, it doesn't need to explicitly handle SIGALRM.  The default behavior of the signal, to terminate the process, is a fine response to the watchdog expiring.
+
+BAS has to deal with two kinds of timeouts:
+
+o There's an idle timeout (kIdleTimeoutInSeconds, currently 2 minutes).  If BAS hasn't received a request within that timeout, the tool quits with an exit status of EXIT_SUCCESS.  This ensures that, once the tool starts, it doesn't run forever.
+
+BAS implements this timeout by waiting for connections using a kqueue.  It then uses the timeout on the waiting function (<x-man-page://2/kevent>) as the idle timeout.
+
+Note that it's possible for a connection to come in between the point that BAS decides to quit and the time that it actually does manage to quit.  This will work just fine.  launchd will notice that the tool has quit with pending connections and relaunch it.
+
+o The second timeout is the timeout for a specific request (kWatchdogTimeoutInSeconds, currently 65 seconds).  The tool should be able to receive a request and send a response in a timely fashion.  If not, that's a problem that should cause the request to fail.
+
+This timeout plays an important part in our protection from denial of service attacks.  Without it, malicious code could open a connection to the tool, send it half a request, and then just leave the connection open.  BAS would be stuck in a system call reading data.  And because BAS is single threaded, this would deny service to all other clients.  The watchdog timer prevents this by terminating the process if it's been stuck for too long.
+
+Ideally we would prefer a short watchdog timeout but kWatchdogTimeoutInSeconds must be greater than 60 seconds: otherwise a persistent attacker could cause us to fail 10 times, each in less than 60 seconds, which would cause launchd to remove our job.  Future versions of launchd will allow you to configure its job removal timeout, but we can't avail ourselves of that currently.
+
+We could have implemented the watchdog by doing asynchronous reads, but that makes the code a lot more complex.  For example, the code currently has functions that abstract away certain complexities (like reading a dictionary), and a switch to asynchronous reads would undermine those abstractions.  Also, the tool could get stuck somewhere that we didn't expect (perhaps in the developer's callback routine) and we need to handle that as well.
+
+We should stress that this is not a perfect solution to denial of service attacks.  If a malicious client repeatedly creates connections to the server and leaves them to time out, it will significantly slow down the progress of other clients.  This is hard to fix while keeping the code simple, and we judged that it wasn't worth the complexity and the risk that that entails.
+
+
+Client-Side Structure
+---------------------
+We adopted the "try, then handle failure" approach for the following reasons:
+
+o Preflighting is hard.
+
+o You have to implement recovery anyway, so you might as well just try it and then handle the failure.
+
+o It allows the admin to tweak the configuration.  For example, the admin could move the helper tools to a new location and, as long as they update the plist file appropriately, everything will work.  That wouldn't be the case if we carefully checked everything before trying to talk to the helper tool.
+
+o It gets us out of the business of versioning.  If the developer wants a version check, they can add a custom command to do that check.  However, a better approach is for the developer to implement new functionality as a new command.  If that command fails because the tool doesn't recognize it, the helper tool is too old and the developer can force an update.
+
+If the developer doesn't like our model, but would rather preflight, they can do it by implementing a "no operation" command in the helper tool.
+
+We separate BASDiagnoseFailure and BASFixFailure because BASFixFailure will request AuthorizationExecuteWithPrivileges (AEWP) authorization, and we want to give the client the opportunity to prepare the user for that dialog.  That's also the purpose of the BASFailCode; it allows the client to customize the UI they present before presenting the user with an AEWP dialog.
+
+We had the choice of passing in a bundle identifier or a CFBundleRef.  We chose to use a bundle identifier because it's a string, and that maps well to the path names that the library uses.  In cases where we need resources from the bundle, we call CFBundleGetBundleWithIdentifier.  It's this decision that makes it impossible to support more than one tool per bundle.
+
+We originally had BASExecuteRequestInHelperTool call BASSetDefaultRules.  We switched away from the design because a) we didn't want each request paying the cost of the BASSetDefaultRules, and b) having BASExecuteRequestInHelperTool also include the parameters for BASSetDefaultRules made the parameter list unwieldy.
+
+The overall structure of BASSetDefaultRules is shown below.
+
+on BASSetDefaultRules(...)
+  for each command
+      AuthorizationRightGet
+      if no right then
+          AuthorizationRightSet
+      end if
+  end for
+end
+
+The overall structure of BASExecuteRequestInHelperTool is shown below.
+
+on BASExecuteRequestInHelperTool(...)
+  if command has associated right
+    authorize request
+  end if
+  open socket
+  connect to /var/run/<bundleID>.socket
+  externalize auth
+  write auth to socket
+  write request to socket
+  read response from socket
+  close socket
+end BASExecuteRequestInHelperTool
+
+The overall structure of BASDiagnoseFailure is shown below.
+
+on BASDiagnoseFailure(...)
+  hasPlist = file /Library/LaunchDaemons/<bundleID>.plist exists
+  hasTool  = file /Library/PrivilegedHelperTools/<bundleID> exists
+  if hasPlist and hasTool then
+    try to connect to /var/run/<bundleID>.socket
+    if that fails with ECONNREFUSED
+      failCode = kBASFailDisabled
+    else
+      failCode = kBASFailUnknown;
+    end if
+  else
+    if hasPlist or hasTool then
+      failCode = kBASFailPartiallyInstalled
+    else
+      failCode = kBASFailNotInstalled
+    end if
+  end if
+end BASDiagnoseFailure
+
+This could probably be improved.  We're interested in learning about what sorts of failures folks see in the field.
+
+We contemplated having the developer pass the IPC error that they got back from BASExecuteRequestInHelperTool into BASDiagnoseFailure.  However, we decided against this because error codes are notoriously unrelated to the actual cause of the problem.
+
+
+Installation
+------------
+After thinking about it for a long time, we decided to use a custom installer tool to install the privileged helper tool.  As we were thinking about coming up with a possible solution to the installation procedure we basically had two methods in mind: 
+
+1. Roll a separate installer tool into BAS to handle everything properly via AEWP.
+
+2. Run Apple's standard installer tool.
+
+3. Embed an installer shell script in the source code and invoke '/bin/sh' via AEWP and pipe the shell script to it.
+
+Option 2 would have been ideal, but it present certain process issues for the developer.  Specifically, on current versions of Mac OS X (10.4.x), it's not possible to create an installer package that installs root-owned files without actually setting up root-owned files on the file system.  You can't do that from an Xcode project without running Xcode as root.  This just made the whole approach too clumsy for us to use (that is, it contradicted goal 2).
+
+Our final choice (between options 1 and 3) was based primarily on erring in favor of following the long established security paradigm of keeping a user-land invoked privileged context as small as possible.  History has shown that running shell scripts as root is an exercise fraught with security concerns.  Shells tend to pull in a very large environment foot-print, thus, clearly running orthogonal to this security base case.  However, we did take into account our own criticisms in using a separate helper tool to possibly mitigate the downsides in using this approach.
+
+The most commonly used privilege escalation mechanism on Mac OS X is the AuthorizationExecuteWithPrivileges (AEWP) routine.  Given an admin user name and password, this routine will run arbitrary code as root.  Now consider what happens if you have two tools in your bundle, one being your privileged helper tool template and the other your installer tool that's run by AEWP to actually install the helper tool in a privileged context.  If you have malicious code running on the system, it's possible for it to switch out either the installer tool or the helper tool template between the point where AEWP is called (which is the last time point you can check the validity of the tools) and the point where the user types their password.  Thus, even with an installer tool, there's a window where malicious code can hijack the installation process.
+
+That is, if you have malicious code running on your system at the point where you install non-privileged software in a privileged context, there's nothing you can do to maintain system security.
+
+Our conclusion, therefore, was that BAS cannot protect the system at installation time.  Therefore, we decided to instead follow the existing paradigm (option 1) instead of doing something which may be have a negligible gain in security for this case but is a very /huge/ faux pas in just about every other security domain (option 3).  This is why we chose to include a separate installer tool.
+
+A superficial downfall to this approach is that it's less convenient.  The developer now has to add /two/ targets to their project, one for the helper tool and another for a separate installer tool.
+
+Finally, here's a quick summary of the installation procedure.
+
+
+on RunLaunchCtl(junkStdIO, command, plistPath)
+  load or unload (command) job at path (via plistPath) launchctl
+  fail if error
+end RunLaunchCtl
+
+on installCommand(bundleID, toolSourcePath, plistSourcePath)
+  // running in installer tool
+  // called by main
+  unmask 022
+  
+  Build plist path from bundleID
+  
+  RunLaunchCtl(true, "unload", <path to plist>);
+
+  mkdir -p /Library/PrivilegedHelperTools
+  fail if error
+  chown root:wheel /Library/PrivilegedHelperTools
+  fail if error
+  chmod 755 /Library/PrivilegedHelperTools
+  fail if error
+
+  rm -f /Library/PrivilegedHelperTools/<bundleID>
+  copy-overwrite toolSourcePath /Library/PrivilegedHelperTools/<bundleID>
+  fail if error
+
+  copy-overwrite plistSourcePath /Library/LaunchDaemons/<bundleID>.plist
+  fail if error
+
+  runLaunchCtl(false, "load", <path to plist>);
+  fail if error
+end installCommand
+
+on enableCommand(bundleID)
+  // running in installer tool
+  // called by main
+  build plist path from bundleID
+  runLaunchCtl(false, "load", <path to plist>);
+  fail if error
+end enableCommand
+
+on main(...)
+  // running in installer tool via AEWP
+  dup stdout to stderr
+  fail if error
+	
+  print pid
+  fail if error
+	
+  check and fix UID
+  fail if error
+	
+  if command is kBASInstallToolInstallCommand
+    installCommand(...);
+  else if command is kBASInstallToolEnableCommand
+    enableCommand(...)
+  end if
+	
+  print "oK"
+  fail if error
+end main
+
+
+on RunInstallToolAsRoot(...)
+  // running in application
+  // called by BASInstall
+  Count the number of arguments passed in
+  Allocate and build argument array
+  fail if error
+	
+  AEWP InstallTool passing in built argument array
+  fail if error
+	
+  loop until error or "oK"
+    read AEWP'ed child's piped output
+  end loop
+  fail if error
+end RunInstallToolAsRoot
+
+on BASInstall(...)
+  // running in application
+  access plist from the embedded string
+  fail if error
+	
+  create plist file using mkstemps() in /tmp
+  fail if error
+	
+  write string to temp file
+  fail if error
+	
+  call RunInstallToolAsRoot with the path to the temp file
+  fail if error
+end BASInstall
+
+on BASFixFailure(...)
+  // running in application
+  find helper tool in bundle
+  find install tool in bundle
+  if failCode is kBASFailDisabled
+    RunInstallToolAsRoot( enable command );
+  else
+    generate disabled plistText in memory from template in memory
+    BASInstall( install command );
+  end if
+end BASFixFailure
+
+
+Miscellaneous Notes
+-------------------
+It would have been nice to have an "Uninstall" command in the sample application.  We chose not to do this because it would require us to expose the RunInstallToolAsRoot routine to external calls and, even then, there's no easy way to remove the custom authorization rights.
+
+The bundle identifier for the sample application is "com.example.BetterAuthorizationSample" rather than "com.apple.dts.BetterAuthorizationSample" because the authorization policy database ("/etc/authorization" on current systems) has a wildcard rule for "com.apple.".  If we use a bundle identifier starting with "com.apple." then our attempt to add a custom right would be treated as an an attempt to modify the policy database.  Such modifications require that you authenticate as an admin user.  The end result is that BASSetDefaultRules puts up an authentication dialog when you first run the application.  This isn't what we want, and it isn't what a typical developer would get.  Thus, we went with "com.example.BetterAuthorizationSample".
+
+On the helper tool side of things, we directly call the callback associated with the command.  This has two advantages.  Firstly, it's less work for the developer.  Secondly, it ensures that we always executes the command that we authorized.  If we had a single callback, the callback would have to do its own dispatching.  If it used a different string comparison algorithm from the core code, it might be possible for a malicious client to authorize one command but execute another (perhaps be embedding null characters in the command string).  Also, if the developer wants to handle multiple commands in a single callback, there's nothing stopping them; they can use the userData parameter to distinguish the commands.

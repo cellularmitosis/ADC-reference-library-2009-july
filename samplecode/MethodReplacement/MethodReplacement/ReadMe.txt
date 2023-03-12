@@ -1,0 +1,5 @@
+Sample Code for WWDC 2006 session 302.
+
+Objective C 2.0 Compatible class_poseAs() replacement. This demonstrates how to replace a method in an existing Objective C class, and how to call the old version without having to store IMP function pointers in a global. The trick is to define a category on the class whose method you want to replace. In the category, declare and implement a method with the same signature as the replaced method. In the +load method of the category, look up the original and replacement methods using class_getInstanceMethod(), then call method_exchangeImplementations(). Subsequent calls to the original method will call the replacement method, and an apparently recursive call to the replacement method will call the original method. Voila.
+
+In this specific example, the method -[NSWindow sendEvent:] is being replaced by the category method -[NSWindow (TestMethodReplacement) TestMethodReplacement_sendEvent:]. Because the method implementations are swapped, the call to [self TestMethodReplacement_sendEvent:] actually calls the original -[NSWindow sendEvent:] implementation.

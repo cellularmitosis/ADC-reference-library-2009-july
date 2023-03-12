@@ -1,0 +1,129 @@
+Read Me About CFProxySupportTool
+================================
+1.0
+
+CFProxySupportTool shows how to use the CFProxySupport APIs to determine whether a network connection should pass through a proxy; this is useful if you're not using Apple's high-level networking APIs (like CFNetwork and the Foundation URL loading system) but still want to interpret the system-supplied proxy settings.
+
+Prior to the introduction of the CFProxySupport API, you had two choices:
+
+1) You could use Apple's high-level networking APIs, which would automatically use the proxy settings.
+
+2) If you couldn't use Apple's high-level networking APIs (perhaps because you're using some cross platform library), you had to read the proxy settings from System Configuration framework (using SCDynamicStoreCopyProxies) and parse them yourself.
+
+Unfortunately, the introduction of support for proxy auto-configuration (PAC) files makes option 2 very difficult.  Hence the need for the CFProxySupport APIs.
+
+The CFProxySupport APIs were introduced in Mac OS X 10.5, which make that the minimum system requirement for this sample.
+
+
+Packing List
+------------
+The sample contains the following items:
+
+o Read Me About CFProxySupportTool.txt -- This file.
+o CFProxySupportTool.c -- C source code for the program.
+o CFProxySupportTool.xcodeproj -- An Xcode 3.0 project for the program.
+o build -- A prebuilt version of the above.
+o test.pac -- A sample proxy auto-configuration (PAC) file.
+
+
+Using the Sample
+----------------
+To use the sample, first open a Terminal window and change into the directory containing the sample.  For example:
+
+$ cd Desktop/CFProxySupportTool
+
+The sample has three sub-commands, one for each of the CFProxySupport APIs.  To start with, you can view the proxies needed for a particular URL using the current system settings.  For a system without a proxy, you should see:
+
+$ build/Debug/CFProxySupportTool proxiesForURL http://www.apple.com
+0 no proxy (kCFProxyTypeNone)
+
+Now go into the Network preferences panel and configure a proxy for HTTP, and then repeat the last command:
+
+$ build/Debug/CFProxySupportTool proxiesForURL http://www.apple.com
+0 HTTP proxy (kCFProxyTypeHTTP)
+  host = proxy.apple.com
+  port = 80
+1 no proxy (kCFProxyTypeNone)
+
+Now go into the Network preferences panel, remove your manual proxy for HTTP, configure it to use the "test.pac" proxy auto-configuration file, and repeat the last command:
+
+$ build/Debug/CFProxySupportTool proxiesForURL http://www.apple.com
+0 PAC proxy (kCFProxyTypeAutoConfigurationURL)
+  url = file://localhost/Users/quinn/Desktop/CFProxySupportTool/test.pac
+1 no proxy (kCFProxyTypeNone)
+
+Once you know that a proxy is supposed to use a PAC file, you can run your URL through the PAC file to determine what proxy to use.  Let's start by referencing the PAC file directly.  If you look at the "test.pac" file, you'll see that it's written so that all Apple web sites are accessed directly and all other web sites go through a proxy (proxy1.apple.com and, if that's not working, proxy2.apple.com).  You can see this in action with the following commands:
+
+$ build/Debug/CFProxySupportTool proxiesForURLUsingScript http://www.apple.com test.pac
+0 no proxy (kCFProxyTypeNone)
+$ build/Debug/CFProxySupportTool proxiesForURLUsingScript http://www.example.com test.pac
+0 HTTP proxy (kCFProxyTypeHTTP)
+  host = proxy1.apple.com
+  port = 80
+1 HTTP proxy (kCFProxyTypeHTTP)
+  host = proxy2.apple.com
+  port = 1234
+
+Finally, you can put the PAC file on the network and get it from there.  Use the Sharing preferences panel to enable Web Sharing.  Then copy the "test.pac" file to the default web site:
+
+$ cp test.pac /Library/WebServer/Documents/
+
+Then repeat the previous tests using a URL for the PAC file:
+
+$ build/Debug/CFProxySupportTool proxiesForURLUsingScriptURL http://www.apple.com http://localhost/test.pac
+0 no proxy (kCFProxyTypeNone)
+$ build/Debug/CFProxySupportTool proxiesForURLUsingScriptURL http://www.example.com http://localhost/test.pac
+0 HTTP proxy (kCFProxyTypeHTTP)
+  host = proxy1.apple.com
+  port = 80
+1 HTTP proxy (kCFProxyTypeHTTP)
+  host = proxy2.apple.com
+  port = 1234
+
+Finally, you can put this all together and actually run a request through the system-specified proxies using the following command:
+
+$ build/Debug/CFProxySupportTool proxyAwareGetURL http://www.example.com/ 
+0 Trying HTTP proxy (kCFProxyTypeHTTP)
+  Failed with error 100002
+1 Trying HTTP proxy (kCFProxyTypeHTTP)
+  Failed with error 100002
+2 Trying direct access (kCFProxyTypeNone)
+HTTP/1.1 200 OK
+Date: Wed, 10 Oct 2007 23:05:07 GMT
+[...]
+
+IMPORTANT:
+Once you done testing, don't forget to set your proxy and Web Sharing settings back to their original values.
+
+
+Building the Sample
+-------------------
+The sample was built using Xcode 3.0 on Mac OS X 10.5.  You should be able to just open the project and choose Build from the Build menu.  This will build the CFProxySupportTest tool in the "build" directory.
+
+
+Caveats
+-------
+The sample shows how to work around one bug in the CFProxySupport implementation <rdar://problem/5530166>.  The workaround is simple and safe, so this isn't a big deal.  For details, search the "CFProxySupportTool.c" file for "5530166".
+
+As is clearly stated in the header file:
+
+    The keys for username and password are optional and will only be present if the username 
+    or password could be extracted from the information passed in (i.e. either the URL itself
+    or the proxy dictionary supplied).  These APIs do not consult any external credential stores
+    (such as the Keychain).
+
+When you configure a proxy user name and password, the Network preferences panel stores these values in the Keychain.  Thus, CFProxySupport won't return them to you.  Rather, you will have to use Keychain APIs to get this information.
+
+
+Credits and Version History
+---------------------------
+If you find any problems with this sample, mail <dts@apple.com> and I'll try to fix them up.
+
+1.0 (Oct 2007) was the first shipping version.
+
+Share and Enjoy.
+
+Apple Developer Technical Support
+Core OS/Hardware
+
+11 Oct 2007

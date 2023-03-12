@@ -1,0 +1,1 @@
+/* * PickMeshShapePart_Prefix.h */#define QD3D_OBSOLETE	0

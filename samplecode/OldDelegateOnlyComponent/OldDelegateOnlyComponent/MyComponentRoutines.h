@@ -1,0 +1,1 @@
+/*	File:		MyComponentRoutines.h		Contains:	simple component sample.	Written by:	John Wang	Copyright:	© 1994 by Apple Computer, Inc., all rights reserved.	Change History (most recent first):		<1>		03/22/94	JW		Created.	To Do:	*/#ifdef THINK_C#define		applec#endif/* ------------------------------------------------------------------------- */

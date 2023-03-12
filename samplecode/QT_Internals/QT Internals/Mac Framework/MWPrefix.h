@@ -1,0 +1,1 @@
+// MW Prefix file// Precompiled headers:#ifdef powerc#include <MacHeadersPPC>#else#include <MacHeaders68K>#endif// Definitions for the project#define DEBUG true// If you want to signal that you are using SIOUX, enable the following flag:#define USESIOUX true

@@ -1,0 +1,1 @@
+/* *	File:		DZSound.h * *	Copyright © 1996 Apple Computer, Inc. */#ifndef __DZSound__#define __DZSound__#include "SoundSprocket.h"void Sound_Init(	void);void Sound_Exit(	void);SSpListenerReference Sound_GetListener(	void);void Sound_Configure(	void);#endif /* __DZSound__ */

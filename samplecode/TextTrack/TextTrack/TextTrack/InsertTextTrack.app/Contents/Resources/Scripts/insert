@@ -1,0 +1,228 @@
+#!/usr/bin/perl
+#
+=disclaimer
+
+File: insert
+
+Abstract: Given an Final Cut Pro XML file and a list of the
+	  form <start duration text>; output a revised XML file
+	  with a new track containing text generators for each
+	  item in the list
+
+Version: 1.0
+
+Disclaimer: IMPORTANT:  This Apple software is supplied to you by Apple
+Computer, Inc. ("Apple") in consideration of your agreement to the
+following terms, and your use, installation, modification or
+redistribution of this Apple software constitutes acceptance of these
+terms.  If you do not agree with these terms, please do not use,
+install, modify or redistribute this Apple software.
+
+In consideration of your agreement to abide by the following terms, and
+subject to these terms, Apple grants you a personal, non-exclusive
+license, under Apple's copyrights in this original Apple software (the
+"Apple Software"), to use, reproduce, modify and redistribute the Apple
+Software, with or without modifications, in source and/or binary forms;
+provided that if you redistribute the Apple Software in its entirety and
+without modifications, you must retain this notice and the following
+text and lin all such redistributions of the Apple Software. 
+Neither the name, trademarks, service marks or logos of Apple Computer,
+Inc. may be used to endorse or promote products derived from the Apple
+Software without specific prior written permission from Apple.  Except
+as expressly stated in this notice, no other rights or licenses, express
+or implied, are granted by Apple herein, including but not limited to
+any patent rights that may be infringed by your derivative works or by
+other works in which the Apple Software may be incorporated.
+
+The Apple Software is provided by Apple on an "AS IS" basis.  APPLE
+MAKES NO WARRANTIES, EXPRESS OR IMPLIED, INCLUDING WITHOUT LIMITATION
+THE IMPLIED WARRANTIES OF NON-INFRINGEMENT, MERCHANTABILITY AND FITNESS
+FOR A PARTICULAR PURPOSE, REGARDING THE APPLE SOFTWARE OR ITS USE AND
+OPERATION ALONE OR IN COMBINATION WITH YOUR PRODUCTS.
+
+IN NO EVENT SHALL APPLE BE LIABLE FOR ANY SPECIAL, INDIRECT, INCIDENTAL
+OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+INTERRUPTION) ARISING IN ANY WAY OUT OF THE USE, REPRODUCTION,
+MODIFICATION AND/OR DISTRIBUTION OF THE APPLE SOFTWARE, HOWEVER CAUSED
+AND WHETHER UNDER THEORY OF CONTRACT, TORT (INCLUDING NEGLIGENCE),
+STRICT LIABILITY OR OTHERWISE, EVEN IF APPLE HAS BEEN ADVISED OF THE
+POSSIBILITY OF SUCH DAMAGE.
+
+Copyright © 2005 Apple Computer, Inc., All Rights Reserved
+
+=cut end of disclaimer
+
+
+use strict;
+
+use Getopt::Long;
+use XML::LibXML;
+
+
+my $parser = XML::LibXML->new();
+my $gen = "gen2.xml";
+
+
+{
+	GetOptions("gen=s" => \$gen)
+		or die "Usage: $0 [-gen file] file ...\n";
+	if (scalar(@ARGV) == 0) {
+		die "Need a file argument\n";
+	} elsif (scalar(@ARGV) != 1) {
+		die "Can't handle multiple files\n";
+	} else {
+		process($ARGV[0]);
+	}
+}
+
+sub process
+{
+	my ($file) = @_;
+
+	# open the FCP XML and grab the root
+	my $doc = $parser->parse_file($file);
+	my $root = $doc->documentElement();
+
+	# filter out non-sequence
+	my @nodes = $root->findnodes("/xmeml/sequence");
+	if (scalar(@nodes) != 1) {
+		print scalar(@nodes), "\n";
+		die "$file does not seem to describe a single sequence\n";
+	}
+
+	# find the right place to add our track
+	my $node = $nodes[0];
+	@nodes = $node->findnodes("child::media/video");
+	if (scalar(@nodes) == 0) {
+		die "That seems odd - no video tag?\n";
+	}
+	my $video = $nodes[0];
+
+	# make an empty track
+	my $track = XML::LibXML::Element->new("track");
+
+	# parse the input
+	my $list = create_list();
+
+	foreach my $items (@$list) {
+		my $gen = make_generator(@$items);
+		$track->appendChild($gen);
+	}
+
+	# attach the track
+	$video->appendChild($track);
+
+	# write it out
+	my $str = $doc->serialize(0);
+	print $str;
+}
+
+
+# make an item from out template
+sub make_generator
+{
+	local $/;
+
+	my ($start, $len, $title) = @_;
+	my $term = $start + $len;
+
+	open(GEN, $gen) or die "Can't open generator template: $!";
+	my $gstr = <GEN>;
+	close(GEN);
+
+	$gstr =~ s/DURATION/$len/;
+	$gstr =~ s/IN/0/;
+	$gstr =~ s/OUT/$len/;
+	$gstr =~ s/START/$start/;
+	$gstr =~ s/END/$term/;
+	$gstr =~ s/STRING/$title/;
+
+	my $doc = $parser->parse_string($gstr);
+	return $doc->documentElement();
+}
+
+
+sub create_list
+{
+	my $line;
+	my @list;
+
+	# read the list
+	while ($line = <STDIN>) {
+		chomp $line;
+		my @items = split /\t/, $line;
+		# really need syntax checking here!
+		if (scalar(@items) < 3) {
+			# not enough items - ignore it
+			next;
+		} else {
+			@items[0] = convert_num(@items[0]);
+			@items[1] = convert_num(@items[1]);
+		}
+		push @list, \@items;
+	}
+
+	# sort it
+	my @sorted = sort item_cmp @list;
+
+	# overlaps give FCP a headache - be merciless...
+	# this is mostly to compensate for any mistakes in input
+	my $i;
+	my $j;
+	my $len = scalar(@sorted);
+	my $pe = 0;
+	for ($i = 0, $j = 0; $i < $len; $i++) {
+		my $ns = $sorted[$j]->[0];
+		my $ne = $ns + $sorted[$j]->[1];
+		if ($ns == $ne) {
+			# no duration - delete this one
+			splice(@sorted,$j,1);
+		} elsif ($ns >= $pe) {
+			# no overlap
+			$pe = $ne;
+			$j++;
+		} elsif ($sorted[$j-1]->[0] == $ns) {
+			# some overlap - shorten this one
+			$sorted[$j]->[0] = $pe;
+			$sorted[$j]->[1] = $ne - $pe;
+			$pe = $ne;
+			$j++;
+		} else {
+			# overlap - truncate previous
+			$sorted[$j-1]->[1] -= ($pe - $ns);
+			$pe = $ne;
+			$j++;
+		}
+	}
+
+	return \@sorted;
+}
+
+sub item_cmp
+{
+	my $r = $a->[0] <=> $b->[0];
+	if ($r == 0) {
+		$r = $a->[1] <=> $b->[1];
+	}
+	return $r;
+}
+
+sub convert_num
+{
+	my ($num) = @_;
+
+	if ($num =~ /^\d+$/) {
+		# assume it's a frame number or count
+		return $num;
+	} elsif ($num =~ /^[\d:]+$/) {
+		# maybe timecode - assume NDF 24 till I get smarter
+		my @com = split /:/, $num;
+		unshift @com,0,0;	# insure at least four items
+		splice @com,0,-4;	# take last four HH:MM:SS:FF
+		return ((($com[0]*60)+$com[1])*60+$com[2])*24+$com[3];
+	} else {
+		# not a number
+		return 0;
+	}
+}

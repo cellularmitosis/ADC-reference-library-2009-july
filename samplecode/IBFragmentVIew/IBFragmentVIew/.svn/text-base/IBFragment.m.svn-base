@@ -1,0 +1,116 @@
+//
+//  IBFragment.m
+//  IBFragmentViewPlugin
+//
+//  Created by Jonathan Hess on 7/17/06.
+//  Copyright 2006 __MyCompanyName__. All rights reserved.
+//
+
+#import "IBFragment.h"
+#import "IBFragmentView.h"
+
+static const CGFloat IBFragmentHorizontalPad = 8.0f;
+static const CGFloat IBFragmentVerticalPad = 4.0f;
+
+
+@implementation IBFragment
+- (id)init {
+    if ((self = [super init])) {
+        title = @"Title";
+        font = [[NSFont systemFontOfSize:[NSFont systemFontSizeForControlSize:NSRegularControlSize]] retain];
+    }
+    return self;
+}
+
+- (id)initWithCoder:(NSCoder *)coder {
+    if ((self = [super init])) {
+        font = [[coder decodeObjectForKey:@"font"] retain];
+        title = [[coder decodeObjectForKey:@"title"] retain];
+        fragmentView = [coder decodeObjectForKey:@"fragmentView"];
+    }
+    return self;
+}
+
+- (void)encodeWithCoder:(NSCoder *)coder {
+    [coder encodeObject:[self title] forKey:@"title"];
+    [coder encodeObject:[self font] forKey:@"font"];
+    [coder encodeConditionalObject:[self fragmentView] forKey:@"fragmentView"];
+}
+
+- (void)dealloc {
+    [title release];
+    [font release];
+    [super dealloc];
+}
+
+- (void)setFragmentView:(IBFragmentView *)view {
+    fragmentView = view;
+}
+
+- (IBFragmentView *)fragmentView {
+    return fragmentView;
+}
+
+- (NSString *)title {
+    return title;
+}
+
+- (void)setTitle:(NSString *)newTitle {
+    if (title != newTitle) {
+        [title release];
+        title = [newTitle copy];
+        [fragmentView setNeedsDisplay:YES];
+    }
+}
+
+- (NSFont *)font {
+    return font;
+}
+
+- (void)setFont:(NSFont *)newFont {
+    if (font != newFont) {
+        [font release];
+        font = [newFont retain];
+    }
+}
+
+- (NSDictionary *)attributes {
+    return [NSDictionary dictionaryWithObjectsAndKeys:[NSColor whiteColor], NSForegroundColorAttributeName, [self font], NSFontAttributeName, nil];
+}
+
+- (NSAttributedString *)attributedTitle {
+    NSMutableAttributedString *attributedTitle = [[[NSMutableAttributedString alloc] initWithString:[self title] attributes:[self attributes]] autorelease];
+    NSMutableParagraphStyle *style = [[NSMutableParagraphStyle alloc] init];
+    [style setLineBreakMode:NSLineBreakByTruncatingTail];
+    [style setAlignment:NSCenterTextAlignment];
+    [attributedTitle addAttribute:NSParagraphStyleAttributeName value:style range:NSMakeRange(0, [attributedTitle length])];
+    [style release];
+    return attributedTitle;
+}
+
+- (NSSize)idealSize {
+    NSSize titleSize = [[self attributedTitle] size];
+    titleSize.width += IBFragmentHorizontalPad;
+    titleSize.height += IBFragmentVerticalPad;
+    return titleSize;
+}
+
+- (CGFloat)idealWidth {
+    return [self idealSize].width;
+}
+
+- (NSRect)titleRectForRect:(NSRect)rect {
+    NSAttributedString *attributedTitle = [self attributedTitle];
+    NSSize titleSize = [attributedTitle size];
+    NSRect titleRect = NSInsetRect(rect, IBFragmentHorizontalPad / 2, IBFragmentVerticalPad / 2);
+    titleRect.size.height = MIN(titleSize.height, rect.size.height);
+    titleRect.origin.y = rect.size.height / 2 - titleSize.height / 2;
+    return titleRect;
+}
+
+- (void)drawInRect:(NSRect)rect {
+    NSRect titleRect = [self titleRectForRect:rect];
+    NSAttributedString *attributedTitle = [self attributedTitle];
+    [attributedTitle drawInRect:titleRect];
+}
+@end

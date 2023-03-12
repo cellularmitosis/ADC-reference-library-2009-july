@@ -1,0 +1,1 @@
+/* *  Prefix file to set Carbon specific defines for the sample * */#define OTCARBONAPPLICATION	1#define TARGET_API_MAC_CARBON 1

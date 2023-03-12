@@ -1,0 +1,1 @@
+/* *	File:		DZUtils.h * *	Copyright © 1996 Apple Computer, Inc. */#ifndef __DZUtils__#define __DZUtils__#include <QD3D.h>Boolean CheckVersionNumber(	const NumVersion*		inVersion,	UInt8					inMajor,	UInt8					inMinor,	UInt8					inBug);TQ3Object Get3DMFResource(	short				inResourceID);#endif /* __DZUtils__ */

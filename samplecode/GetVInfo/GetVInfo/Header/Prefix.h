@@ -1,0 +1,1 @@
+#define SystemSevenOrLater		1#define CGLUESUPPORTED			0#define OLDROUTINENAMES			0#define OLDROUTINELOCATIONS		0

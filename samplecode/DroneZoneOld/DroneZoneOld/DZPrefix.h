@@ -1,0 +1,1 @@
+#undef NDEBUG		// used in <assert.h> to turn off debugging#define USE_DRAW_SPROCKET 0#define __USING_OLD_SOUND_H__ 0

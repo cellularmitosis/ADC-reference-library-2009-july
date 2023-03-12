@@ -1,0 +1,1 @@
+void PrintPlural(long x, StringPtr zero,StringPtr s1,		StringPtr pluralizer, StringPtr s2);

@@ -1,0 +1,1 @@
+This sample illustrates how to export a QTMovie object on a background thread.

@@ -1,0 +1,1 @@
+OBJECTS = init.a.oJGNESample ÄÄ JGNESample.make {OBJECTS}	Link -t INIT -c SPat -rt INIT=128 -m MAIN -sg JGNESample -ra JGNESample=resSysHeap,resLocked ¶		{OBJECTS} ¶		-o JGNESampleinit.a.o Ä JGNESample.make init.a	 Asm  init.a

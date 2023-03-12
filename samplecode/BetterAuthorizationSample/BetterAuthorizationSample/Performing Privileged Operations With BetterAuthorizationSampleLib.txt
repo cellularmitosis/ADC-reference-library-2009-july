@@ -1,0 +1,630 @@
+Performing Privileged Operations With BetterAuthorizationSampleLib
+==================================================================
+16 Aug 2007
+
+Introduction
+------------
+This document describes how to perform privileged operations using BetterAuthorizationSampleLib (BAS).  You should read this if you need to perform some privileged operation (that is, an operation that, for security reasons, the system restricts in some way) on an ongoing basis.
+
+For example, if you're writing a packet capture application, you'll find that critical APIs will fail when called from application code.  Specifically, opening the Berkeley Packet Filter (BPF) device, ("/dev/bpf0"), is a privileged operation; you can only do it if you're running as root (that is, your EUID is 0).  BAS shows how, with the consent of an admin user, you can bypass this restriction.
+
+However, simply bypassing the restriction is not sufficient.  The system administrator might want to install your application but authorize access to the privileged functionality in some imaginative way.  For example:
+
+o A university administrator might want to install your packet trace application and allow anyone to open existing packet trace documents (so that first year students can look at packet traces associated with their course work) but only give certain people (say, university staff members) access to the privileged operation required to create a new packet trace.
+
+o A network application developer might be sick of entering passwords on their work computer, and thus prefer that the application not require any credentials to capture packets.
+
+BAS makes it easy to associate privileged operations with authorization rights.  The system administrator can then control access to those rights by modifying the policy database ("/etc/authorization").  You can also use BAS to set up the default right specification for your rights, so that a typical user gets a good out-of-box experience.
+
+If you need to perform privileged operations, like the one described above, Apple strongly recommends against running your entire application as root.  The more code you run as root, the more likely you are to accidentally compromise system security; and when you run an entire GUI application as root, you're bringing in lots and lots of code that doesn't expect to be running in a privileged environment.  For example, many GUI frameworks have plug-ins which they load from ~/Library, and you don't want to load an arbitrary user-installed plug-in into a root process.
+
+To promote security, Apple recommends that you factor the privileged code out of your application and into a separate process, known as a privileged helper tool.  You can then carefully audit the privileged helper tool for security vulnerabilities.
+
+Unfortunately this approach carries with it a certain amount of complexity.  For example, you have to arrange some sort of inter-process communication (IPC) between your application and your privileged helper tool.  The goal of BetterAuthorizationSampleLib is to hide all of this complexity and allow you to concentrate on the code that's specific to your application.  Also, BAS promotes the correct use of authorization rights, as outlined above.
+
+In the BAS design, a privileged helper tool is launched by launchd <x-man-page://8/launchd>.  The tool is launched on demand when you try to communicate with it.  It processes your request, then lingers for a short while waiting for new requests.  If no new requests come in within that time, it quits.
+
+    Note:
+    Apple's older sample code (AuthSample and MoreAuthSample) used 
+    a setuid root privileged helper tool.  BAS uses launchd because it's 
+    more secure.  In the BAS design, an attacker can't directly control 
+    the environment which the helper tool inherits, and that prevents a 
+    variety of potential attacks.
+
+Because your application and privileged helper tool are in different processes, you must define a protocol that specifies the requests supported by your privileged helper tool, and its response to those requests.  This sounds hard, but BAS actually makes it pretty easy.  See the "Protocol" section for details.  However, before we dive into those details, let's take a quick look at the files that BAS installs on the user's system.
+
+
+File System Layout
+------------------
+Before we get into the details of how to use BAS, let's look at the files used by BAS.
+
+/Library/LaunchDaemons/                     rwxr-xr-x root:wheel
+/Library/LaunchDaemons/<bundleID>.plist     rw-r--r-- root:wheel
+/Library/PrivilegedHelperTools/             rwxr-xr-x root:wheel
+/Library/PrivilegedHelperTools/<bundleID>   rwxr-xr-x root:wheel
+/var/run/                                   rwxrwxr-x root:daemon
+/var/run/<bundleID>.socket                  rw-rw-rw- root:daemon
+
+o /Library/LaunchDaemons/ -- BAS relies on this standard directory being created when the system is installed.
+
+o /Library/LaunchDaemons/<bundleID>.plist -- This is the standard location, name, and permissions for launchd configuration files (see <x-man-page://5/launchd.plist> for details).  This file instructs launchd to create a listening UNIX domain socket ("/var/run/<bundleID>.socket") and, when someone connects to that socket, launch the privileged helper tool ("/Library/PrivilegedHelperTools/<bundleID>") to handle the connection.
+
+o /Library/PrivilegedHelperTools/ -- BAS creates this directory if it doesn't exist.  Its sole purpose is to provide a secure place to install privileged helper tools.
+
+o /Library/PrivilegedHelperTools/<bundleID> -- This is the privileged helper tool that is executed by launchd.  For the sake of convenience, BAS uses the bundle ID to form the name of this tool.
+
+    Note:
+    BAS is not designed to allow more than one privileged helper tool 
+    per bundle.
+
+o /var/run/ -- BAS relies on this standard directory being created when the system is installed.
+
+o /var/run/<bundleID>.socket -- This listening UNIX domain socket is created automatically by launchd.  The permissions must be "rw-rw-rw-" so that arbitrary non-privileged clients can connect to it.
+
+
+Protocol
+--------
+The first step in using BAS is to design a protocol to communicate between your application and your privileged helper tool.  For example, if you're adding web server functionality to your GUI database program, the request might be "open TCP port 80" and the response might be "here's the descriptor that I opened".
+
+BAS makes it very easy to define a simple request/response protocol.  The request is a CFDictionary specifying the action to do.  The response is another CFDictionary containing the result of that action.  BAS puts some constraints on these dictionaries:
+
+o Both the request and response must be flattenable via CFPropertyList routines.  Effectively this means that all elements must be either CFString, CFNumber, CFBoolean, CFData, CFDate, CFDictionary or CFArray (or their NS equivalents).
+
+o In the request dictionary, the key kBASCommandKey must yield a CFString that contains a command name.  I'll discuss these command names in more detail below.
+
+#define kBASCommandKey "com.apple.dts.BetterAuthorizationSample.command"
+
+This key is not special in the response.
+
+o In the response dictionary, the key kBASErrorKey is used to hold an error code.  This must yield a CFNumber that can be accessed as an OSStatus.  Again, this is discussed in more detail below.
+
+#define kBASErrorKey "com.apple.dts.BetterAuthorizationSample.error"
+
+This key is not special in the request.
+
+o In the response dictionary, the key kBASDescriptorArrayKey is optional.  If it's present, it must be a CFArray of CFNumbers.  Each number must be accessible as an int.  Each int is a descriptor that is being passed from the privileged helper tool to the application.  I'll discuss this in more detail below.
+
+#define kBASDescriptorArrayKey "com.apple.dts.BetterAuthorizationSample.descriptors"
+
+This key is not special in the request.
+
+To define your protocol, simply come up with a list of commands that should be supported by your helper tool.  Give each command a unique name (this only has to be unique within the context of your program).  For each command, work out the list of input and output parameters.  Define dictionary keys for each input parameter; these apply to the request dictionary.  Similarly, define response dictionary keys for each output parameter.  For each key, specify the type of data you expect, any constraints on that data, and the meaning of the data.  Also specify whether the response will contain a kBASDescriptorArray key and, if present, the semantics of each element of the array.
+
+An example protocol definition is shown below:
+
+#define kMyFirstCommand "MyFirstCommand"
+    // inputs:
+    //     kBASCommandKey (CFString)
+    // outputs:
+    //     kBASErrorKey (CFNumber)
+    // authorization right
+           #define kMyFirstCommandRightName "com.example.MyFirstCommand"
+
+#define kMySecondCommand "MySecondCommand"
+    // inputs:
+    //     kBASCommandKey (CFString)
+    // outputs:
+    //     kBASErrorKey (CFNumber)
+    //     kMySecondCommandStatusKey (CFString) -- detailed status result
+    //     kBASDescriptorArrayKey (CFArray of CFNumber) -- one entry, TCP 
+    // authorization right                              -- desc for port 80
+           #define kMySecondCommandRightName "com.example.MySecondCommand"
+
+As you design your protocol, keep in mind the following:
+
+1. Make the operations as specific as possible -- For example, don't define an "OpenLowNumberedPort" command that takes the port to open as an input parameter.  If you did this, the associated authorization right would control access to all low-numbered TCP ports, which is unlikely to be specific enough for the system administrator.  A better example would be a "OpenWebServerPort" command, which will only open port 80.
+
+2. Make the operations as high-level as possible -- For example, if you need to update a privileged file on disk, don't define a right for deleting the file, another for creating the new file, and another for writing data to the new file.  Instead, define a high-level command for the entire update operation.
+
+3. Keep it simple -- Remember that every piece of code in your helper tool is a potential security vulnerability.  Thus, it's important to limit the code in your helper tool, including the code that you implicitly run by linking with frameworks.  Given that the reason you need a privileged helper tool is to bypass OS-level security checks, and most of those checks are done at the lowest-level of the system, you should try to restrict your privileged helper tools to those low-level frameworks.  As a rule of thumb, a privileged helper tool should limit itself to the CoreServices layer and below.  A privileged helper tool should never use the GUI frameworks.  You should design your operations with that restriction in mind.
+
+4. Check your input -- The input to a command (the contents of the request dictionary) is specified by non-privileged, and potentially malicious, code.  You should be very careful when taking information from this request.  For example, if you have a key whose value is meant to be a CFString, check that it's a CFString before using it as a string.  You can do this check with code like the following:
+
+    value = (CFStringRef) CFDictionaryGetValue(request, CFSTR("key"));
+    if ( (value != NULL) && (CFGetTypeID(value) == CFStringGetTypeID()) ) {
+        // parameter is present and of the right type
+    } else {
+        // bad parameter
+    }
+
+Likewise, if the string has any specific constraints (for example, it can't be empty, or its maximum length is 15 characters), you must write code to check these constraints.
+
+Once you have decided on a protocol, it's time to set up your project to use BetterAuthorizationSampleLib.
+
+
+Setting Up Your Project
+-----------------------
+For the sake of this discussion, I'll assume that you already have an Xcode project that builds your application, and you want to extend your application to do some privileged operations.  After deciding on your protocol, the next step is to set up your project.  Specifically, you will have to add two new targets to your project and arrange to have some declarations and definitions shared with those new targets.  This section will lead you through the various steps involved.
+
+To start, add two tool targets (helper and installer) to the project.  For each target, choose New Target from the Project menu and selecting the BSD/Shell Tool template.  You can name these targets whatever you like.  However, the rest of this example assumes that the product names (the "PRODUCT_NAME" build setting) are "HelperTool" for the helper tool target and "InstallTool" for the installer tool target.
+
+You then should make the application target dependent on both tool targets. You can do this by opening an info window for the application target, selecting the General tab, and then dragging the tool targets icon to the Direct Dependencies list in the info window.  From now on, when you build your application target, it will build the tools beforehand.
+
+You must then set your application target so that, when you build the application, the results of the tool targets are copied to the application's executables directory.  To do this, make the application target the current target and do the following for BOTH the INSTALLER and HELPER tools:
+
+1. Add a Copy Files build phase by choosing New Copy Files Build Phase from the New Build Phase submenu of the Project menu.
+
+2. Open the info window for the newly created build phase (if Xcode has not already done so for you) and set the Destination popup to "Executables".  This ensures that the copied files go into the executables directory of the application bundle (Contents/MacOS).
+
+3. Drag the build product of the tool target (typically in the Products group) to the Copy Files build phase of the application target.  This tells Xcode that the file you want to copy is the build product of the tool target.
+
+At this point your tool targets are ready to go.  Now you need to add the reusable components of BetterAuthorizationSample to the various targets in your project:
+
+1. Copy "BetterAuthorizationSampleLib.h", "BetterAuthorizationSampleLib.c", and "BetterAuthorizationSampleLibInstallTool.c" to your project directory.
+
+2. Drag the new copy of "BetterAuthorizationSampleLib.c" to the Groups & Files section of the project window and, in the resulting dialog, choose to add the file to both the application and helper tool target.
+
+3. Drag the new copy of "BetterAuthorizationSampleLibInstallTool.c" to the Groups & Files section of the project window and, in the resulting dialog, choose to add the file to the installer tool target.
+
+4. Drag the new copy of "BetterAuthorizationSampleLib.h" to the Groups & Files section of the project window and, in the resulting dialog, choose to add the file to NO TARGETS (just trust me on this one :-).
+
+Finally, you need to set up a file that contains definitions that are included into both your application and your tool.  Do the following:
+
+1. Choose New File from the File menu and create a file based on the BSD/C File template.
+
+2. Give the new file a reasonable name ("Common.c") and make sure that "Also create 'Common.h'" checkbox is checked.
+
+3. Ensure that "Common.c" is added to both application and helper tool targets by checking the application and the tool target in the Targets list.
+
+    Note:
+    The "Common.h" file is a convenient place to put the declarations 
+    associated with the protocol that you defined in the previous section. 
+    For example, you can place a #define for the name of each of your 
+    commands here, and it will be accessible by both your application and 
+    tool code.
+
+At this point your project is all set up and it's time to start writing code.
+
+
+Common Data Structures
+----------------------
+Once you've decided on your list of commands and you have your project set up, you can write the definitions that tell BAS about your commands.  You do this using an array of BASCommandSpec records.
+
+struct BASCommandSpec {
+    const char * commandName;
+    const char * rightName;
+    const char * rightDefaultRule;
+    const char * rightDescriptionKey;
+    const void * userData;
+};
+typedef struct BASCommandSpec BASCommandSpec;
+
+The array is terminated by an entry with a NULL commandName field.
+
+The fields of this record as used as follows:
+
+o commandName -- This is the command name discussed in the "Protocol" section.
+
+o rightName -- This is the Authorization Services right name that's associated with this command, or NULL if there is no associated right.  You should define a right for any command that does privileged work.  Authorization right names are strings that typically follow reverse DNS notation.  For example, if you work for Wombat Varnishers Inc, whose domain is "wombat-varnishers.com", you might define the "com.wombat-varnishers.WombatFax.SendFax" to control your WombatFax product's ability to send faxes.
+
+For more information about authorization rights, see the Authorization Services documentation linked to in the "Related Reading" section, below.
+
+o rightDefaultRule -- This is the default rule for the authorization right, if any.  This is the value that defines the out-of-box experience for the user as they execute this command.  Typical values, and their semantics, are:
+
+- kAuthorizationRuleIsAdmin ("is-admin") -- User must be an admin user.
+
+- kAuthorizationRuleAuthenticateAsSessionUser ("authenticate-session-user") -- User must present credentials for the session owner.
+
+- kAuthorizationRuleAuthenticateAsAdmin ("authenticate-admin") -- User must authenticate as an admin user.
+
+- "default" -- User must present recent admin credentials. 
+
+- "allow" -- User is always authenticated.
+
+o rightDescriptionKey -- This key is used to find localized versions of the custom prompt when creating the default right specification in the policy database.  If it's NULL, the prompt is not customized.
+
+o userData -- You can use this value for anything you like; BAS ignores it.
+
+The BASCommandSpec array is used in three places:
+
+1. Inside your application, you pass it into BAS so that BAS can create the default right specifications for each of the authorization rights used by your commands.  For each command, BAS creates the associated Authorization Services right specification by calling AuthorizationRightSet, passing the rightName, rightDefaultRule and rightDescriptionKey fields to the similarly-named parameters.
+
+2. Inside your application, when you execute a privileged operation, BAS uses the BASCommandSpec array to pre-authorize the associated authorization right, if any.
+
+3. Inside your privileged helper tool, you pass the BASCommandSpec array into BAS so that it can a) check which incoming commands you support, and b) acquire the associated authorization right, if any, before calling your callback.
+
+The following listing shows how you might define a BASCommandSpec array for the example protocol described in the previous section.
+
+const BASCommandSpec kSampleCommandSet[] = {
+    {
+        kMyFirstCommand,          // commandName
+        kMyFirstCommandRightName, // rightName
+        "allow",                  // rightDefaultRule -- allow anyone
+        NULL,                     // rightDescriptionKey -- no custom prompt
+        NULL                      // userData
+    },
+    {
+        kMySecondCommand,         // commandName
+        kMySecondCommandRightName,// rightName
+        "default",                // rightDefaultRule -- need admin creds
+        NULL,                     // rightDescriptionKey -- no custom prompt
+        NULL                      // userData
+    },
+    {   
+        NULL,                     // the array is null terminated
+        NULL, 
+        NULL, 
+        NULL, 
+        NULL
+    }
+};
+
+    Note:
+    If you've set up your project as described in "Setting Up Your 
+    Project" (above), you should declare your commands array (let's call 
+    it kMyCommandSet) in "Common.h" and define it in "Common.c".  The 
+    project is set up so that code in both the application and the tool 
+    targets can include "Common.h".  Also, both targets compile and link 
+    in a copy of the kMyCommandSet variable.  Check out "SampleCommon.h" 
+    and "SampleCommon.c" for an example of how to write the declaration 
+    and definition respectively.
+
+    IMPORTANT
+    Due to a bug in Authorization Services <rdar://problem/3430642>, if 
+    you use want to use custom prompts, your localization project folders 
+    must use modern names (for example, "en.lproj") as opposed to 
+    compatibility names ("English.lproj").
+
+    IMPORTANT
+    Another bug in Authorization Services means that custom prompts don't 
+    always show up the authorization dialog <rdar://problem/4199765>.
+
+
+Creating Your Helper Tool
+-------------------------
+When implementing your privileged helper tool, BAS takes care of most of the mechanics, leaving you free to concentrate on the details that are specific to your problem.  The main function of your tool can be as simple as a call to BASHelperToolMain.  For example:
+
+static const BASCommandProc kMyCommandProcs[] = {
+    DoMyFirstCommand,
+    DoMySecondCommand,
+    NULL
+};
+
+int main(int argc, char **argv)
+{
+    return BASHelperToolMain(kMyCommandSet, kMyCommandProcs);
+}
+
+The definition of BASHelperToolMain is as follows.
+
+int BASHelperToolMain(
+    const BASCommandSpec commands[],
+    const BASCommandProc commandProcs[]
+);
+
+BASHelperToolMain will set up a command processing loop, receive commands from the UNIX domain socket (created for it by <x-man-page://8/launchd>) and process them one at a time.  If it doesn't receive a command within some interval (currently two minutes), it will return zero and your tool should quit normally.  Otherwise, the return value is some non-zero exit status.  This doesn't mean that an individual command failed, but that the entire IPC mechanism to receive and reply to commands has failed in such a way that no more commands can be processed.  The tool should immediately quit with that failure exit status.
+
+BASHelperToolMain's commands parameter is discussed in detail in the "Common Data Structures" section.
+
+The commandProcs parameter is a pointer to an array of functions that parallel the commands data structure.  When a valid command request is received, BAS calls the corresponding callback.  The function prototype is shown below:
+
+typedef OSStatus (*BASCommandProc)(
+    AuthorizationRef            auth,
+    const void *                userData,
+    CFDictionaryRef             request,
+    CFMutableDictionaryRef      response,
+    aslclient                   asl,
+    aslmsg                      aslMsg
+);
+
+auth is a reference to the authorization instance of the process that sent the command.  userData is taken from the userData field of the BASCommandSpec structure for this command.  request is a dictionary that specifies the command.  response is a CFMutableDictionaryRef into which you can place response values.  asl and aslMsg allow you to easily log messages with ASL (see "Helper Tool Logging", below).
+
+The implementation of your command callbacks (DoMyFirstCommand and DoMySecondCommand in the above example) is entirely up to you.  This is where you (finally) escape the boilerplate and get to implement your privileged functionality.
+
+The result of your callback routine becomes the command error returned to the application.  See "Invoking Your Helper Tool", below, for information about the difference between an IPC error and a command error, and how your application can access this error result.
+
+Finally, for you helper tool to link correctly, you must add both the CoreFoundation and Security frameworks to it.
+
+(If you're still confused please see "SampleTool.c" for an example of how BAS organizes all of this.)
+
+
+Helper Tool Logging
+-------------------
+If your helper tool code needs to log information about its progress, it should use the Apple System Log facility (ASL).  As an example, if you detect a failure, you might use the following code:
+
+junk = asl_log(asl, aslMsg, ASL_LEVEL_ERR, "Could not varnish wombats\n");
+assert(junk == 0);
+
+You can parameterize your log messages using standard printf-style percent sequences.
+
+junk = asl_log(asl, aslMsg, ASL_LEVEL_ERR, "%d wombats required\n", failCount);
+assert(junk == 0);
+
+If you want to log an errno-style error, ensure that its value is in errno and then use %m to log a nice text message.
+
+errno = EADDRINUSE;
+junk = asl_log(asl, aslMsg, ASL_LEVEL_ERR, "Could not open port: %m\n");
+assert(junk == 0);
+
+When you log using ASL, you must specify the log level.  The most common levels are:
+
+o ASL_LEVEL_ERR -- Something has definitely failed.
+
+o ASL_LEVEL_WARNING -- Something odd has happened, but it's not considered a failure.
+
+o ASL_LEVEL_INFO -- Something notable, but not wrong, has happened.
+
+o ASL_LEVEL_DEBUG -- Use this to trace the execution of your code while debugging; these messages are not shown to the user by default.
+
+
+Creating Your Installer Tool
+----------------------------
+Your installer tool target requires very little customization.  All of the code you need is in the "BetterAuthorizationSampleLibInstallTool.c" file.  However, keep in mind that the target's product name (the "PRODUCT_NAME" build setting) must match the string you pass to the installName parameter of BASFixFailure (see below).  For the example in this document, we use "InstallTool".
+
+
+Application Startup
+-------------------
+Before doing anything with BAS in your application, you should make sure that all of the rights that you use are present in the policy database.  You can do this by calling BASSetDefaultRules.
+
+void BASSetDefaultRules(
+    AuthorizationRef     auth,
+    const BASCommandSpec commands[],
+    CFStringRef          bundleID,
+    CFStringRef          descriptionStringTableName
+);
+
+This routine ensures that the policy database contains right specifications for all of the rights that are referenced by your commands array.  This has two important consequences:
+
+1. It makes the rights that you use visible to the system administrator.  After they run your program once, they can see your default right specifications in the policy database.  This makes it easy for them, if needs be, to customise the right specification.
+
+2. It means that, when the privileged helper tool tries to acquire the right, it will use your specification of the right (perhaps modified by the system administrator) rather than the default right specification.
+
+You must call this function before calling BASExecuteRequestInHelperTool.  Typically you would call it at application startup time, or lazily, immediately before calling BASExecuteRequestInHelperTool.
+
+Here's an example of a typical application startup sequence:
+
+static AuthorizationRef gAuth;
+
+int main(int argc, char *argv[])
+{
+    // Create the AuthorizationRef that we'll use through this application.
+
+    (void) AuthorizationCreate(
+        NULL, 
+        NULL, 
+        kAuthorizationFlagDefaults, 
+        &gAuth
+    );
+
+    // For each of our commands, check to see if a right specification 
+    // exists and, if not, create it. 
+
+    BASSetDefaultRules(
+        gAuth, 
+        kMyCommandSet, 
+        CFBundleGetIdentifier(CFBundleGetMainBundle()), 
+        CFSTR("MyAuthPrompts")
+    );
+    
+    // And now, the miracle that is Cocoa...
+    
+    return NSApplicationMain(argc,  (const char **) argv);
+}
+
+There are a number of notable things going on here:
+
+o It is possible for AuthorizationCreate to fail (although this is very rare for a GUI program) and this program ignores that error.  That will leave gAuth set to NULL, which means that all authorization operations will fail with an error code.  However, they won't crash.
+
+o The call to BASSetDefaultRules ensures that a right specification exists for each of the commands that we use.  If a right specification doesn't exist, it is created based on the information in the kMyCommandSet array. This is discussed in more detail in the "Common Data Structures" section, above.
+
+o If you want any of your rights to have custom authorization prompts, you have to pass BASSetDefaultRules the name of a ".strings" file that contains these prompts.  In this example, BASSetDefaultRules expects your bundle to contain a localized file called "MyAuthPrompts.strings" that contains the custom prompts for your rights.  The keys for this file should match the values you use in the rightDescriptionKey field of the BASCommandSpec array.
+
+o BASSetDefaultRules does not return an error code because it's typically called at application startup time, and you can't respond to errors at this point.
+
+o When attempting to acquire right be sure you're grabbing your custom right. If you're attempting to acquire a right already defined in the policy database be sure to understand its meaning and how it fits into the system before you try and use it.
+
+
+Invoking Your Helper Tool
+-------------------------
+To invoke your helper tool, call the BASExecuteRequestInHelperTool routine.
+
+OSStatus BASExecuteRequestInHelperTool(
+    AuthorizationRef     auth,
+    CFStringRef          bundleID,
+    CFDictionaryRef      request,
+    CFDictionaryRef *    response
+);
+
+This routine passes the request to the helper tool and gets the response back.  The trickiest thing about this routine is the difference between inter-process communication (IPC) errors and command errors.  An IPC error occurs when the communication with the privileged helper tool fails.  A command error occurs when communication with the tool succeeds, but the command-specific code within the tool fails for some reason (that is, the command callback routine in the tool returns an error).
+
+When an IPC error occurs, BASExecuteRequestInHelperTool returns an error code.  The recommended approach for dealing with these errors is described in "Handling IPC Errors" (below).
+
+When a command error occurs, BASExecuteRequestInHelperTool returns noErr and a valid response dictionary.  However, if you look inside the response dictionary (by calling BASGetErrorFromResponse), you'll find that it might contain an error code.  This is the command error, returned by command-specific code within the helper tool.  There is no boilerplate technique for dealing with this sort of error.  This is, essentially, an error from your code and you need to deal with it as if you'd called the code directly.
+
+A typical example of executing a command using BASExecuteRequestInHelperTool is shown below:
+
+{
+    OSStatus        ipcErr;
+    OSStatus        commandErr;
+    NSDictionary *  request;
+    CFDictionaryRef response;
+
+    response = NULL;
+    
+    ipcErr = BASExecuteRequestInHelperTool(
+        gAuth, 
+        kSampleCommandSet, 
+        (CFStringRef) [[NSBundle mainBundle] bundleIdentifier], 
+        (CFDictionaryRef) [NSDictionary 
+                 dictionaryWithObjectsAndKeys:@kMyFirstCommand, 
+                                         @kBASCommandKey, nil], 
+        &response
+    );
+        
+    if (ipcErr == noErr) {
+        commandErr = BASGetErrorFromResponse(response);
+        if (commandErr == noErr) {
+            [... all went well, response has command results ...]
+        } else {
+            [... handle command error ...]
+        }
+        CFRelease(response);
+    } else {
+        [... handle IPC error ...]
+    }
+}
+
+There are a number of things to note about this:
+
+o A BAS request is a CFDictionary, but NSDictionary is toll-free bridged to CFDictionary so you can just create your command as an NSDictionary and pass it directly to BASExecuteRequestInHelperTool.
+
+o Likewise for the bundle identifier.
+
+o If an IPC error occurs, there is no response dictionary.  See "Handling IPC Errors" (below) for details on how to respond to this problem.
+
+o If there's no IPC error, the response dictionary has been created and you must release it.  Also, you have to check for a command error using BASGetErrorFromResponse before you know whether the command really succeeded.
+
+
+Handling IPC Errors
+-------------------
+BASExecuteRequestInHelperTool can fail with an IPC error for a variety of reasons.  Regardless of the specific error value you can call BASDiagnoseFailure to try and isolate the cause of the failure.  Once you know why it failed, you can decide what remedial action to take, get the user's approval if appropriate, and then call BASFixFailure to fix the failure.
+
+enum {
+    kBASFailUnknown,
+    kBASFailDisabled,
+    kBASFailPartiallyInstalled,
+    kBASFailNotInstalled,
+    kBASFailNeedsUpdate
+};
+typedef uint32_t BASFailCode;
+
+BASFailCode BASDiagnoseFailure(
+    AuthorizationRef            auth,
+    CFStringRef                 bundleID
+);
+
+OSStatus BASFixFailure(
+    AuthorizationRef            auth,
+    CFStringRef                 bundleID,
+    CFStringRef                 installToolName,
+    CFStringRef                 helperToolName,
+    BASFailCode                 failCode
+);
+
+IMPORTANT: BASDiagnoseFailure will never return kBASFailNeedsUpdate.  It's your responsibility to detect version conflicts (see "Versioning", below).  However, once you've detected a version conflict, you can pass kBASFailNeedsUpdate to BASFixFailure to get it to install the latest version of your tool.
+
+The following code shows how to expand the previous example to handle IPC errors:
+
+{
+    OSStatus        ipcErr;
+    OSStatus        commandErr;
+    OSStatus        installErr;
+    NSDictionary *  request;
+    CFDictionaryRef response;
+    BASFailCode     failCode;
+
+    response = NULL;
+    
+    ipcErr = BASExecuteRequestInHelperTool(
+        gAuth, 
+        kSampleCommandSet, 
+        (CFStringRef) [[NSBundle mainBundle] bundleIdentifier], 
+        (CFDictionaryRef) [NSDictionary 
+                 dictionaryWithObjectsAndKeys:@kMyFirstCommand, 
+                                         @kBASCommandKey, nil], 
+        &response
+    );
+        
+    if (ipcErr == noErr) {
+        commandErr = BASGetErrorFromResponse(response);
+        if (commandErr == noErr) {
+            [... all went well, response has command results ...]
+        } else {
+            [... handle command error ...]
+        }
+        CFRelease(response);
+    } else {
+        failCode = BASDiagnoseFailure(
+            gAuth, 
+            (CFStringRef) [[NSBundle mainBundle] bundleIdentifier]
+        );
+        
+        switch (failCode) {
+            case kBASFailDisabled:
+                [... tell the user that tool is installed but disabled ...]
+                [... offer to enable it...]
+                break;
+            case kBASFailPartiallyInstalled:
+                [... tell the user that tool is installed incorrectly ...]
+                [... offer to correct it...]
+                break;
+            case kBASFailNotInstalled:
+                [... tell the user that tool is not installed ...]
+                [... offer to install it...]
+                break;
+            default:
+                [... tell the user something generic ...]
+                [... offer to reinstall it ...]
+                break;
+        }
+        
+        if ( [... user agrees ...] ) {
+            installErr = BASFixFailure(
+                gAuth, 
+                (CFStringRef) bundleID, 
+                CFSTR("InstallTool"), 
+                CFSTR("HelperTool"), 
+                failCode
+            );
+            
+            if (installErr == noErr) {
+                [... retry the request ...]
+            }
+        }
+    }
+}
+
+There are a number of things to note here:
+
+o The separation of BASDiagnoseFailure and BASFixFailure allows you to notify the user of the failure in a way that's appropriate for your application.
+
+o You don't need complex code that tells the user exactly went wrong (the BetterAuthorizationSample sample application doesn't), but your users will appreciate it.
+
+o BASFixFailure is the routine that actually installs your privileged helper tool.  It will require the user to present admin credentials (typically this means that it will prompt for an admin user name and password).
+
+o The third and fourth parameters to BASFixFailure are the names the installer and helper tools embedded within your bundle.  BASFixFailure expects to be able to access these tools by passing this string to CFBundleCopyAuxiliaryExecutableURL.  Typically this means that the tools must be in the "Contents/MacOS" directory within your bundle.  BASFixFailure will use the installer tool to copy the helper tool to a secure location as part of the installation process.
+
+o Retrying the failed request is optional.  Whether you should do this depends on the structure of your product, the nature of the request, and the expectations set by your user interaction.  However, my experiencing is that retrying /is/ the right thing to do.
+
+
+Versioning
+----------
+BAS requires that you split certain parts of your code out into a separate privileged helper tool.  This introduces the issue of versioning.  That is, what happens if the version of the installed helper tool does not match the version of your application.  BAS makes no attempt to address this versioning problem.  However, there are a number of ways that you can handle it within the BAS framework.
+
+1. Binary compatibility -- One way to handle the versioning problem is to maintain binary compatibility in your helper tool.  When you need to implement new functionality in the tool, do it by adding new commands.  As long as you continue to support the old commands with the old semantics, older versions of your application will continue to work with your new tool.
+
+On the other hand, if you run a new version of your application with an old tool installed, you will get a predictable error back from BASExecuteRequestInHelperTool.  Specifically, BASExecuteRequestInHelperTool will succeed (that is, there's no IPC error) but the response will contain 100002 (errSecErrnoBase + ENOENT, or the OSStatus equivalent of ENOENT).  Your application can detect this error, let the user know about the problem, and then update the tool by calling BASFixFailure with the kBASFailNeedsUpdate failure code.
+
+2. Bundle identifier change -- If you change the tool in a completely incompatible way, one easy solution is to change your bundle identifier.  This will let your new version operate independently of the old version.  However, it does have far-reaching consequences for the rest of your application.
+
+3. Get version command -- You can prepare for this problem in advance by defining a non-privileged "get version" command that allows you to explicitly check that the version of the helper tool that you're talking to.  If you give this command no authorization right, anyone can use it to check that the helper tool is up-to-date and, if it isn't, request that BAS update the tool.
+
+
+Preflighting
+------------
+When communicating with the helper tool, BAS uses the "try, then handle failure" model.  This approach has a number of advantages over the "prepare in advance" model (these are discussed in detail in the "Design and Implementation Rationale" document).  However, it's possible that this approach might not work for your application.  For example, it may result in installation dialogs cropping up at inconvenient times (during drag tracking perhaps).
+
+If that's the case, it's easy to preflight communication with the tool by adding a no operation (NOP) command with no associated authorization right.  You can then execute the NOP command at a time that's convenient for you.  This will check that the communication path with the tool is copacetic; if not, you can take the standard steps to notify the user and fix the installation.
+
+
+Related Reading
+---------------
+"Performing Privileged Operations With Authorization Services"
+
+<http://developer.apple.com/documentation/Security/Conceptual/authorization_concepts/index.html>
+
+"Authorization Services C Reference"
+
+<http://developer.apple.com/documentation/Security/Reference/authorization_ref/index.html>
+
+DTS Q&A 1277 "Security Credentials"
+
+<http://developer.apple.com/qa/qa2001/qa1277.html>
+
+DTS Technote 2095 "Authorization for Everyone"
+
+<http://developer.apple.com/technotes/tn2002/tn2095.html>
+
+DTS Sample Code "AuthForAll"
+
+<http://developer.apple.com/samplecode/AuthForAll/index.html>

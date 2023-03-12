@@ -1,0 +1,1 @@
+/* *	File:		TS3Events.h * *	Copyright © 1996 Apple Computer, Inc. */#ifndef __TS3Events__#define __TS3Events__void Events_Init(	void);void Events_Exit(	void);void Events_Process(	void);#endif /* __TS3Events__ */

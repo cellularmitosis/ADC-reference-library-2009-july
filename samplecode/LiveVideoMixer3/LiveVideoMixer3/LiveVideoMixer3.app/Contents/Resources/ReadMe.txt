@@ -1,0 +1,3 @@
+Building on the known LiveVideoMixer sample code that shows compositing of video streams using the QTVisualContext and OpenGL, the LiveVideoMixer3 adds video input capabilites using QTKit and the QTCapture API.
+You find the code for capturing in the CaptureChannel files. The device setup is in the LiveVideoMixer controller - look out for 'for capturing' comments.
+Note that for in WWDC 2006 Leopard seed the QTCaptureVideoPreviewOutput is missing and therefore commented out in this sample which causes a few compiler warnings.

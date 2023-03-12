@@ -1,0 +1,1 @@
+//// process.h//#include "qd3d_support.h"extern	void InitTest(void);extern	void DoModelWindowNullEvent(void);extern	void UpdateModelWindow(void);extern	void DrawModelWindow(void);extern	void SelectCompressor(void);void SubmitFogAndGeometry(QD3DSetupOutputType *viewInfo);

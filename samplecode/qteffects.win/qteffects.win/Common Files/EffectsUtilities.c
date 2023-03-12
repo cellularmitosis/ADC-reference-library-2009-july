@@ -1,0 +1,493 @@
+//////////
+//
+//	File:		EffectsUtilities.c
+//
+//	Contains:	Some utilities for working with QuickTime video effects.
+//
+//	Written by:	Tim Monroe
+//
+//	Copyright:	© 2001 by Apple Computer, Inc., all rights reserved.
+//
+//	Change History (most recent first):
+//
+//	   <1>	 	07/10/01	rtm		first file
+//	   
+//
+//////////
+
+#ifndef __EFFECTSUTILITIES__
+#include "EffectsUtilities.h"
+#endif
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// Effects utilities.
+//
+// Use these functions to set up and run QuickTime video effects.
+//
+///////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+//////////
+//
+// EffectsUtils_CreateEffectDescription
+// Create an effect description for zero, one, two, or three sources.
+// 
+// The effect description specifies which video effect is desired and the parameters for that effect.
+// It also describes the source(s) for the effect. An effect description is simply an atom container
+// that holds atoms with the appropriate information.
+//
+// Note that because we are creating an atom container, we must pass big-endian data (hence the calls
+// to EndianU32_NtoB).
+//
+// The caller is responsible for disposing of the returned atom container, by calling QTDisposeAtomContainer.
+//
+//////////
+
+QTAtomContainer EffectsUtils_CreateEffectDescription (OSType theEffectType, OSType theSourceName1, OSType theSourceName2, OSType theSourceName3)
+{
+	QTAtomContainer		myEffectDesc = NULL;
+	OSType				myType = EndianU32_NtoB(theEffectType);
+	OSErr				myErr = noErr;
+
+	// create a new, empty effect description
+	myErr = QTNewAtomContainer(&myEffectDesc);
+	if (myErr != noErr)
+		goto bail;
+
+	// create the effect ID atom: the atom type is kParameterWhatName, and the atom ID is kParameterWhatID
+	myErr = QTInsertChild(myEffectDesc, kParentAtomIsContainer, kParameterWhatName, kParameterWhatID, 0, sizeof(myType), &myType, NULL);
+	if (myErr != noErr)
+		goto bail;
+		
+	// add the first source
+	if (theSourceName1 != kSourceNoneName) {
+		myType = EndianU32_NtoB(theSourceName1);
+		myErr = QTInsertChild(myEffectDesc, kParentAtomIsContainer, kEffectSourceName, 1, 0, sizeof(myType), &myType, NULL);
+		if (myErr != noErr)
+			goto bail;
+	}
+							
+	// add the second source
+	if (theSourceName2 != kSourceNoneName) {
+		myType = EndianU32_NtoB(theSourceName2);
+		myErr = QTInsertChild(myEffectDesc, kParentAtomIsContainer, kEffectSourceName, 2, 0, sizeof(myType), &myType, NULL);
+		if (myErr != noErr)
+			goto bail;
+	}
+
+	// add the third source
+	if (theSourceName3 != kSourceNoneName) {
+		myType = EndianU32_NtoB(theSourceName3);
+		myErr = QTInsertChild(myEffectDesc, kParentAtomIsContainer, kEffectSourceName, 3, 0, sizeof(myType), &myType, NULL);
+	}
+
+bail:
+	return(myEffectDesc);
+}
+
+
+//////////
+//
+// EffectsUtils_GetTypeFromEffectDescription
+// Given an effect description, return the type of the effect it describes.
+// 
+//////////
+
+OSErr EffectsUtils_GetTypeFromEffectDescription (QTAtomContainer theEffectDesc, OSType *theEffectType)
+{
+	QTAtom			myEffectAtom = 0;
+	long			myEffectTypeSize = 0;
+	Ptr				myEffectTypePtr = NULL;
+	OSErr			myErr = noErr;
+
+	if ((theEffectDesc == NULL) || (theEffectType == NULL))
+		return(paramErr);
+
+	myEffectAtom = QTFindChildByIndex(theEffectDesc, kParentAtomIsContainer, kParameterWhatName, kParameterWhatID, NULL);
+	if (myEffectAtom != 0) {
+	
+		myErr = QTLockContainer(theEffectDesc);
+		if (myErr != noErr)
+			goto bail;
+
+		myErr = QTGetAtomDataPtr(theEffectDesc, myEffectAtom, &myEffectTypeSize, &myEffectTypePtr);
+		if (myErr != noErr)
+			goto bail;
+
+		if (myEffectTypeSize != sizeof(OSType)) {
+			myErr = paramErr;
+			goto bail;
+		}
+		
+		*theEffectType = *(OSType *)myEffectTypePtr;
+		*theEffectType = EndianU32_BtoN(*theEffectType);	// because the data is read from an atom container
+		
+		myErr = QTUnlockContainer(theEffectDesc);
+	}
+	
+bail:
+	return(myErr);
+}
+
+
+//////////
+//
+// EffectsUtils_AddTrackReferenceToInputMap
+// Add a track reference to the specified input map.
+// 
+//////////
+
+OSErr EffectsUtils_AddTrackReferenceToInputMap (QTAtomContainer theInputMap, Track theTrack, Track theSrcTrack, OSType theSrcName)
+{
+	QTAtom				myInputAtom;
+	long				myRefIndex;
+	OSType				myType;
+	OSErr				myErr = noErr;
+
+	myErr = AddTrackReference(theTrack, theSrcTrack, kTrackReferenceModifier, &myRefIndex);
+	if (myErr != noErr)
+		goto bail;
+			
+	// add a reference atom to the input map
+	myErr = QTInsertChild(theInputMap, kParentAtomIsContainer, kTrackModifierInput, myRefIndex, 0, 0, NULL, &myInputAtom);
+	if (myErr != noErr)
+		goto bail;
+	
+	// add two child atoms to the parent reference atom
+	myType = EndianU32_NtoB(kTrackModifierTypeImage);
+	myErr = QTInsertChild(theInputMap, myInputAtom, kTrackModifierType, 1, 0, sizeof(myType), &myType, NULL);
+	if (myErr != noErr)
+		goto bail;
+	
+	myType = EndianU32_NtoB(theSrcName);
+	myErr = QTInsertChild(theInputMap, myInputAtom, kEffectDataSourceType, 1, 0, sizeof(myType), &myType, NULL);
+		
+bail:
+	return(myErr);
+}
+ 
+ 
+//////////
+//
+// EffectsUtils_MakeSampleDescription
+// Return a new image description with default and specified values.
+// 
+//////////
+
+ImageDescriptionHandle EffectsUtils_MakeSampleDescription (OSType theEffectType, short theWidth, short theHeight)
+{
+	ImageDescriptionHandle		mySampleDesc = NULL;
+
+#if USES_MAKE_IMAGE_DESC_FOR_EFFECT
+	OSErr						myErr = noErr;
+	
+	// create a new sample description
+	myErr = MakeImageDescriptionForEffect(theEffectType, &mySampleDesc);
+	if (myErr != noErr)
+		return(NULL);
+#else
+	// create a new sample description
+	mySampleDesc = (ImageDescriptionHandle)NewHandleClear(sizeof(ImageDescription));
+	if (mySampleDesc == NULL)
+		return(NULL);
+		
+	// fill in the fields of the sample description
+	(**mySampleDesc).cType = theEffectType;
+	(**mySampleDesc).idSize = sizeof(ImageDescription);
+	(**mySampleDesc).hRes = 72L << 16;
+	(**mySampleDesc).vRes = 72L << 16;
+	(**mySampleDesc).frameCount = 1;
+	(**mySampleDesc).depth = 0;
+	(**mySampleDesc).clutID = -1;
+#endif
+	
+	(**mySampleDesc).vendor = kAppleManufacturer;
+	(**mySampleDesc).temporalQuality = codecNormalQuality;
+	(**mySampleDesc).spatialQuality = codecNormalQuality;
+	(**mySampleDesc).width = theWidth;
+	(**mySampleDesc).height = theHeight;
+	
+	return(mySampleDesc);
+}
+
+
+//////////
+//
+// EffectsUtils_GetEffectDescFromQFXFile
+// Open the specified effects parameter file and get the effect description in it.
+// 
+//////////
+
+QTAtomContainer EffectsUtils_GetEffectDescFromQFXFile (FSSpec *theFSSpec)
+{
+	Handle			myEffectDesc = NULL;
+	short			myRefNum = 0;
+	long			mySize = 0L;
+	OSType			myType = 0L;
+	long			myAtomHeader[2];
+	OSErr			myErr = noErr;
+
+	myErr = FSpOpenDF(theFSSpec, fsRdPerm, &myRefNum);
+	if (myErr != noErr)
+		goto bail;
+		
+	SetFPos(myRefNum, fsFromStart, 0);
+		
+	while ((myErr == noErr) && (myEffectDesc == NULL)) {
+		// read the atom header at the current file position
+		mySize = sizeof(myAtomHeader);
+		myErr = FSRead(myRefNum, &mySize, myAtomHeader);
+		if (myErr != noErr)
+			goto bail;
+
+		mySize = EndianU32_BtoN(myAtomHeader[0]) - sizeof(myAtomHeader);
+		myType = EndianU32_BtoN(myAtomHeader[1]);
+
+		if (myType == FOUR_CHAR_CODE('qtfx')) {
+			myEffectDesc = NewHandleClear(mySize);
+			if (myEffectDesc == NULL)
+				goto bail;
+				
+			myErr = FSRead(myRefNum, &mySize, *myEffectDesc);
+
+		} else {
+			SetFPos(myRefNum, fsFromMark, mySize);
+		}
+	}	
+	
+bail:
+	return((QTAtomContainer)myEffectDesc);
+}
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// General imaging utilities.
+//
+// Use these functions to draw pictures into GWorlds and do other imaging operations.
+//
+///////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+//////////
+//
+// EffectsUtils_GetPictResourceAsGWorld
+// Create a new GWorld of the specified size and bit depth; then draw the specified PICT resource into it.
+// The new GWorld is returned through the theGW parameter.
+//
+//////////
+
+OSErr EffectsUtils_GetPictResourceAsGWorld (short theResID, short theWidth, short theHeight, short theDepth, GWorldPtr *theGW)
+{
+	PicHandle				myHandle = NULL;
+	PixMapHandle			myPixMap = NULL;
+	CGrafPtr				mySavedPort;
+	GDHandle				mySavedDevice;
+	Rect					myRect;
+	OSErr					myErr = noErr;
+
+	// get the current drawing environment
+	GetGWorld(&mySavedPort, &mySavedDevice);
+
+	// read the specified PICT resource from the application's resource file
+	myHandle = GetPicture(theResID);
+	if (myHandle == NULL) {
+		myErr = ResError();
+		if (myErr == noErr)
+			myErr = resNotFound;
+		goto bail;
+	}
+
+	// set the size of the GWorld
+	MacSetRect(&myRect, 0, 0, theWidth, theHeight);
+
+	// allocate a new GWorld
+	myErr = QTNewGWorld(theGW, theDepth, &myRect, NULL, NULL, kICMTempThenAppMemory);
+	if (myErr != noErr)
+		goto bail;
+	
+	SetGWorld(*theGW, NULL);
+
+	// get a handle to the offscreen pixel image and lock it
+	myPixMap = GetGWorldPixMap(*theGW);
+	LockPixels(myPixMap);
+
+	EraseRect(&myRect);
+	DrawPicture(myHandle, &myRect);
+	
+	if (myPixMap != NULL)
+		UnlockPixels(myPixMap);
+	
+bail:
+	// restore the previous port and device
+	SetGWorld(mySavedPort, mySavedDevice);
+
+	if (myHandle != NULL)
+		ReleaseResource((Handle)myHandle);
+	
+	return(myErr);
+}
+
+
+//////////
+//
+// EffectsUtils_AddVideoTrackFromGWorld
+// Add to the specified movie a video track for the specified picture resource.
+//
+//////////
+
+OSErr EffectsUtils_AddVideoTrackFromGWorld (Movie *theMovie, GWorldPtr theGW, Track *theSourceTrack, long theStartTime, TimeValue theDuration, short theWidth, short theHeight)
+{
+	Media						myMedia;
+	ImageDescriptionHandle		mySampleDesc = NULL;
+	Rect						myRect;
+	Rect						myRect2;
+	Rect						myRect3;
+	long						mySize;
+	Handle						myData = NULL;
+	Ptr							myDataPtr = NULL;
+	GWorldPtr					myGWorld = NULL;
+	CGrafPtr 					mySavedPort = NULL;
+	GDHandle 					mySavedGDevice = NULL;
+	PicHandle					myHandle = NULL;
+	PixMapHandle				mySrcPixMap = NULL;
+	PixMapHandle				myDstPixMap = NULL;
+	OSErr						myErr = noErr;
+	
+	// get the current port and device
+	GetGWorld(&mySavedPort, &mySavedGDevice);
+	
+	// create a video track in the movie
+	*theSourceTrack = NewMovieTrack(*theMovie, IntToFixed(theWidth), IntToFixed(theHeight), kNoVolume);
+	if (theSourceTrack == NULL)
+		goto bail;
+		
+	myMedia = NewTrackMedia(*theSourceTrack, VideoMediaType, kVideoTrackTimeScale, NULL, 0);
+	if (myMedia == NULL)
+		goto bail;
+
+	// get the rectangle for the movie
+	GetMovieBox(*theMovie, &myRect);
+	
+	// begin editing the new track
+	myErr = BeginMediaEdits(myMedia);
+	if (myErr != noErr)
+		goto bail;
+		
+	// create a new GWorld; we draw the picture into this GWorld and then compress it
+	// (note that we are creating a picture with the maximum bit depth)
+	myErr = NewGWorld(&myGWorld, 32, &myRect, NULL, NULL, 0L);
+	if (myErr != noErr)
+		goto bail;
+	
+	mySrcPixMap = GetGWorldPixMap(theGW);
+	// LockPixels(mySrcPixMap);
+	
+	myDstPixMap = GetGWorldPixMap(myGWorld);
+	LockPixels(myDstPixMap);
+	
+	// create a new image description; CompressImage will fill in the fields of this structure
+	mySampleDesc = (ImageDescriptionHandle)NewHandle(4);
+	
+	SetGWorld(myGWorld, NULL);
+#if TARGET_OS_MAC
+	GetPortBounds(theGW, &myRect2);
+	GetPortBounds(myGWorld, &myRect3);
+#endif
+#if TARGET_OS_WIN32
+	myRect2 = theGW->portRect;
+	myRect3 = myGWorld->portRect;
+#endif
+
+	// copy the image from the specified GWorld into the new GWorld
+	CopyBits((BitMapPtr)*mySrcPixMap, (BitMapPtr)*myDstPixMap, &myRect2, &myRect3, srcCopy, NULL);
+
+	// restore the original port and device
+	SetGWorld(mySavedPort, mySavedGDevice);
+	
+	myErr = GetMaxCompressionSize(myDstPixMap, &myRect, 0, codecNormalQuality, kJPEGCodecType, anyCodec, &mySize);
+	if (myErr != noErr)
+		goto bail;
+		
+	myData = NewHandle(mySize);
+	if (myData == NULL)
+		goto bail;
+		
+	HLockHi(myData);
+#if TARGET_CPU_68K
+	myDataPtr = StripAddress(*myData);
+#else
+	myDataPtr = *myData;
+#endif
+	myErr = CompressImage(myDstPixMap, &myRect, codecNormalQuality, kJPEGCodecType, mySampleDesc, myDataPtr);
+	if (myErr != noErr)
+		goto bail;
+		
+	myErr = AddMediaSample(myMedia, myData, 0, (**mySampleDesc).dataSize, theDuration, (SampleDescriptionHandle)mySampleDesc, 1, 0, NULL);
+	if (myErr != noErr)
+		goto bail;
+
+	myErr = EndMediaEdits(myMedia);
+	if (myErr != noErr)
+		goto bail;
+
+	myErr = InsertMediaIntoTrack(*theSourceTrack, theStartTime, 0, GetMediaDuration(myMedia), fixed1);
+	
+bail:
+	// restore the original port and device
+	SetGWorld(mySavedPort, mySavedGDevice);
+	
+	if (myData != NULL) {
+		HUnlock(myData);
+		DisposeHandle(myData);
+	}
+
+	if (mySampleDesc != NULL)
+		DisposeHandle((Handle)mySampleDesc);
+		
+	// if (mySrcPixMap != NULL)
+	// 	UnlockPixels(mySrcPixMap);
+		
+	if (myDstPixMap != NULL)
+		UnlockPixels(myDstPixMap);
+		
+	if (myGWorld != NULL)
+		DisposeGWorld(myGWorld);
+	
+	return(myErr);
+}
+
+
+//////////
+//
+// EffectsUtils_GetFrontmostTrackLayer
+// Return the layer number of the frontmost track of the specified kind in a movie.
+// 
+//////////
+
+short EffectsUtils_GetFrontmostTrackLayer (Movie theMovie, OSType theTrackType)
+{
+	short		myLayer = 0;
+	short		myIndex = 1;
+	Track		myTrack = NULL;
+	
+	// get the layer number of the first track of the specified kind;
+	// if no track of that kind exists in the movie, return 0
+	myTrack = GetMovieIndTrackType(theMovie, 1, theTrackType, movieTrackMediaType | movieTrackEnabledOnly);
+	if (myTrack == NULL)
+		return(myLayer);
+		
+	myLayer = GetTrackLayer(myTrack);
+	
+	// see if any of the remaining tracks have lower layer numbers
+	while (myTrack != NULL) {
+		if (myLayer > GetTrackLayer(myTrack))
+			myLayer = GetTrackLayer(myTrack);
+		myIndex++;
+		myTrack = GetMovieIndTrackType(theMovie, myIndex, theTrackType, movieTrackMediaType | movieTrackEnabledOnly);
+	}
+	
+	return(myLayer);
+}
+
+

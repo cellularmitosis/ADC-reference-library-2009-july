@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+        "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+	<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+	<title>Carbon Events</title>
+	<link rel="stylesheet" href="SampleCode.css" type="text/css" />
+</head>
+<body>
+<h1>Tutorial: Updating a Classic application to modern Carbon</h1>
+<h2>3. Carbon Events</h2>
+<p>
+One of the most important and difficult taks in a Carbon porting job is switching from the "classic" Event Manager WaitNextEvent() driven event loop to the modern Carbon Event Manager RunApplicationEventLoop() driven event loop. This step does just that. Special effort was take to reap the benefits of all the hard work put into step 1 so that as much code is reused as possible. In fact the Classic code is left in on this step to illustrate just how much code can be reused.
+</p>
+<p>
+The application Carbon Event handler is registered in the Open Application Apple Event handler.
+</p>
+<div class="mycodebox">
+<pre>
+static pascal OSErr openApplicationAEHandler(const AppleEvent *appleEvent, AppleEvent *reply, 
+                                                long refcon)
+{
+    OSErr error;
+    DescType returnedType;
+    Size actualSize;
+    
+    error = AEGetAttributePtr(appleEvent, keyMissedKeywordAttr, typeWildCard, &amp;returnedType,
+                                NULL, 0, &amp;actualSize);
+    if (error == noErr)
+        error = errAEParamMissed;
+    else if (error == errAEDescNotFound)
+    {
+        EventTypeSpec applicationEvents[] = {
+                                                {kEventClassCommand, kEventCommandProcess}
+                                            };
+        
+#if TARGET_API_MAC_CARBON
+        gAppEventHandler = NewEventHandlerUPP(appEventHandler);
+        InstallApplicationEventHandler(gAppEventHandler, GetEventTypeCount(applicationEvents), 
+                                        applicationEvents, NULL, NULL);
+#endif
+        error = noErr;
+    }
+    
+    return error;
+}
+</pre>
+</div>
+<p>
+The application event handler simply passes on menu commands to the menu command handler which is unchanged from step 2.
+</p>
+<div class="mycodebox">
+<pre>
+static pascal OSStatus appEventHandler(EventHandlerCallRef nextHandler, EventRef event, 
+                                        void *junk)
+{
+#pragma unused (nextHandler, junk)
+
+    OSStatus result = eventNotHandledErr;
+    UInt32 eventClass, eventKind;
+    HICommand command;
+    
+    eventClass = GetEventClass(event);
+    eventKind = GetEventKind(event);
+    
+    switch (eventClass)
+    {
+        case kEventClassCommand:
+            switch (eventKind)
+            {
+                case kEventCommandProcess:
+                    GetEventParameter(event, kEventParamDirectObject, typeHICommand, NULL, 
+                                        sizeof(HICommand), NULL, &amp;command);
+                    
+                    if (command.commandID != kHICommandQuit)    // let the Quit Application 
+                    {                        // Apple Event handler take care of Quit commands
+                        MenuCommand commandID;
+                        
+                        if (command.commandID != 0)
+                            commandID = command.commandID;
+                        
+                        HandleMenuChoice(commandID);
+                        
+                        result = noErr;
+                    }
+                    break;
+            }
+            break;
+    }
+    
+    return result;
+}
+</pre>
+</div>
+<p>
+See PrefsWindow.c in the 3_Carbon_Events folder to see the window event handler that was added for the window in this step. The dialog's event handler is now split into a window event handler to handle clicks in the window's controls (see PrefsDialog.c), and a control event handler to handle key presses in the list box. Because key presses can potentially close the dialog (if the user presses return, escape, etc.), the dialog's window is retained before the standard handler is called.
+
+</p>
+<div class="mycodebox">
+<pre>
+static pascal OSStatus listBoxControlEventHandler(EventHandlerCallRef nextHandler, 
+                                                    EventRef event, void *prefsDialog)
+{
+    OSStatus result = eventNotHandledErr;
+    UInt32 eventClass, eventKind;
+    DialogRef dialog;
+    WindowRef dialogWindow;
+    
+    eventClass = GetEventClass(event);
+    eventKind = GetEventKind(event);
+    
+    switch (eventClass)
+    {
+        case kEventClassTextInput:
+            switch (eventKind)
+            {
+                case kEventTextInputUnicodeForKeyEvent:
+                    dialog = (DialogRef)prefsDialog;
+                    dialogWindow = GetDialogWindow(dialog);
+                    RetainWindow(dialogWindow);        // hold onto the dialog's window
+                    
+                    result = CallNextEventHandler(nextHandler, event);
+                    if (result == noErr)    // we don't need to postprocess if nothing happened
+                    {
+                        ItemCount retainCount;
+                        
+                        retainCount = GetWindowRetainCount(dialogWindow);
+                        if (retainCount > 1)        // if we're the last one holding the window
+                            handleDialogItemHit(dialog, iIconList);        // then there's no 
+                    }            // need to postprocess anything because it's about to go away
+                    
+                    ReleaseWindow(dialogWindow);
+                    break;
+            }
+            break;
+    }
+    
+    return result;
+}
+</pre>
+</div>
+<p><a href="Mach-O.html">Next Page</a></p>
+<p><a href="First%20Carbon.html">Previous Page</a></p>
+<p><a href="../0_%20Tutorial%20Start%20Here.html">Return to Main Page</a></p>
+</body>
+</html>

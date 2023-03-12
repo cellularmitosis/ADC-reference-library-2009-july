@@ -1,0 +1,1 @@
+This sample illustrates how to subclass QTMovieView and override some of the view events. This technique works for all QuickTime version 7.0.4 and later.

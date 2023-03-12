@@ -1,0 +1,1 @@
+SoftVDIG is  a software-only video digitizer component. It illustrates how to write a software digitizer component, and it's useful to test the HackTV application on computers that do not have hardware digitizers.See develop issue 14 for more complete information on SoftVDIG.Enjoy,The QuickTime Team.

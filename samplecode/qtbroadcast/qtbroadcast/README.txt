@@ -1,0 +1,1 @@
+README - QTBroadcastThis sample illustrates the most basic ways of using the broadcast APIs introduced in QuickTime 5.Enjoy,QuickTime Team

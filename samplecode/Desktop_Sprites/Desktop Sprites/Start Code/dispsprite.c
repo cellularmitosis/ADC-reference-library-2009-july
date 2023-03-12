@@ -1,0 +1,1 @@
+#ifndef _MAININCLUDES_#include "main.h"#endifvoid MyDisposeEverything (void){	short				nIndex;// Step 7.// Insert "DisposeSprites.clp" here}

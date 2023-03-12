@@ -1,0 +1,1 @@
+#include "Instrument Editor.h"void SetMasterTuneDoc(short n,short menuItem, short menuRef);void SetDefaultInstrumentDoc(short n,short menuItem, short menuRef);

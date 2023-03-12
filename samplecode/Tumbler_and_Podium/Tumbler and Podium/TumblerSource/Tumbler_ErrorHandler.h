@@ -1,0 +1,1 @@
+#ifndef _MYERROR_HANDLER_#define _MYERROR_HANDLER_#include "QD3D.h"#include "QD3DErrors.h"void MyErrorHandler( TQ3Error error, TQ3Error error2, long  refCon ) ;void MyWarningHandler( TQ3Warning sticky, TQ3Warning latest, long refCon ) ;extern const int kErrorHandlerAlertID ; // 21032#endif

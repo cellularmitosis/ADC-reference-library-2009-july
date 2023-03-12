@@ -1,0 +1,153 @@
+{\rtf1\mac\ansicpg10000{\fonttbl\f0\froman\fcharset77 Times-Roman;}
+{\colortbl;\red255\green255\blue255;}
+\pard\tx1120\tx2240\tx3360\tx4480\tx5600\tx6720\tx7840\tx8960\tx10080\tx11200\tx12320\tx13440\tx14560\tx15680\tx16800\tx17920\tx19040\tx20160\tx21280\tx22400\tx23520\tx24640\tx25760\tx26880\tx28000\tx29120\tx30240\tx31360\tx32480\tx33600\tx34720\tx35840\tx36960\tx38080\tx39200\tx40320\tx41440\tx42560\tx43680\tx44800\tx45920\tx47040\tx48160\tx49280\tx50400\tx51520\tx52640\tx53760\tx54880\tx56000\tx57120\tx58240\tx59360\tx60480\tx61600\tx62720\tx63840\tx64960\tx66080\tx67200\tx68320\tx69440\tx70560\tx71680\tx72800\tx73920\tx75040\tx76160\tx77280\tx78400\tx79520\tx80640\tx81760\tx82880\tx84000\tx85120\tx86240\tx87360\tx88480\tx89600\tx90720\tx91840\tx92960\tx94080\tx95200\tx96320\tx97440\tx98560\tx99680\tx100800\tx101920\tx103040\tx104160\tx105280\tx106400\tx107520\tx108640\tx109760\tx110880\ql\qnatural
+
+\f0\b\fs48 \cf0 Read Me About TrivialThreads
+\b0\fs28 \
+\
+1.0d5\
+\
+This sample demonstrates a trivial use of the Cocoa threading APIs, including the use of Distributed Objects (DO) to coordinate a pre-emptively scheduled secondary thread with the non-reentrant Cocoa framework. \
+\
+\pard\tx1120\tx2240\tx3360\tx4480\tx5600\tx6720\tx7840\tx8960\tx10080\tx11200\tx12320\tx13440\tx14560\tx15680\tx16800\tx17920\tx19040\tx20160\tx21280\tx22400\tx23520\tx24640\tx25760\tx26880\tx28000\tx29120\tx30240\tx31360\tx32480\tx33600\tx34720\tx35840\tx36960\tx38080\tx39200\tx40320\tx41440\tx42560\tx43680\tx44800\tx45920\tx47040\tx48160\tx49280\tx50400\tx51520\tx52640\tx53760\tx54880\tx56000\tx57120\tx58240\tx59360\tx60480\tx61600\tx62720\tx63840\tx64960\tx66080\tx67200\tx68320\tx69440\tx70560\tx71680\tx72800\tx73920\tx75040\tx76160\tx77280\tx78400\tx79520\tx80640\tx81760\tx82880\tx84000\tx85120\tx86240\tx87360\tx88480\tx89600\tx90720\tx91840\tx92960\tx94080\tx95200\tx96320\tx97440\tx98560\tx99680\tx100800\tx101920\tx103040\tx104160\tx105280\tx106400\tx107520\tx108640\tx109760\tx110880\ql\qnatural
+
+\b\fs36 \cf0 Introduction
+\b0\fs28 \
+\
+This section provides introductory background material to threads, distributed objects, and run loops.  Most of this information is already covered in the class reference: this section brings together and summarises the information contained in the class reference.\
+\
+\pard\tx1120\tx2240\tx3360\tx4480\tx5600\tx6720\tx7840\tx8960\tx10080\tx11200\tx12320\tx13440\tx14560\tx15680\tx16800\tx17920\tx19040\tx20160\tx21280\tx22400\tx23520\tx24640\tx25760\tx26880\tx28000\tx29120\tx30240\tx31360\tx32480\tx33600\tx34720\tx35840\tx36960\tx38080\tx39200\tx40320\tx41440\tx42560\tx43680\tx44800\tx45920\tx47040\tx48160\tx49280\tx50400\tx51520\tx52640\tx53760\tx54880\tx56000\tx57120\tx58240\tx59360\tx60480\tx61600\tx62720\tx63840\tx64960\tx66080\tx67200\tx68320\tx69440\tx70560\tx71680\tx72800\tx73920\tx75040\tx76160\tx77280\tx78400\tx79520\tx80640\tx81760\tx82880\tx84000\tx85120\tx86240\tx87360\tx88480\tx89600\tx90720\tx91840\tx92960\tx94080\tx95200\tx96320\tx97440\tx98560\tx99680\tx100800\tx101920\tx103040\tx104160\tx105280\tx106400\tx107520\tx108640\tx109760\tx110880\ql\qnatural
+
+\b \cf0 Threads Under Cocoa
+\b0 \
+\
+Cocoa provides a simple yet functional threading API as defined by the Foundation class NSThread.  This allows you to create pre-emptively scheduled threads with fast context switching, a boon for networking programmers and others doing complicated I/O.  The only drawback is that very few classes in the Cocoa framework are re-entrant.  [The lower layers of Foundation are re-entrant, but none of the AppKit is.]  So you can do your networking in threads, but you can't modify the user interface from your threads.\
+\
+
+\b Distributed Objects
+\b0 \
+\
+The solution to this problem is Distributed Objects (DO).  DO was designed to provide a mechanism for distributing objects across the network in such a way that you use an object without caring whether the object is local, or on a remote server.  This is very cool for doing distributed computing in general, and client/server programming in the specific.\
+\
+But what does this have to do with threads?  Well, DO is normally used for distributing objects between processes on different computers, but it can also be used for distributed objects between two processes on the same computer, or even two threads within the same process.  So you can use DO to communicate between the threads in the application.\
+\
+The big win for doing that is synchronisation.  Normally, when you're running in a secondary thread in your application, calling a method on an AppKit object is very dangerous, if not fatal, because the AppKit is not re-entrant.  However, if instead of talking directly to an AppKit object, you talk to a DO proxy that's acting for that object, you do not suffer this penalty because the message is forwarded by DO to your application's primary thread and executed there.\
+\
+To understand this, you need to understand a little bit about how DO works.\
+\
+
+\b DO Implementation
+\b0 \
+\
+There are two processes involved in a Distributed Objects transaction: the 
+\b client
+\b0  and the 
+\b server
+\b0 .  The server 
+\b vends
+\b0  an object to the client.  This creates a 
+\b proxy
+\b0  to the object in the client's address space.  As far as the client is concerned, the proxy is indistinguishable from the real object.  When the client calls a method on the object, it's actually calling into the proxy.  The proxy bundles up the contents of the method into a message, and sends that message (either locally or over the network) to the server.  When the server receives the message, it decodes it, finds the object which it refers to, and executes the specified method on the object.\
+\
+
+\b Run Loops
+\b0 \
+\
+Most Mac OS programmers are familiar with the concept of the 
+\b event loop
+\b0 .  This is the part of your code that gets the next event, processes that event, and loops until the application quits.  Cocoa provides an event loop concept wrapped up in the NSRunLoop class.\
+\
+At the highest possible level, an NSRunLoop is an object that, when told to run, listens for events from a variety of sources, and when an event arrives, dispatches that event to an appropriate handler.  When the handler completes, the NSRunLoop loops waiting for the next event.\
+\
+Every Cocoa application has a run loop at its top level which is responsible for getting user events (mouse clicks, key presses, etc) and forwarding them on to the appropriate window.  As well as listening for user events, the run loop is also responsible for listening for and dispatching DO requests.  So, when you send a method to an object that was vended from the application, the object's proxy bundles up the DO request into a message which it delivers, via the NSConnection, to the application's run loop.  The next time the application returns to the run loop, it notices this DO request, decodes it and executes it.  The upshot of this is that DO requests to objects vended by the main application are executed such that they don't re-enter the AppKit.\
+\
+Secondary threads can also field DO requests because they too have run loops.  Obviously the run loops for secondary threads are not concerned with user events, but they can still handle DO requests.\
+\
+\pard\tx1120\tx2240\tx3360\tx4480\tx5600\tx6720\tx7840\tx8960\tx10080\tx11200\tx12320\tx13440\tx14560\tx15680\tx16800\tx17920\tx19040\tx20160\tx21280\tx22400\tx23520\tx24640\tx25760\tx26880\tx28000\tx29120\tx30240\tx31360\tx32480\tx33600\tx34720\tx35840\tx36960\tx38080\tx39200\tx40320\tx41440\tx42560\tx43680\tx44800\tx45920\tx47040\tx48160\tx49280\tx50400\tx51520\tx52640\tx53760\tx54880\tx56000\tx57120\tx58240\tx59360\tx60480\tx61600\tx62720\tx63840\tx64960\tx66080\tx67200\tx68320\tx69440\tx70560\tx71680\tx72800\tx73920\tx75040\tx76160\tx77280\tx78400\tx79520\tx80640\tx81760\tx82880\tx84000\tx85120\tx86240\tx87360\tx88480\tx89600\tx90720\tx91840\tx92960\tx94080\tx95200\tx96320\tx97440\tx98560\tx99680\tx100800\tx101920\tx103040\tx104160\tx105280\tx106400\tx107520\tx108640\tx109760\tx110880\ql\qnatural
+
+\b\fs36 \cf0 High Level Structure
+\b0\fs28 \
+\
+The sample contains the following classes:\
+\
+\pard\tx840\tx2240\tx3360\tx4480\tx5600\tx6720\tx7840\tx8960\tx10080\tx11200\tx12320\tx13440\tx14560\tx15680\tx16800\tx17920\tx19040\tx20160\tx21280\tx22400\tx23520\tx24640\tx25760\tx26880\tx28000\tx29120\tx30240\tx31360\tx32480\tx33600\tx34720\tx35840\tx36960\tx38080\tx39200\tx40320\tx41440\tx42560\tx43680\tx44800\tx45920\tx47040\tx48160\tx49280\tx50400\tx51520\tx52640\tx53760\tx54880\tx56000\tx57120\tx58240\tx59360\tx60480\tx61600\tx62720\tx63840\tx64960\tx66080\tx67200\tx68320\tx69440\tx70560\tx71680\tx72800\tx73920\tx75040\tx76160\tx77280\tx78400\tx79520\tx80640\tx81760\tx82880\tx84000\tx85120\tx86240\tx87360\tx88480\tx89600\tx90720\tx91840\tx92960\tx94080\tx95200\tx96320\tx97440\tx98560\tx99680\tx100800\tx101920\tx103040\tx104160\tx105280\tx106400\tx107520\tx108640\tx109760\tx110880\li840\fi-300\ql\qnatural
+\cf0 \'b7	Controller \'d0 This is the primary controller for the application.  There is one instance of this class which is instantiated in the main NIB file, and wired up to the user interface via Interface Builder.  When it is created, the instance creates a secondary thread and connects to an object (of class TransferServer) in that thread via Distributed Objects.  From then on, when the controller wants to do some slow operation, it calls a method on the transfer server object.  This method will then execute in the secondary thread.\
+\'b7	TransferServer \'d0 This class contains the code for the server object.  When the connectToPorts: method is invoked it is running in the secondary thread.  That method sets up the DO connection back to the application thread and then enters the run loop and waits for DO requests.\
+\pard\tx1120\tx2240\tx3360\tx4480\tx5600\tx6720\tx7840\tx8960\tx10080\tx11200\tx12320\tx13440\tx14560\tx15680\tx16800\tx17920\tx19040\tx20160\tx21280\tx22400\tx23520\tx24640\tx25760\tx26880\tx28000\tx29120\tx30240\tx31360\tx32480\tx33600\tx34720\tx35840\tx36960\tx38080\tx39200\tx40320\tx41440\tx42560\tx43680\tx44800\tx45920\tx47040\tx48160\tx49280\tx50400\tx51520\tx52640\tx53760\tx54880\tx56000\tx57120\tx58240\tx59360\tx60480\tx61600\tx62720\tx63840\tx64960\tx66080\tx67200\tx68320\tx69440\tx70560\tx71680\tx72800\tx73920\tx75040\tx76160\tx77280\tx78400\tx79520\tx80640\tx81760\tx82880\tx84000\tx85120\tx86240\tx87360\tx88480\tx89600\tx90720\tx91840\tx92960\tx94080\tx95200\tx96320\tx97440\tx98560\tx99680\tx100800\tx101920\tx103040\tx104160\tx105280\tx106400\tx107520\tx108640\tx109760\tx110880\ql\qnatural
+\cf0 \
+\pard\tx1120\tx2240\tx3360\tx4480\tx5600\tx6720\tx7840\tx8960\tx10080\tx11200\tx12320\tx13440\tx14560\tx15680\tx16800\tx17920\tx19040\tx20160\tx21280\tx22400\tx23520\tx24640\tx25760\tx26880\tx28000\tx29120\tx30240\tx31360\tx32480\tx33600\tx34720\tx35840\tx36960\tx38080\tx39200\tx40320\tx41440\tx42560\tx43680\tx44800\tx45920\tx47040\tx48160\tx49280\tx50400\tx51520\tx52640\tx53760\tx54880\tx56000\tx57120\tx58240\tx59360\tx60480\tx61600\tx62720\tx63840\tx64960\tx66080\tx67200\tx68320\tx69440\tx70560\tx71680\tx72800\tx73920\tx75040\tx76160\tx77280\tx78400\tx79520\tx80640\tx81760\tx82880\tx84000\tx85120\tx86240\tx87360\tx88480\tx89600\tx90720\tx91840\tx92960\tx94080\tx95200\tx96320\tx97440\tx98560\tx99680\tx100800\tx101920\tx103040\tx104160\tx105280\tx106400\tx107520\tx108640\tx109760\tx110880\ql\qnatural
+
+\b\fs36 \cf0 User Level Operation
+\b0\fs28 \
+\
+The compiled version of this sample was built for a pre-DR2 release of Rhapsody (Titan 1N).  Your mileage may vary.\
+\
+To see the sample in action, simply launch TrivialThreads.app from Workspace.  You will see a window with two test buttons and an output text view.  When you click on the \'aaSomething Slow\'ba button, the sample starts a slow operation in a secondary thread.  This operation involves the thread repeatedly sleeping and outputing progress information to the text view.  The clever thing is that the main application thread starts the operation through a DO message to the secondary thread, and the secondary thread updates the output text view by sending a DO message back to the main thread (thereby avoiding AppKit re-entrancy problems).\
+\
+The \'aaSomething Slower\'ba button is similar to the \'aaSomething Slow\'ba button except that its operation is even slower.\
+\
+
+\b\fs36 Building the Code
+\b0\fs28 \
+\
+The code was built for PPC on a pre-DR2 release of Rhapsody (Titan 1N).  Your mileage may vary.\
+\
+As far as I know this code does not use any Rhapsody-specific constructs, and should build just fine in other OpenStep 4.2 environments.\
+\
+To build the code, launch the \'aaPB.project\'ba file inside the \'aaTrivialThreads\'ba folder. After the project opens, choose \'aaBuild\'ba from the \'aaProject Build\'ba submenu of the \'aaTools\'ba menu. When the build finishes, choose \'aaRun\'ba from the \'aaLauncher\'ba submenu of the \'aaTools\'ba menu to execute the code.\
+\
+
+\b\fs36 Restrictions and Caveats
+\b0\fs28 \
+\
+The current design has a single secondary thread to do the slow operations.  If you start a slow operation while the secondary thread is busy, the operation is queued on the secondary threads NSConnection's receive port.  When the secondary thread finishes it slow operation, it returns to its run loop, which notices the second operation and executes it.\
+\
+One problem with this design is if you queue up too many pending operations on the secondary thread's receive port.  Eventually the port fills up, and the main thread blocks.  Because the secondary thread needs the main thread to complete its slow operations, this deadlocks the application.  You can see this in the current code by clicking \'aaSomething Slower\'ba, and while the operation is in progress, repeatedly click on the \'aaSomething Slow\'ba button.  On the seventh click, the application deadlocks.  [If you do this, you can terminate the errant application in one of two ways: a) if you launched the application using Workspace, use Workspace's Processes panel (under the Tools menu); b) if you launched the application from Project Builder, use the Stop button in Project Builder's Launcher panel.]\
+\
+The obvious work around for this problem is to start each operation in a separate thread.  This has the added benefit of allowing for multiple operations to proceed in parallel.  Another sample, "SimpleThreads" extends the code from TrivialThreads to do this. \
+\
+******\
+One other caveat in the current design is that it does not shut down properly.  When you deallocate the Controller object, it leaves the TransferServer and connection object behind.  This is not a problem in practice (the only way for the Controller to be deallocated is when the application shuts down), but I would like to revisit this design at some stage when I know more about how to clean up properly.\
+******\
+\
+My final caveat is that I don't handle torn connections well.  NSConnections can be run over the network, and hence are subject to tearing through network failures.  Normally you would have to watch for this by observing the NSConnectionDidDieNotification, however I've made the simplifying assumption that this won't happen for local connections between threads.  This is tied in with shutting down properly, something that I haven't quite mastered yet.\
+\
+
+\b\fs36 Coding Notes
+\b0\fs28 \
+\
+The vast bulk of this code is actually derived from the example in the NSConnection class reference.  I basically typed it in and made it work.\
+\
+The tricky part of this sample was avoiding deadlock.  Deadlock is a problem for all concurrent programming, but it is especially worrisome in DO because DO provides such strong concurrency guarantees.  I found that I could work around this problem by using the special type qualified \'aaoneway\'ba.  Normally when you invoke a method on a distributed object, the DO system sends the message to the vendor and then awaits a reply containing the function result.  This can cause deadlocks if the vendor is already waiting for a function result from you.  You can avoid this by specifying that the method is \'aaoneway\'ba, which tells DO that you are not interested in the function result, and should not block waiting for it.\
+\
+The source code is 
+\b heavily
+\b0  commented.  For more information about the specifics of the design, take a look at the comments.\
+\
+
+\b\fs36 See Also
+\b0\fs28 \
+\
+For more information about Distributed Objects, check out the reference documentation for the following classes: NSConnection, NSRunLoop, and NSThread.\
+\
+
+\b\fs36 Credits and Version History
+\b0\fs28 \
+\
+Version 1.0d1 was distributed for review inside Apple.\
+\
+Version 1.0d2 is the first widely released version and was included with the Developer Release.  It includes some cosmetic code changes.\
+\
+Version 1.0d3 added code to make sure that the main window is active after launch [Radar ID 1683474].\
+\
+Version 1.0d4 (TimC)Corrected a few threading bugs, properly disposes of connections when the application quits, and is updated to the latest UI guidelines\
+\
+Version 1.0d5 Updated for Project Builder on Mac OS X\
+\
+Share and Enjoy.\
+\
+Quinn \'aaThe Eskimo!\'ba and Timothy Carroll\
+Apple Worldwide Developer Technical Support\
+\
+17 March 1998\
+}

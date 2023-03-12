@@ -1,0 +1,1 @@
+/* *	File:		TS3Main.h * *	Copyright © 1996 Apple Computer, Inc. */#ifndef __TS3Main__#define __TS3Main__void Main_LastRoundup(	void);#endif /* __TS3Main__ */

@@ -1,0 +1,1 @@
+typedef struct {	Rect	bounds;	short	height;	short	rowLongs;	long	*image;	long	*mask;} pixiZAM;OSErr LoadPixiFromCIcon(pixiZAM *pz, short resID);void PixelMover(pixiZAM *srcPixi, PixMapHandle destMap, Rect *destRect);void MaskedPixelMover(pixiZAM *srcPixi, PixMapHandle destMap, Rect *destRect);

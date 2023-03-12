@@ -1,0 +1,105 @@
+Read Me About SocketCancel
+==========================
+1.1
+
+SocketCancel is a sample that shows how to use safely cancel threads that are blocked within BSD sockets calls.  It uses a simple sockets abstraction layer that wraps a non-blocking data socket, a UNIX domain socket pair that's used to signal cancellation, and creative use of the select system call.
+
+SocketCancel should work on all versions of Mac OS X.  It was originally written and tested on Mac OS X 10.2.x.  This version was tested on Mac OS X 10.4.
+
+Packing List
+------------
+The sample contains the following items:
+
+o Read Me About SocketCancel.txt -- This document.
+o SocketCancel.xcodeproj -- An Xcode 2.1 project file.
+o SocketCancel.c -- Source code to the sample.
+o build -- A folder containing a built version of the sample.
+
+Using the Sample
+----------------
+To use SocketCancel, open a Terminal window, change into the "build/Development" directory, and then enter some test commands.  The standard sequence that I use is as follows.
+
+$ ./SocketCancel 1.2.3.4
+Test connect and read to 1.2.3.4
+Main thread is looking up name.
+SIGINT (typically ^C) to cancel
+Connect thread is connecting.
+^C
+Connect thread done, err = 89
+threadResult = 89
+Success!
+
+In this first example, SocketCancel will attempt to connect to port 80 on an unknown host. The connection thread will block waiting for the connect to complete.  If you enter a SIGINT (usually by typing control-C), the main thread will cancel the connection attempt and the connection thread will terminate with error 89 (ECANCELED).
+
+$ ./SocketCancel www.stanford.edu.
+Test connect and read to www.stanford.edu.
+Main thread is looking up name.
+SIGINT (typically ^C) to cancel
+Connect thread is connecting.
+Connect thread is reading.
+^C
+Connect thread done, err = 89
+threadResult = 89
+Success!
+
+In the second example, SocketCancel will attempt to connect to www.stanford.edu and then read data. The connection thread will block waiting for data because a web server will not send you any data until you send it a request.  If you enter a SIGINT, the main thread will cancel the read and the connection thread will terminate with error 89 (ECANCELED).
+
+$ ./SocketCancel www.apple.com.
+Test connect and read to www.apple.com.
+Main thread is looking up name.
+SIGINT (typically ^C) to cancel
+Connect thread is connecting.
+Connect thread is reading.
+Looks like the server threw us off.
+Connect thread done, err = 32
+^C
+threadResult = 32
+Success!
+
+In the third example, SocketCancel will attempt to connect to www.apple.com and then read data. The connection thread will block waiting for data because a web server will not send you any data until you send it a request.  If you wait for a short time, the connection thread will terminate with error 32 (EPIPE) after the server terminates the connection because the client hasn't sent it a request quickly enough. You must then enter a SIGINT to terminate the main thread.
+
+$ ./SocketCancel 
+Test write to localhost
+Connect thread is connecting.
+Connect thread is writing.
+SIGINT (typically ^C) to cancel
+^C
+Connect thread done, err = 89
+threadResult = 89
+Success!
+
+In the fourth example, SocketCancel will create a listening socket on the local machine and then create a thread that connects to that socket and sends it a lot of data.  The main thread never reads the data, so the writing thread will eventually block waiting for socket buffer space. If you enter a SIGINT, the main thread will cancel the write and the writing thread will terminate with error 89 (ECANCELED).
+
+Building the Sample
+-------------------
+The sample was built using Xcode 2.1 on Mac OS X 10.4.  You should be able to just open the project and choose Build from the Build menu.  This will build the SocketCancel tool in the "Build" directory.
+
+How it Works
+------------
+SocketCancel includes a simple sockets abstraction layer, CSocket (for cancelable socket).  The abstraction layer wraps each of the common sockets APIs (socket, connect, read, write, close). The wrapper uses a non-blocking socket for the main data transfer, and a pair of UNIX domain sockets to signal cancellation. When an operation blocks (such as a read waiting for data), the wrapper function waits in a call to select, monitoring both the non-blocking data socket and the cancellation socket.  If data arrives on the data socket, it reads the data.  On the other hand, if data arrives on the cancellation socket, it returns with an ECANCELED error.
+
+Caveats
+-------
+Cancellation only works when the socket blocks waiting for the network.  If the socket never blocks (for example, a continuous stream of data arrives), the cancellation function has no effect.  This shouldn't be a serious problem because, as a rule, if you're processing that much data you're making multiple calls to the read function, which gives you an opportunity to notice the cancellation yourself.
+
+I have only wrapped the basic sockets functions. More advanced sockets functions are left as an exercise for the user.
+
+Credits and Version History
+---------------------------
+If you find any problems with this sample, mail <dts@apple.com> and I'll try to fix them up.
+
+1.0a1 (Jul 2003) was the first shipping version.
+
+1.1 (Aug 2005) was updated to include a project that produces a universal binary. No code changes were required for it to run correctly on the Developer Transition Systems.
+
+Share and Enjoy.
+
+Apple Developer Technical Support
+Networking, Communications, Hardware
+
+2 Aug 2005
+
+$Log: Read\040Me\040About\040SocketCancel.txt,v $
+Revision 1.2  2005/08/03 13:52:31         
+Fix grammo.  Add CVS checkin change logging.
+

@@ -1,0 +1,1 @@
+README - QTWiredActionsQTWiredActions shows how to attach wired actions to text tracks. It also showshow to use wired actions to make sprites bounce around inside their track rectangle and how to collide with one another.Enjoy,QuickTime Team

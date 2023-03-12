@@ -1,0 +1,1 @@
+/* Our Rez file.  All this does is include the .rsrc file that contains the *//* compiled resources */type 'ERST' {       integer = $$CountOf(ErrorArray); /*                */       array ErrorArray {           integer;                      /* error number */           pstring;                    /* and the string       */       };};include "AESamp.rsrc";

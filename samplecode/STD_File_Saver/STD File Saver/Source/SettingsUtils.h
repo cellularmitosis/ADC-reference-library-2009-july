@@ -1,0 +1,1 @@
+typedef struct {	short	selectedItemNumber;	Boolean isRadioOptionOn;} settings, **settingsHandle;/* settings utils */void SaveSettings(settingsHandle theSettings);settingsHandle RetrieveSettings(void);void SaveItemNumber(short item);short GetSavedItemNumber(void);void SaveRadioOption(Boolean state);Boolean GetSavedRadioOption(void);

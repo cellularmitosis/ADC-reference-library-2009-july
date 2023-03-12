@@ -1,0 +1,1 @@
+This sample shows how we can display data from your application without breaking the tone you created in your game. PinBall_Initial Shows how this can be done, and PinBall_Final shows how we can improve it in Leopard to make it even more compelling.

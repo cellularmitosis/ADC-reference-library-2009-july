@@ -1,0 +1,127 @@
+{\rtf1\mac\ansicpg10000\cocoartf102
+{\fonttbl\f0\fnil\fcharset77 LucidaGrande-Bold;\f1\fnil\fcharset77 LucidaGrande;}
+{\colortbl;\red255\green255\blue255;}
+\margl1440\margr1440\vieww11600\viewh12000\viewkind0
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\ql\qnatural
+
+\f0\b\fs36 \cf0 Read Me About SSLSample
+\f1\b0\fs24 \
+1.0d1 (11/4/02)\
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\ql\qnatural
+\cf0 						  \
+This directory contains a set of programs intended for use in testing the SecureTransport library, and for providing examples for people writing code which will use SecureTransport. These are UNIX command line programs; you build them with either Project Builder or pbxbuild, and you run them from a Terminal. \
+\
+Building\
+--------\
+\
+To build everything in SSLSample, open the SSLSample.pbproj file with Project Builder, select target 'World', and build. The results are two executables called sslViewer and sslServer. \
+\
+Contents\
+--------\
+\
+Relative to the SSLSample directory, we have:\
+\
+SSLSample.pbproj 		-- builds the whole thing\
+Examples/			-- the SecureTransport example code\
+   sslViewer.cpp		-- SSL client example \
+   sslServer.cpp		-- SSL server example \
+libSslSupport/		-- misc. support code\
+   clutils.[ch]			-- CDSA startup and support\
+   fileIo.[ch]			-- simple file read and create\
+   ioSock.[ch]		-- socket-level I/O; see below\
+   oidParser.\{cpp,h\}	-- converts known OIDs to readable strings\
+   printCert.\{cpp,h\}		-- cert parser\
+   sslAppUtils.[ch]		-- misc. SecureTranpsort support\
+   timeStr.\{cpp,h\}		-- CDSA time string support\
+   dumpasn1.cfg		-- used for parsing certificates. This needs\
+				to be in the current working directory when\
+				running the executables in order to fully\
+				parse certificates. \
+   \
+\
+sslViewer\
+---------\
+\
+This is a tool which allows one to connect to an arbitrary SSL server and obtain just about any info one could want about the SSL connection.  One can (optionally) see the SSL protocol version and CipherSuite which were negotiated, the server's certificate(s), and the actual data returned from the server. Specific session parameters can be specified on the command line, such as SSL protocol to attempt, a restricted set of CipherSuites, port number, server name, etc. \
+\
+The most basic usage is like so:\
+\
+.........start of sample session...........\
+\
+% sslViewer www.amazon.com\
+Connecting to host www.amazon.com with TLS V1...\
+\
+   Attempted  SSL version : kTLSProtocol1\
+   Result                 : noErr\
+   Negotiated SSL version : kTLSProtocol1\
+   Negotiated CipherSuite : SSL_RSA_WITH_3DES_EDE_CBC_SHA\
+   Number of server certs : 1\
+\
+Connecting to host www.amazon.com with SSL V3...\
+\
+   Attempted  SSL version : kSSLProtocol3\
+   Result                 : noErr\
+   Negotiated SSL version : kSSLProtocol3\
+   Negotiated CipherSuite : SSL_RSA_WITH_3DES_EDE_CBC_SHA\
+   Number of server certs : 1\
+\
+Connecting to host www.amazon.com with SSL V2...\
+\
+   Attempted  SSL version : kSSLProtocol2\
+   Result                 : noErr\
+   Negotiated SSL version : kSSLProtocol2\
+   Negotiated CipherSuite : SSL_RSA_WITH_RC4_128_MD5\
+   Number of server certs : 1\
+\
+.........end of sample session...........\
+\
+In this case, we specified one argument, the server name  (www.amazon.com). The sslViewer program by default attempted to connect to the server with all three protocols (TLS1, SSL3, SSL2), and we see that the server supports all three, and that each attempt was successful (Result = noErr). Note that the CipherSuite negotiated for SSL2 differs from that of the other two protocols. \
+\
+There are many many command line options, more than are appropriate to describe here. Run "sslViewer h" to get usage info. \
+\
+Two key programming areas are exemplified in this program. One, the sslPing() function in Examples/sslViewer.cpp, shows everything involved in one SSL client session, from the initial \
+socket connection, thru required and optional SecureTransport configuration calls, to the close of the socket and the disposal of the SSLContextRef. \
+\
+The other crucial area is in libSslSupport/ioSock.c. This file provides the read/write callback functions a client of SecureTransport needs to implement and register via SSLSetIOFuncs(). This implementation uses UNIX sockets in blocking mode. Other implementations including OpenTransport and non-blocking UNIX sockets have been tested as well. \
+\
+\
+sslServer\
+---------\
+\
+This is a bare-bones SSL server program. Structurally it's very similar to the sslViewer program. It uses the same read/write functions in libSslSupport/ioSock.c. The heart of the program is the function sslServe() in sslServer.cpp. This function shows an entire SSL session.\
+\
+To use the sslServer program, one MUST have a keychain with a certificate and a signing key. Typically, certtool is used to generate such a keychain. (See the Security release notes for info on using certtool.) A typical use of sslServer is like so:\
+\
+.........start of sample session...........\
+\
+% sslServer k=certkc P=2000 H=10.0.61.5 l\
+Waiting for client connection...\
+client request: GET / HTTP/1.0\\r\\n\\r\\n\
+\
+   Attempted  SSL version : kTLSProtocol1\
+   Result                 : noErr\
+   Negotiated SSL version : kTLSProtocol1\
+   Negotiated CipherSuite : SSL_RSA_WITH_3DES_EDE_CBC_SHA\
+   Number of peer certs : 0\
+\
+.........end of sample session...........\
+\
+At this point the server is still connected and waiting for another connection per the 'l' (letter l, not number one) command line option. After we started the server, we ran sslViewer from another Terminal like so:\
+\
+% sslViewer 10.0.61.5 P=2000 r\
+\
+A couple of notes:\
+\
+-- run "sslServer h" for usage info. \
+\
+-- We passed in the Keychain named "certkc" when we ran sslServer. If this Keychain is not open when the program runs, the user will be prompted to open it when it's used. The UI for this is NOT performed by the sslServer program or by SecureTransport; it is part of the system-wide SecurityAgent functionality. \
+\
+-- The standard HTTPS port number is 443. However to open  this port you need to run as root. Telling both sslServer and sslViewer (or whatever client you use) to use a port higher than 1024 allows you to run as non-root.\
+\
+-- This program has been verified to work with IE on OS X and  OS 9 and with Netscape on OS 9. HOWEVER: these browsers will put up a bit of a fuss due to the fact that your cert is not recognized. After some coddling and reassurance, they all let you go ahead and trust the sslServer's cert.  (Note that the sslViewer run, above, included an 'r'  command line argument, which means "trust any root cert". \
+\
+-- To connect to sslServer as it was run above from a real web browser, the URL would be...\
+   \
+   https://10.0.61.5:2000/\
+   \
+}

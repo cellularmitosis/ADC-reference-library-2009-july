@@ -1,0 +1,38 @@
+// MOCompletionStrategy.h
+// MOKit
+//
+// Copyright © 1996-2001, Mike Ferris.
+// All rights reserved.
+
+// ABOUT MOKit
+//
+// MOKit is a collection of useful and general objects.  Permission is
+// granted by the author to use MOKit in your own programs in any way
+// you see fit.  All other rights to the kit are reserved by the author
+// including the right to sell these objects as part of a LIBRARY or as
+// SOURCE CODE.  In plain English, I wish to retain rights to these
+// objects as objects, but allow the use of the objects as pieces in a
+// fully functional program.  NO WARRANTY is expressed or implied.  The author
+// will under no circumstances be held responsible for ANY consequences to
+// you or others from the use of these objects.  Since you don't have to pay for
+// them, and full source is provided, I think this is perfectly fair.
+
+// ABOUT MOCompletionStrategy
+//
+// Subclasses of MOCompletionStrategy are used to define the actual completion 
+// behavior for a MOCompletionManager.
+
+#import <Foundation/Foundation.h>
+#import <MOKit/MOKitDefines.h>
+
+@interface MOCompletionStrategy : NSObject {
+
+}
+
+- (NSArray *)matchesForPrefixString:(NSString *)str newPrefixString:(NSString **)newStr basePath:(NSString *)basePath;
+    // New strategies must implement this one.
+
+- (NSString *)fullStringForPrefixString:(NSString *)prefixStr completionString:(NSString *)completionStr isInitialPrefixMatch:(BOOL)initialPrefixMatch basePath:(NSString *)basePath;
+    // By default, this just appends the completionString onto to the prefixString.  New strategies can override to provide sepcial post-processing.
+
+@end

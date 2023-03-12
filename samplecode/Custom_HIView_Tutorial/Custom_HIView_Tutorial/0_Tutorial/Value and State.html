@@ -1,0 +1,175 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2 Final//EN"
+        "http://www.w3.org/MarkUp/Wilbur/HTML32.dtd">
+<html lang="en">
+<head>
+	<meta http-equiv="content-type" content="text/html; charset=utf-8">
+	<title>Support for Value and State</title>
+	<meta name="generator" content="BBEdit 8.2">
+<style type="text/css">
+<!--
+.mybox {
+	background-color: #F7F7F7;
+	margin: 4px;
+	padding: 4px;
+	border: 1px solid #999999;
+}
+-->
+<!--
+.mycodebox {
+	background-color: #F1F5F9;
+	margin: 4px;
+	padding: 4px;
+	border: 1px solid #999999;
+}
+-->
+</style>
+</head>
+<body>
+
+<h1>
+Tutorial: Writing a custom HIView
+</h1>
+
+<h2>
+B) Implementing support for value and state
+</h2>
+
+<p>
+Supporting the changes of value or state is, again, very easy.
+</p>
+
+<p>
+In the kEventControlDraw code above, the same thing (a circle) is drawn no matter what the value of the HIView is. We can just replace the line:
+</p>
+
+<div class="mycodebox"><pre>
+ CGContextAddArc(context, cx, cy, minDim, 0, 2 * pi, true);
+</pre></div>
+
+<p>
+with:
+</p>
+
+<div class="mycodebox"><pre>
+ // having some fun with geometric shapes based on the value of the custom view
+ UInt32 i, n = GetControl32BitValue(myData->view);
+ switch (n)
+    {
+    case 0: CGContextAddArc(context, cx, cy, minDim, 0, 2 * pi, true); break;
+    case 1: CGContextAddEllipseInRect(context, CGRectInset(bounds, bounds.size.width * 0.4, 0)); break;
+    default:
+	{
+	float deltangle = pi / n, angle = 0, r = minDim / 2;
+	CGContextMoveToPoint(context, cx + minDim, cy);
+	for (i = 0; i < n; i++)
+	   {
+	   angle += deltangle;
+	   CGContextAddLineToPoint(context, cx + r * cos(angle), cy + r * sin(angle));
+	   angle += deltangle;
+	   CGContextAddLineToPoint(context, cx + minDim * cos(angle), cy + minDim * sin(angle));
+	   }
+	CGContextAddLineToPoint(context, cx + minDim, cy);
+	}
+    }
+</pre></div>
+
+<p>
+And we will get the following display for value 17:
+</p>
+
+<img src="../0_Tutorial/Picture%202.png" alt="" width="536" height="469">
+
+<p>
+For the states (active, enable, hilite), we just change the color settings:
+</p>
+
+<div class="mycodebox"><pre>
+ // setting our colors according to state: IsControlEnabled, IsControlActive, IsControlHilited
+ if (!IsControlEnabled(myData->view))
+    {
+    CGContextSetRGBFillColor(context, 0.3, 0.3, 0.3, 0.8);
+    CGContextSetRGBStrokeColor(context, 0.5, 0.5, 0.5, 0.8);
+    }
+ else if (!IsControlActive(myData->view))
+    {
+    CGContextSetRGBFillColor(context, 0.7, 0.7, 0.7, 0.8);
+    CGContextSetRGBStrokeColor(context, 0.8, 0.8, 0.8, 0.8);
+    }
+ else if (!IsControlHilited(myData->view))
+    {
+    CGContextSetRGBFillColor(context, 1, 0, 0, 0.8);
+    CGContextSetRGBStrokeColor(context, 0, 0, 1, 0.8);
+    }
+ else
+    {
+    CGContextSetRGBFillColor(context, 0.7, 0, 0, 0.8);
+    CGContextSetRGBStrokeColor(context, 0, 0, 0.7, 0.8);
+    }
+</pre></div>
+
+<p>
+And we will get the following display when the HIView is disabled:
+</p>
+
+<img src="../0_Tutorial/Picture%203.png" alt="" width="535" height="469">
+
+<p>
+The last thing we have to do is to generate a redraw event whenever the custom HIView’s value or state changes.
+</p>
+
+<div class="mybox">
+<strong>Note: This is a radical change from the old style controls if you have been working with them in the past. Most APIs such as SetControlValue, HiliteControl, SetControlMaximum could and would most of the time redraw the control immediately. This meant that if you were calling those 3 APIs in a row for example, the control would be redrawn 3 times in a row. This was generating flicker and was detrimental to the overall performance. In the new world of HIViews, all those APIs just change the private data of the HIView and it is the responsibility of the HIView to issue a redraw event if there is a need for it: for example, changing the maximum value from 100 to 50 when the current value is 25 may need a redrawing (as the slider or scrollbar do) or not (as an indeterminate progress bar). The APIs to call to request a redraw event are HIViewSetNeedsDisplay and its variant forms.
+</strong></div>
+
+<p>
+To be alerted of any change of the value or state, we just intercept 2 more Carbon Events: kEventControlValueFieldChanged and kEventControlHiliteChanged. So we change the static EventTypeSpec kFactoryEvents[] declaration in the function GetHICustomViewClass to:
+</p>
+
+<div class="mycodebox"><pre>
+static EventTypeSpec kFactoryEvents[] =
+  {
+     { kEventClassHIObject, kEventHIObjectConstruct },
+     { kEventClassHIObject, kEventHIObjectDestruct },
+     { kEventClassControl, kEventControlDraw },
+     { kEventClassControl, kEventControlValueFieldChanged },
+     { kEventClassControl, kEventControlHiliteChanged }
+  };
+</pre></div>
+
+<p>
+And we add 2 more cases in our case kEventClassControl switch in the function Internal_HICustomViewHandler:
+</p>
+
+<div class="mycodebox"><pre>
+case kEventControlValueFieldChanged:
+case kEventControlHiliteChanged:
+	{
+	// just asking for a redraw
+	HIViewSetNeedsDisplay(myData->view, true);
+	break;
+	}
+</pre></div>
+
+<p>
+That’s it for the support of value and state, it’s all in the kEventControlDraw handler which is really the center piece of your custom HIView. You can test the custom HIView for this step by using the project located in the folder “2_Value_State”, and you will see that now, all the Tester controls from the “SetNeedsDisplay true” push button to the “Active” check box have an immediate effect on the display of the custom HIView.
+</p>
+
+<br>
+
+<a href="../0_Tutorial/Tracking.html">Next Page
+</a>
+
+<br>
+<br>
+
+<a href="../0_Tutorial/Minimum%20Requirements.html">Previous Page
+</a>
+
+<br>
+<br>
+
+<a href="../0_%20Tutorial%20Start%20Here.html">Return to Main Page
+</a>
+
+</body>
+</html>

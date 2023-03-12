@@ -1,0 +1,1 @@
+README - QTEffectsThis application shows how to work with QuickTime video effects. It builds a number of effects movies, and shows how to manage the effects parameters dialog box.Enjoy,QuickTime Team

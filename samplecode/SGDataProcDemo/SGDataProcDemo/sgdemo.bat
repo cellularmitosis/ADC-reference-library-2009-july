@@ -1,0 +1,1 @@
+java -classpath %CLASSPATH%;SGDataProcDemo.jar SGDataProcDemo

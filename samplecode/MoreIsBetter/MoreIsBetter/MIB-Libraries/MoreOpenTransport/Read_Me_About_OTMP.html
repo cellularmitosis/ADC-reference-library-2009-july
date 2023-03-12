@@ -1,0 +1,1172 @@
+<HTML>
+<HEAD>
+   <TITLE>Read Me About OTMP</TITLE>
+</HEAD>
+<BODY BGCOLOR="#FFFFFF">
+<H1>Read Me About OTMP</H1>
+
+<P>1.0a5</P>
+
+<P>OTMP is a sample code library that lets you to call Open Transport
+synchronously from preemptively scheduled tasks (MP tasks). The
+library enables high performance network programming from a common
+source base on both Mac OS 9 and Mac OS X. This package contains the
+library itself, a number of supports modules, and a demo
+application.</P>
+
+<P>On traditional Mac OS, the OTMP library requires Mac OS 9.0 or
+above. Carbon applications should work with CarbonLib 1.2.5 and
+later, assuming the underlying Mac OS version is sufficient. On Mac
+OS X the OTMP library requires Mac OS X 10.0 or later.</P>
+
+<H2>Justification</H2>
+
+<P>Fast networking requires preemptive scheduling. When network data
+arrives the system must buffer it until the application executes and
+reads the data. If the network is very fast, the memory required for
+this buffering can be huge. Therefore it's vitally important that the
+application run as quickly as possible after the arrival of network
+data. Cooperatively scheduled threads do not fit this bill.</P>
+
+<P>For example, let's say your application uses Thread Manager
+threads for its networking. While inter-thread switch times are very
+low, one of those threads must eventually call
+<CODE>WaitNextEvent</CODE> in order to respond to user events. At
+that point the Process Manager yields time to other applications. If
+there are other applications running it's possible for your
+application to remain unscheduled for a long time; a typically value
+might be 6 ticks, or 0.1 seconds. If your application is receiving
+data from a gigabit network (1000 Gb/s, or approximate 100 MB/s), the
+system must buffer 10 MB of data (100 MB/s times 0.1 s) to prevent
+flow control on the wire. This is prohibitively large buffer, which
+implies that a cooperatively scheduled application will never yield
+excellent network performance.</P>
+
+<P>The traditional way to run your network application preemptively
+is to use notifiers. A notifier runs at <A HREF="http://developer.apple.com/technotes/tn/tn1104.html#ExecutionLevels">deferred
+task time</A>, so there's very little latency between the arrival of
+network data (an interrupt from the network hardware) and the
+execution of your application's code.</P>
+
+<P>The big drawback to notifiers is that they run in an interrupt
+context: your application must do its processing and leave the
+notifier. Notifier-based applications must use a state machine
+execution model, which makes them hard to program and unwieldy to
+maintain. Unfortunately, given Mac OS's traditional lack of
+preemptive threads, notifiers are the only solution.</P>
+
+<P>In Mac OS 8.6 Apple introduced a preemptive thread model to Mac OS
+in the form of multiprocessing (MP) tasks. While the name implies
+that these threads require a multiprocessor system, this is not the
+case. MP tasks work just fine, and are preemptively scheduled, on
+single-processor systems. Unfortunately, MP tasks can only call a
+very limited set of system services. In Mac OS 8.6 this set was too
+small to write useful network applications. However, in Mac OS 9.0
+this set expanded such that MP task-based network applications became
+possible.</P>
+
+<P>The two key changes in Mac OS 9.0 are:</P>
+
+<UL>
+   <LI>the ability to make synchronous File Manager calls from an MP
+   task, and</LI>
+   
+   <LI>the ability to schedule deferred tasks from an MP task.</LI>
+</UL>
+
+<P>The first change is critical because network applications
+typically need to access the file system as well as the network. This
+is especially true for network applications where speed is a
+priority; such applications typically move a lot of data, and the
+file system is either the source or the sink for that data.</P>
+
+<P>The second change is critical because it offers a low-latency
+communications mechanism between MP tasks and Open Transport. OTMP
+uses this mechanism to implement its simple and efficient interface
+to the network from MP tasks. The implementation is described later
+in this <A HREF="#HowItWorks">document</A>.</P>
+
+<P>In summary, high-speed networking requires a preemptively
+scheduled execution environment. You can use notifiers to implement
+high-speed networking, but the programming model is state
+machine-based and therefore unnecessarily difficult. OTMP allows you
+to efficiently access the network using a synchronous threaded
+execution model based on MP tasks.</P>
+
+<H2>Packing List</H2>
+
+<P>The sample contains the following items:</P>
+
+<UL>
+   <LI>Read Me -- A document that redirects users to this
+   document.</LI>
+   
+   <LI>MoreOpenTransport -- A folder containing OTMP and various
+   support files.
+   
+   <UL>
+      <LI>Read_Me_About_OTMP.html (in "MoreOpenTransport" folder) --
+      This document.</LI>
+      
+      <LI>OTMP.h -- The interface to the OTMP library. The library
+      exports two variants of most OT routines: OTMP routines allow
+      you to call OT from MP tasks on Mac OS 9; OTMPX routines allow
+      you to call OT from MP tasks on both Mac OS 9 and Mac OS
+      X.</LI>
+      
+      <LI>OTMP.c -- The implementation of the OTMP library.</LI>
+      
+      <LI>OpenTransportClientPPC.debug.o -- OTMP requires that you
+      use the "InContext" Open Transport routines, even when building
+      InterfaceLib-based applications. See DTS sample code <A HREF="http://developer.apple.com/samplecode/Sample_Code/Networking/OTClassicContext.htm">OTClassicContext</A>
+      for details.</LI>
+      
+      <LI>OTMPSimpleServerHTTP -- A sample HTTP server that uses the
+      OTMP library to run preemptively.</LI>
+   </UL>
+   </LI>
+   
+   <LI>MoreMultiprocessing -- MoreIsBetter Multiprocessing utilities.
+   
+   <UL>
+      <LI>MoreBlueActions -- OTMP uses the MoreBlueActions library as
+      an abstraction layer on deferred tasks.</LI>
+      
+      <LI>MoreMPLog -- OTMP logs its activities to the MoreMPLog
+      library for debugging purposes.</LI>
+   </UL>
+   </LI>
+   
+   <LI>MoreMemory -- MoreIsBetter Memory Manager utilities.</LI>
+   
+   <LI>MoreProcesses -- MoreIsBetter Process Manager utilities.</LI>
+   
+   <LI>MoreSetup.h -- The standard MoreIsBetter include file.</LI>
+   
+   <LI>MIB_Carbon.h -- A C prefix file for Carbon development.</LI>
+</UL>
+
+<H2>Using the Sample</H2>
+
+<P>The OTMP library comes with a test application,
+OTMPSimpleServerHTTP, which you can run to demonstrate the library
+functioning on your computer. OTMPSimpleServerHTTP is an evolution of
+the DTS sample code <A HREF="http://developer.apple.com/samplecode/Sample_Code/Networking/OTSimpleServerHTTP.htm">OTSimpleServerHTTP</A>.
+The non-MP sample is a very simple HTTP server that is threaded using
+Thread Manager threads and Open Transport's "sync idle" programming
+model. The MP sample is threaded using preemptively scheduled threads
+(MP tasks), along with synchronous network access using OTMP.</P>
+
+<P>To try out this sample, take the following steps.</P>
+
+<OL>
+   <LI>Set up a machine running Mac OS 9 or later with a statically
+   allocated IP address.</LI>
+   
+   <LI>Make sure that no existing web server software is running. The
+   easiest way to check for a running web server is to connect to the
+   machine with a web browser and see if it responds.</LI>
+   
+   <LI>Duplicate the "Sample HTTP Source" folder (inside the
+   OTMPSimpleServerHTTP folder) and rename the copy to the text of
+   the machine's IP address (for example, "1.2.3.4").</LI>
+   
+   <LI>Run the application appropriate to your platform.
+   
+   <UL>
+      <LI>Mac OS X -- Run the OTMPSimpleServer-Carbon,
+      OTMPSimpleServer-Mach-O, or OTMPSimpleServer-PB applications.
+      As the sample binds to a privileged port (port 80, the HTTP
+      port), you must be running with superuser privileges. The best
+      way to do this is to from Terminal. Switch to superuser
+      privileges using "sudo -s", then simply execute the application
+      on the command line (except for the Carbon version which you
+      must launch using LaunchCFMApp).</LI>
+      
+      <LI>Mac OS 9 -- Run the OTMPSimpleServer-PPC application. If
+      you have CarbonLib prior to version 1.2.5 installed, you will
+      need to disable it before running this sample. See the
+      <A HREF="#Caveats">Caveats</A> section for an explanation of
+      why this is necessary.</LI>
+   </UL>
+   </LI>
+   
+   <LI>Connect to the machine with your web browser. You should see
+   the sample main web page (index.html) from the HTTP source
+   folder.</LI>
+</OL>
+
+<H2>Building the Sample</H2>
+
+<P>The sample was built using the CodeWarrior Pro 7 environment
+upgraded to Universal Headers 3.4. To build a sample just open its
+project, select the appropriate target, and choose Make from the
+Project menu.</P>
+
+<P>The sample also builds with Project Builder on Mac OS X 10.1. To
+build it, open the "OTMPSimpleServerHTTP.pbproj" project and choose
+Build from the Build menu.</P>
+
+<H2>Adding OTMP Support to Your Code</H2>
+
+<P>The difficulty of adding OTMP support to your code depends on how
+your existing code is structured.</P>
+
+<UL>
+   <LI>If your existing code uses the sync/blocking/threaded OT
+   programming model (with "sync idle" events, described in <A HREF="http://developer.apple.com/techpubs/mac/NetworkingOT/NetworkingWOT-30.html#HEADING30-10">Using
+   Synchronous with Threads</A> in <A HREF="http://developer.apple.com/techpubs/mac/NetworkingOT/NetworkingWOT-2.html">Inside
+   Macintosh: Networking with Open Transport</A> (Chapter 5, page
+   130)), it is relatively easy to recast it to run preemptively
+   using OTMP. Doing so may yield an excellent performance gain.</LI>
+   
+   <LI>If your code is structured as a notifier-based state machine
+   (see <A HREF="http://developer.apple.com/techpubs/mac/NetworkingOT/NetworkingWOT-30.html#HEADING30-23">Asynchronous
+   Processing with a Notifier</A> in&nbsp;<A HREF="http://developer.apple.com/techpubs/mac/NetworkingOT/NetworkingWOT-2.html">Inside
+   Macintosh: Networking with Open Transport</A> (Chapter 5, page
+   134), it is quite difficult to recast it to run as MP tasks.
+   Fortunately, a notifier-based state machine should yield excellent
+   network performance on Mac OS 9 (and good performance on Mac OS
+   X), so there is little need to adopt the OTMP technology.</LI>
+</UL>
+
+<P>The remainder of this section describes the various steps in
+converting a sync/blocking/threaded to use OTMP.</P>
+
+<H3>Being InContext</H3>
+
+<P>The first step in adopting OTMP is to switch your code to use the
+"InContext" version of the various OT routines. The rationale for
+this change is described in DTS Technote 1173 <A HREF="http://developer.apple.com/technotes/tn/tn1173.html">Understanding
+Open Transport Asset Tracking</A>. If your code is Carbonized, you
+have already made this change. If your code is not Carbonized, you
+can make the change without Carbonizing your entire application using
+the technique shown in the DTS sample code <A HREF="http://developer.apple.com/samplecode/Sample_Code/Networking/OTClassicContext.htm">OTClassicContext</A>.</P>
+
+<H3>OT to OTMP</H3>
+
+<P><A NAME=SystemTask></A>The next step is to switch your
+sync/blocking/threaded OT calls to use OTMP. It's easier to do this
+before converting to preemptive threads because you can debug your
+initial OTMP changes with a standard debugger (good MP task-aware
+debuggers are hard to find). You can safely call OTMP from system
+task time (including Thread Manager threads) as long as you install a
+yielder callback. To install a yielder callback, call the routine
+<CODE>InstallOTMPMainThreadYielder</CODE> (declared in "OTMP.h").
+Make sure you read the header comments for this routine before
+calling it.</P>
+
+<P>The next step is to change all of your Open Transport calls to be
+OTMP calls. OTMP exports two versions of each of the APIs it
+supports.</P>
+
+<UL>
+   <LI>Routines with the OTMP prefix are for use on Mac OS 9 only.
+   This is the appropriate choice if you're building for Mac OS 9
+   only and you want the lightest weight solution.</LI>
+   
+   <LI>Routines with the OTMPX prefix support both Mac OS 9 and Mac
+   OS X. Each routine tests the system version and either calls the
+   corresponding OTMP routine (Mac OS 9) or the OT compatibility
+   routine (provided by Mac OS X). In general, Carbon applications
+   should use these routines.</LI>
+</UL>
+
+<P>You should pick the API that best meets your requirements and then
+start converting your code. The regular expression
+"OT&#91;a-z0-9&#93;+\(" does a good job of finding all of the calls
+to Open Transport in a source file. Search each of your source files
+for these calls and then, for each call, decide on the appropriate
+action.</P>
+
+<UL>
+   <LI>For routines that deals with providers (endpoints, Internet
+   services, and so on), you must call the OTMP equivalent
+   routine.</LI>
+   
+   <LI>For routines that allocate or deallocate memory
+   (<CODE>OTAllocMem</CODE>, <CODE>OTAllocMemInContext</CODE>,
+   <CODE>OTFreeMem</CODE>, <CODE>OTAlloc</CODE>,
+   <CODE>OTAllocInContext</CODE>, <CODE>OTFree</CODE>), you must
+   switch to use the MP memory allocator
+   (<CODE>MPAllocateAligned</CODE>, <CODE>MPFree</CODE>). OTMP does
+   not provide MP-safe OT memory allocators because MP already
+   provides a good memory allocator.</LI>
+   
+   <LI>A number of Open Transport utilities are already MP-safe. See
+   DTS Technote 2006 <A HREF="http://developer.apple.com/technotes/tn/tn2006.html">MP-Safe
+   Routines</A> for details.</LI>
+   
+   <LI>If the call doesn't fit into any of the above categories, you
+   may need to wrap it in an <CODE>MPRemoteCall</CODE>.</LI>
+</UL>
+
+<P>Once you have completed this step you should make sure your
+application still runs correctly before making the switch to MP
+tasks.</P>
+
+<P><STRONG>Important:</STRONG> For regular C programmers,
+<CODE>EndpointRef</CODE> is basically defined as a <CODE>void
+*</CODE>. This makes it easy to accidentally call a real OT routine
+with an <CODE>OTMPEndpointRef</CODE> &#91;2553322&#93;. If your
+program crashes with a PowerPC access exception in the first few
+lines of an OT routine, it's likely that you've made this
+mistake.</P>
+
+<P><STRONG>Important:</STRONG> The current version of OTMP does not
+provide any <CODE>InetSvcRef</CODE> routines. This is deliberate.
+Most users of <CODE>InetSvcRef</CODE> are calling
+<CODE>OTInetStringToAddress</CODE> to translate a DNS string to an
+<CODE>InetAddress</CODE>, which they then pass to OT. If this is the
+case, you should consider using an <CODE>AF_DNS</CODE> address
+instead. See DTS sample code <A HREF="http://developer.apple.com/samplecode/Sample_Code/Networking/OTSimpleDownloadHTTP.htm">OTSimpleDownloadHTTP</A>
+for an example. Using <CODE>AF_DNS</CODE> addresses will help make
+your code more compatible with IPv6. If you use other
+<CODE>InetSvcRef</CODE> routines let me know and I will add those
+routines to OTMP.</P>
+
+<H3>Thread Manager to MP</H3>
+
+<P>The next step is to convert your Thread Manager threads to MP
+tasks. One quick way to flush out any dependencies on Thread Manager
+is to remove ThreadsLib from your project; the linker errors will
+then tell you exactly what Thread Manager routines you use and where
+you use them. You must then work out an MP task equivalent for the
+Thread Manager routines you are using. This can range from the very
+easy (<CODE>MPCreateTask</CODE> instead of <CODE>NewThread</CODE>) to
+the non-trivial (<CODE>ThreadCurrentStackSpace</CODE>). For more
+assistance in this area, see <A HREF="http://developer.apple.com/techpubs/macos8/OSSvcs/MultiPServices/MultiprocessingRef/index.html">Adding
+Multitasking Capabilities to Applications Using Multiprocessing
+Services</A>.</P>
+
+<P>However, converting your Thread Manager calls to MP calls is only
+the tip of the iceberg: you also have to find and fix any MP-unsafe
+code within your threads.</P>
+
+<UL>
+   <LI>The previous section discussed how to convert from OT to OTMP.
+   In addition, <STRONG>any MP task must prepare itself before
+   calling OTMP, and unprepare itself before terminating</STRONG>. To
+   prepare a task call <CODE>OTMPPrepareThisTask</CODE> (or
+   <CODE>OTMPXPrepareThisTask</CODE>). To unprepare a task call
+   <CODE>OTMPUnprepareThisTask</CODE> (or
+   <CODE>OTMPXUnprepareThisTask</CODE>).</LI>
+   
+   <LI>Beyond Open Transport, MP tasks can only call a limited set of
+   system routines. You must carefully analyze the system routines
+   you call from your MP tasks and check that each one is MP-safe.
+   See DTS Technote 2006 <A HREF="http://developer.apple.com/technotes/tn/tn2006.html">MP-Safe
+   Routines</A> for details on which system services are
+   MP-safe.</LI>
+   
+   <LI>For calls that aren't MP-safe, an easy but inefficient
+   workaround is to wrap them in an <CODE>MPRemoteCall</CODE>.
+   However, it may be better to restructure your application to avoid
+   using these MP-unsafe routines.</LI>
+   
+   <LI>Cooperative threading radically simplifies many
+   synchronization problems. For example, you don't have to use
+   critical sections (mutexes) in cooperatively threaded code because
+   the code between two calls to <CODE>YieldToAnyThread</CODE> will
+   never be interrupted. Preemptively scheduled MP tasks will expose
+   a number of these synchronization problems. You must fix these
+   problems, either by using MP synchronization primitives (for
+   example, <CODE>MPEnterCriticalSection</CODE>) or by adopting
+   non-blocking synchronization primitives (such as using
+   <CODE>OTAtomicAdd32</CODE> to update a global counter).</LI>
+</UL>
+
+<P>The OTMPSimpleServerHTTP sample code illustrates a number of the
+techniques required to turn Thread Manager code into MP task
+code.</P>
+
+<H3>Debugging</H3>
+
+<P>Once you have converted your code to use MP tasks, you then have
+the arduous task of debugging it. Unless you have access to an
+MP-aware debugger, the only good debugging technique is printf-style
+debugging. To this end, OTMP is bundled with a library, MoreMPLog,
+that supports a number of useful logging techniques. The easiest to
+grasp technique is, literally, printf-style debugging. MoreMPLog
+provides a routine, <CODE>MPLogPrintfSlow</CODE>, that you can use to
+print text to standard out from an MP task. This routine uses
+<CODE>MPRemoteCall</CODE> to do its job, so it isn't fast. Adding too
+many calls to <CODE>MPLogPrintfSlow</CODE> to your code will
+significantly slow it down (which may have an effect on the problem
+you're trying to debug).</P>
+
+<P>A faster alternative to <CODE>MPLogPrintfSlow</CODE> is
+<CODE>MPLogPrintf</CODE>. This routine logs its text to a memory
+buffer. Before calling this routine you must call
+<CODE>InitMPLog</CODE> to create the log buffer. You can call this
+routine from any execution environment, including MP tasks, system
+task code (the main thread and other cooperative threads), and all
+forms of interrupts.</P>
+
+<P>The MoreMPLog module also provides a number of convenience
+routines to log events and parameters to those events. These routines
+are named <CODE>MPLog</CODE>, <CODE>MPLog1</CODE>, and so on. These
+routines have a number of useful features.</P>
+
+<UL>
+   <LI>Like <CODE>MPLogPrintf</CODE>, these routines can be called
+   from any execution environment.</LI>
+   
+   <LI>They take a "module" parameter which allows you to selectively
+   enable the logging for a particular module. The module parameter
+   acts as a bit number in a <CODE>UInt32</CODE> mask that you can
+   set up using <CODE>MPLogSetMask</CODE>. If that bit is on in the
+   mask when you call <CODE>MPLog</CODE>, the log entry is created.
+   Various components of OTMP use this feature so you can selectively
+   enable and disable their logging of events.</LI>
+   
+   <LI>If you're compiling a non-debug build, MoreMPLog provides null
+   macros for these routines so you don't have to conditionally
+   compile them out yourself.</LI>
+</UL>
+
+<P>There are two ways of looking at the log. The simplest is to call
+the routine <CODE>MPLogWriteToFile</CODE>, which writes the contents
+of the log to a text file. This routine takes a non-synchronized
+snapshot of the log, so if threads are still logging you will see
+inconsistent results. It's often best to call this routine in the
+process of quitting your application, after you have shut down your
+MP tasks.</P>
+
+<P>The second way of looking at the log is using MacsBug. The two key
+MoreMPLog state variables, the logs position and size, are CFM
+exported by the module. If you link with the appropriate options,
+these values will be visible to MacsBug. You can then dump out the
+log from within MacsBug.</P>
+
+<P>As part of its startup processing, MoreMPLog defines a convenience
+macro, "MPLog", for finding the end of the log. When you execute this
+macro from within MacsBug it will search the log for the most recent
+entry and display the last 256 bytes of the log.</P>
+
+<P>To read the log you need to understand a how it is structured.
+Each log entry is surrounded by french quotes (option-\ and
+option-shift-\, &#171; and &#187;). The most recent entry is
+immediately followed by a bullet character (option-8, &#149;). Note
+that the log can wrap around at the end of the buffer: the end of the
+buffer includes a text mark "___End Buffer___" so that you can easily
+spot it.</P>
+
+<H2><A NAME=HowItWorks></A>How it Works</H2>
+
+<P>This section describes how the OTMP library works, in gruesome
+detail. If your goal is to ship your next cool Mac product, you can
+probably skip this section. If you want to learn about the gory
+details inside this library, read on MacDuff!</P>
+
+<P>The key difficulty in implementing OTMP was to provide blocking
+network I/O on Mac OS 9. On Mac OS X the Carbon Open Transport
+compatibility library provides convenient and efficient blocking
+networking, so on that platform OTMP just calls the system and lets
+it do the heavy lifting. However, things are not that simple on Mac
+OS 9.</P>
+
+<P>On Mac OS 9 it's not possible to do networking directly from an MP
+task. Open Transport is not MP-safe. Therefore, OTMP must get the
+main task to do all the actual networking. There are three key
+problems to consider.</P>
+
+<UL>
+   <LI>MP to main communications -- When an MP task performs some
+   network operation, it must signal the main task to actual call
+   Open Transport. For good performance, this signaling mechanism
+   must have a low latency. <CODE>MPRemoteCall</CODE>, which stalls
+   the MP task until some application calls <CODE>SystemTask</CODE>,
+   does not meet this requirement.</LI>
+   
+   <LI>Main to MP communications -- Once the MP task has signaled the
+   main task to start an asynchronous operation, the MP task must
+   block waiting for the operation to complete. When the operation
+   completes (which typically happens at deferred task time), the
+   main task must unblock the MP task, also with a minimum
+   latency.</LI>
+   
+   <LI>Global Synchronization -- The communication between MP tasks
+   and the main task implies that some data structure must be shared
+   by the two execution environments. Access to this data structure
+   must be synchronized to prevent race conditions. However, the two
+   environments are very different, and require different
+   synchronization primitives. For example, the main task can't call
+   <CODE>MPEnterCriticalSection</CODE> at deferred task time and MP
+   tasks can't call <CODE>OTEnterNotifier</CODE>.</LI>
+</UL>
+
+<P>Each of these topics is discussed in a later section. But first,
+let's look at the core data structures used by OTMP.</P>
+
+<H3>Data Structures</H3>
+
+<P>OTMP uses three core data structures, as shown in Figure 1.</P>
+
+<P><A NAME=Figure1></A></P>
+
+<CENTER><IMG SRC="ReadMeFigure1.gif" WIDTH=396 HEIGHT=405 ALIGN=bottom>
+
+<P><B>Figure 1. OTMP Data Structures</B></P></CENTER>
+
+<P><A NAME=EventGroupAllocation></A>For every MP task that is
+prepared to call OTMP (every task that has called
+<CODE>OTMPPrepareThisTask</CODE>) there is an
+<CODE>OTMPTaskData</CODE> structure. This structure is referenced by
+a per-task variable (see <A HREF="http://developer.apple.com/techpubs/macos8/OSSvcs/MultiPServices/MultiprocessingRef/MP.5e.html"><CODE>MPGetTaskStorageValue</CODE></A>)
+and is allocated when the task calls <CODE>OTMPPrepareThisTask</CODE>
+and deallocated when the task calls
+<CODE>OTMPUnprepareThisTask</CODE>. The only interesting field of
+this structure is <CODE>waitEvents</CODE>, an MP <A HREF="http://developer.apple.com/techpubs/macos8/OSSvcs/MultiPServices/MultiprocessingRef/MP.40.html">event
+group</A> that is allocated along with the structure. This event
+group is used to block MP tasks when they are waiting for the main
+task to complete an operation.</P>
+
+<P><B>Note:</B> A per-task data structure is used to avoid memory
+allocations on the data path. It is not possible to allocate an event
+group per provider because there can be more than one outstanding
+blocking operations on the same provider (for example, an
+<CODE>OTMPSnd</CODE> and an <CODE>OTMPRcv</CODE>). On the other hand,
+allocating an event group for each operation would slow down every
+operation, including operations on the data path that should be
+quick. Using an event group per task is a good middle position. It's
+not possible for a task to do two blocking calls simultaneously, so
+an event group per task is sufficient. It is also efficient, because
+it uses a single lightweight call (<A HREF="http://developer.apple.com/techpubs/macos8/OSSvcs/MultiPServices/MultiprocessingRef/MP.5e.html"><CODE>MPGetTaskStorageValue</CODE></A>)
+instead of a call that requires allocation (<A HREF="http://developer.apple.com/techpubs/macos8/OSSvcs/MultiPServices/MultiprocessingRef/MP.41.html"><CODE>MPCreateEvent</CODE></A>).</P>
+
+<P>The next core data structure is the <CODE>OTMPProvider</CODE>. It
+wraps the underlying Open Transport provider (a reference to which is
+in the <CODE>otEP</CODE> field) and adds some additional fields. The
+most important extra field is <CODE>waitRecords</CODE>, a linked list
+of all operations blocked on this provider.</P>
+
+<P><B>Note:</B> This has to be a list rather than a single pointer
+because there can be more than one outstanding blocking operation on
+the provider.</P>
+
+<P><B>Note:</B> Although the "EP" in <CODE>otEP</CODE> and
+<CODE>mpEP</CODE> implies that OTMP deals exclusively with endpoints,
+that is not true. Just like OT, OTMP works on providers at the bottom
+level. While OTMP currently only supports one class of providers, the
+endpoint class, this may not always be true.</P>
+
+<P>The final core data structure is the <CODE>OTMPWaitRecord</CODE>.
+This structure holds all the information needed for</P>
+
+<UL>
+   <LI>the MP task to request the main task to do a network
+   operation</LI>
+   
+   <LI>the MP task to block waiting for the main task to complete the
+   operation</LI>
+   
+   <LI>the main task to unblock the MP task</LI>
+</UL>
+
+<P>The <CODE>link</CODE> field is used to chain together all of the
+wait records for a given provider. The concurrency control on this
+list is a tricky topic and is <A HREF="#GlobalSync">discussed
+below</A>.</P>
+
+<P>The <CODE>waitingFor</CODE> field holds an
+<CODE>OTEventCode</CODE> that describes the event that the operation
+is waiting for. The example in figure one shows an
+<CODE>OTMPBind</CODE> operation, and hence the value is
+<CODE>T_BINDCOMPLETE</CODE>. When the provider's notifier (which is
+run by the main task) is called with this value, the main task will
+unblock the corresponding MP task.</P>
+
+<P>It's important to recognize that this value is not matched
+exactly. For example, if an MP task does an <CODE>OTMPRcv</CODE> and
+no data is present, a wait record is queued with a
+<CODE>waitingFor</CODE> value of <CODE>T_DATA</CODE>. However, if the
+endpoint disconnects before more data arrives, the endpoint's
+notifier will be called with a <CODE>T_DISCONNECT</CODE> event, which
+will cause the wait record to be dequeued and the MP task to continue
+with a <CODE>kOTLookErr</CODE>. For more details, see the comments
+associated with the routine <CODE>WaitRecordSearchProc</CODE> in
+"OTMP.c".</P>
+
+<P>The <CODE>noteProc</CODE> field of the wait record contains a
+pointer to a routine that is called when the <CODE>waitingFor</CODE>
+event is delivered to the notifier. It allows the routine to do
+event-specific notification processing. <CODE>OTMPBind</CODE> does
+not need this, so it sets this field to <CODE>NULL</CODE>.</P>
+
+<P>The <CODE>waitEvents</CODE> field contains the ID of the event
+group associated with the MP task that made the request. The code
+running in the main task set an event in this event group when it
+wants to unblock the MP task (see <A HREF="#BlueToMP">Main to MP
+Communication</A>). This field is <CODE>kInvalidID</CODE> when the
+request is made by cooperatively scheduled code (the main thread or a
+Thread Manager thread). In that case, the cooperative code polls the
+<CODE>waitComplete</CODE> Boolean and unblocks when the notifier sets
+it to true.</P>
+
+<P>The <CODE>waitResult</CODE> field holds the result of the
+operation. Although this field is initialized to
+<CODE>ioInProgress</CODE> (1) it is not possible to poll this field
+because some OT routines (for example, <CODE>OTMPIoctl</CODE> and
+<CODE>OTMPSnd</CODE>) return positive values to indicate success.
+When the MP task unblocks it extracts the operation result from this
+field and returns it as the function result for the OTMP routine.</P>
+
+<P>The final field of the wait record is labeled <CODE>blue</CODE>.
+This is a <A HREF="#MPToBlue">Blue action</A> that is used schedule
+an operation that runs on the main task as soon as possible. It is
+basically a wrapper around a deferred task: it contains a pointer to
+a routine that is called at deferred task time. See <A HREF="#MPToBlue">MP
+To Main Communication</A> for more details.</P>
+
+<P>The wait record is actually a sub-field of other structures that
+holds additional parameters. The first wrapper structure is a
+<CODE>StdParam</CODE>. This holds fields required for standard OT
+operations, that is an operation on an provider that might run
+asynchronously. Some OTMP operations are not standard operations (for
+example, <CODE>OTMPOpenEndpointQInContext</CODE> is non-standard
+because there is no endpoint present when the operation starts) but
+most operations are standard (including <CODE>OTMPBind</CODE>, which
+is used in this example).</P>
+
+<P>Aside from the embedded wait record, the <CODE>StdParam</CODE>
+structure includes two additional fields. The <CODE>mpEP</CODE> field
+is a reference back to the <CODE>OTMPProvider</CODE>. This is
+required as part of the <CODE>StdAction</CODE> routine, which is
+<A HREF="#StdAction">discussed later</A>. The second extra field is
+<CODE>stdAction</CODE>, a pointer to a callback routine used by
+<CODE>StdAction</CODE>.</P>
+
+<P>The outmost level of wrapping around the wait record is a
+parameter block that is unique to each OTMP routine. This parameter
+block embeds the wait record (inside a <CODE>StdParam</CODE>, if the
+routine implements a standard operation) and the other parameters
+necessary for the routine. In this example we can see that
+<CODE>BindParam</CODE> includes a <CODE>StdParam</CODE> (which holds
+the <CODE>mpEP</CODE> parameter to <CODE>OTMPBind</CODE>) and two
+other fields to hold the <CODE>reqAddr</CODE> and
+<CODE>retAddr</CODE> parameters to <CODE>OTMPBind</CODE>.</P>
+
+<P>One crucial aspect of these routine-specific parameter blocks is
+that they exist on the stack (that is, the parameter block is a local
+variable of the OTMP routine). The OTMP routine fills out the fields
+of the parameter block, starts the operation by scheduling a Blue
+action, and then blocks until the main task has completed the
+operation and unblocks it. By allocating the parameter block on the
+stack we minimize the overhead of memory allocations on the data
+path.</P>
+
+<H3><A NAME=MPToBlue></A>MP to Main Communication</H3>
+
+<P>Communication from MP to the main task is done via Blue actions,
+implemented in the module MoreBlueActions. A Blue action is much like
+a deferred task. The client supplies a <CODE>MoreBlueAction</CODE>
+structure to a routine <CODE>MoreBlueActionInstall</CODE>, which adds
+the structure to a linked list of structures
+(<CODE>gMoreBlueActionList</CODE>). The module then installs a
+deferred task (using <CODE>DTInstall</CODE>). When the deferred task
+callback (<CODE>MoreBlueActionsRun</CODE>) executes, it dequeues all
+of the Blue actions on the list and calls their associated action
+callback. MoreBlueActions uses a single deferred task to run all
+queued Blue actions, and uses an atomic lock,
+<CODE>gMoreBlueActionsRunInUse</CODE>, to track the usage of that
+deferred task.</P>
+
+<P>OTMP uses Blue actions to schedule operations to run on the main
+task. The <CODE>blue</CODE> field of the wait record is the Blue
+action used for that record. <A NAME=StdAction></A>For a standard
+operation, the <CODE>blue</CODE> field contains a pointer to the
+routine <CODE>StdAction</CODE>. When this routine is called at
+deferred task time it does three things.</P>
+
+<OL>
+   <LI>On entry <CODE>StdAction</CODE> enters the provider's
+   notifier. On exit it leaves the notifier. This locks out other
+   notifications while the routine is running. This is a required
+   part of the <A HREF="#GlobalSync">global synchronization
+   model</A>.</LI>
+   
+   <LI><CODE>StdAction</CODE> calls the callback routine referenced
+   by the <CODE>stdAction</CODE> field of the <CODE>StdParam</CODE>
+   structure. This routine is different from a standard Blue action
+   in that it returns a Boolean result indicating whether the
+   operation is complete.</LI>
+   
+   <LI>If the callback routine returns true, <CODE>StdAction</CODE>
+   completes the wait record, which unblocks the MP task. If the
+   callback returns false, <CODE>StdAction</CODE> adds the wait
+   record to the list of wait records associated with the provider.
+   An event in the future (the delivery of an event to the provider's
+   notifier) will complete the operation and unblock the MP
+   task.</LI>
+</OL>
+
+<P>See the <CODE>StdAction</CODE> routine in "OTMP.c" for more
+details.</P>
+
+<H3><A NAME=BlueToMP></A>Main to MP Communication</H3>
+
+<P>Communication from the main task to the MP task in done via an
+event group. The allocation of this event group is <A HREF="#EventGroupAllocation">discussed
+above</A>. After the MP task has initialized an operation parameter
+block, it schedules a Blue action to start the operation. It then
+blocks itself on its event group. When the operation completes, the
+code in the main task (typically running at deferred task time) is
+responsible for unblocking the MP task. It does this in three
+steps.</P>
+
+<OL>
+   <LI>It sets the <CODE>waitResult</CODE> field of the wait record
+   to the result of the operation. After being unblocked the OTMP
+   routine will return this as its function result.</LI>
+   
+   <LI>It sets the <CODE>waitComplete</CODE> field of the wait record
+   to true. This will unblock a cooperatively scheduled caller of
+   OTMP. See <A HREF="#SystemTaskExecution">System Task Execution</A>
+   for more details on how cooperatively scheduled clients of OTMP
+   work.</LI>
+   
+   <LI>If the <CODE>waitEvents</CODE> field of the wait record is not
+   <CODE>kInvalidID</CODE>, it sets a bit it the event group using
+   <CODE>MPSetEvent</CODE>. This will unblock an MP task caller of
+   OTMP.</LI>
+</OL>
+
+<P>See the <CODE>CompleteWaitRecord</CODE> routine in "OTMP.c" for
+the exact code.</P>
+
+<P><CODE>CompleteWaitRecord</CODE> is called in two broad classes of
+scenario.</P>
+
+<UL>
+   <LI>If the Blue action completes immediately (either because it's
+   an immediate operation (for example, <CODE>OTLook</CODE>) or
+   because the attempt to start an asynchronous operation failed (for
+   example, <CODE>OTBind</CODE> returns an error), the Blue action
+   calls <CODE>CompleteWaitRecord</CODE> directly.</LI>
+   
+   <LI>If the Blue action successfully starts an asynchronous
+   operation, it adds the wait record to the provider's list of wait
+   records and returns. When the operation completes, the provider's
+   notifier is called. The notifier finds the correct wait record by
+   walking the list of wait records, matching the notifier's
+   <CODE>OTEventCode</CODE> parameter to the <CODE>waitingFor</CODE>
+   field of each wait record. When it finds a match, it removes the
+   wait record from the list and, in most cases, calls
+   <CODE>CompleteWaitRecord</CODE> to unblock the MP task.</LI>
+</UL>
+
+<H3><A NAME=GlobalSync></A>Global Synchronization Model</H3>
+
+<P>Whenever you write multithreaded code it is vital to synchronize
+accesses to data shared between the threads. OTMP is no exception to
+this rule. However, OTMP's job is particularly tricky because it
+lives on the boundary between two threading models, MP tasks and Open
+Transport (deferred tasks and notifiers).</P>
+
+<P>MP tasks can use MP critical sections (mutexes) to synchronized
+access to their shared data. However, MP critical sections can not be
+used to synchronize with deferred tasks -- they are blocking
+operations, and it is not safe for the main task to block at deferred
+task time. On the other hand the main task can use deferred tasks and
+notifiers to synchronize access to its shared data, but this will not
+stop MP task accessing it. MP tasks can not call
+<CODE>OTEnterNotifier</CODE>!</P>
+
+<P>OTMP's solution to this is to access all shared data from an OT
+notifier running at deferred task time in the main task. The MP task
+is responsible for initializing an operation parameter block and then
+queuing a Blue action. The Blue action does all of the work. It's
+running as a deferred task so it can use standard OT mechanisms to
+synchronize access to data.</P>
+
+<P>The key data structure that needs protection is the
+<CODE>waitRecords</CODE> list in the <CODE>OTMPProvider</CODE>. This
+list is a standard OT list and thus OTMP must ensure than only one
+thread of execution is touching it at any given time. It does this in
+the following way.</P>
+
+<UL>
+   <LI>Blue actions always run at deferred task time.</LI>
+   
+   <LI>Blue actions that modify the list will always call
+   <CODE>OTEnterNotifier</CODE> before doing so. This prevents an OT
+   notification from being delivered while the Blue action is
+   running.</LI>
+   
+   <LI>OT notifications are typically executed at deferred task time.
+   However, this is not always the case. It OT calls OTMP's notifier
+   at system task time, OTMP switches to deferred task time to
+   actually do the work.</LI>
+   
+   <LI>OT notifications implicitly hold the notification lock for the
+   endpoint. This prevents other notifications for the same endpoint
+   from running until the notifier returns. Also, OT notifications
+   run at deferred task time, which prevents any Blue actions from
+   interrupting the notifier (Blue actions also run at deferred task
+   time and deferred tasks are serialized).</LI>
+</UL>
+
+<P><B>Note:</B> The third and fourth point are the reasons why the
+OTMPX routines must call the system-supplied OT compatibility library
+on Mac OS X rather than just calling the corresponding OTMP routine.
+Mac OS X provides no concurrency guarantees between deferred tasks
+and OT notifiers.</P>
+
+<H3>A Walk Through OTMPXBind</H3>
+
+<P>To illuminate the topics covered in the previous sections, let's
+look at the various steps taken by <CODE>OTMPXBind</CODE> when it's
+called by an MP task.</P>
+
+<OL>
+   <LI><CODE>OTMPXBind</CODE> tests whether it's running on Mac OS X.
+   The technique used is described in DTS Q&amp;A OV 03 <A HREF="http://developer.apple.com/qa/ov/ov03.html">Detecting
+   Classic and Carbon Environments</A>. If it's running on Mac OS X,
+   it calls <CODE>OTBind</CODE> and returns. Mac OS X's Open
+   Transport compatibility library is safe to call from MP tasks. If
+   it's running on Mac OS 9, <CODE>OTMPXBind</CODE> calls
+   <CODE>OTMPBind</CODE>. All of the remaining steps describe the
+   process on Mac OS 9.</LI>
+   
+   <LI><CODE>OTMPBind</CODE> initializes a stack-based
+   <CODE>BindParam</CODE> structure to the state shown in <A HREF="#Figure1">Figure
+   1</A>. It then calls an OTMP internal routine,
+   <CODE>QueueBlueAndWait</CODE>.</LI>
+   
+   <LI><CODE>QueueBlueAndWait</CODE> starts by calling
+   <CODE>MoreBlueActionInstall</CODE> to schedule the Blue action
+   associated with the operation. At this point the execution paths
+   fork. The MP task continues to run <CODE>QueueBlueAndWait</CODE>,
+   while the main task takes an interrupt and schedules a deferred
+   task which eventually runs the Blue action (in this case
+   <CODE>StdAction</CODE>). I will discuss the MP task first although
+   you must remember that these operations can happen in different
+   orders.</LI>
+   
+   <LI>The MP task continues the execution of
+   <CODE>QueueBlueAndWait</CODE>. The next step is for the MP task to
+   block waiting on the <CODE>waitEvents</CODE> field of the event
+   record. The task remains blocked until it is unblocked by the Blue
+   action.</LI>
+   
+   <LI>At some point after calling <CODE>MoreBlueActionInstall</CODE>
+   (step 3) the main task runs the Blue action, in this case
+   <CODE>StdAction</CODE>. This routine calls
+   <CODE>OTEnterNotifier</CODE> to prevent OT calling the endpoint's
+   notifier. It then calls the standard action (the
+   <CODE>stdAction</CODE> field of the <CODE>StdParam</CODE>
+   structure), which in this case calls
+   <CODE>BindStdAction</CODE>.</LI>
+   
+   <LI><CODE>BindStdAction</CODE> is quite simple. It calls
+   <CODE>OTBind</CODE> with the parameters stored in the
+   <CODE>BindParam</CODE> parameter block. It is safe to call OT at
+   this time because we're running as a deferred task on the main
+   task. <CODE>BindStdAction</CODE> then returns, with a return
+   result of either true (the <CODE>OTBind</CODE> call returned an
+   error) or false (the <CODE>OTBind</CODE> call succeeded).</LI>
+   
+   <LI>At this point <CODE>StdAction</CODE>'s behavior varies
+   depending on the result from the standard action
+   (<CODE>BindStdAction</CODE>). If the result is true,
+   <CODE>StdAction</CODE> will complete the wait record and unblock
+   the MP task by calling <CODE>CompleteWaitRecord</CODE>. However,
+   for the sake of this discussion let's assume that the result is
+   false. In that case <CODE>StdAction</CODE> adds the wait record to
+   the endpoint's <CODE>waitRecords</CODE> list.</LI>
+   
+   <LI>Before returning, <CODE>StdAction</CODE> calls
+   <CODE>OTLeaveNotifier</CODE> to unblock notifications on this
+   endpoint (they were blocked in step 5). It's likely that the
+   <CODE>T_BINDCOMPLETE</CODE> event has already occurred (the bind
+   operation is very fast), in which case this call will actually
+   deliver that event to the endpoint's notifier
+   (<CODE>TrueBlueNotifier</CODE>).</LI>
+   
+   <LI><CODE>TrueBlueNotifier</CODE> determines that it is being
+   called at deferred task time, and so can call BlueNotifier without
+   any complications.</LI>
+   
+   <LI><CODE>BlueNotifier</CODE> searches the endpoint's
+   <CODE>waitRecords</CODE> list for a wait record that matches the
+   event that is being delivered. In this case it finds the wait
+   record that was added to the list in step 7. It removes that wait
+   record from the list and looks at the <CODE>noteProc</CODE> field.
+   If <CODE>noteProc</CODE> is not <CODE>NULL</CODE>,
+   <CODE>BlueNotifier</CODE> calls it. However, in the case of
+   <CODE>OTMPBind</CODE> the <CODE>noteProc</CODE> field is
+   <CODE>NULL</CODE>, which indicates that this request does not
+   require notification processing: <CODE>BlueNotifier</CODE> can
+   complete the wait record by calling
+   <CODE>CompleteWaitRecord</CODE>. It uses the notifier's
+   <CODE>result</CODE> parameter as the operation result for the wait
+   record.</LI>
+   
+   <LI><CODE>CompleteWaitRecord</CODE> stores the operation result
+   into the <CODE>waitResult</CODE> field of the wait record and then
+   sets <CODE>waitComplete</CODE> to true. It then sets an event in
+   the event group designated by the <CODE>waitEvents</CODE> field.
+   This unblocks the MP task that was blocked in step 4. It then
+   returns to <CODE>BlueNotifier</CODE>, which in turns returns to
+   OT, which returns from <CODE>OTLeaveNotifier</CODE> to
+   <CODE>StdAction</CODE>, which returns to the Blue actions module,
+   which returns to the Deferred Task Manager. The critical thing is
+   that none of these routines touch the wait record after the MP
+   task has been unblocked. This is necessary because the wait record
+   exists on the MP task's stack, and may well be destroyed as soon
+   as the MP task unblocks.</LI>
+   
+   <LI>After being unblocked (in the step above) the MP task is now
+   running the remainder of <CODE>QueueBlueAndWait</CODE>. This
+   extracts the operation result from the wait record and returns it
+   as its function result to <CODE>OTMPBind</CODE>, which returns the
+   result to <CODE>OTMPXBind</CODE>, which returns the result to the
+   original caller.</LI>
+</OL>
+
+<P>Neat huh?</P>
+
+<P>While this is an accurate description of the implementation of
+<CODE>OTMPXBind</CODE>, it is an idealized view of OTMP as a whole.
+There are a number of OT routines that do not have simple completion
+events, or have two completion events, or where OT breaks reentrancy
+invariants. Some of the trickier cases include
+<CODE>OTMPXOpenEndpointQInContext</CODE>,
+<CODE>OTMPXCloseProvider</CODE>, <CODE>OTMPXLook</CODE>,
+<CODE>OTMPXConnect</CODE>, <CODE>OTMPXSnd</CODE>,
+<CODE>OTMPXRcv</CODE>, <CODE>OTMPXListen</CODE> and
+<CODE>OTMPXAccept</CODE>. These corner cases are extensively
+documented in comments in "OTMP.c".</P>
+
+<H3><A NAME=SystemTaskExecution></A>System Task Execution</H3>
+
+<P>As mentioned <A HREF="#SystemTask">earlier in this document</A> it
+is possible to call OTMP from cooperative scheduled code. This has a
+number of consequences. First, when a cooperative thread calls OTMP
+there's no need for an event group on which to block the thread while
+waiting for the network. This is good because the technique used to
+store the event group's ID (per-MP task storage) does not work well
+for multiple cooperative threads within the main task. Instead of
+blocking on an event group the cooperative thread simply spins on the
+<CODE>waitComplete</CODE> field of the wait record. While it's
+spinning it calls the thread yielder (installed using
+<CODE>InstallOTMPMainThreadYielder</CODE>) which allows the client
+application to yield time to other threads and processes.</P>
+
+<UL>
+   <LI>Step 4 -- Instead of blocking on the event group, the
+   cooperative thread loops waiting for the <CODE>waitComplete</CODE>
+   field to become true. While looping it calls the thread yielder
+   (if any) installed by the client.</LI>
+   
+   <LI>Step 10 -- Wait records initialized by cooperative threads
+   have their <CODE>waitEvents</CODE> field set to
+   <CODE>kInvalidID</CODE>. <CODE>CompleteWaitRecord</CODE> detects
+   this special case and doesn't attempt to set an event in this
+   event group. Setting <CODE>waitComplete</CODE> to true is
+   sufficient to unblock the cooperatively scheduled thread.</LI>
+</UL>
+
+<H3>Reusing OTMP Techniques</H3>
+
+<P>It is possible to reuse the techniques described above to make any
+Mac OS 9 interrupt-safe system service available from MP tasks. For
+example, say you want to call the USB API synchronously from an MP
+task. You can do this by</P>
+
+<UL>
+   <LI>creating a per-task event group,</LI>
+   
+   <LI>allocating a <CODE>USBPB</CODE> on your MP task's stack,</LI>
+   
+   <LI>using <CODE>DTInstall</CODE> (or
+   <CODE>MoreBlueActionInstall</CODE>) to run a Blue action that does
+   an asynchronous USB operation from deferred task time,</LI>
+   
+   <LI>blocking the MP task on the event group, and</LI>
+   
+   <LI>having the USB operation's completion routine set an event in
+   the event group to unblock the MP task.</LI>
+</UL>
+
+<P>Apple has used techniques similar to this to make the File Manager
+and Device Manager callable from MP tasks. You can extend this
+technique for any Mac OS API that is callable at <A HREF="http://developer.apple.com/technotes/tn/tn1104.html">interrupt
+time</A> (for example, USB, FireWire, SCSI Manager, ATA Manager,
+Sound Manager).</P>
+
+<H2><A NAME=Caveats></A>Caveats</H2>
+
+<P>This sample has a number of caveats of which you should be
+aware.</P>
+
+<UL>
+   <LI>Due to a bug in CarbonLib &#91;2563553&#93;, OTMP will not run
+   if a version of CarbonLib older than 1.2.5 is installed. You can
+   use the function <CODE>OTMPGetCanRunStatus</CODE> to determine
+   whether OTMP will run on the current system.</LI>
+   
+   <LI>Due to a bug in the system software, this sample may be
+   unreliable when run on Mac OS 9.1. The problem is that
+   <CODE>MPRemoteCall</CODE> sometimes deadlocks the system on Mac OS
+   9.1. The only workaround is to not use Mac OS 9.1. The problem
+   does not occur on Mac OS 9.0.x and is fixed on Mac OS 9.2.x.</LI>
+   
+   <LI>OTMP does not implement all the the OT APIs that make sense to
+   call from MP tasks. Some routines, such as
+   <CODE>OTInetStringToAddress</CODE>, were deliberately omitted.
+   Other routines, for example <CODE>OTInetAddressToName</CODE>, were
+   left out because I ran out of time. Adding these routines is left
+   as an exercise for the reader (-: Seriously though, if you need
+   any additional OT routines please let me know and I will update
+   the sample.</LI>
+   
+   <LI>There is no 68K support. This makes sense given that the OTMP
+   library uses MP features that are only available on Mac OS 9,
+   which in turn requires a PowerPC-based computer.</LI>
+   
+   <LI>OTMP uses a per-task storage variables, as provided by the MP
+   library's <CODE>MPAllocateTaskStorageIndex</CODE> routine. These
+   variables are a very limited resource (current implementations
+   only provide 32), so it's possible to run out.</LI>
+   
+   <LI>This sample makes use of the <A HREF="http://developer.apple.com/samplecode/Sample_Code/Networking/OTClassicContext.htm">OTClassicContext</A>
+   library. See that library's Read Me document for caveats
+   associated with the use of that library.</LI>
+   
+   <LI>OTMPTest is a program I used it to explore various issues
+   during development; it's code is not meant to be copied into a
+   production application, which is why it isn't included in the
+   official sample distribution (it is available, however, as part of
+   MoreIsBetter). If you want to copy code for your production
+   application, copy it from the OTMPSimpleServerHTTP sample.</LI>
+   
+   <LI>OTMP does not provide any notification mechanism. If you need
+   to receive unusual events from OT (for example,
+   <CODE>T_ATALKCABLERANGECHANGEDEVENT</CODE> ), you will have to
+   either add your own notification mechanism to OTMP or just not use
+   OTMP for that part of your software.</LI>
+   
+   <LI>OTMP currently has no support for no copy sends (AckSends) and
+   receives. Adding support for no copy receives is fairly easy, but
+   adding support for no copy sends requires a little design effort
+   to solve the issue of how OT returns buffers to your preemptive
+   threads.</LI>
+   
+   <LI>OTMP does not currently support non-blocking I/O. I believe
+   that you can use <CODE>OTMPCountDataBytes</CODE> to avoid the need
+   for non-blocking I/O. If I'm wrong, please let me know.</LI>
+   
+   <LI>The implementation of <CODE>OTMPAccept</CODE> (and hence
+   <CODE>OTMPXAccept</CODE> when running on Mac OS 9) has a race
+   condition that you must avoid in your code. See the comments in
+   "OTMP.h" for details.</LI>
+   
+   <LI>OTMP does not properly support expedited data. There are a
+   variety of technical reasons for this (see the comments in
+   "OTMP.c"). I could probably fix this, but at the moment I'm taking
+   the position that very few protocols use expedited data and thus
+   this problem is not a high priority. Let me know if I'm
+   wrong.</LI>
+   
+   <LI>Mac OS X Public Beta had a number of MP-related bugs that
+   cause problems for the OTMPSimpleServerHTTP sample. These bugs are
+   fixed in Mac OS X 10.0.
+   
+   <UL>
+      <LI>The clean quitting approach implemented by
+      OTMPSimpleServerHTTP does not work under Carbon on Mac OS X
+      Public Beta. This is due to a bug in
+      <CODE>OTCancelSynchronousCalls</CODE> on that platform
+      &#91;2529685&#93;. The workaround on Public Beta is to quit the
+      application using the Quit menu command (command-Q) without
+      first shutting down the server with the "q" command.</LI>
+      
+      <LI><CODE>MPLogPrintfSlow</CODE> uses
+      <CODE>MPRemoteCall</CODE>, which isn't implemented on Mac OS X
+      Public Beta &#91;2544931&#93;. I have hacked up a workaround
+      that is good enough to get the sample to a demoable state. See
+      the comments in the implementation of that routine for details.
+      I've left that hack in place for the time being, although I
+      will eventually remove it once Public Beta is long
+      forgotten.</LI>
+      
+      <LI>On Mac OS X Public Beta the construct
+      <CODE>MPTaskIsPreemptive(kInvalidID)</CODE> will always return
+      true, regardless of whether you're running on the main thread
+      or a preemptive thread &#91;2552548&#93;. Fortunately, all of
+      the calls to <CODE>MPTaskIsPreemptive</CODE> that run on Mac OS
+      X are inside debug assertions. The workaround is to ignore
+      these debug assertions.</LI>
+   </UL>
+   </LI>
+   
+   <LI>The OTMPSimpleServerHTTP sample is not a production HTTP
+   server. The purpose of this sample is to demonstrate the OTMP
+   library, not to show you how to write an HTTP server.
+   
+   <UL>
+      <LI>The sample creates an endpoint for each connection, and
+      disposes of it when the connection closes. This is bad for
+      performance because it takes a long time to create an endpoint,
+      especially on traditional Mac OS. A production server should
+      implement HTTP "keepalive" and create a pool of endpoints for
+      reuse by various connections.</LI>
+      
+      <LI>The sample creates an MP task for each connection, and
+      disposes of it when the connection closes. This is bad for
+      performance because it takes a long time to create an MP task,
+      especially on Mac OS X. A production server should create a
+      pool of MP tasks for reuse by various connections.</LI>
+      
+      <LI>The sample does a very poor job of parsing incoming
+      requests. It is susceptible to buffer overrun attacks. A
+      production server must protect against this form of
+      attack.</LI>
+      
+      <LI>The sample copies data to the endpoint in 4 KB chunks. A
+      production server would use larger buffers, and cache the
+      contents of files to prevent excessive File Manager load
+      (especially on Mac OS 9).</LI>
+      
+      <LI>The sample uses a 64 KB stack for all MP tasks. This is
+      probably excessive, but I haven't done the analysis required to
+      reduce it.</LI>
+   </UL>
+   </LI>
+</UL>
+
+<H2>Credits and Version History</H2>
+
+<P>If you find any problems with this sample, mail
+&lt;DTS@apple.com&gt; and we will try to fix them up.</P>
+
+<UL>
+   <LI>1.0d1 (Sep 2000) was released to a few employees for testing
+   purposes.</LI>
+   
+   <LI>1.0a1 (Nov 2000) was released to Apple employees only for
+   internal evaluation.</LI>
+   
+   <LI>1.0a2 (Dec 2000) is the first general release.</LI>
+   
+   <LI>1.0a3 (Feb 2001) is the first cut at a release for Mac OS X
+   10.0. It still has a number of rough edges; I will polish them in
+   subsequent releases.</LI>
+   
+   <LI>1.0a4 (Jul 2001) is an interim release to fix a particularly
+   nasty bug uncovered by a developer during testing.</LI>
+   
+   <LI>1.0a5 (Sep 2001) is the polished release that includes both of
+   the recent updates (Mac OS X support and the 1.0a4 bug fix).</LI>
+</UL>
+
+<P>Share and Enjoy.</P>
+
+<P>Worldwide Developer Technical Support<BR>
+21 Sep 2001</P>
+
+<P></P>
+</BODY>
+</HTML>

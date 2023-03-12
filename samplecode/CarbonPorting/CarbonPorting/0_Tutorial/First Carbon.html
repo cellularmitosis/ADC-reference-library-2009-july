@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+        "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+	<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+	<title>First Carbon Version</title>
+	<link rel="stylesheet" href="SampleCode.css" type="text/css" />
+</head>
+<body>
+<h1>Tutorial: Updating a Classic application to modern Carbon</h1>
+<h2>2. The First Carbon Version</h2>
+<p>
+The first Carbon version minimizes changes from step 1 as much as possible to create an application that will launch natively in Mac OS X. The Classic version first gets updated to use CarbonAccessors.o and from there it's a simple matter to change it over to Carbon. The major difference is that the Aqua appearance has different metrics than the Platinum appearance so the UI has to be updated to present the proper versions of the windows and controls.
+</p>
+<img src="WindowAqua.png" alt="Aqua Window" width="315" height="507" align="top" />
+<img src="DialogAqua.png" alt="Aqua Dialog" width="321" height="563" align="top" />
+<p>For applications with a lot of UI, updating the metrics in the resource files may be prohibitively time consuming and you may wish to skip straight to using Interface Builder nib files discussed in <a href="HIToolbox.html">Step 6: HIToolbox</a>. The main code change is a few calls to QDFlushPortBuffer(), such as in the code that simulates a button click in the preferences dialog.
+</p>
+<div class="mycodebox">
+<pre>
+static Boolean dialogFilter(EventRecord *event, DialogRef *theDialog, DialogItemIndex *itemHit)
+{
+    Boolean eventHandled = false;
+    char charCode, keyCode;
+    
+    switch (event->what)
+    {
+        case keyDown:    // handle key presses not handled by DialogSelect
+        case autoKey:
+            *theDialog = GetDialogFromWindow(FrontNonFloatingWindow());
+            SetPortDialogPort(*theDialog);
+            charCode = event->message &amp; charCodeMask;
+            keyCode = (event->message &amp; keyCodeMask) >> 8;
+            
+            if ( (keyCode == kEnterKeyCode) || (keyCode == kReturnKeyCode) || 
+                (keyCode == kEscapeKeyCode) || 
+                ( ((event->modifiers &amp; cmdKey) != 0) &amp;&amp; (charCode == '.') ) )
+            {
+                ControlRef button;
+                CGrafPtr dialogPort;
+                unsigned long finalTicks;
+                
+                if ( (keyCode == kEnterKeyCode) || (keyCode == kReturnKeyCode) )
+                {
+                    GetDialogItemAsControl(*theDialog, kStdOkItemIndex, &amp;button);
+                    *itemHit = kStdOkItemIndex;
+                }
+                else
+                {
+                    GetDialogItemAsControl(*theDialog, kStdCancelItemIndex, &amp;button);
+                    *itemHit = kStdCancelItemIndex;
+                }
+                
+                HiliteControl(button, kControlButtonPart);
+#if TARGET_API_MAC_CARBON                                   // in Mac OS X you have to flush 
+                dialogPort = GetDialogPort(*theDialog);     // your QuickDraw port's buffer
+                QDFlushPortBuffer(dialogPort, NULL);        // to make screen updates happen 
+#else                                                       // outside of an update event
+#pragma unused (dialogPort)
+#endif
+                Delay(8, &amp;finalTicks);
+                HiliteControl(button, kControlNoPart);
+#if TARGET_API_MAC_CARBON
+                QDFlushPortBuffer(dialogPort, NULL);
+#endif
+                eventHandled = true;
+            }
+    }
+    
+    return eventHandled;
+}
+</pre>
+</div>
+<p>
+The other main change in the first Carbon version is to use the Carbon Help Manager instead of Balloon Help. See Help.c in the 2_First_Carbon folder and 
+<a href="http://developer.apple.com/documentation/Carbon/Conceptual/ProvidingHelpTags/">
+Providing Help Tags in Carbon
+</a>
+ for more information about help tags.
+<p><a href="Carbon%20Events.html">Next Page</a></p>
+<p><a href="Classic.html">Previous Page</a></p>
+<p><a href="../0_%20Tutorial%20Start%20Here.html">Return to Main Page</a></p>
+</body>
+</html>

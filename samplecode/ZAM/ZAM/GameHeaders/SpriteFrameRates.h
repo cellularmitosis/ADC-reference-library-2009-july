@@ -1,0 +1,1 @@
+enum {		kMissileFrameTime = 250,		kMissileMoveTime = 30,		kTankFrameTime = 100,		kTankMoveTime = 100,		kExplosionFrameTime = 100,		kCollThresh = 4,		kSynchTime = 100};

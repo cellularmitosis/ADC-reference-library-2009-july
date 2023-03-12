@@ -1,0 +1,70 @@
+PortMapper 1.0.0
+
+Build Requirements: Xcode 3.0
+Runtime requirements: Mac OS X 10.5
+
+Project Summary:
+
+Demonstrates Bonjour's NAT port-mapping API, and provides a higher-level Objective-C interface to it.
+
+Project Description:
+
+Bonjour (in Mac OS X 10.5 or later) provides a "port-mapping" facility, which allows a computer behind a Network Address Translator (NAT), such as a typical home router, to request a public TCP or UDP port number that can accept connections from outside. This allows the client to join peer-to-peer networks, or to provide a publicly-available service such as a Web server.
+
+In 10.5 this facility is only available via the low-level <dnssd.h> header, and as such, using it requires familiarity with POSIX networking APIs (socket descriptors, sockaddrs, etc.) It also has no formal documentation, although there are extensive comments in the header file.
+
+This sample code demonstrates how to use the API. It provides a complete Objective-C wrapper class that can be used as-is in Cocoa applications; or the innards of the class can be taken as snippets to use in other contexts.
+
+About NAT Port Mapping:
+
+Most homes with broadband connections, and all Wi-Fi hot-spots, use a router or an AirPort/Wi-Fi base station to share the connection among multiple computers. These devices are called Network Address Translators, or NATs. Like firewalls, they allow their clients to make outgoing network connections but by default block incoming connections. This is generally a security advantage, as it prevents hostile computers from directly attacking local clients. However, there are situations where a client application needs to accept incoming connections from the outside world.
+
+In general, whenever two computers want to communicate directly, one of them needs to open a socket to the other. If both of the computers belong to end users, it's very likely that both of them are behind some sort of NAT, which means neither one of them can open the connection, since neither one has a publicly-reachable IP port. This makes life difficult for applications like instant-messaging file transfers, multi-player games, voice-over-IP, and peer-to-peer clients.
+
+Various hacks have been devised to work around these limitations, but they are unreliable and often don't support TCP connections. Fortunately, most newer NATs support protocols that allow a client to request a public port. Apple's AirPort Extreme and AirPort Express base stations support NAT-PMP, and many third-party NATs support Microsoft's UPnP. The Bonjour port-mapping service attempts to locate the NAT and use one of these protocols to request the mapping. (It does not attempt any of the unofficial hacks.)
+
+It's important to realize that port-mapping is not guaranteed to succeed. There are many variables involved that are outside the operating system's control:
+
+o The computer might be behind a firewall that doesn't perform address translation. There's no straightforward way to tell this apart from the absence of a firewall/NAT; incoming connections will simply fail.
+o The NAT might not support UPnP or NAT-PMP.
+o A network administrator may have disabled port mapping for security reasons; or just never explicitly enabled it, if the device shipped with it turned off.
+o There may be a second layer of NAT past the first. This is not uncommon: some ISPs put their networks behind NATs. As of OS X 10.5, Bonjour does not attempt to traverse multiple NATs.
+o The NAT may have a buggy implementation of UPnP. Unfortunately, some third-party routers and base stations suffer from this. In this case it may appear to the client as though the mapping succeeded, but incoming connections won't make it through.
+
+But let's be optimistic. Assuming port mapping is possible, how can your application use it?
+
+Using NAT Port Mapping:
+
+1. Open a "listener" socket, using your favorite network API that accepts TCP connections or UDP packets on a particular port. (This doesn't even have to be done by your process; for example, you might use exec() or NSTask to launch a low-level server process, or register such a process for automatic launch via launchd.)
+
+2. Request a port mapping, including the port number of your listener socket, and optionally a public port number you'd like to use. With PortMapper, this step looks like:
+	mapper = [[PortMapper alloc] initWithPort: mySocketPort];
+	ok = [mapper open];
+
+3. Wait for the port mapping, if any, to be established. PortMapper hooks up to the standard NSRunLoop. Whenever the status of the mapping changes, the PortMapper updates the values of its properties, and posts an NSNotification. Your program can use either key-value observing or NSNotificationCenter to be notified of these changes. It may be easier to use NSNotificationCenter, since multiple properties may change at once (like address and port), and KVO will send you multiple notifications, one per property.
+
+    [[NSNotificationCenter defaultCenter] addObserver: self 
+                                             selector: @selector(portMappingChanged:) 
+                                                 name: PortMapperChangedNotification 
+                                               object: mapper];
+
+It's important to realize that you may get multiple notifications. Port mapping is dynamic and may change. For example, the computer might go to sleep, and when it wakes is assigned a new mapping with a different port number. Or it might wake up on a different network. The PortMapper will notify you of the mapping's current status.
+
+4. Inform peers of the public address & port. This step is crucial (how else can anyone connect to your service?) but there is clearly a chicken-and-egg problem if two peers have to discover each other's address before either one can connect! The solutions are rather application-specific, but here are some typical ones:
+
+	o Register with a dynamic-DNS service, and inform its servers of your IP address and port.
+	o Send the information to the peer via a different communications protocol. For example, iChat and other instant-messaging programs relay video-chat or file-transfer invitations through the IM server, as small messages containing the inviter's public address and port.
+	o Attempt to connect to a peer at its last-known address. Some P2P clients use this approach, caching addresses from previous sessions. This is not reliable, but often works because broadband modems tend to keep the same IP address for long periods of time. (Clients using this approach need to use a protocol such as SSL that securely identifies each party to the other, since "wrong numbers" are possible.)
+	o Display the address and port on screen and ask the user to tell them to the other computer's user (by phone, IM, email). Low-tech but reliable.
+
+5. Update your state if notified that the mapping's changed. If the mapping changes, tell peers (repeat step 4). If it's lost, inform the user.
+
+6. Close the mapping when you close your socket. The mapping remains in effect until the PortMapper object is closed or deallocated. (But if your process exits or crashes, the mapping will be cleaned up automatically.)
+    [_mapper close];
+    [_mapper release];
+
+Running the Sample:
+
+Simply open up Terminal and execute the application with no arguments to see the output:
+
+$admin> ./PortMapper 

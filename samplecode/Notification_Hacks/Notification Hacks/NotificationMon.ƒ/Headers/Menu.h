@@ -1,0 +1,1 @@
+extern int	MenuNum,MenuItemNum;extern Boolean	MenuSelected;#define APPLE_MENU	128#define FILE_MENU	129#define	EDIT_MENU	130#define SLIM_MENU	131#define FILE_RESET  1#define FILE_SAVE	2#define FILE_PAGE	4#define FILE_PRINT	5#define FILE_PREFS	7#define FILE_QUIT	9

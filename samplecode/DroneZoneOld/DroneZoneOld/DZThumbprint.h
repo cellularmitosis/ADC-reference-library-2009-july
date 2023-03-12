@@ -1,0 +1,1 @@
+/* *	File:		DZThumbprint.h * *	Copyright © 1996 Apple Computer, Inc. */#ifndef __DZThumbprint__#define __DZThumbprint__typedef enum TThumbprint {	kThumbprint_Dead		= 'dead',	kThumbprint_SelfDrone	= 'self',	kThumbprint_AutoDrone	= 'auto',	kThumbprint_BulletDrone	= 'bllt'} TThumbprint;#endif /* __DZThumbprint__ */

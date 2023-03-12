@@ -1,0 +1,1 @@
+#include	"Types.r"#include	"SysTypes.r"resource 'vers' (2) {	0x1,	0x0,	development,	0x2,	0,	"PGPuam Server",	"PGPuam Server 1.0"};resource 'vers' (1) {	0x1,	0x0,	development,	0x2,	0,	"1.0b1",	"1.0b1   (c) Apple Computer, Inc. 1998"};

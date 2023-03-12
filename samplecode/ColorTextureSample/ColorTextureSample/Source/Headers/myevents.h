@@ -1,0 +1,1 @@
+//// Events.h//		#include <Events.h>#include <AEDataModel.h>extern void	HandleEvents(void);extern void	HandleMouseDown(void);extern void	HandleNullEvent(void);extern void	HandleKeyDown(char);extern	pascal OSErr MyAE_QuitApplication(AppleEvent *theAppleEvent, AppleEvent *reply,							SInt32 handlerRefcon);

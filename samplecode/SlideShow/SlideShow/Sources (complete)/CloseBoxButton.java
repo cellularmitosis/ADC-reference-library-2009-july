@@ -1,0 +1,1 @@
+public class CloseBoxButton extends RolloverButton{	protected void initImages()	{		//Initialize images for the CloseBoxButton		//Insert "CloseBoxButton initImages"		addImage("images/closebox.jpg", upImage);		addImage("images/closeboxa.jpg", downImage);	}}

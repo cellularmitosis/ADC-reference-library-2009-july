@@ -1,0 +1,1 @@
+pascal -mbg ch8 pMyMDEF.pasm MyMDef.alink -rt MDEF=128 ¶	MyMDef.a.o ¶	pMyMDEF.p.o ¶	"{libraries}"interface.o ¶	"{Plibraries}"PasLib.o ¶	-o MenuDef.resRez Sample.r -append -o menutestmenutest

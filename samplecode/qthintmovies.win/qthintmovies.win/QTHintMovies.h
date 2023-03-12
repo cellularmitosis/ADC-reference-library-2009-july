@@ -1,0 +1,68 @@
+//////////
+//
+//	File:		QTHintMovies.h
+//
+//	Contains:	Sample code for adding hint tracks to a QuickTime movie.
+//
+//	Written by:	Tim Monroe
+//
+//	Copyright:	© 1998 by Apple Computer, Inc., all rights reserved.
+//
+//	Change History (most recent first):
+//
+//	   <1>	 	10/16/98	rtm		first file
+//	 
+//////////
+
+#include <Files.h>
+#include <Movies.h>
+#include <QuickTimeComponents.h>
+#include <Script.h>
+#include <TextUtils.h>
+
+#include <string.h>
+#include <stdlib.h>
+
+#define TESTING_HINTING			1			// compiler flag for our test shell
+
+//////////
+//
+// constants
+//
+//////////
+
+// type and creator for our sample settings preferences file
+#define kSettingsFileType		FOUR_CHAR_CODE('Pref')
+#define kSettingsFileCreator	FOUR_CHAR_CODE('RTM ')
+
+// the name of our preferences file
+#define kSettingsFileName		"HintPrefs.rtm"
+
+
+//////////
+//
+// data types
+//
+//////////
+
+
+//////////
+//
+// function prototypes
+//
+//////////
+
+OSErr							QTHints_HintMovieUsingToolbox (Movie theMovie, FSSpecPtr theFSSpecPtr);
+OSErr							QTHints_HintMovieUsingExportComponent (Movie theMovie, FSSpecPtr theFSSpecPtr, Boolean thePromptUser);
+
+Track							QTHints_GetIndHintTrack (Movie theMovie, long theIndex);
+Track							QTHints_GetIndHintedTrack (Track theHintTrack, long theIndex);
+Boolean							QTHints_MovieHasHintTrack (Movie theMovie);
+
+OSErr							QTHints_GetPrefsFileSpec (FSSpecPtr thePrefsSpecPtr, void *theRefCon);
+
+OSErr							QTUtils_SaveExporterSettingsInFile (MovieExportComponent theExporter, FSSpecPtr theFSSpecPtr);
+OSErr							QTUtils_GetExporterSettingsFromFile (MovieExportComponent theExporter, FSSpecPtr theFSSpecPtr);
+OSErr							QTUtils_WriteHandleToFile (Handle theHandle, FSSpecPtr theFSSpecPtr);
+Handle							QTUtils_ReadHandleFromFile (FSSpecPtr theFSSpecPtr);
+

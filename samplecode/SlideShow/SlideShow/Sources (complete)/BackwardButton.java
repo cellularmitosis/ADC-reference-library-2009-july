@@ -1,0 +1,1 @@
+public class BackwardButton extends RolloverButton{	protected void initImages()	{		//Initialize images for the BackwardButton		//Insert "BackwardButton initImages"		addImage("images/RWW.jpg", upImage);		addImage("images/RWWa.jpg", downImage);		addImage("images/RWWb.jpg", rolloverImage);	}}

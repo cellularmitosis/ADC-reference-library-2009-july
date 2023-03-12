@@ -1,0 +1,321 @@
+Read Me About MFSLives
+======================
+1.0
+
+MFSLives is a sample VFS plug-in that implements read-only access to the Macintosh File System (MFS) volume format.  This volume format debuted on the original Macintosh in 1984, and was supplanted by HFS (the predecessor to HFS Plus) with the introduction of the Macintosh Plus in 1986.  MFS support was dropped from traditional Mac OS in Mac OS 8.1, and it has never been supported on Mac OS X.
+
+MFS is an excellent volume format for sample code because it's very simple but it allows you to exercise the code paths associated with Macintosh-specific metadata (specifically, Finder info, multi-fork files, and volfs).
+
+The MFS volume format was documented in Inside Macintosh II.  As this book is not on the Apple developer web site (it was never published electronically), I've included a excerpt of the relevant section in this sample.
+
+I've chosen to limit MFSLives to read-only access because a) it significantly simplifies the problem of creating a file system, and b) MFS does not support directories, which limits the usefulness of read/write access (-:
+
+MFSLives requires Mac OS X 10.4 or later.  Mac OS X 10.4 introduced a new programming model for VFS plug-ins, and MFSLives is tied to this model.  It would be tricky to port this code to earlier versions of Mac OS X.
+
+Packing List
+------------
+The sample contains the following items:
+
+o Read Me About MFSLives.txt -- This file.
+
+o MFSVolumeFormat.pdf -- An excerpt from Inside Macintosh II that describes the MFS volume format.
+
+o MFSLives.xcodeproj -- An Xcode 2.4 project for the sample.
+
+
+o MFSLives.c -- Source code for top level of the VFS plug-in kernel extension (KEXT).
+
+o MFSCore.h, MFSCore.c -- Core MFS code that's used by the VFS plug-in KEXT to parse MFS disks.  This will also build for user space, and it's built that way by the test tool and the utility tool targets.
+
+o HashNode.h, HashNode.c -- A module for managing the VFS plug-in's FSNode hash table.  This code is intended to be reusable by other VFS plug-ins.
+
+o MFSLivesMountArgs.h -- Definitions shared by the mount tool and the VFS plug-in.
+
+o KEXTInfo.plist -- A property list file for the VFS plug-in KEXT.
+
+o MFSLives.kext.exp -- An export file for the VFS plug-in KEXT.
+
+
+o FSBundle.plist -- A property list file for the file system bundle.
+
+o MountMFSLives.c -- Source for the mount tool.
+
+o MFSLivesUtil.c -- Source for the utility tool.
+
+o MFSLivesPseudoMount.h, MFSLivesPseudoMount.c -- A wrapper around MFSCore that makes it easier to use from user space code.
+
+o VNodeAttr.h -- Declarations necessary to build MFSCore for user space.
+
+o utf8_decodestr.h, utf8_decodestr.c -- A user space implementation of the kernel routine "utf8_decodestr".  This is necessary to build MFSCore for user space.
+
+
+o TableGenerator.c -- Source for a tool that generates the MFSLives text encoding conversion tables (see the "Text Encodings" comment in "MFSCore.h" for details).
+
+
+o TestMFSLives.c -- Source code for the test tool.
+
+o UserSpaceKernel.h, UserSpaceKernel.c -- A module that emulates the kernel routines necessary to test critical components of MFSLives in user space (specifically, the HashNode module).
+
+
+o build -- A directory containing a pre-built version of the file system bundle.
+
+o Sample.img -- A sample MFS disk image.
+
+Using the Sample
+----------------
+To use this sample, first install the MFSLives file system.  I've included a pre-built version of the file system, so you can just copy it to /System/Library/Filesystems as shown below (assuming you downloaded the sample to your Desktop).
+
+$ cd Desktop/MFSLives
+$ sudo cp -R build/Debug/MFSLives.fs /System/Library/Filesystems/
+
+You should then reboot so that "diskarbitrationd" notices the new file system.
+
+At this point, you'll be able to mount any disk containing an MFS file system.  As original MFS floppy disks are very thin on the ground these days (and floppy drives that can read them are even thinner), I've included a disk image of an example MFS file system in this package.  Just double click the "Sample.img" file in the Finder, and it should mount on the desktop like any other disk image.
+
+    Note
+    Because the MFSLives mount tool is run as root by Disk Arbitration, it is 
+    possible for it to automatically load the VFS plug-in KEXT if it's not already 
+    loaded.  So you don't have to explicitly load the KEXT.
+
+If you have Classic installed, you can actually double click the applications on the disk and have them run.
+
+When the debug build of the mount tool loads the KEXT, it generates the KEXT's symbols in "/System/Library/Filesystems/MFSLives.fs/MFSLives.kext/".  You can easily copy the symbols from there to your GDB machine, or modify the mount tool's code to place the symbols somewhere more convenient (possibly to copy them directly to your GDB machine via an automounted file system).
+
+Both the mount tool and the utility tool have extensive logging.  To enable this logging, just create the relevant log files using "touch".  It's a good idea to make them world writable, so that the tool can log to the file regardless of what user it's running as.  The following commands will do the trick:
+
+$ sudo touch /var/log/mount_MFSLives.log
+$ sudo chmod ugo+w /var/log/mount_MFSLives.log
+$ sudo touch /var/log/MFSLives.util.log
+$ sudo chmod ugo+w /var/log/MFSLives.util.log
+
+    Note
+    Having world writable log files is a clear security 'no no'.  However, the 
+    location of these files means that they can only be created by an admin user.  
+    This means that I can safely /not/ conditionally compile out the logging in the 
+    release build.  Rather, I rely on the admin user to not create the log files on 
+    a machine which has untrusted users.
+
+Testing the Sample
+------------------
+MFSLives has a comprehensive test suite, encompassing both unit tests and functional tests.  These are all embodied in the "TestMFSLives" program.  To run this program, you will first need to do some setup.
+
+1. Install MFSLives and mount the same disk image, as described in the previous section.
+
+    IMPORTANT
+    The MFSLives sample disk image should be mounted on "/Volumes/Sample".  
+    If you have another disk called "Sample" mounted, the MFSLives sample 
+    disk image might be mounted on a different directory (for example, 
+    "/Volumes/Sample 1").  The test program won't work in that case.
+
+2. Change into the MFSLives directory.
+
+$ cd Desktop/MFSLives
+
+3. Create a "SampleFiles" directory.
+
+$ mkdir SampleFiles
+
+4. Extract the "TN.002.Compatibility" and "PSillyBalls" files from the MFSLives sample disk image to that directory.  These files are used by the test program to check whether the results from the mounted file system match those from "MFSLives.util".
+
+$ /System/Library/Filesystems/MFSLives.fs/MFSLives.util -X Sample.img \
+TN.002.Compatibility SampleFiles/TN.002.Compatibility
+$ /System/Library/Filesystems/MFSLives.fs/MFSLives.util -X Sample.img \
+PSillyBalls SampleFiles/PSillyBalls
+
+5. Create a "SampleImages" directory.
+
+$ mkdir SampleImages
+
+6. Copy any MFS disk images that you have lying around into this directory.  If you don't have any MFS disk images handy, leaving this directory empty is OK.
+
+7. Run the test program with the "all" argument.
+
+$ build/Debug/TestMFSLives all
+
+8. To run a specific test, first display the list of tests by running the test program with no arguments:
+
+$ build/Debug/TestMFSLives 
+usage: TestMFSLives [ all | <group>... | <group>.<test>... ]
+    where the groups and their tests are:
+        Hash
+            Basic
+            TwiceBasic
+            RepeatBasic
+            AttachFail
+            [...]
+        MFSCore
+            MacRoman
+            MDB
+            DateTime
+            DirIterate
+        [...]
+
+You can run a group of tests by supplying the group name as an argument:
+
+$ build/Debug/TestMFSLives MFSCore
+
+You can run an individual test by supplying it as an argument in the form <group>.<test>:
+
+$ build/Debug/TestMFSLives MFSCore.MacRoman
+
+Building the Sample
+-------------------
+The sample was built using Xcode 2.4 on Mac OS X 10.4.7.  You should be able to just open the project, select the "All" target, and choose Build from the Build menu.  This will build the following items:
+
+o The "MFSLives.fs" file system bundle, which contains the kernel extension, and mount and utility tools ("MFSLives.kext", "mount_MFSLives" and "MFSLives.util", respectively).
+
+o The "TestMFSLives" tool, which will automatically test MFSLives.  This includes both unit tests and functional tests.
+
+o The "TableGenerator" tool, which is used to generate some text encoding conversion tables (see the "Text Encodings" comment in "MFSCore.h" for details).
+
+There are N targets in the project:
+
+o All -- This aggregate target builds the file system bundle (target "FSBundle") and the tools that aren't built by that target (targets "Test Tool" and "TableGenerator"), as described above.
+
+o FSBundle -- This builds the kernel extension (target "KEXT"), mount tool (target "Mount Tool") and utility tool (target "Util Tool"), and assembles the results into a file system bundle ("MFSLives.fs").
+
+o KEXT -- This builds the kernel extension ("MFSLives.kext").
+
+o Mount Tool -- This builds the mount tool ("mount_MFSLives").
+
+o Util Tool -- This builds the mount tool ("MFSLives.util").
+
+o Test Tool -- This builds the test tool ("TestMFSLives").
+
+o TableGenerator -- This builds the table generator tool ("TableGenerator").
+
+VFS Plug-in Documentation
+-------------------------
+At this point in time there is no formal documentation for the VFS plug-in KPI or for the file system bundle packaging format <rdar://problem/3524590>.  There are, however, a number of resource that you should know about before you start to tackle a VFS plug-in.
+
+o DTS Q&A 1241 "Developing for VFS"
+
+  <http://developer.apple.com/qa/qa2001/qa1242.html>
+
+o DTS Sample Code "EmptyFS" -- The read me for this sample contains some key information about the VFS KPI.
+
+  <http://developer.apple.com/samplecode/EmptyFS/index.html>
+
+o man pages for Apple BSD API extensions
+
+  <x-man-page://2/getattrlist>
+  <x-man-page://2/setattrlist>
+  <x-man-page://2/getdirentriesattr>
+  <x-man-page://2/searchfs>
+  <x-man-page://2/exchangedata>
+
+o DTS Q&A 1113 "The '/.vol' directory and 'volfs'"
+
+  <http://developer.apple.com/qa/qa2001/qa1113.html>
+
+o DTS Q&A 1351 "Directories Appear as Volume Aliases"
+
+  <http://developer.apple.com/qa/qa2004/qa1351.html>
+
+o DTS Q&A 1173 "Text Encodings in VFS"
+
+  <http://developer.apple.com/qa/qa2001/qa1173.html>
+
+o DTS Q&A 1223 "File Manager Text Encoding Hints"
+
+  <http://developer.apple.com/qa/qa2001/qa1223.html>
+
+Code Notes
+----------
+Because of the lack of formal documentation for VFS plug-ins, I've been very careful to include extensive comments in the MFSLives source code.  Specifically, the following files have significant high-level comments:
+
+o MFSLives.c
+o MFSCore.h
+o MFSLivesMountArgs.h
+o HashNode.h 
+
+Build System Notes
+------------------
+Build settings are tricky for any KEXT.  This is especially true for MFSLives, which is a KEXT wrapped up in a file system bundle.  I have used a number of interesting tricks that you'll probably want to know about.
+
+o As with all my projects, I put the bulk of my build settings in the project build settings panel, from where they are inherited by all targets.
+
+o One project-wide build setting, MasterVersion, contains the master version number that's used by a variety of different projects.
+
+o I preprocess the KEXT's property list file ("KEXTInfo.plist") by enabling the INFOPLIST_PREPROCESS setting in the "KEXT" target.  I do this for two reasons:
+
+  - It allows the property list file to pick up compile-time variables (KEXT_BUNDLE_ID and KEXT_VERSION) from the INFOPLIST_PREPROCESSOR_DEFINITIONS build setting, which in turn picks them up from MODULE_NAME and MODULE_VERSION build settings.  Thus, you can change these settings in one place (the target build settings panel) and they propagate to all of the relevant places.
+
+  - It allows me to conditionally express a dependency on the "com.apple.kpi.unsupported" KPI.  I need this KPI in my debug build (for lck_mtx_assert), but I don't want my release build to depend on it.
+
+On the other hand, for the file system bundle's property list file ("FSBundle.plist"), I don't need to jump through so many hoops, and I can use Xcode's default build setting substitution feature instead.
+
+o In the KEXT's release build, I strip all non-exported symbols using the STRIP_STYLE build setting.  This is very important for KEXTs because the kernel is a single flat namespace.  In order to prevent this stripping the symbols needed to load the KEXT, I list the symbols that need to be preserved in an export file (MFSLives.kext.exp, referenced by the EXPORTED_SYMBOLS_FILE build setting).
+
+o To speed up build times during development, I normally set the ARCHS build setting to $(NATIVE_ARCH) for the Debug configuration, and to "ppc i386" for the Release configuration.  That way, during development, I only build for the architecture on which I'll be debugging.  However, this doesn't work well for MFSLives, where I don't want to load the KEXT on my build machine (because, if it crashes, it takes out the entire machine), and that raises the possibility that the test machine's architecture is not the same as the build machine's architecture.  
+
+Thus, I introduce a new build setting to the project, VictimArch.  Currently this is set to "ppc i386", which makes the Debug configuration build universal.  However, if you want to speed up your build during development, you can change it to the architecture of the machine on which you're loading the KEXT.
+
+Only some targets use this technique.  User space programs that I expect to run on my build machine, like the TableGenerator, continue to use my standard approach.
+
+o I create the file system bundle with a fairly simple bundle target.  However, I have to do a few bits of non-obvious customisation.
+
+- I removed all of the build phases except a Copy Files build phase, which I use to copy the KEXT, mount tool, and utility tool into the bundle.
+
+- I place the mount and utility tools in "Contents/Resources" directory within the file system bundle.  We recommend that all third party VFS plug-in developers do this.
+
+IMPORTANT:
+Don't be put off by the fact that most of Apple's built-in file systems do not do this.
+
+Note:
+If you don't do this, it's possible that your "Contents/Resources" directory might be empty, in which case you need to be be aware of an interesting gotcha.  If you have no other resources, Xcode won't create create the "Contents/Resources" folder.  However, this upsets Disk Arbitration because the paths in your property list file ("FSBundle.plist" in this example) are relative to the Resources folder.  Thus, even if you don't have any resources, your file system bundle needs a Resources folder.  You can work around this by creating an empty "Contents/Resources" folder using a Run Script build phase with the following script.
+
+mkdir -p "${TARGET_BUILD_DIR}/MFSLives.fs/Contents/Resources"
+
+- Because symbol stripping is controlled by the settings of the Debug and Release build configurations of the various targets, I turn the COPY_PHASE_STRIP setting off.  Otherwise, Xcode will strip the symbols from the KEXT as it copies it into the file system bundle.  This is either annoying (in the Debug build configuration) or redundant (in the Release configuration), so I disable it.
+
+o On the subject of file system bundles, the system requires that my mount tool be in "/sbin" because that's the only place that "mount -t MFSLives" can find it, and Disk Arbitration uses "mount -t" to mount volumes.  This is kinda inconvenient, because it means you can't install a file system as a single unit.  I use a sneaky trick to get around this: in the utility tool, if I probe a volume and decide that I want to claim it, I create a symlink from "/sbin/mount_MFSLives" to "/System/Library/Filesystems/MFSLives.fs/Contents/Resources/mount_MFSLives".  By the time Disk Arbitration gets around to invoking "mount -t", the mount tool (actually its a symlink) is in place.
+
+Because the test tool uses asserts to catch any and all errors, it will fail if you compile it with NDEBUG defined.  Therefore, in the Test Tool target I override GCC_PREPROCESSOR_DEFINITIONS for all build configurations to /not/ define NDEBUG and to defined MACH_ASSERT.  Without this, the release build of the test tool wouldn't do anything (and you get compile-time errors anyway).
+
+- I added a French localisation of the file system's type purely to demonstrate how it's done (I apologise in advance to the world's French speaker community for any abuses, real or perceived, of the French language in this demonstration :-).  To see this localisation in action, make French your preferred language (using the International preferences panel), log out, log in, mount the sample image, click on the disk icon in the Finder, and press command-I.  The info window should display the file system name from the "fr.lproj/InfoPlist.strings" file.
+
+Credits and Version History
+---------------------------
+If you find any problems with this sample, mail <dts@apple.com> and I'll try to fix them up.
+
+1.0 (Oct 2006) was the first shipping version.
+
+Share and Enjoy.
+
+Apple Developer Technical Support
+Core OS/Hardware
+
+17 Oct 2006
+
+$Log: Read\040Me\040About\040MFSLives.txt,v $
+Revision 1.10  2006/10/17 16:15:30         
+Localise file system type as displayed by the Finder.
+
+Revision 1.9  2006/10/17 15:21:45         
+Move the mount and utility tools into Contents/Resources.
+
+Revision 1.8  2006/10/10 21:14:04         
+Change group name.
+
+Revision 1.7  2006/10/09 13:55:25         
+Copy edit.
+
+Revision 1.6  2006/10/09 13:32:28         
+Xcode 2.4, not 2.3.
+
+Revision 1.5  2006/10/09 13:29:13         
+Added "sudo" prefixes to the log generation commands.
+
+Revision 1.4  2006/10/09 13:13:08         
+Update dates.
+
+Revision 1.3  2006/09/08 17:03:20         
+Lots of changes to account for the new, public-friendly sample disk image.  A number of trivial fixes to the text.
+
+Revision 1.2  2006/08/17 14:41:44         
+Corrected a minor grammo.
+
+Revision 1.1  2006/07/27 15:49:16         
+First checked in.
+

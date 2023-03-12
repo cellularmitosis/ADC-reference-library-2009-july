@@ -1,0 +1,164 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html>
+
+	<head>
+		<meta http-equiv="content-type" content="text/html;charset=ISO-8859-1">
+		<meta name="generator" content="Adobe GoLive 6">
+		<title>Read Me About MoreAuthSample</title>
+	</head>
+
+	<body bgcolor="#ffffff">
+		<h1>Read Me About MoreAuthSample</h1>
+		<p>1.1b1</p>
+		<p>MoreAuthSample shows how to access privileged functionality from a non-privileged application on Mac OS X. This technique, described in detail in the <a href="http://developer.apple.com/techpubs/macosx/CoreTechnologies/securityservices/authorizationservices/authservices.html">Authorization Services documentation</a>, is somewhat complicated to implement, and thus a good code sample can be extremely valuable.</p>
+		<p>MoreAuthSample is designed to support Mac OS X 10.0 and above, although it has only been tested on Mac OS X 10.1 and above.</p>
+		<h2>MoreAuthSample versus AuthSample</h2>
+		<p>MoreAuthSample is a replacement for <a href="http://developer.apple.com/samplecode/Sample_Code/Security/AuthSample.htm">AuthSample</a>, the original sample that showed this technique. As the two samples share no code, I decided to make a new sample rather than update AuthSample.</p>
+		<p>MoreAuthSample has the following advantages over AuthSample.</p>
+		<ul>
+			<li>The bulk of MoreAuthSample is implemented in a code library, MoreSecurity. You can reuse the common code as a whole and just concentrate on the application-specific parts of your code.
+			<li>MoreAuthSample allows your application to pass a CFDictionary to the helper tool, whereas AuthSample only allows you to pass a simple parameter block. The AuthSample approach is more secure, but it is also much less flexible.			<li>MoreAuthSample allows your application to receive a complex response from the helper tool (a CFDictionary) while AuthSample only returns a simple error code.
+
+			<li>MoreAuthSample allows the helper tool to return descriptors. You can use this facility to create a non-privileged application that uses its helper tool to do common privileged operations, such as bind to low-numbered TCP ports.
+			<li>MoreAuthSample stores its helper tool in the Application Support folder, which fixes many of the real world problems encountered by users of AuthSample.
+		</ul>
+		<p>Having said this, I should stress that the basic algorithm used by MoreAuthSample is identical to that used by AuthSample, which means that MoreAuthSample inherits most of the security pros and cons of AuthSample.</p>
+		<h2>Packing List</h2>
+		<p>The sample contains the following items.</p>
+		<ul>
+			<li>MoreSecurityTest.app &#151; A compiled version of the sample.
+			<li>MoreSecurity.h &#151; The implementation of the MoreSecurity module.
+			<li>MoreSecurity.c &#151; The interface to the MoreSecurity module.
+			<li>MoreSecurityTest.c &#151; A Carbon application used to test the MoreSecurity module.
+			<li>MoreSecurityTest.nib &#151; The user interface for the application.
+			<li>MoreSecurityTestCommon.h &#151; Declarations common to the application and the helper tool.
+			<li>MoreSecurityTestTool.c &#151; The privileged helper tool used by the application.
+			<li>MoreSecurityTest.pbproj &#151; A Project Builder project to build the application and helper tool.			<li>MoreSecurityTest.mcp &#151; A CodeWarrior project to build the application.			<li>MoreSecurityTestTool.mcp &#151; A CodeWarrior project to build the helper tool.
+			<li>MoreSecurityTest.plc &#151; A property list compiler file for the CodeWarrior build.
+			<li>MoreSecurityTest.pch &#151; A pre-compiled header for the CodeWarrior build.
+			<li>MoreSetup.h &#151; The MoreIsBetter setup header.
+			<li>MoreCFQ &#151; A MoreIsBetter module that contains Core Foundation utility routines.
+			<li>MoreUNIX &#151; A MoreIsBetter module that contains BSD-level utility routines.
+		</ul>
+		<h2>Using the Sample</h2>
+		<p>To try out the sample for yourself, launch the MoreSecurityTest application and click the one of the two test buttons. This will issue a command to the embedded helper tool and display the results.</p>
+		<ul>
+			<li>The &quot;UIDs&quot; button fetches the Real User ID (RUID), Effective User ID (EUID) and Saved User ID (SUID) of the process running the helper tool run. If the SUID is 0, the sample is working correctly.
+			<li>The &quot;Low Ports&quot; button asks the helper tool to create three TCP sockets, bind them to low-numbered ports (130, 131, and 132), and pass the descriptors back to the application.
+		</ul>
+		<h2>Building the Sample</h2>
+		<p>You can build the sample using Project Builder from the Dec 2002 developer tools. Open the project file (MoreSecurityTest.pbproj), make sure that the &quot;App&quot; target is selected, and choose Build from the Build menu. This will automatically build the application and the helper tool.</p>
+		<p>The project also builds with CodeWarrior Pro 8.3 on Mac OS X 10.2. Open the project file (MoreSecurityTest.mcp) and choose Make from the Project menu. This will automatically build the application and the helper tool.</p>
+		<h2>Using MoreSecurity In Your Code</h2>
+		To use the MoreSecurity module in your own code, follow these instructions.
+		<ol>
+			<li>Define a request/response protocol based around CFDictionaries. This is as simple as defining the set of keys in the request that describe the operation you want to do, and the set of keys in the response that hold the results of those operations (if any).			<li>Create a helper tool whose <code>main</code> function looks like the one shown in Listing 1. In this listing, <code>MyCommandProc</code> is a callback that is executed when a request is passed to the tool.  It can do privileged operations, such as committing changes to System Configuration framework.  Its parameters are passed to it as a CFDictionary.  It can pass results back to the application by creating a response dictionary.<br>
+			<table border=0 cellpadding=0 width=480>
+				<tr>
+					<td>
+						<p>&nbsp;<b>Listing 1</b>. The main function for a MoreSecurity-based helper tool</p>
+						<table border=0 cellpadding=5 width=470>
+							<tr>
+								<td bgcolor="#EEEEE0">
+									<pre>int main(int argc, const char *argv[])
+{   
+    int                 err;
+    int                 result;
+    AuthorizationRef    auth;
+    
+    auth = MoreSecHelperToolCopyAuthRef();
+
+    err = MoreSecDestroyInheritedEnvironment(
+                          kMoreSecKeepStandardFilesMask, 
+                          argv);
+    if (err == 0) {
+        err = MoreUNIXIgnoreSIGPIPE();
+    }
+    if (err == 0) {
+        err = MoreSecHelperToolMain(STDIN_FILENO, 
+                                    STDOUT_FILENO, 
+                                    auth, 
+                                    MyCommandProc, 
+                                    argc, 
+                                    argv);
+    }
+
+    return MoreSecErrorToHelperToolResult(err);
+}</pre>
+								</td>
+							</tr>
+						</table>
+					</td>
+				</tr>
+			</table>
+			<li>Build the helper tool in the &quot;MacOS&quot; folder inside your application package. Decide on two tool names, one for the original template tool (for example, &quot;HelperToolTemplate&quot;) and one for the working copy of the tool (for example, &quot;HelperTool&quot;).			<li>In your application, use <code>MoreSecCopyHelperToolURLAndCheckBundled</code> to find (or create) the working copy of your tool. The working copy of the helper tool will exist within the user's Application Support folder. See the description of <samp>MoreSecCopyHelperToolURLAndCheck</samp>[<code>Bundled</code>] (in &quot;MoreSecurity.h&quot;) for an explanation of this.
+			<li>Then use <code>MoreSecExecuteRequestInHelperTool</code> to execute the tool, passing it a request dictionary. On success, you will get back a response dictionary. Use <code>MoreSecGetErrorFromResponse</code> to extract the error result from your tool's <code>MyCommandProc</code> routine.
+
+			<li>If you need your helper tool to open privileged descriptors on your behalf, see the comments associated with <code>kMoreSecFileDescriptorsKey</code> (in &quot;MoreSecurity.h&quot;) for information on how to do this.
+			<li>For extra credit, use <code>AuthorizationCopyRights</code> to have your tool be self-limiting, as described in the <a href="http://developer.apple.com/techpubs/macosx/CoreTechnologies/securityservices/authorizationservices/authservices.html">Authorization Services documentation</a>.
+
+			<li>Read the <a href="#Caveats">Caveats</a> section of this document for important information about issues raised by this sample.
+		</ol>
+		<h2>How it Works</h2>
+		<p>This sample inherits much of its architecture from AuthSample. For a high-level overview of how AuthSample works, look at the <a href="http://developer.apple.com/techpubs/macosx/CoreTechnologies/securityservices/authorizationservices/authservices.html">Authorization Services documentation</a>. For a detail description of how this sample works, look at the commented code.</p>
+		<p>This sample's complex design is required for a number of reasons.</p>
+		<ul>
+			<li>The technique of using a self-limiting setuid root helper tool is recommended by Apple's security team.
+			<li>You need to use a working helper tool and a backup helper tool because of the problems in the Mac OS X Finder. The problems are as follows.			<ul>
+				<li>In Mac OS X 10.0.x, the Finder will silently drop the setuid root attribute of a helper program within your bundle.				<li>In Mac OS X 10.1.x, the Finder will not copy the setuid root helper program within your bundle (and display a cryptic error dialog).				<li>In Mac OS X 10.2.x, the Finder will refuse to copy an application that contains a setuid root helper tool.
+			</ul>
+			<li>It's a general requirement that a Mac OS X application should be self-contained, that is, it should be drag installable and not require the user to run an installer.
+			<li>It's a general requirement that a Mac OS X application be runnable from a read-only volume (like a CD-ROM). Thus, you can't place the helper tool within the application bundle because copying it there would require the volume be writable.
+			<li>Users can choose to ignore privileges on a particular volume by checking a checkbox in the Finder Get Info window. A setuid root program on an volume that's ignoring privileges will not be effective (it won't run as EUID 0).
+		</ul>
+		<p>By placing the setuid root helper tool within the Application Support folder, the MoreSecurity library allows you to copy the application bundle from one disk to another without breaking it, and without any weird error dialogs. In addition, you can copy the program to another machine entirely, and the only thing the user has to do is to reenter their admin password when they first run the application. Finally, the user's Application Support folder is typically inside their home directory, which is typically on the system volume, and thus is not ignoring privileges.</p>
+		<h2><a name="Caveats"></a>Caveats</h2>
+		<p>MoreIsBetter code, including MoreSecurity, makes heavy use of asserts to check for programming errors in the debug build. By default these asserts are enabled. <strong>If you ship this code in a production system, you must disable these asserts.</strong> The tripping of an assert in a privileged program could be used to create a security violation. To disable these asserts, set the <code>NDEBUG</code> compile time variable.</p>
+		<p>MoreSecurity requires that both the application and the helper tool set the disposition for <code>SIGPIPE</code> to be <code>SIG_IGN</code>. You can set it this way by calling <code>MoreUNIXIgnoreSIGPIPE</code>. If you're using CodeWarrior, you must make sure that you disable <code>SIGPIPE</code> via System framework calls. <strong>Do not call the <code>signal</code> function</strong>, because MSL provides its own version of <code>signal</code> that does not disable <code>SIGPIPE</code> at the system level. If in doubt, call <code>MoreUNIXIgnoreSIGPIPE</code>, which does the heavy lifting for you (internally it calls <code>sigaction</code>, which MSL does not override).</p>
+		<p>MoreAuthSample stores the template helper tool in the &quot;MacOS&quot; directory within your package, so that the tool can be found using <code>CFBundleCopyAuxiliaryExecutableURL</code>. AuthSample incorrectly puts the helper tool in the &quot;Resources&quot; directory.</p>
+		<p>When <code>MoreSecHelperToolMain</code> calls your callback function (the <code>commandProc</code> parameter), your process's EUID is set to its RUID. This is in line with the standard security policy of only setting the EUID to 0 when privileges are required. You can use <code>MoreSecSetPrivilegedEUID</code> to switch to EUID 0 and <code>MoreSecTemporarilySetNonPrivilegedEUID</code> to return to the non-privileged EUID.</p>
+		<p>The error code returned by <code>MoreSecHelperToolMain</code> indicates whether the invocation of the helper tool was successful. It does not indicate that the command performed by the helper tool worked. Use <code>MoreSecGetErrorFromResponse</code> to get the result status from the helper tool command callback.</p>
+		<p>Your helper tool must call <code>MoreSecHelperToolCopyAuthRef</code> before it calls <code>MoreSecDestroyInheritedEnvironment</code>. <code>MoreSecDestroyInheritedEnvironment</code> destroys the environmental information that <code>MoreSecHelperToolCopyAuthRef</code> needs to return a meaningful result.</p>
+		<p>Your application must be prepared to handle the <code>kMoreSecIgnoringPrivsInFolderErr</code> (5370) error result from <code>MoreSecCopyHelperToolURLAndCheckBundled</code>. This indicates that the user's home directory is on a volume whose privileges the system is set to ignore. MoreSecurity can not function correctly in that case. The first version of your application should probably just display a meaningful error message in this case. If you get a significant number of users complaining about this error, you will need to modify your program to handle this error more gracefully (perhaps put the helper tool in the Temporary Items folder). If you are forced to do this, please let me know so that I can add support for this in MoreSecurity.</p>
+		<p>When <code>MoreSecCopyHelperToolURLAndCheckBundled</code> copies the helper tool from your bundle into the Application Support folder, it only copies the data fork. For the new copy of the helper tool to work properly, it must be a Mach-O executable with no dependence on the resource fork or HFS-specific metadata.</p>
+		<p><code>MoreSecExecuteRequestInHelperTool</code> (actually its sub-routine, <code>ExecuteSelfInPrivilegedSelfRepairMode</code>) uses a workaround to make up for the fact that <code>AuthorizationExecuteWithPrivileges</code> does not return the process ID (PID) of the child process [3090277]. Without this workaround, the inopportune termination of another, unrelated, child process could confuse MoreSecurity into reaping the wrong zombie. With this workaround the chance of that happening is minimal, but it's still possible. For optimal results, structure your application so that you don't need to call <code>MoreSecExecuteRequestInHelperTool</code> while your program has outstanding unterminated child processes.</p>
+		<p>MoreSecurity does not check the helper tool for tampering before it self-repairs. The rationale for this is explained in the comment &quot;Notes on Code Signing&quot; in &quot;MoreSecurity.c&quot;.</p>
+		<p>Unlike AuthSample, MoreAuthSample does not use preauthorization. This is because the preauthorization flag (<code>kAuthorizationFlagPreAuthorize</code>) does nothing on current versions of Mac OS X [2907852]. In fact, by attempting to do preauthorization, AuthSample causes the notorious &quot;two authentication dialogs on first run&quot; problem. When the system is fixed to pay attention to the preauthorization flag, I will revise MoreAuthSample to take advantage of it.</p>
+		<h2>Credits and Version History</h2>
+		<p>If you find any problems with this sample, mail &lt;DTS@apple.com&gt; and I&#146;ll try to fix them up.</p>
+		<p>1.0a1 (Dec 2002) was given to reviewers.</p>
+		<p>1.0b1 (Jan 2003) was the first version that shipped to the general public. The improvements over 1.0a1 are purely cosmetic.</p>
+		<p>1.0b2 (May 2003) is a minor update. The update fixes <code>MoreSecIsFolderIgnoringPrivileges</code> to not return false positives. I also picked up a number of other less relevant changes.</p>
+		<p>1.1b1 (May 2003) is a an update to support passing descriptors from the helper tool back to the application. This allows you to write a helper tool that, say, binds a low-numbered TCP port on behalf of your application.</p>
+		<p>Share and Enjoy.</p>
+		<p>Apple Developer Technical Support<br>
+			Networking, Communications, Hardware</p>
+		<p>25 May 2003</p>
+		<p><!--
+$Log: ReadMeAboutMoreAuthSample.html,v $
+Revision 1.7  2003/05/25 12:59:14         
+1.0b3 should've been 1.1b1.
+
+Revision 1.6  2003/05/25 12:23:05         
+1.0b3 changes.
+
+Revision 1.5  2003/05/20 16:09:49         
+1.0b2 changes.
+
+Revision 1.4  2003/01/23 14:00:06         
+Corrected document title.
+
+Revision 1.3  2003/01/20 08:03:07         
+Include a description of the changes between 1.0b1 and 1.0a1.
+
+Revision 1.2  2003/01/20 08:01:12         
+Updated for version 1.0b1.
+
+Revision 1.1  2002/12/13 00:49:15         
+First checked in.
+
+--></p>
+	</body>
+
+</html>

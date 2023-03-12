@@ -1,0 +1,149 @@
+/*
+Project: TrackingImageUnit
+
+File: cikernel.h
+
+Abstract: 
+This is the kernel file for the TrackingImageUnit. It contains kernels . . . . . .
+
+Version 1.0
+
+Disclaimer: IMPORTANT:  This Apple software is supplied to you by 
+Apple Inc. ("Apple") in consideration of your agreement to the
+following terms, and your use, installation, modification or
+redistribution of this Apple software constitutes acceptance of these
+terms.  If you do not agree with these terms, please do not use,
+install, modify or redistribute this Apple software.
+
+In consideration of your agreement to abide by the following terms, and
+subject to these terms, Apple grants you a personal, non-exclusive
+license, under Apple's copyrights in this original Apple software (the
+"Apple Software"), to use, reproduce, modify and redistribute the Apple
+Software, with or without modifications, in source and/or binary forms;
+provided that if you redistribute the Apple Software in its entirety and
+without modifications, you must retain this notice and the following
+text and disclaimers in all such redistributions of the Apple Software. 
+Neither the name, trademarks, service marks or logos of Apple Inc. 
+may be used to endorse or promote products derived from the Apple
+Software without specific prior written permission from Apple.  Except
+as expressly stated in this notice, no other rights or licenses, express
+or implied, are granted by Apple herein, including but not limited to
+any patent rights that may be infringed by your derivative works or by
+other works in which the Apple Software may be incorporated.
+
+The Apple Software is provided by Apple on an "AS IS" basis.  APPLE
+MAKES NO WARRANTIES, EXPRESS OR IMPLIED, INCLUDING WITHOUT LIMITATION
+THE IMPLIED WARRANTIES OF NON-INFRINGEMENT, MERCHANTABILITY AND FITNESS
+FOR A PARTICULAR PURPOSE, REGARDING THE APPLE SOFTWARE OR ITS USE AND
+OPERATION ALONE OR IN COMBINATION WITH YOUR PRODUCTS.
+
+IN NO EVENT SHALL APPLE BE LIABLE FOR ANY SPECIAL, INDIRECT, INCIDENTAL
+OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+INTERRUPTION) ARISING IN ANY WAY OUT OF THE USE, REPRODUCTION,
+MODIFICATION AND/OR DISTRIBUTION OF THE APPLE SOFTWARE, HOWEVER CAUSED
+AND WHETHER UNDER THEORY OF CONTRACT, TORT (INCLUDING NEGLIGENCE),
+STRICT LIABILITY OR OTHERWISE, EVEN IF APPLE HAS BEEN ADVISED OF THE
+POSSIBILITY OF SUCH DAMAGE.
+
+Copyright (C) 2007 Apple Inc. All Rights Reserved.
+
+*/
+
+
+
+vec3 normalizeColor(vec3 color)
+{
+    return color / max(dot(color, vec3(1.0/3.0)), 0.001);
+}
+
+kernel vec4 maskFromColor(sampler image, __color color, float threshold)
+{
+    float  d;
+    vec4   p;
+
+    // Compute distance between current pixel color and reference color
+    p = sample(image, samplerCoord(image));
+    d = distance(normalizeColor(p.rgb), normalizeColor(color.rgb));
+    
+    // If color difference is larger than threshold, return black.
+    return  (d > threshold)  ?  vec4(0.0)  :  vec4(p.a);
+}
+
+kernel vec4 sampleAndScale(sampler image, float scale)
+{
+    return scale * sample(image, samplerCoord(image));
+}
+
+kernel vec4 coordinateMask(sampler mask, vec2 invSize)
+{
+    vec4  d;
+
+    // Create a vector with (x,y, 1,1), normalizing the coordinates to 0-1 range
+    d = vec4(destCoord()*invSize, vec2(1.0));
+
+    // Return this vector weighted by the mask value
+    return sample(mask, samplerCoord(mask))*d;
+}
+
+kernel vec4 centroid(sampler image)
+{
+    vec4  p;
+
+    p = sample(image, samplerCoord(image));
+    p.xy = p.xy / max(p.z, 0.001);
+    return  p;
+}
+
+
+kernel vec4 overlayComposite(sampler image, sampler overlay, sampler location, vec2 size, vec2 offset, float scale)
+{
+    vec4  p, d, l;
+    vec2  v;
+
+    p = sample(image, samplerCoord(image));
+
+    // Fetch centroid location
+    l = sample(location, samplerTransform(location, vec2(0.5, 0.5)));
+
+    // Translate to the centroid location, and scale image by
+    // the distance estimate, which in this case is the square root
+    // of the area
+    v = (destCoord() - l.xy * size) / (scale * sqrt(l.z)) + offset;
+
+    // Get the corresponding pixel from the overlay image, and composite
+    // on top of the video
+    d = sample(overlay, samplerTransform(overlay,v));
+    return (1.0 - d.a)*p + d*p.a;
+}
+
+
+kernel vec4 scaleXY4(sampler image)
+{
+    vec4  p0,p1,p2,p3;
+    vec2  d;
+
+    d  = 4.0*destCoord();
+    p0 = sample(image, samplerTransform(image, d + vec2(-1.0,-1.0)));
+    p1 = sample(image, samplerTransform(image, d + vec2(+1.0,-1.0)));
+    p2 = sample(image, samplerTransform(image, d + vec2(-1.0,+1.0)));
+    p3 = sample(image, samplerTransform(image, d + vec2(+1.0,+1.0)));
+
+    return 0.25*(p0 + p1 + p2 + p3);
+}
+
+kernel vec4 scaleX2(sampler image)
+{
+    vec2  d;
+
+    d  = vec2(2.0, 1.0)*destCoord();
+    return sample(image, samplerTransform(image, d));
+}
+
+kernel vec4 scaleY2(sampler image)
+{
+    vec2  d;
+
+    d  = vec2(1.0, 2.0)*destCoord();
+    return sample(image, samplerTransform(image, d));
+}

@@ -1,0 +1,1 @@
+#ifndef _GTFILE_H_#define _GTFILE_H_#include "GTSupport.h"OSErr	HandleNewCommand( void ) ;OSErr	HandleOpenCommand( void ) ;void HandleCloseWindow( WindowPtr theWindow ) ;#endif

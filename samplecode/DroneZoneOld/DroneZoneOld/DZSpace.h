@@ -1,0 +1,1 @@
+/* *	File:		DZSpace.h * *	Copyright © 1996 Apple Computer, Inc. */#ifndef __DZSpace__#define __DZSpace__#include <QD3D.h>void Space_Init(	void);void Space_Exit(	void);void Space_Submit(	TQ3ViewObject		inView,	const TQ3Point3D*	inPosition,	const TQ3Vector3D*	inDirection);#endif /* __DZSpace__ */

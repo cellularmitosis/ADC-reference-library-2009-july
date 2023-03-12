@@ -1,0 +1,1 @@
+/* *	File:		DZMain.h * *	Copyright © 1996 Apple Computer, Inc. */#ifndef __DZMain__#define __DZMain__void Main_LastRoundup(	void);#endif /* __DZMain__ */

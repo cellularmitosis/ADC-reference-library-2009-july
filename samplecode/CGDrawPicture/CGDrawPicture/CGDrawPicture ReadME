@@ -1,0 +1,57 @@
+CGDrawPicture is a sample program using Carbon on MacOS X which can view PICT files. PICT files can
+be dragged onto it or a file of type 'PICT' can be opened in the Open dialog. Two windows appear
+for each picture opened in the application. One window is the picture drawing with QuickDraw's
+DrawPicture routine. The second window is the picture drawn using QDPictDrawToCGContext to render 
+QuickDraw pictures into a Quartz CGContextRef.
+
+CGDrawPicture demonstrates the following:
+1) How to use QuickDraw's QDPictDrawToCGContext to render QuickDraw pictures into a Quartz
+    CGContextRef. This rendering will be equivalent to the rendering that the printing system
+    does when QuickDraw's DrawPicture is used during printing. Also, for applications that wish
+    to remove their use of QuickDraw and switch to Quartz drawing only, use of QDPictDrawToCGContext
+    allows them to remove their need to draw into a QuickDraw port and exclusively draw
+    into a CGContextRef.
+2) How to use QDBeginCGContext/QDEndCGContext to obtain a CGContextRef for a grafPort. This
+    routine, unlike CreateCGContextForPort, allows for content to be rendered to a CGContextRef
+    both on screen and during printing. This content can be any Quartz drawing, not just use
+    of QDPictDrawToCGContext.
+3) How to use document modal dialogs (aka "sheets") during printing
+4) How to create a PDF file from content that is rendered to a CGContextRef
+
+Issues:
+a) Use of the QDPictToCGContext.h header file. The sample code explicitly includes this header file:
+#include <QD/QDPictToCGContext.h>	// needed because in 10.1 it isn't included by ApplicationServices.h
+
+In principle this header file should be picked up by including Carbon.h however due to a bug this file was not included in the ApplicationServices.h header file. The result is that it must be explicitly included AND with ProjectBuilder you must include the ApplicationServices subframeworks (which includes QuickDraw) in your FRAMEWORK_SEARCH_PATHS. This is done by looking at the Targets in ProjectBuilder, selecting the BuildSettings tab, scroll down to the "Search paths" section and select the heading "Frameworks" and press the 'Enter' key. This will create a new, editable entry in which you should add the text:
+
+$(NEXT_ROOT)/System/Library/Frameworks/ApplicationServices.framework/Frameworks
+
+The problem with ApplicationServices.h will be corrected in a future MacOS X release. This is strictly a build problem and has no effect on the runtime behavior of your application. Even after this header problem is addressed in the MacOS X system headers your application will build correctly.
+
+b) QDBeginCGContext/QDEndCGContext are used to allow applications to obtain a CGContextRef corresponding to the current QuickDraw port even during print time. In order to support this behavior, the semantics are such that applications cannot have a valid CGContextRef to draw into and, at the same time, draw into the corresponding grafPort with QuickDraw. To facilitate applications switching to this usage pattern for both on screen and printing, no QD drawing is allowed after execution of QDBeginCGContext and before QDEndCGContext. QDBeginCGContext modifies the QuickDraw bottlenecks on the grafPort to do no rendering during that time. Note that the Quartz drawing coordinate system is always initialized to the default coordinate system for a given port when QDBeginCGContext. Any changes to the graphics state that may have existed at the time a previous QDEndCGContext was called are NOT carried over to future calls of QDBeginCGContext.
+
+Usage of these routines is as follows:
+
+QDBeginCGContext(port, &contextRef);	// obtain a CGContextRef. graphics state is the default gstate
+... draw using Quartz
+... no drawing allowed with QuickDraw until QDEndCGContext is called 
+QDEndCGContext(port, &contextRef);	
+// now contextRef is NULL and we must call QDBeginCGContext to do any further Quartz drawing
+... draw using QuickDraw
+...
+// now we again want to draw with Quartz
+QDBeginCGContext(port, &contextRef);	// obtain a new CGContextRef. graphics state is again the default
+...
+... draw using Quartz
+... no drawing allowed with QuickDraw until QDEndCGContext is called 
+QDEndCGContext(port, &contextRef);	// etc.	
+
+c) Note that QDBeginCGContext/QDEndCGContext and QDPictDrawToCGContext are MacOS X 10.1 and later only.
+
+d) QuickDraw patterns are device dependent and their behavior is different from that of many other graphics systems. Specifically, QuickDraw patterns do not scale when a picture is drawn using QuickDraw's DrawPicture call. If the destination rectangle is different from the original picture bounds, the patterns do not scale but rather there are more or fewer pattern tiles within a given graphic element drawn with a pattern.
+
+It is desirable to allow use of the QDPictDrawToCGContext drawing to mimic this behavior however it is also desirable to allow the ability to scale (or rotate or skew) a picture as a whole, including the patterns that may be contained within it. Thus, the semantics of QDPictDrawToCGContext are as follows:
+
+The Quartz 2-D current transformation matrix (CTM) at the time QDPictDrawToCGContext is called is used as the CTM to 'latch' the patterns to. Any scaling, rotation, and skew applied to the CTM prior to calling QDPictDrawToCGContext is therefore applied to the QuickDraw picture as a whole, including patterns. Any scaling which must be done to draw the QuickDraw picture into the destination rectangle supplied to QDPictDrawToCGContext is NOT applied to patterns contained in the picture. This allows the patterns to scale as they would with QuickDraw's DrawPicture routine. Note that QDPictDrawToCGContext does not correctly handle pattern scaling in MacOS X v10.1.0. This will be fixed in a future release, most likely a software update.
+
+Many applications use the printing manager to allow them to set an application drawing resolution at print time. This sample code demonstrates the usage of this capability while maintaining the proper scaling for QuickDraw patterns. The sample code handles this for both the use of QD's DrawPicture routine as well as QDPictDrawToCGContext. Note that pattern scaling at print time when used in conjunction with DrawPicture and application scaling does not work correctly in MacOS X v10.1.0 and earlier. This will be fixed in a future release, most likely a software update.

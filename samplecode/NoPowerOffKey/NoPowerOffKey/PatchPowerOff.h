@@ -1,0 +1,1 @@
+/* functions defined in PatchPowerOff.c */void InitAlertPatch(void);void ClearAlertPatch(void);

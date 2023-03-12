@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+        "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+	<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+	<title>Data Browser</title>
+	<link rel="stylesheet" href="SampleCode.css" type="text/css" />
+</head>
+<body>
+<h1>Tutorial: Updating a Classic application to modern Carbon</h1>
+<h2>5. The Data Browser Control</h2>
+<p>
+The main UI element in the sample application is the list box which is based on the deprecated List Manager. This step replaces that with the Data Browser control. The drawing code is largely unchanged from the custom list drawing procedure. Drawing a fill style highlight in a custom Data Browser column is actually tricky because the callback only passes in the content part bounds.
+</p>
+<div class="mycodebox">
+<pre>
+pascal void DrawIconDataBrowserItemCB(ControlRef browser, DataBrowserItemID item, 
+                                        DataBrowserPropertyID property, 
+                                        DataBrowserItemState itemState, const Rect *theRect, 
+                                        SInt16 gdDepth, Boolean colorDevice)
+{
+#pragma unused (theRect)
+    Rect enclosingRect, iconRect, textRect;
+    Boolean active;
+    IconDBItemDataRec *itemData;
+    
+    GetDataBrowserItemPartBounds(browser, item, property, kDataBrowserPropertyEnclosingPart, 
+                                    &amp;enclosingRect);
+    
+    active = IsControlActive(browser);
+    
+    if ((itemState &amp; kDataBrowserItemIsSelected) != 0)
+    {
+        ThemeDrawingState savedState;
+        
+        GetThemeDrawingState(&amp;savedState);
+        
+        SetThemePen(active ? kThemeBrushPrimaryHighlightColor : kThemeBrushSecondaryHighlightColor, 
+                    gdDepth, colorDevice);
+        PaintRect(&amp;enclosingRect);
+        
+        SetThemeDrawingState(savedState, true);
+    }
+    
+    calculateDrawingBounds(&amp;enclosingRect, &amp;iconRect, &amp;textRect);    // get the drawing Rects
+    itemData = (IconDBItemDataRec *)item;
+    
+    PlotIconRef(&amp;iconRect, kAlignNone, active ? kTransformNone : kTransformDisabled, 
+                kIconServicesNormalUsageFlag, itemData->icon);
+    DrawThemeTextBox(itemData->name, kThemeViewsFont, 
+                        active ? kThemeStateActive : kThemeStateInactive, true, &amp;textRect, 
+                        teCenter, NULL);
+}
+</pre>
+</div>
+<p>
+Another useful data browser callback is one that informs of selection changes. This step takes advantage of that callback to handle the panel switching.
+</p>
+<div class="mycodebox">
+<pre>
+pascal void IconDataBrowserItemSelectionCB(ControlRef browser, DataBrowserItemID item, 
+                                            DataBrowserItemNotification message)
+{
+#pragma unused (browser)
+    IconDBItemDataRec *itemData;
+    
+    itemData = (IconDBItemDataRec *)item;
+    
+    switch (message)
+    {
+        case kDataBrowserItemSelected:
+            SetControlVisibility(itemData->userPane, true, true);    // this will draw over the 
+            break;                                                // previously selected user pane
+        
+        case kDataBrowserItemDeselected:
+            SetControlVisibility(itemData->userPane, false, false);        // we've already been 
+            break;    // drawn over so there's no need to update the display (which would flicker)
+    }
+}
+</pre>
+</div>
+<p>
+This was a good time to improve the localization and bundle support in the sample application. All displayed strings moved out of string resources and into strings files, and icons are moved out of icon resources and into icon files. Both file types are read in using Bundle Services, and the remaining resources are localized. See IconDBUtilities.c in 5_Data_Browser to see how the application loads in its resources. The window's Carbon event handler is also greatly simplified, see PrefsWindow.c.
+</p>
+<p><a href="HIToolbox.html">Next Page</a></p>
+<p><a href="Mach-O.html">Previous Page</a></p>
+<p><a href="../0_%20Tutorial%20Start%20Here.html">Return to Main Page</a></p>
+</body>
+</html>

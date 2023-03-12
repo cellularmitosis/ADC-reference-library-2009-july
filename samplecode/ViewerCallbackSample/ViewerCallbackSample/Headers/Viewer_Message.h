@@ -1,0 +1,1 @@
+/*   *	Viewer_Message.h * *	QuickDraw 3D 1.6 Sample *	Robert Dierkes * *	 12/22/98	RDD		Created. */#ifndef _HViewer_Message#define _HViewer_Message#ifdef __cplusplusextern "C" {#endifvoid Message_Register(void);#ifdef __cplusplus}#endif#endif /* _HViewer_Message */

@@ -1,0 +1,1 @@
+//// process.h//#define	NUM_TEST	5enum{	TEST_TRIMESH,	TEST_SPHERE,	TEST_TORUS};extern	void InitTest(void);extern	void DoModelWindowNullEvent(void);extern	void UpdateModelWindow(void);extern	void DrawModelWindow(void);extern	void BuildCurrentTest(void);

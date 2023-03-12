@@ -1,0 +1,1 @@
+/*	TCP Client/Server Queuing Example	Steve Falkenburg, MacDTS, Apple Computer	3/11/92*/void InitQueues(void);MyQElemPtr GetUnusedPBlock(void);void RecycleFreePBlock(MyQElemPtr pBlock);MyQElemPtr GetCompletedPBlock(void);void StoreCompletedPBlock(MyQElemPtr pBlock);

@@ -1,0 +1,151 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2 Final//EN"
+        "http://www.w3.org/MarkUp/Wilbur/HTML32.dtd">
+<html lang="en">
+<head>
+	<meta http-equiv="content-type" content="text/html; charset=utf-8">
+	<title>Drag and Drop</title>
+	<meta name="generator" content="BBEdit 8.2">
+<style type="text/css">
+<!--
+.mybox {
+	background-color: #F7F7F7;
+	margin: 4px;
+	padding: 4px;
+	border: 1px solid #999999;
+}
+-->
+<!--
+.mycodebox {
+	background-color: #F1F5F9;
+	margin: 4px;
+	padding: 4px;
+	border: 1px solid #999999;
+}
+-->
+</style>
+</head>
+<body>
+
+<h1>
+Tutorial: Writing a custom HIView
+</h1>
+
+<h2>
+E) Implementing support for drag-and-drop
+</h2>
+
+<p>
+The support for drag-and-drop is done by handling four events: kEventControlDragEnter, kEventControlDragWithin, kEventControlDragLeave, and kEventControlDragReceive.
+</p>
+
+<p>
+This is very straightforward and, as usual, after adding those four events to the event list that we register in GetHICustomViewClass, we add the four cases in the function Internal_HICustomViewHandler. We will also add two more fields to our private data as we did when we implemented the custom tracking:
+</p>
+
+<div class="mycodebox"><pre>
+typedef struct
+   {
+   HIViewRef view;                             // our view
+
+   Boolean trackOn;                            // tracking information
+   HIPoint trackSpot;
+
+   HIViewTrackingAreaRef trackRef;             // tracking area
+
+   Boolean dragOn;                             // drag-and-drop information
+   HIPoint dragSpot;
+   }
+HICustomViewData;
+</pre></div>
+
+<p>
+And slightly modify the kEventHIObjectInitialize handler to turn dragging on:
+</p>
+
+<div class="mycodebox"><pre>
+case kEventHIObjectInitialize:
+   {
+   // always begin kEventHIObjectInitialize by calling through to the previous handler
+   status = CallNextEventHandler(inHandlerCallRef, inEvent);
+   require_noerr(status, InitializeExit);
+   
+   // if that succeeded, do our own initialization
+   status = HIViewNewTrackingArea(myData->view, NULL, 0, &myData->trackRef);
+   require_noerr(status, InitializeExit);
+
+   status = SetControlDragTrackingEnabled(myData->view, true);
+   require_noerr(status, InitializeExit);
+
+InitializeExit:
+   break;
+   }
+</pre></div>
+
+<p>
+When implementing the kEventControlDragEnter handler, we must ensure the proper behavior by returning correctly the right value in the kEventParamControlWouldAcceptDrop parameter. The three other drag-related handlers will be called only if the kEventControlDragEnter handler returns a ‘true’ value in that parameter and the handler itself returns a status of noErr. In real-life custom HIViews, you should test the contents of the drag pasteboard for a flavor that you can accept: if you find one then return ‘true’ in the parameter kEventParamControlWouldAcceptDrop, ‘false’ if not. In this example, to keep it simple, it accepts all drags and tests for the flavor (text) only in the kEventControlDragReceive handler.
+</p>
+
+<div class="mycodebox"><pre>
+case kEventControlDragEnter:
+   {
+   Boolean accept = true;
+   status = SetEventParameter(inEvent, kEventParamControlWouldAcceptDrop, typeBoolean, sizeof(accept), &accept);
+   require_noerr(status, ControlDragEnterExit);
+   
+   myData->dragOn = true;
+
+ControlDragEnterExit:
+   break;
+   }
+</pre></div>
+
+<p>
+Look at the implementation of the three other handlers by using the project located in the folder “6_Drag_and_Dropping”.
+</p>
+
+<p>
+The last thing we have to do is to add the dragging spot drawing in our kEventControlDraw handler:
+</p>
+
+<div class="mycodebox"><pre>
+// if we're dragging then we also draw the drag spot and the focus ring
+if (myData->dragOn)
+   {
+   bounds = CGRectInset(viewBounds, 2, 2);
+   HIThemeDrawFocusRect(&bounds, true, context, kHIThemeOrientationNormal);
+
+   CGContextBeginPath(context);
+   CGContextAddArc(context, myData->dragSpot.x, myData->dragSpot.y, 10, 0, 2 * pi, 1);
+   CGContextClosePath(context);
+   CGContextSetRGBFillColor(context, 0.7, 0.7, 0, 0.8);
+   CGContextSetRGBStrokeColor(context, 0, 0.7, 0, 0.8);
+   CGContextDrawPath(context, kCGPathFillStroke);
+   }
+</pre></div>
+
+<p>
+And you will see the following dragging:
+</p>
+
+<img src="../0_Tutorial/Picture%206.png" alt="" width="534" height="468">
+
+<br>
+<br>
+
+<a href="../0_Tutorial/Conclusion.html">Next Page
+</a>
+
+<br>
+<br>
+
+<a href="../0_Tutorial/Custom%20Cursor.html">Previous Page
+</a>
+
+<br>
+<br>
+
+<a href="../0_%20Tutorial%20Start%20Here.html">Return to Main Page
+</a>
+
+</body>
+</html>

@@ -1,0 +1,1 @@
+/****************************//*         MY GLOBALS       *//****************************/#include <QD3D.h>#include <math.h>#include <qdoffscreen.h>#define NORMAL_UPDATES		true#define REMOVE_ALL_EVENTS	 0#define	MOVE_TO_FRONT		(WindowPtr)-1L#define	NIL_STRING			"\p"

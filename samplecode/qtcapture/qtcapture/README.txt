@@ -1,0 +1,1 @@
+README - QTCaptureThis sample illustrates how to use the sequence grabber to capture sound and video from devices attached to the computer.Enjoy,QuickTime Team

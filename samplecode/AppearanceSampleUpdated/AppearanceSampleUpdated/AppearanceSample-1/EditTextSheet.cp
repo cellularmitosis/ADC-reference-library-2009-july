@@ -1,0 +1,145 @@
+/*
+	File:		EditTextSheet.cp
+
+	Contains:	Sheet to create an edit text control.
+
+    Version:	Mac OS X
+
+	Disclaimer:	IMPORTANT:  This Apple software is supplied to you by Apple Computer, Inc.
+				("Apple") in consideration of your agreement to the following terms, and your
+				use, installation, modification or redistribution of this Apple software
+				constitutes acceptance of these terms.  If you do not agree with these terms,
+				please do not use, install, modify or redistribute this Apple software.
+
+				In consideration of your agreement to abide by the following terms, and subject
+				to these terms, Apple grants you a personal, non-exclusive license, under Apple’s
+				copyrights in this original Apple software (the "Apple Software"), to use,
+				reproduce, modify and redistribute the Apple Software, with or without
+				modifications, in source and/or binary forms; provided that if you redistribute
+				the Apple Software in its entirety and without modifications, you must retain
+				this notice and the following text and disclaimers in all such redistributions of
+				the Apple Software.  Neither the name, trademarks, service marks or logos of
+				Apple Computer, Inc. may be used to endorse or promote products derived from the
+				Apple Software without specific prior written permission from Apple.  Except as
+				expressly stated in this notice, no other rights or licenses, express or implied,
+				are granted by Apple herein, including but not limited to any patent rights that
+				may be infringed by your derivative works or by other works in which the Apple
+				Software may be incorporated.
+
+				The Apple Software is provided by Apple on an "AS IS" basis.  APPLE MAKES NO
+				WARRANTIES, EXPRESS OR IMPLIED, INCLUDING WITHOUT LIMITATION THE IMPLIED
+				WARRANTIES OF NON-INFRINGEMENT, MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+				PURPOSE, REGARDING THE APPLE SOFTWARE OR ITS USE AND OPERATION ALONE OR IN
+				COMBINATION WITH YOUR PRODUCTS.
+
+				IN NO EVENT SHALL APPLE BE LIABLE FOR ANY SPECIAL, INDIRECT, INCIDENTAL OR
+				CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE
+				GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+				ARISING IN ANY WAY OUT OF THE USE, REPRODUCTION, MODIFICATION AND/OR DISTRIBUTION
+				OF THE APPLE SOFTWARE, HOWEVER CAUSED AND WHETHER UNDER THEORY OF CONTRACT, TORT
+				(INCLUDING NEGLIGENCE), STRICT LIABILITY OR OTHERWISE, EVEN IF APPLE HAS BEEN
+				ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+	Copyright © 2000-2001 Apple Computer, Inc., All Rights Reserved
+*/
+
+#include "EditTextSheet.h"
+#include "AppearanceHelpers.h"
+#if !BUILDING_FOR_CARBON_8
+	#include <Carbon/Carbon.h>
+#else
+	#include <Carbon.h>
+#endif
+
+const ControlID 	kPasswordCheckBox 			= { 'EDIT', 3 };
+const ControlID		kEditUnicodeTextCheckBox 	= { 'EDIT', 4 };
+const ControlID		kSizePopup				 	= { 'EDIT', 5 };
+
+EditTextSheet::EditTextSheet( TWindow* parent )
+		: CDEFTesterSheet( CFSTR( "Edit Text" ), parent )
+{
+	WindowAttributes testerAttributes;
+	
+	GetWindowAttributes( parent->GetWindowRef(), &testerAttributes );
+	if (testerAttributes & kWindowCompositingAttribute) // non-Unicode edit text is not supported in compositing mode
+	{
+                ControlRef editUnicodeTextCheckBox;
+
+                GetControlByID( GetWindowRef(), &kEditUnicodeTextCheckBox, &editUnicodeTextCheckBox );
+                DisableControl( editUnicodeTextCheckBox );
+                SetControlValue( editUnicodeTextCheckBox, 1 );
+	}
+	Show();
+}
+
+EditTextSheet::~EditTextSheet()
+{
+}
+
+
+ControlRef
+EditTextSheet::CreateControl()
+{
+	ControlRef			control;
+	Rect				bounds = { 20, 20, 36, 200 };
+	Boolean				isPassword;
+	SInt16				baseLine;
+	Boolean				isUnicode;
+	SInt16				fontSize;
+	
+	::GetControlByID( GetWindowRef(), &kPasswordCheckBox, &control );
+	if ( GetControlValue( control ) )
+		isPassword = true;
+	else
+		isPassword = false;
+
+    // Create a EditUnicodeText Control if the user so desires
+    ::GetControlByID( GetWindowRef(), &kEditUnicodeTextCheckBox, &control );
+   isUnicode = GetControlValue( control ) != 0;
+
+	::GetControlByID( GetWindowRef(), &kSizePopup, &control );
+	switch ( ::GetControlValue( control ) )
+	{
+		default:
+		case 1:
+			fontSize = kControlFontBigSystemFont;
+			break;
+		case 2:
+			fontSize = kControlFontSmallSystemFont;
+			break;
+		case 3:
+			fontSize = kControlFontMiniSystemFont;
+			break;
+	}
+
+   if ( isUnicode )
+        CreateEditUnicodeTextControl( GetParentWindowRef(), &bounds, CFSTR(""), isPassword, NULL, &control );
+    else
+        CreateEditTextControl( GetParentWindowRef(), &bounds, CFSTR( "" ), isPassword, false, nil, &control );
+
+	if ( control != NULL )
+	{
+		SetControlVisibility( control, false, false );
+	
+		SetKeyboardFocus( GetParentWindowRef(), control, kControlFocusNextPart );
+		
+		if ( !isPassword )
+		{
+			CFStringRef initialText = CFCopyLocalizedString( CFSTR( "Sample Text" ), CFSTR( "" ) );
+			
+			SetEditTextCFString( control, initialText, false );
+			
+			CFRelease( initialText );
+		}
+		
+		ControlFontStyleRec	myFontStyleRec;
+		myFontStyleRec.flags = kControlUseFontMask;
+		myFontStyleRec.font = fontSize;
+		::SetControlFontStyle( control, &myFontStyleRec );
+
+		if ( GetBestControlRect( control, &bounds, &baseLine ) == noErr )
+				SetControlBounds( control, &bounds );
+	}
+	
+	return control;
+}

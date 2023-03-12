@@ -1,0 +1,1 @@
+/*   *	Viewer_Events.h * *	QuickDraw 3D 1.6 Sample *	Robert Dierkes * *	 12/22/98	RDD		Created. */#ifndef _HViewer_Events#define _HViewer_EventsBoolean Events_Initialize(			void);void	Events_Process(			void);#endif /* _HViewer_Events */

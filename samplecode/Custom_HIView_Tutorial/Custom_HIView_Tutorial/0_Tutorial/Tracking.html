@@ -1,0 +1,273 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2 Final//EN"
+        "http://www.w3.org/MarkUp/Wilbur/HTML32.dtd">
+<html lang="en">
+<head>
+	<meta http-equiv="content-type" content="text/html; charset=utf-8">
+	<title>Support for Tracking</title>
+	<meta name="generator" content="BBEdit 8.2">
+<style type="text/css">
+<!--
+.mybox {
+	background-color: #F7F7F7;
+	margin: 4px;
+	padding: 4px;
+	border: 1px solid #999999;
+}
+-->
+<!--
+.mycodebox {
+	background-color: #F1F5F9;
+	margin: 4px;
+	padding: 4px;
+	border: 1px solid #999999;
+}
+-->
+</style>
+</head>
+<body>
+
+<h1>
+Tutorial: Writing a custom HIView
+</h1>
+
+<h2>
+C) Implementing support for tracking
+</h2>
+
+<p>
+Tracking means receiving a mouse-down event and showing some sort of feedback as the user moves the mouse around the control, ending with a mouse-up event.
+</p>
+
+<p>
+The HIView Manager automatically supports basic tracking, which is the model used for simple clickable views such as a push button or checkbox. In this model, the view shows a hilited appearance while the mouse is pressed inside the view, unhilites when the mouse moves outside of the view, and generates kEventControlHit and kEventCommandProcess events if the mouse is released inside the view. In order to use the basic tracking support, you only have to implement kEventControlHitTest.
+</p>
+
+<p>
+The HIView Manager also allows a view to provide custom tracking. A view would provide custom tracking behavior if it needs to provide a more complex response to a mouse click; for example, custom tracking would be required in order to display a menu in response to a click, or to start a drag operation. To implement custom tracking, you must implement kEventControlTrack. You should not implement kEventControlTrack if you only need to use the basic tracking support.
+</p>
+
+<p>
+Let’s go over the basic tracking first: you add the kEventControlHitTest event to the event list that you register in GetHICustomViewClass:
+</p>
+
+<div class="mycodebox"><pre>
+static EventTypeSpec kFactoryEvents[] =
+   {
+      { kEventClassHIObject, kEventHIObjectConstruct },
+      { kEventClassHIObject, kEventHIObjectDestruct },
+      { kEventClassControl, kEventControlDraw },
+      { kEventClassControl, kEventControlValueFieldChanged },
+      { kEventClassControl, kEventControlHiliteChanged },
+      { kEventClassControl, kEventControlHitTest }
+   };
+</pre></div>
+
+<p>
+And you add one more case in the function Internal_HICustomViewHandler:
+</p>
+
+<div class="mycodebox"><pre>
+case kEventControlHitTest:
+   {
+   HIPoint mouseLoc;
+   status = GetEventParameter(inEvent, kEventParamMouseLocation, typeHIPoint, NULL, sizeof(mouseLoc), NULL, &mouseLoc);
+   require_noerr(status, ControlHitTestExit);
+
+   HIRect hiBounds;
+   status = HIViewGetBounds(myData->view, &hiBounds);
+   require_noerr(status, ControlHitTestExit);
+
+   ControlPartCode partCode = ( CGRectContainsPoint(hiBounds, mouseLoc) ) ? kControlButtonPart : kControlNoPart;
+   status = SetEventParameter(inEvent, kEventParamControlPart, typeControlPartCode, sizeof(partCode), &partCode);
+   require_noerr(status, ControlHitTestExit);
+
+ControlHitTestExit:
+   break;
+   }
+</pre></div>
+
+<p>
+In this example, we do not have multiple parts so we just verify that the proposed location is within the bounds of our custom HIView. In order for the HIToolbox to set the hilite state correctly, you need to return in the kEventParamControlPart parameter a non-zero value less than 128. In this example, for convenience, we just return kControlButtonPart.
+</p>
+
+<div class="mybox">
+<strong>
+Note: The mouse location received in the kEventParamMouseLocation parameter is in the view-local coordinate system, not in the global or owning window coordinate system, so we can just test if the view bounds which are also in the same view-local coordinate system contains that location.
+</strong>
+</div>
+
+<p>
+You can test the custom HIView for this step by using the project located in the folder “3_Basic_Tracking”.
+</p>
+
+<p>
+To support custom Tracking, we simply add one more event in the event list that you register in GetHICustomViewClass and add two fields to our private data:
+</p>
+
+<div class="mycodebox"><pre>
+typedef struct
+   {
+   HIViewRef view;                             // our view
+
+   Boolean trackOn;                            // tracking information
+   HIPoint trackSpot;
+   }
+HICustomViewData;
+
+static EventTypeSpec kFactoryEvents[] =
+   {
+      { kEventClassHIObject, kEventHIObjectConstruct },
+      { kEventClassHIObject, kEventHIObjectDestruct },
+      { kEventClassControl, kEventControlDraw },
+      { kEventClassControl, kEventControlValueFieldChanged },
+      { kEventClassControl, kEventControlHiliteChanged },
+      { kEventClassControl, kEventControlHitTest },
+      { kEventClassControl, kEventControlTrack }
+   };
+</pre></div>
+
+<p>
+And you add one more case in the function Internal_HICustomViewHandler:
+</p>
+
+<div class="mycodebox"><pre>
+case kEventControlTrack:
+   {
+   // handling the mouse tracking
+   status = Internal_HICustomViewTrack(myData, inEvent);
+   break;
+   }
+</pre></div>
+
+<p>
+and the function Internal_HICustomViewTrack is implemented this way:
+</p>
+
+<div class="mycodebox"><pre>
+static OSStatus Internal_HICustomViewTrack(HICustomViewData * myData, EventRef inEvent)
+   {
+   // Here we are having some fun with a time-controlled value setting
+   // The value is going to be incremented each time we move within our bounds
+   // or incremented every 1/3 second if we don't move but are within our bounds
+   // If we reach the maximum, we go back to the minimum
+   OSStatus status;
+   
+   // Getting our bounds and locations
+   HIRect hiViewBounds;
+   status = HIViewGetBounds(myData->view, &hiViewBounds);
+   require_noerr(status, HIViewGetBounds);
+   
+   Rect qdWindowBounds;
+   status = GetWindowBounds(GetControlOwner(myData->view), kWindowStructureRgn, &qdWindowBounds);
+   require_noerr(status, GetWindowBounds);
+
+   HIPoint hiPoint;
+   status = GetEventParameter(inEvent, kEventParamMouseLocation, typeHIPoint, NULL, sizeof(hiPoint), NULL, &hiPoint);
+   require_noerr(status, GetEventParameter);
+
+   // handle the first mouseDown before moving
+   MouseTrackingResult mouseStatus = kMouseTrackingMouseDown;
+   while (mouseStatus != kMouseTrackingMouseUp)
+      {
+      if (CGRectContainsPoint(hiViewBounds, hiPoint))
+         {
+         if (hiPoint.x < hiViewBounds.origin.x+4) hiPoint.x = hiViewBounds.origin.x+4;
+         if (hiPoint.x > hiViewBounds.origin.x+hiViewBounds.size.width-4) hiPoint.x = hiViewBounds.origin.x+hiViewBounds.size.width-4;
+         if (hiPoint.y < hiViewBounds.origin.y+4) hiPoint.y = hiViewBounds.origin.y+4;
+         if (hiPoint.y > hiViewBounds.origin.y+hiViewBounds.size.height-4) hiPoint.y = hiViewBounds.origin.y+hiViewBounds.size.height-4;
+         myData->trackSpot = hiPoint;
+
+         // setting the new value
+         SInt32 currentValue = GetControl32BitValue(myData->view);
+         UInt32 newValue = currentValue + 1;
+         newValue %= (GetControl32BitMaximum(myData->view) + 1);
+         SetControl32BitValue(myData->view, newValue);
+         
+         myData->trackOn = true;
+         HiliteControl(myData->view, 1);
+         }
+      else if (myData->trackOn)
+         {
+         myData->trackOn = false;
+         HiliteControl(myData->view, 0);
+         }
+
+      // a -1 GrafPtr to TrackMouseLocationWithOptions yields global coordinates
+      Point qdPoint;
+      status = TrackMouseLocationWithOptions((GrafPtr)-1L, 0, kEventDurationSecond / 3, &qdPoint, NULL, &mouseStatus);                  
+      require_noerr(status, TrackMouseLocation);
+
+      // convert to window-relative coordinates
+      hiPoint.x = qdPoint.h - qdWindowBounds.left;
+      hiPoint.y = qdPoint.v - qdWindowBounds.top;
+      
+      // convert to view-relative coordinates
+      HIViewConvertPoint(&hiPoint, NULL, myData->view);
+      }
+
+SendEventToEventTarget:
+GetWindowEventTarget:
+SetEventParameter:
+CreateEvent:
+TrackMouseLocation:
+GetEventParameter:
+GetWindowBounds:
+HIViewGetBounds:
+
+   myData->trackOn = false;
+   HiliteControl(myData->view, 0);
+
+   return status;
+   }
+</pre></div>
+
+<p>
+The last thing we have to do is to add the tracking spot drawing in our kEventControlDraw handler:
+</p>
+
+<div class="mycodebox"><pre>
+// if we're tracking then we also draw the track spot
+if (myData->trackOn)
+   {
+   CGContextBeginPath(context);
+   CGContextAddArc(context, myData->trackSpot.x, myData->trackSpot.y, 10, 0, 2 * pi, 1);
+   CGContextClosePath(context);
+   CGContextSetRGBFillColor(context, 0.7, 0, 0.7, 0.8);
+   CGContextSetRGBStrokeColor(context, 0, 0.7, 0.7, 0.8);
+   CGContextDrawPath(context, kCGPathFillStroke);
+   }
+</pre></div>
+
+<p>
+And you will see the following tracking:
+</p>
+
+<img src="../0_Tutorial/Picture%204.png" alt="" width="534" height="468">
+
+<p>
+If you do custom Tracking, you must use the APIs TrackMouseLocation or TrackMouseLocationWithOptions to follow the mouse movements. Do not use tight loops and the APIs Button, WaitMouseUp or StillDown since they use 100% of CPU time while doing nothing. Furthermore, as you can see in the Internal_HICustomViewTrack function, there is no direct drawing during the custom tracking but just a request for redraw which will be honored as soon as you enter TrackMouseLocationWithOptions. Thus, respecting the Golden Rule of the HIView Architecture, all the drawing is located in the kEventControlDraw handler.
+</p>
+
+<p>
+You can test the custom HIView for this step by using the project located in the folder “4_Custom_Tracking”.
+</p>
+
+<br>
+
+<a href="../0_Tutorial/Custom%20Cursor.html">Next Page
+</a>
+
+<br>
+<br>
+
+<a href="../0_Tutorial/Value%20and%20State.html">Previous Page
+</a>
+
+<br>
+<br>
+
+<a href="../0_%20Tutorial%20Start%20Here.html">Return to Main Page
+</a>
+
+</body>
+</html>

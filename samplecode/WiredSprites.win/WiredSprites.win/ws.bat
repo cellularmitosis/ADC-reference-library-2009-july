@@ -1,0 +1,1 @@
+java -classpath %JDKHOME%\lib\classes.zip;%QTJAVA%;WiredSprites.zip WiredSprites

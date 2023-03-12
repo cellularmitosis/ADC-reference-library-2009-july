@@ -1,0 +1,1 @@
+// Tumbler_event.h//// Event related function prototypes for the Tumbler application//// Modification History////	11/26/94		nick		initial cut - symantec proto_helper app, add defines#ifndef _Tumbler_EVENT_H_#define _Tumbler_EVENT_H_/* Tumbler_event.c */pascal void ScrollProc(ControlHandle theControl, short theCode);void EventLoop(void);#endif

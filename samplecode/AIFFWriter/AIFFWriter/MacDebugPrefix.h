@@ -1,0 +1,1 @@
+// MacDebugPrefix.h// debug prefix file for our Mac projects#include "MacPrefix.h"// define DEBUG to turn on debugging code// this prefix file is included only by the Metrowerks debug targets#define _DEBUG

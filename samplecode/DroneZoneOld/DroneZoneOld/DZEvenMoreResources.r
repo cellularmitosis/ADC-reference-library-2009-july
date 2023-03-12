@@ -1,0 +1,1 @@
+/* Rez from CWPro 2.0 chokes if total size of compiled .r file is too large *//* so DZAutoDroneExpl.3DMF moved from DZMoreResources.r */read '3DMF' (130) "DZAutoDroneExpl.3DMF";

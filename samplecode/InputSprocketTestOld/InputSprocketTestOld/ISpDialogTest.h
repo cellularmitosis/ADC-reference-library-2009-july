@@ -1,0 +1,1 @@
+// which test (AUTOTEST, DIALOGTEST or MENUTEST)#define DIALOGTEST		1

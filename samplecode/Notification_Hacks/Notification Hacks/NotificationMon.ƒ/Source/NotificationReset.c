@@ -1,0 +1,1 @@
+#include"NotificationMon.h"void DoNotificationReset(){	short	itemHit;		ParamText("\pAre you sure you want to remove all Notifications?",nil,nil,nil);	itemHit = Alert(500,nil);	if(itemHit == 1)		KillNotifications(MainView);}

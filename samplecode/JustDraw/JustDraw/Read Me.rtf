@@ -1,0 +1,53 @@
+{\rtf1\mac\ansicpg10000\cocoartf824\cocoasubrtf100
+{\fonttbl\f0\fswiss\fcharset77 Helvetica;\f1\fnil\fcharset77 Monaco;}
+{\colortbl;\red255\green255\blue255;\red0\green0\blue255;\red137\green19\blue21;}
+\margl1440\margr1440\vieww14160\viewh13620\viewkind0
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\ql\qnatural\pardirnatural
+
+\f0\fs24 \cf0 "JustDraw" is not your typical sample code. It doesn't make much sense outside of the setting in which it has been used, i.e. the WWDC 2005 hands-on session 215 "Moving from Quickdraw to Quartz 2D".\
+\
+Start out with the file JustDraw-QD.c. Compared to the default main.c which you get when you create a new Carbon application project in Xcode, it only adds a DrawHandler that calls "JustDrawSomething". \
+\
+Now set the gToggle global to false, and fill in the Quartz equivalent in "JustDrawSomething". You would write\
+\pard\tx960\tx1920\tx2880\tx3840\tx4800\tx5760\tx6720\tx7680\tx8640\tx9600\tx10560\tx11520\tx12480\tx13440\tx14400\tx15360\tx16320\tx17280\tx18240\tx19200\tx20160\tx21120\tx22080\tx23040\tx24000\tx24960\tx25920\tx26880\tx27840\tx28800\tx29760\tx30720\tx31680\tx32640\tx33600\tx34560\tx35520\tx36480\tx37440\tx38400\tx39360\tx40320\tx41280\tx42240\tx43200\tx44160\tx45120\tx46080\tx47040\tx48000\tx48960\tx49920\tx50880\tx51840\tx52800\tx53760\tx54720\tx55680\tx56640\tx57600\tx58560\tx59520\tx60480\tx61440\tx62400\tx63360\tx64320\tx65280\tx66240\tx67200\tx68160\tx69120\tx70080\tx71040\tx72000\tx72960\tx73920\tx74880\tx75840\tx76800\tx77760\tx78720\tx79680\tx80640\tx81600\tx82560\tx83520\tx84480\tx85440\tx86400\tx87360\tx88320\tx89280\tx90240\tx91200\tx92160\tx93120\tx94080\tx95040\tx96000\ql\qnatural\pardirnatural
+
+\f1\fs20 \cf0 \CocoaLigature0 	CGContextMoveToPoint(ctx, \cf2 0\cf0 , \cf2 0\cf0 );\
+	CGContextAddLineToPoint(ctx, \cf2 100\cf0 , \cf2 100\cf0 );\
+	CGContextStrokePath(ctx);\
+
+\f0\fs24 for the diagonal line and get what you'd expect. \
+But if you then write \
+
+\f1\fs20 	CGContextSelectFont(ctx, \cf3 "Geneva"\cf0 , \cf2 18\cf0 , kCGEncodingMacRoman);\
+	CGContextShowText(ctx, &s[\cf2 1\cf0 ], s[\cf2 0\cf0 ]);\
+
+\f0\fs24 the text will show up at the top of the window, and upside-down. Unlike QD, Quartz does not maintain a "current pen position", and you need to use\
+
+\f1\fs20 	CGContextShowTextAtPoint(ctx, \cf2 100\cf0 , \cf2 100\cf0 , &s[\cf2 1\cf0 ], s[\cf2 0\cf0 ]);\
+
+\f0\fs24 to position the text.\
+The text is still upside-down, because the HIView mechanism already concatenated the CGContext's CTM with a coordinate-flip to mimic the left-handed QD coordinates with the origin at the top-left corner; and all Quartz drawing gets transformed through this CTM.\
+So, you might want to experiment with reversing the HIView coordinate transform, and add the following code to the DrawHandler, before calling JustDrawSomething():\
+
+\f1\fs20 	HIRect	    bounds;\
+	HIViewRef   theView = (HIViewRef)inUserData; \
+	HIViewGetBounds(theView, &bounds);\
+	CGContextConcatCTM(ctx, CGAffineTransformMake(\cf2 1\cf0 , \cf2 0\cf0 , \cf2 0\cf0 , \cf2 -1\cf0 , \cf2 0\cf0 , bounds.size.height));\
+
+\f0\fs24 Now, the text is oriented correctly, but the diagonal line originates at the bottom-left corner and goes upwards.\
+In summary, to reproduce the result of the QD code, we need to make one of two changes:\
+- either use the default Quartz coordinates, and change the hard-coded start- and endpoint of the line,\
+- or us the HIView coordinates, and add a call to flip the text orientation back. This is possible because a CGContext allows to set a text matrix separately:\
+
+\f1\fs20 	CGContextSetTextMatrix(ctx, CGAffineTransformMakeScale(\cf2 1\cf0 , \cf2 -1\cf0 ));\
+\
+
+\f0\fs24 The file JustDraw-CG.c expands on this exercise by adding a KeyHandler() that allows the following:\
+- toggle back and forth between the QD and Quartz version of the drawing\
+- for Quartz drawing, select either HIView or default CG coordinates\
+- for Quartz drawing, select any one of the three ways to draw text:\
+a) CGContextShowTextAtPoint, \
+b) ATSUDrawText\
+c) HIThemeDrawTextBox.\
+\
+}

@@ -1,0 +1,1 @@
+OSErr IDDisc(short refNum, unsigned long *discID);

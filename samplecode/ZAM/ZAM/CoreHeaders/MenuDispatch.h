@@ -1,0 +1,1 @@
+#pragma once/* Menu resource IDs */#define APPLE_MENU	128#define FILE_MENU	129#define	EDIT_MENU	130/* Menu item numbers */#define APPLE_ABOUT 1#define FILE_NEW	1#define FILE_OPEN	2#define FILE_CLOSE	3#define FILE_SAVE	4#define FILE_PRINT	6#define FILE_QUIT	7/* resource ID of about box Alert */#define rAboutBoxID 129

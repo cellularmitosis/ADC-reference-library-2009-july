@@ -1,0 +1,1 @@
+/* *	File:		TS3TestLoLevel.h * *	Copyright © 1996 Apple Computer, Inc. */#ifndef __TS3TestLoLevel__#define __TS3TestLoLevel__void TestLoLevel_Init(	void);void TestLoLevel_Exit(	void);void TestLoLevel_Preset(	UInt32			index);#endif /* __TS3TestLoLevel__ */

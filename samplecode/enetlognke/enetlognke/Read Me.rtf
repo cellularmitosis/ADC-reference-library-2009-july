@@ -1,0 +1,102 @@
+{\rtf1\mac\ansicpg10000\cocoartf824\cocoasubrtf100
+{\fonttbl\f0\fnil\fcharset77 LucidaGrande-Bold;\f1\fnil\fcharset77 LucidaGrande;\f2\fnil\fcharset77 Geneva;
+\f3\fnil\fcharset77 Monaco;}
+{\colortbl;\red255\green255\blue255;\red137\green19\blue21;\red104\green56\blue33;}
+\margl1440\margr1440\vieww12800\viewh15520\viewkind0
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\ql\qnatural
+
+\f0\b\fs36 \cf0 Read Me About enetlognke
+\f1\b0\fs24 \
+1.1 (12 July 2005)
+\f0\b \
+\
+
+\f1\b0 Change History\
+1.0 - 02 June 2005 - Original release\
+1.1 - 12 July 2005 - sample updated to include a project (for Xcode 2.1) to produce a universal binary. No code changes were necessary for this sample to run correctly on a Developer Transition System. Also added note to this Read Me file about using the 
+\f2\fs20 mbuf_pkthdr_setrcvif 
+\f1\fs24 function to set the source interface for a new  incoming packet.\
+
+\f0\b \
+\pard\tx960\tx1920\tx2880\tx3840\tx4800\tx5760\tx6720\tx7680\tx8640\tx9600\ql\qnatural
+
+\f1\b0 \cf0 enetlognke is sample to demonstrate the implementation of an interface filter using the supported NKE API's in Mac OS X 10.4. This sample will only work under Mac OS X 10.4 and greater.\
+\
+The enetlognke demonstrates the implementation of an interface filter by showing how to set up the iff_filter structure and to register the filter using the iflt_attach call. This sample filter is designed to look at each packet which passes to and from the built-in Ethernet interface. In addition, the sample demonstrates packet swallowing and delayed processing and re-insertion of the packets from a timer routine. \
+\
+The sample queues swallow packets into an input or output queue. To control access to the queues, the sample demonstrates the new fine grain locking calls now available in OS X 10.4. The network_funnel is no longer used by a network kernel process.\
+\
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\ql\qnatural
+
+\f0\b\fs28 \cf0 Sample Requirements
+\f1\b0\fs24 \
+\
+The supplied Xcode project was created using Xcode v2.1 running under Mac OS X 10.4.1. The project is designed to work with Mac OS X 10.4.x. The API's used in this sample are not compatible with Mac OS X 10.3.x and earlier. This sample will work with the Developer Transition Systems.\
+\
+
+\f0\b\fs28 Project Description
+\f1\b0\fs24 \
+\
+The file enetlognke.c contains all of the source code for the kernel extension. Near the beginning of the file, there is the define SWALLOW_PACKETS. By setting this define to 1, the code will swallow all incoming and outgoing packets, then re-inject them later through a timer routine. By setting this define to 0, the packets are simply passed through the input and output processing routines.\
+\
+The 
+\f3\fs20 \CocoaLigature0 gBuiltinEnetName 
+\f1\fs24 \CocoaLigature1 global contains the name of the interface over which the interface filter will be installed. It is presently set to the built-in Ethernet interface 
+\f3\fs20 \cf2 \CocoaLigature0 "en0"
+\f1\fs24 \cf0 \CocoaLigature1 . \
+\
+
+\f0\b\fs28 Considerations
+\f1\b0\fs24 \
+\
+Under OS X 10.4, the Network Kernel Extension API's are such that all packet filters, including interface filters, socket filters and IP filters, must be prepared to process (see) a specific packet multiple times. When a packet is swallowed by an interface filter and later re-injected, all interface filters will again be called to reprocess the packet on the re-injected path. If there are multiple interface filters, and all of the filters swallow and re-inject packets, then one of the filters will see the re-injected packet for each re-injection.\
+\
+When a packet is re-injected, the corresponding input or output routine will be called to process the re-injected packet. The sample demonstrates the use of the tag functions to mark a packet which has been previously "processed". The tag process provides a means to allocate a small amount of memory on a per packet basis. When calling 
+\f3\fs20 \CocoaLigature0 mbuf_tag_id_find
+\f1\fs24 \CocoaLigature1  use a unique value, like the reverse DNS name for your company to ensure the uniqueness of the tag ID value.\
+\
+To conserve memory, do not allocate multiple tags for the same packet to track different events. Instead, use the allocated memory to store packet specific information - for example if your filter process swallows an outbound packet and later re-injects the packet on the inbound path, use the allocated memory to track which paths, the packet has already been processed on. The small amount of memory associated with the tag, is for the use by your code and will not be modified by the system until the mbuf_t reference is freed.\
+\
+If your interface filter duplicates an mbuf, the tags associated with the original mbuf, will not be copied to the duplicated mbuf. For example the interface filter might be layered atop multiple Ethernet interfaces and makes a copy of a packet to process through a different interface. The duplicated packet will not have the tags from the original packet. Your process will have to allocate new tags for the duplicated process to track processing.\
+\
+When an input packet is swallowed, the kernel extension uses the 
+\f3\fs20 \CocoaLigature0 ifnet_input
+\f1\fs24 \CocoaLigature1  routine to inject the packet back into the packet stream. This simulates the injection of a packet from an interface driver. Your injection routine must make sure to set the packet header field of the header packet, else a panic results when the kernel tries to dereference an invalid packet header field pointer.\
+\
+If the interface filter will receive ethernet packets on one interface and re-inject the packet into a second ethernet interface, you must make sure of the following - 1. the destination address in the frame header is either the broadcast address or supported multicast address for the destination interface, or is the unicast address address associated with the destination interface and 2. the MBUF_PROMISC flag is not set in the packet header flags. If neither condition is true, the packet will be dumped on re-injection.\
+\
+If you create a new incoming packet from scratch and expect to pass the packet into the system using the  
+\f3\fs20 \CocoaLigature0 ifnet_input
+\f1\fs24 \CocoaLigature1  routine, use the 
+\f2\fs20 mbuf_pkthdr_setrcvif 
+\f1\fs24 function to set the interface that the packet was received on, else the system will panic when it references an invalid 
+\f3\fs20 \CocoaLigature0 ifnet_t 
+\f1\fs24 \CocoaLigature1 reference.\
+\
+When using fine grain locking as demonstrated in this sample, do not hold the lock over a system call. Other code in your kernel extension could be called while processing the system call, resulting in another access to code which accesses the lock. If the lock were held at the time of making the system call, a deadlock could occur. The typical symptom that deadlock has occurred is that Ethernet activity across the filter stops.\
+\
+
+\f0\b\fs28 Using enetlognke
+\f1\b0\fs24 \
+\
+To load a Network Kernel Extension, follow these instructions after building the enetlognke.kext.\
+\
+1. Open a Terminal window and copy the kernel extension to the /tmp directory.\
+$cp -R ../enetlognke/build/enetlognke.kext /tmp\
+\
+2. Use the chown command to set the owner and group of the enetlognke.kext to root:wheel. Under 10.3.x and greater, the owner and group of the Kernel Extension must be root:wheel in order for the kextload tool to load the Kernel Extension.\
+$sudo chown -R root:wheel /tmp/enetlognke.kext\
+\
+3. Use the kextload(8) command line utility. Currently, automatic loading is only possible for IOKit extensions and other extensions which IOKit extensions depend on. Admin privileges are required to use the kextload tool.\
+$sudo kextload -v /tmp/enetlognke.kext\
+\
+If there are no problems, the enetlognke.kext is loaded.If you open a console window to show the system.log contents, and you have set 
+\f3\fs20 \cf3 \CocoaLigature0 SHOWDEBUGMESSAGES
+\f1\fs24 \cf0 \CocoaLigature1  to 1, you will see information for each incoming and outgoing packet across the built-in Ethernet interface.\
+\
+
+\f0\b\fs28 FeedBack
+\f1\b0\fs24 \
+\
+Please send all feedback about this sample to \
+http://developer.apple.com/contact/feedback.html}

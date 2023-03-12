@@ -1,0 +1,1 @@
+/*	File:		UsherCarbon.r	Copyright:	© 2000-2001 by Apple Computer, Inc., all rights reserved.*//*----------------------------carb ¥ Carbon on OS X launch information --------------------------*/type 'carb' {};resource 'carb'(0) {};

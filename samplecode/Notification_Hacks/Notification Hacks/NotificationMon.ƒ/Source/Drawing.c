@@ -1,0 +1,1 @@
+#include "NotificationMon.h"DrawImage(notificationDoc *w){	if(IsNotificationDoc((WindowPeek)w)) {		UpdateNotifications((notificationDoc*)w, GetCtlValue(w->vScroll));	}}

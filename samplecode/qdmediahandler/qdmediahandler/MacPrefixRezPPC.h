@@ -1,0 +1,1 @@
+#define TARGET_REZ_MAC_PPC		1#define TARGET_REZ_MAC_68K		0#define TARGET_CPU_MAC			1

@@ -1,0 +1,1 @@
+// DebugUtils.c//// Original version by Jon Lansdell and Nigel Humphreys.// 4.0 and 3.1 updates by Greg Sutton.// ©Apple Computer Inc 1996, all rights reserved.#include <Types.h>void DebugNum ( long err );void DebugStrNum ( Str255 str, long num );

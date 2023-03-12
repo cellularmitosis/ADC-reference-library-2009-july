@@ -1,0 +1,1 @@
+/* * File: "All The MIDI Components.h" */ Component InstallFB01(void);Component InstallDumbSynth(void);

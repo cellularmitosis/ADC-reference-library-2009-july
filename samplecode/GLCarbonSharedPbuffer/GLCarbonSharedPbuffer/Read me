@@ -1,0 +1,68 @@
+This is a simple sample showing the use of pixel buffers (pbuffers) on Mac OS X v10.3 Panther and later. It renders content into the off screen pbuffer and then uses this as the texture for drawing other objects in the application.  In this example a single pbuffer is shared between multiple on screen contexts to provide a texture for all to use.  The pbuffer has its own context and the on screen contexts are each associated with a window for their drawing.  Texturing is accomplished through AGLs standard context object sharing mechanism. This sample also builds on the GLCarbonAGLWindow sample thus has much of the same support code.  See that sample for more information on the surrounding supporting code.
+
+One note when using multiple contexts will want to be followed. One should always flush (glFlush) or swap (aglSwapBuffers) between drawing to different contexts.  This means if the scene is finished and you are using a double buffered context aglSwapBuffers should be called, otherwise ensure the commands sent are flushed prior to setting the current context to a different context and drawing.
+
+There are 7 pbuffers routines in the sample:
+
+void initialConditionsPbuffer (pRecPbuffer pPbufferInfo)
+
+This simply sets the initial conditions for the pbuffer structure (tracking things like lighting and spin values.
+
+
+OSStatus buildPbuffer (pRecPbuffer pPbufferInfo)
+
+This routine a pixel format and a context for the pbuffer.  It then uses the aglCreatepbuffer call to actually create the pbuffer as a 2D texture (other formats are available including 1D, rectangle and cube map).  In this example max mipmap levels is set to zero as we will not be providing mipmaps.  Note, creating the pbuffer is like creating a window and specifically does no work related attaching and OpenGL context.  
+
+
+void initGLPbuffer (pRecPbuffer pPbufferInfo)
+
+This initializes OpenGL for the pbuffer and builds the object display lists.  Note, it assumes pbuffer is set with correct virtual screen for target drawable and its context is current.
+
+
+void updatePbuffer (AGLContext targetContext, pRecPbuffer pPbufferInfo)
+
+Sets current context to pbuffer context.  Gets the virtual screen of the  target context (context the pbuffer will be textured into).  Sets the pbuffer if the virtual screen has change, which is the pbuffer equivalent of set a drawable for rendering.  If the pbuffer is not initialized it does so.  Updates the time delta when animating. If the pbuffer needs to be redrawn it then updates the rotation, projection and modelview matrices using the standard application defined functions.  Lastly, the pbuffer content is drawn and finally flushed to the front buffer since the pbuffer is a single buffered context (controlled by the pixel format). The current context is set to NULL prior to exit to prevent further pbuffer drawing. 
+
+
+void dirtyPbuffer (pRecPbuffer pPbufferInfo) 
+
+Utility routine to simply set the pbuffer structures dirty flag allowing the update routine to know a redraw is required.
+
+
+void bindPbuffer (AGLContext targetContext, pRecPbuffer pPbufferInfo)
+
+This function binds the pbuffer as a texture to allow drawing from it.  On the first pass, when no texture name as been created, it crates a texture name, binds to this object, sets the texture parameter for no mipmapping then calls aglTexImagepbuffer which is the pbuffer equivalent to glTexImage.  If a texture object has been created already it just binds to this object.  Note, if one is using mipmaps and the content has changed aglTexImagepbuffer should be re-issued for the mipmap changes to be picked up.  One must have the context being drawn into (where the texture is being created) set as the current context when calling this function.
+
+
+// disposes of all pbuffer internal structures (does not dealloc memory for pbuffer info structure)
+// assumes context is current that pbuffer texture was created in
+
+OSStatus disposePbuffer(pRecPbuffer pPbufferInfo)
+
+This routine correctly disposes the pbuffer.  first, if a texture object has been created it deletes the texture (for this to operate correctly one should ensure the context is set to the same one as it was when bindpbuffer was called to create the texture object (or a shared context).  The pbuffer is then destroyed, followed by the context and the pixel format.  Failure to...
+
+
+Specifically in main.c, the following marks indicate points of interest in the source:
+
+*** create pbuffer ***
+aglCreatePBuffer is called to create the pixel buffer after the context has been created.  No new context nor pixel format is created here. 
+
+*** set pbuffer as drawable ***
+aglSetPBuffer is equivalent to aglSetDrawable for pbuffers (always use aglSetPBuffer when to set the pbuffer as the drawable and aglSetDrawable to set a window as a drawable).  It takes the virtual screen from the target context and uses this to choose the renderer for drawing into the pbuffer.  Think of the virtual screen as an index to hardware to use for rendering. Optional one can target a specific mipmap level or cube face for mipmapped and cube map Pbuffers respectively.  Lastly, note this is only called if we actually need to draw into the pbuffer to remove the overhead of needless drawable and renderer changes.
+
+*** dispose pbuffer ***
+Context is set to current then the texture being used as the Pbuffer texture is disposed.  Following this aglDestroyPBuffer is called to destroy the Pbuffers buffers and any memory associated with it.
+
+*** draw to pbuffer ***
+This code draws the to Pbuffer.  Note, the correct OpenGL viewport, projection and modelview matrices have been set prior to drawing each time to account for these changing when drawing in the window.
+
+There are two important notes.  First, we use a simple method to limit the pbuffer updates to once every 1/60th of a second, when the renderer of the window (e.g., its virtual screen) changes, or when settings change that affect the appearance of the pbuffer's content.  This brings up the second point.  The Pbuffer has its own buffers and thus is persistent across draws.  The buffers are not affected by drawing to the window and thus only need to be updated whenever changes are required.
+
+*** bind pbuffer as texture ***
+The routine bindPbuffer encapsulates pbuffer texture binding. This function binds the Pbuffer as a texture to allow drawing from it.  On the first pass, when no texture name as been created, it creates a texture name, binds to this object, sets the texture parameter for no mipmapping then calls aglTexImagePBuffer which is the Pbuffer equivalent to glTexImage.  If a texture object has been created already it just binds to this object.  Note, if one is using mipmaps with the Pbuffer and the content has changed aglTexImagePBuffer should be re-issued for the mipmap changes to be picked up (the texture does not need to be deleted, just re-issue aglTexImagePBuffer to get mipmap updates).
+
+*** texture from pbuffer ***
+This code simple calls the previous bindPbuffer routine and draws content (in this case a cube) using the Pbuffer as the texture.
+
+Comments and bugs are welcome at: <http://developer.apple.com/bugreporter>
+

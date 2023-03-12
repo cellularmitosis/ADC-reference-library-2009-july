@@ -1,0 +1,1 @@
+OSErr SelectOutputFile(FSSpec *fileSpec);OSErr OpenOutputFile(FSSpec *fileSpec, short *refnum, Boolean isResource);OSErr CloseOutputFile(short refnum, Boolean isResource);OSErr WritePictData(short refnum, Handle pictHandle, short pageNum, Boolean isResource);OSErr WriteCLUTData(short refnum);

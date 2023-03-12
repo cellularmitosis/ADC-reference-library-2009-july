@@ -1,0 +1,1 @@
+void MakeAMIDIMovie(short n,short item, short ref);  void MakeAFunkyMusicMovie(short n,short item, short ref);

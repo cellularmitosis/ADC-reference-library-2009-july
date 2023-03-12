@@ -1,0 +1,1 @@
+/* *	File:		TS3Menu.h * *	Copyright © 1996 Apple Computer, Inc. */#ifndef __TS3Menu__#define __TS3Menu__void Menu_Init(	void);void Menu_Exit(	void);void Menu_Select(	short			inMenuID,	short			inItem);short Menu_GetInterpolation(	void);#endif /* __TS3Menu__ */

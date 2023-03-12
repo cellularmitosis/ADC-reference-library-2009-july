@@ -1,0 +1,1 @@
+#include "CodeFragmentTypes.r"resource 'cfrg' (0){   {      kPowerPC,      kFullLib,	  kNoVersionNum, kNoVersionNum,	  kDefaultStackSize, kNoAppSubFolder,	  kIsApp, kOnDiskFlat, kZeroOffset, kWholeFork,	  "MenuScripter"   }};

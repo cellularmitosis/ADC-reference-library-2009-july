@@ -1,0 +1,1 @@
+//// game.h//extern	void InitTest(void);extern	void DoModelWindowNullEvent(void);extern	void UpdateModelWindow(void);extern	void DrawModelWindow(void);extern	void MoveModel(void);

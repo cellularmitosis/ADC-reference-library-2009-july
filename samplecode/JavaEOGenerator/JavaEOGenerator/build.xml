@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project name="JavaEOGenerator" default="build" basedir=".">
+	<description>
+		Builds a WebObjects Application
+	</description>
+ 	<!-- ==================================================== -->
+	<!--			Global properties						  -->
+    <!-- ==================================================== -->
+    <target name="init">
+		<xmlproperty file="build-properties.xml" collapseAttributes="true" keepRoot="false"/>
+
+		<!--NOTE: a project can be made self-contained if the following properties are reconfigured -->
+		<!--WARNING: the wo.path.installed.support_files_dir must be set either here or in the build properties file
+		<property name="wo.build.modulefile" location="${wo.path.installed.support_files_dir}/app-modules.xml"/>
+		 -->
+
+    	<property name="wo.build.modulefile" location="${basedir}/app-modules.xml"/>
+    	<property name="wo.path.installed.support_files_dir" location="${basedir}/wo-resources/BuildFiles"/>
+
+		<property name="wo.path.wobootstrap_file" location="${wo.path.installed.support_files_dir}/WOBootstrap.jar"/>
+		<property name="wo.path.unixlaunchscript" location="${wo.path.installed.support_files_dir}/UnixLaunch.sh"/>
+		<property name="wo.path.windowslaunchscript" location="${wo.path.installed.support_files_dir}/WinLaunch.CMD"/>
+		<property name="wo.path.j2ee.license_file" location="${wo.path.installed.support_files_dir}/LICENSE.pdf"/>
+		<property name="wo.path.j2ee.jboss_webxml_file" location="${wo.path.installed.support_files_dir}/jboss-web.xml"/>
+		<property name="wo.path.j2ee.servletweb_xml_file" location="${wo.path.installed.support_files_dir}/ServletEnv_web.xml"/>
+		<property name="wo.path.j2ee.wo_taglib_file" location="${wo.path.systemroot}/Library/Frameworks/JavaWOJSPServlet.framework/Resources/WOtaglib_1_0.tld"/>
+		<property name="wo.j2ee.taglib" value="WOtaglib_1_0.tld" />
+		<property name="wo.path.client_wsdd_file" location="${wo.path.systemroot}/Library/Frameworks/JavaWebServicesClient.framework/Resources/template_client.wsdd"/>
+		<property name="wo.path.server_wsdd_file" location="${wo.path.systemroot}/Library/Frameworks/JavaWebObjects.framework/Resources/template_server.wsdd"/>
+		<property name="wo.path.local.pbdevelopment_file" location="${wo.path.installed.support_files_dir}/pbdevelopment"/>
+	</target>
+
+	<!-- ==================================================== -->
+	<!--			Basic clean target						  -->
+    <!-- ==================================================== -->
+	<target name="clean" depends="init" description="Cleans out temporary directories (dist, bin, build)">
+		<echo message="Start top level Clean task"/>
+		<ant antfile="${wo.build.modulefile}" target="clean"></ant>
+		<echo message="Finished top level Clean task"/>
+	</target>
+
+	<!-- ==================================================== -->
+	<!--			Global build all target					  -->
+    <!-- ==================================================== -->
+	<target name="build" depends="init" description="Default build target that compiles and assembles all bundle types">
+		<echo message="Start top level Build task"/>
+		<ant antfile="${wo.build.modulefile}" target="all" inheritAll="true"></ant>
+
+		<!-- bogus javac target so this will be importable in Eclipse -->
+		<!-- NOTE: you'll have to configure the Eclipse project files -->
+		<javac srcdir="bin" destdir="bin">
+			<classpath>
+				<pathelement path="${java.class.path}"/>
+			</classpath>
+		</javac>
+
+		<echo message="Finished top level Build task"/>
+	</target>
+
+	<!-- ==================================================== -->
+	<!--			Build war bundle only 					  -->
+    <!-- ==================================================== -->
+	<target name="war" depends="init" description="Create a J2EE style bundle with an embedded WO application.">
+		<echo message="Build only war bundle"/>
+		<ant antfile="${wo.build.modulefile}" target="all" inheritAll="true">
+			<property name="wo.create_legacy_bundle" value="false"/>
+			<property name="wo.create_selfcontained_bundle" value="false"/>
+			<property name="wo.create_war_bundle" value="true"/>
+		</ant>
+		<echo message="Finished build only war bundle"/>
+	</target>
+
+	<!-- ==================================================== -->
+	<!--			Build legacy woa bundle only 			  -->
+    <!-- ==================================================== -->
+	<target name="woa" depends="init" description="Create a traditional WebObjects .woa bundle.">
+		<echo message="Build only legacy woa bundle"/>
+		<ant antfile="${wo.build.modulefile}" target="all" inheritAll="true">
+			<property name="wo.create_legacy_bundle" value="true"/>
+			<property name="wo.create_selfcontained_bundle" value="false"/>
+			<property name="wo.create_war_bundle" value="false"/>
+		</ant>
+		<echo message="Finished build legacy woa bundle"/>
+	</target>
+
+	<!-- ==================================================== -->
+	<!--			Build self-contained woa bundle only 	  -->
+    <!-- ==================================================== -->
+	<target name="self-contained-woa" depends="init" description="Build a self-contained .woa bundle that embeds all dependent .jars and resources within the bundle.">
+		<echo message="Build only self contained woa bundle"/>
+		<ant antfile="${wo.build.modulefile}" target="all" inheritAll="true">
+			<property name="wo.create_legacy_bundle" value="false"/>
+			<property name="wo.create_selfcontained_bundle" value="true"/>
+			<property name="wo.create_war_bundle" value="false"/>
+		</ant>
+		<echo message="Finished build only self contained woa bundle"/>
+	</target>
+
+	<!-- ==================================================== -->
+	<!--			Deploy application bundles				  -->
+    <!-- ==================================================== -->
+	<target name="deployment" depends="init" description="Analogous to the split install from the old Xcode build system.  Where resources are copied is specified by the wo.path.webobjects_applicationroot and wo.path.webobjects_documentroot.">
+		<echo message="Start split install for deployment"/>
+		<ant antfile="${wo.build.modulefile}" target="split-install" inheritAll="true">
+			<property name="wo.create_legacy_bundle" value="true"/>
+			<property name="wo.create_selfcontained_bundle" value="false"/>
+			<property name="wo.create_war_bundle" value="false"/>
+		</ant>
+		<echo message="Finished split install for deployment"/>
+	</target>
+
+	<target name="servlet-deployment" description="Deploy war bundle in the location specified by the j2ee.servlet_deploy_dir property">
+
+		<ant antfile="${wo.build.modulefile}" target="servlet-deploy" inheritAll="true">
+				<property name="wo.create_legacy_bundle" value="false"/>
+				<property name="wo.create_selfcontained_bundle" value="false"/>
+				<property name="wo.create_war_bundle" value="true"/>
+		</ant>
+
+	</target>
+
+	<!-- ==================================================== -->
+	<!--			Global run target						  -->
+	<!-- Configure the bundle to launch with property		  -->
+	<!-- wo.run.launchscript								  -->
+	<!-- Valid values are: legacy or selfcontained			  -->
+    <!-- ==================================================== -->
+	<target name="run" depends="init" description="By default this target will make sure the bundles are compiled and the legacy woa bundle is launched.">
+		<echo message="Start run target"/>
+		<ant antfile="${wo.build.modulefile}" target="run-app" inheritAll="true">
+			<property name="wo.create_legacy_bundle" value="true"/>
+			<property name="wo.create_selfcontained_bundle" value="true"/>
+			<property name="wo.create_war_bundle" value="false"/>
+		</ant>
+		<echo message="Finished run target"/>
+	</target>
+
+	<!-- ==================================================== -->
+	<!--			Documentation target					  -->
+	<!-- Developers must configure this target				  -->
+    <!-- ==================================================== -->
+	<target name="javadoc" depends="init" description="Default target for javadoc generation.">
+		<echo message="Start javadoc generation"/>
+		<mkdir dir="doc"/>
+		<javadoc sourcepath="src" destdir="doc"/>
+		<echo message="Finished javadoc generation"/>
+	</target>
+
+</project>
+
+
+

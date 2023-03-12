@@ -1,0 +1,1 @@
+#pragma onceGWorldPtr PictureToGWorld(PicHandle	pict, int gdepth);PixMapHandle PreserveGraf(GWorldPtr newPort);void RestoreGraf(void);#define RECT_WD(rekt) ((rekt).right - (rekt).left)#define RECT_HT(rekt) ((rekt).bottom - (rekt).top)

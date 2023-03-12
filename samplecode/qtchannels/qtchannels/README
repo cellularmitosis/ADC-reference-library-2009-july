@@ -1,0 +1,1 @@
+README - QTChannelsThis snippet shows how to add items to (and remove items from) the favorites drawer in QuickTime Player.Enjoy,QuickTime Team

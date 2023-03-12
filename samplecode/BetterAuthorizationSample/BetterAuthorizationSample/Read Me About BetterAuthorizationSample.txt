@@ -1,0 +1,107 @@
+Read Me About BetterAuthorizationSample
+=======================================
+1.0
+
+BetterAuthorizationSample shows how to factor privileged operations out of your application and into a privileged helper tool that is run by launchd.  When your application must do privileged operations, Apple recommends that you use this approach because it improves security by:
+
+o ensuring that your privileged code inherits a trusted environment
+
+o reducing the amount of code that runs with elevated privileges
+
+o making your privileged code easier to audit for security
+
+The core of BetterAuthorizationSample is a reusable library that you can drop into your own application.  This reusable code takes care of the niggling details of the problem, leaving you to concentrate on the code that's specific to your application.
+
+BetterAuthorizationSample has a number of advantages over previous samples in this space.
+
+o It is more secure because it doesn't use a setuid root helper tool.  Setuid root tools are inherently vulnerable to a certain class of attacks because they inherit their environment from a non-trusted source.  BetterAuthorizationSample's helper tools inherit their environment from a trusted source (launchd) and are not vulnerable to that class of attacks.
+
+o It has better integration with Authorization Services.  BetterAuthorizationSample makes it easy to associate a custom authorization right with your privileged operations; the reusable code will automatically enforce that right.
+
+You should only use BetterAuthorizationSample if your application needs ongoing access to privileged operations.  For example, if you're writing a packet capture tool (where the underlying technology, BPF, is only available to privileged processes) and you want to make it available to users in a controlled and configurable fashion (determined by an authorization right), BetterAuthorizationSample is for you.  On the other hand, if your application needs elevated privileges for a one-off task (like installing or uninstalling), you should consider using AuthorizationExecuteWithPrivileges directly.
+
+BetterAuthorizationSample requires Mac OS X 10.4.6 or later.  The reason for this specific requirement is that the system must support the "SockPathMode" key in the <x-man-page://5/launchd.plist> file.  This is supported on all versions of Mac OS X for Intel-based Macintosh computers, but it wasn't supported on PowerPC until 10.4.6.
+
+Packing List
+------------
+The sample contains the following items:
+
+o Read Me About BetterAuthorizationSample.txt -- This file.
+
+o Performing Privileged Operations With BetterAuthorizationSampleLib.txt -- A document describing how to adapt BetterAuthorizationSampleLib to perform privileged operations in your own programs.
+
+o Design and Implementation Rationale.txt -- A document describing the design decisions and implementation details.
+
+o BetterAuthorizationSample.xcodeproj -- An Xcode 2.4.1 project for the program.
+
+o build -- A pre-built version of the above.
+
+o BetterAuthorizationSampleLib.h -- The interface to the reusable code.
+o BetterAuthorizationSampleLib.c -- The implementation of the reusable code.
+o BetterAuthorizationSampleLibInstallTool.c -- Reusable code for the installation tool.
+
+o SampleApp.m -- Source code for the sample application.
+o SampleTool.c -- Source code for the sample helper tool.
+o SampleCommon.h -- Declarations shared by the application and tool.
+o SampleCommon.c -- Definitions shared by the application and tool.
+
+o Info.plist -- The Info.plist file for the sample application.
+o SampleApp.nib -- The UI for the sample application.
+o en.lproj -- Localized resources for the sample application.  While the sample is not, in general, localized, one file, "SampleAuthorizationPrompts.strings", is localized to illustrate a key point about custom authorization rights.
+
+o SampleUninstall.sh -- A shell script to uninstall the sample helper tool.  This is helpful during development, because it allows you to reset your system to a known state.
+
+Using the Sample
+----------------
+To test the sample, just launch the pre-built binary.  You'll see a window with three buttons.
+
+o GetVersion -- Click this to get the version number of the currently installed helper tool (which should be 17, for no good reason other than it's easy to see if things have gone wrong).
+
+Unlike the other two buttons, this button requires that the tool be installed already.  If you click this button first, the operation will fail with error 100002 (the OSStatus equivalent of the POSIX error ENOENT). To fix this, install the tool by clicking one of the other buttons.
+
+There is no authorization right for this operation.  All users can do it all the time.
+
+o GetUIDs -- Click this to ask the privileged helper tool to return its real and effective user IDs.  These should both be zero.  If the privileged helper tool is not installed, it will ask you whether you want to install it.
+
+The authorization right for this operation defaults to allow anyone to do it.  However, a system admin can change this default by editing the right specification for "com.example.BetterAuthorizationSample.GetUIDs" in the policy database (currently "/etc/authorization").
+
+o LowNumberedPorts -- Click this to ask the privileged helper tool to open certain low numbered TCP ports (130, 131, and 132) and return descriptors for them to the application.
+
+The authorization right for this operation requires that the user hold (or be able to enter) administrator credentials (typically an admin user name and password).  Again, a system admin can change this default by editing the right specification for "com.example.BetterAuthorizationSample.LowNumberPorts" in the policy database (currently "/etc/authorization").
+
+Checking the "Force failure" checkbox modifies the behavior of these buttons as described in "Force Failure", below.
+
+Building the Sample
+-------------------
+The sample was built using Xcode 2.4.1 on Mac OS X 10.4.10.  You should be able to just open the project and choose Build from the Build menu.  This will build the "App" target, which builds the tool courtesy of a target dependency on the "Tool" target.  The final application will end up in the "build" directory, as per normal, with a copy of the tool embedded within its package.
+
+The project includes a "Debug64" build configuration, used to build a 64-bit version of the code for testing purposes.  This target only builds with Xcode 3.0, and the resulting binary is for Mac OS X 10.5 and later.  Also, Mac OS X 10.5.x currently has a bug that causes the 64-bit privileged helper tool to fail.  Specifically, launch_data_get_fd does not work for 64-bit processes <rdar://problem/5410487>.
+
+Using BetterAuthorizationSampleLib In Your Program
+--------------------------------------------------
+For information about how to use the reusable portions of BetterAuthorizationSample in your own program, read the document "Performing Privileged Operations With BetterAuthorizationSampleLib.txt".
+
+How it Works
+------------
+For information about the design and implementation of BetterAuthorizationSample, read the document "Design and Implementation Rationale.txt".
+
+Force Failure
+-------------
+The "Force failure" checkbox in the sample application allows you to test some likely error scenarios.
+
+o If "Force failure" is checked and you click "GetVersion", the application will pass an illegal command string to the reusable code.  This let you validate the mechanism that rejects illegal commands.
+
+o If "Force failure" is checked and you click "LowNumberedPorts", the operation will fail as if one of the ports was in use.  This let you test the error path, making sure that everything gets cleaned up along the way.
+
+Credits and Version History
+---------------------------
+If you find any problems with this sample, mail <dts@apple.com> and we'll try to fix them up.
+
+1.0 (Nov 2007) was the first shipping version.
+
+Share and Enjoy
+
+Apple Developer Technical Support
+Core OS/Hardware
+
+12 Nov 2007

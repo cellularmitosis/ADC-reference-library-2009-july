@@ -1,0 +1,1 @@
+This sample illustrates how to hide and show the buttons in a controller bar.

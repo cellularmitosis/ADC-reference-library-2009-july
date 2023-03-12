@@ -1,0 +1,1 @@
+//// 3dmf.h//#include "qd3d_support.h"extern	TQ3Object	Load3DMFModel(FSSpec *inFile);extern	void Save3DMFModel(QD3DSetupOutputType *setupInfo,FSSpec *outFile, void (*callBack)(QD3DSetupOutputType *));

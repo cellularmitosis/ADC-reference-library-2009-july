@@ -1,0 +1,167 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+
+<!--
+
+File:ChoiceVersionCheck.dist
+
+Abstract: Installer Distribution Sample
+Version: <1.0>
+
+Disclaimer: IMPORTANT:  This Apple software is supplied to you by Apple
+Computer, Inc. ("Apple") in consideration of your agreement to the
+following terms, and your use, installation, modification or
+redistribution of this Apple software constitutes acceptance of these
+terms.  If you do not agree with these terms, please do not use,
+install, modify or redistribute this Apple software.
+
+In consideration of your agreement to abide by the following terms, and
+subject to these terms, Apple grants you a personal, non-exclusive
+license, under Apple's copyrights in this original Apple software (the
+"Apple Software"), to use, reproduce, modify and redistribute the Apple
+Software, with or without modifications, in source and/or binary forms;
+provided that if you redistribute the Apple Software in its entirety and
+without modifications, you must retain this notice and the following
+text and disclaimers in all such redistributions of the Apple Software. 
+Neither the name, trademarks, service marks or logos of Apple Computer,
+Inc. may be used to endorse or promote products derived from the Apple
+Software without specific prior written permission from Apple.  Except
+as expressly stated in this notice, no other rights or licenses, express
+or implied, are granted by Apple herein, including but not limited to
+any patent rights that may be infringed by your derivative works or by
+other works in which the Apple Software may be incorporated.
+
+The Apple Software is provided by Apple on an "AS IS" basis.  APPLE
+MAKES NO WARRANTIES, EXPRESS OR IMPLIED, INCLUDING WITHOUT LIMITATION
+THE IMPLIED WARRANTIES OF NON-INFRINGEMENT, MERCHANTABILITY AND FITNESS
+FOR A PARTICULAR PURPOSE, REGARDING THE APPLE SOFTWARE OR ITS USE AND
+OPERATION ALONE OR IN COMBINATION WITH YOUR PRODUCTS.
+
+IN NO EVENT SHALL APPLE BE LIABLE FOR ANY SPECIAL, INDIRECT, INCIDENTAL
+OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+INTERRUPTION) ARISING IN ANY WAY OUT OF THE USE, REPRODUCTION,
+MODIFICATION AND/OR DISTRIBUTION OF THE APPLE SOFTWARE, HOWEVER CAUSED
+AND WHETHER UNDER THEORY OF CONTRACT, TORT (INCLUDING NEGLIGENCE),
+STRICT LIABILITY OR OTHERWISE, EVEN IF APPLE HAS BEEN ADVISED OF THE
+POSSIBILITY OF SUCH DAMAGE.
+
+Copyright © 2005 Apple Computer, Inc., All Rights Reserved
+
+-->
+
+<installer-script minSpecVersion="1.0">
+<!-- 
+	Purpose: To show how to lock out downgrades of packages.						
+	Overview: Unlike a mpkg or pkg, a distribution does not restrict downgrades automatically, this functionality is the choice of the distribution creator.  There are some sim															
+-->
+    <title>My Great Software</title>
+
+	<volume-check script='volume_check()'/>
+	
+	<script>
+<!--
+	This volume check script checks to see if installing this distribution should be allowed based on the version of exisiting packages on disk.  It leverages the fact that later we disable any choice which has a package which is already installed with a larger or equal value.
+-->
+		function volume_check(){
+			var thisChoice = choices['TextEditChoice'];
+				
+			<!-- If any choice is enabled or selected, then there is something the user can install-->
+			if(thisChoice.enabled || thisChoice.selected){
+				<!-- Allow install on this volume -->
+				return true;
+			}
+				
+			<!-- If there is nothing to install, do not allow selectio of this volume.-->
+			my.result.type = 'Fatal';
+			my.result.message = 'Nothing to install';
+			
+			return false;
+		}
+		
+<!--
+	This function checks to see if install should be allowed on the current choice, if not, it returns false and sets the tooltip for the choice.
+-->
+		function should_enable_choice(){
+			if(!should_allow_install()){
+<!--
+	my.choice.tooltop is the tooltip attribute for a my.choice.  It is the only attribute for a choice that can be set in JavaScript.  The value for tooltip will be displayed in the custom install panel when a user puts their mouse over the given choice.
+-->
+				my.choice.tooltip = 'There is nothing to install.';
+				return false;
+			}
+			
+			//Blank out the tooltip
+			my.choice.tooltip = '';
+
+			return true;
+		}
+		
+
+<!-- 
+	This function returns true if the packages for the given choice are either not already installed or they are an upgrade (package version numbers are greater in the containing packages then the ones on disk.  See should_allow_install_the_hard_way() for more details on doing what packageUpgradeAction does by hand.
+-->
+		function should_allow_install(){
+<!-- 
+	The value for a choice's packageUpgradeAction attribute can be the following:
+		clean		-	No version of the package is installed on disk.
+		upgrade		-	An older version of the package is already installed on disk.
+		downgrade	-	A newer version of the package is already installed on disk.
+		mixed		-	At least one package contained in this choice will be a downgrade.
+		
+	This attribute returns the value for all the packages attached to a particular choice.
+-->
+			var action = my.choice.packageUpgradeAction;
+				
+			if((action == 'clean') || (action == 'upgrade')){
+				return true;
+			}
+			
+			return false;
+		}
+		
+<!--
+		//An Example script of checking for downgrade the hard way
+		//Since packageUpgradeAction is built in, it is more efficient, but
+		//if a product requires that some packages must be downgraded and some
+		//not, doing it by hand may be the best option
+		function should_allow_install_the_hard_way(){
+			var packages = my.choice.packages;
+			var allow = true;
+			
+			//Loop through all the packages attached to this choice.
+			for(var i; i &lt; packages.length; i++){
+				var pkg = packages[i];
+				var installedPkg = my.target.receiptForIdentifier(pkg.identifier);
+				
+				if(installedPkg){
+					if(1 != system.compareVersions(pkg.version,installedPkg.version)){
+						allow = false;
+						break;
+					}
+				}
+			}
+
+			return allow;
+		}
+-->
+	</script>
+
+    <choices-outline>
+        <line choice="TextEditChoice"/>
+    </choices-outline>
+
+<!--
+	The start state for enabled and selected are given by the two scripts should_enable_choice() and should_allow_install().  These two scripts allow a choice to be enabled/selected dynamically.  In this case, the choice will only be enabled (or selectable) and selected if should_enable_choice() is true and should_allow_install() is true.
+-->
+    <choice id="TextEditChoice" 
+    	title="TextEdit" 
+    	description="Installs TextEdit.app compiled from source."
+    	start_enabled="should_enable_choice()"
+    	start_selected="should_allow_install()">
+    	<pkg-ref id="com.apple.pkg.example.textedit"/>
+    </choice>
+
+	<pkg-ref id="com.apple.pkg.example.textedit" version="10.4.0.10.4" installKBytes="976" auth="None" onConclusion="None">file:../Packages/TextEdit.pkg</pkg-ref>
+
+</installer-script>

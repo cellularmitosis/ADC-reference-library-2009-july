@@ -1,0 +1,261 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2 Final//EN"
+        "http://www.w3.org/MarkUp/Wilbur/HTML32.dtd">
+<html lang="en">
+<head>
+	<meta http-equiv="content-type" content="text/html; charset=utf-8">
+	<title>Minimum Requirements</title>
+	<meta name="generator" content="BBEdit 8.2">
+<style type="text/css">
+<!--
+.mybox {
+	background-color: #F7F7F7;
+	margin: 4px;
+	padding: 4px;
+	border: 1px solid #999999;
+}
+-->
+<!--
+.mycodebox {
+	background-color: #F1F5F9;
+	margin: 4px;
+	padding: 4px;
+	border: 1px solid #999999;
+}
+-->
+</style>
+</head>
+<body>
+
+<h1>
+Tutorial: Writing a custom HIView
+</h1>
+
+<h2>
+A) What are the minimum requirements?
+</h2>
+
+<p>
+To use a custom HIView, you need to be running on Mac OS X v10.2 or later.
+</p>
+
+<p>
+You need to define and register its class, for instance: com.apple.sample.dts.HICustomView. You usually will use your reverse-ordered ICANN domain name with your specific class name at the end.
+</p>
+
+<p>
+You need to handle at least 3 Carbon Events: kEventHIObjectConstruct, kEventHIObjectDestruct, and kEventControlDraw. If you do not handle kEventHIObjectConstruct or kEventHIObjectDestruct then your custom HIView will not be created. If you do not handle kEventControlDraw then it would draw nothing.
+</p>
+
+<div class="mybox">
+<strong>
+Note: A custom HIView which does not draw anything is not a very useful custom HIView unless you want it to be an embedding view only. Since there are already two existing HIViews (HIView itself, the base class, and the User Pane control) which are embedders, it would make more sense to just use one of them and override the few Carbon Events necessary for your specialized behavior rather than write your own.
+</strong>
+</div>
+
+<p>
+With those Carbon Events, you already have a custom HIView which can manage its own private data and can be added to any other embedding HIView and displayed. It will not react to any mouse or keyboard actions and would just be a displaying view but it is still a completely valid HIView.
+</p>
+
+<p>
+Thus the header file of a custom HIView will typically contain the following elements: definition/declaration, and the registration and creation function prototypes.
+</p>
+
+<div class="mycodebox">
+<pre>// Definition/Declaration
+#define kHICustomViewClass CFSTR("com.apple.sample.dts.HICustomView")
+
+// Registration
+CFStringRef GetHICustomViewClass(void);
+
+// Creation
+OSStatus HICreateCustomView(
+   const HIRect * boundsRect,      // can be NULL
+   HIViewRef * outHICustomView);   // cannot be NULL</pre>
+</div>
+
+<p>
+Of course, your creation prototype may contain a lot more parameters and you may also add function prototypes specific to your custom HIView.
+</p>
+
+<p>
+The implementation of this custom HIView is pretty much boiler plate:
+</p>
+
+<div class="mycodebox">
+<pre>CFStringRef GetHICustomViewClass(void)
+   {
+   static HIObjectClassRef   theClass;
+   
+   if (theClass == NULL)
+      {
+      static EventTypeSpec kFactoryEvents[] =
+         {
+            { kEventClassHIObject, kEventHIObjectConstruct },
+            { kEventClassHIObject, kEventHIObjectDestruct },
+            { kEventClassControl, kEventControlDraw }
+         };
+      
+      HIObjectRegisterSubclass(kHICustomViewClass, kHIViewClassID, 0, Internal_HICustomViewHandler,
+                          GetEventTypeCount(kFactoryEvents), kFactoryEvents, 0, &theClass);
+      }
+   
+   return kHICustomViewClass;
+   }
+
+OSStatus HICreateCustomView(
+   const HIRect * boundsRect,      // can be NULL
+   HIViewRef * outHICustomView)    // cannot be NULL
+   {
+   OSStatus status;
+   HIObjectRef hiObject;
+   
+   require_action(outHICustomView != NULL, exitCreation, status = paramErr);
+   *outHICustomView = NULL;
+
+   // create the view
+   status = HIObjectCreate(GetHICustomViewClass(), 0, &hiObject);
+   require_noerr(status, exitCreation);
+      
+   // position the view
+   if (boundsRect != NULL)
+      {
+      status = HIViewSetFrame((HIViewRef)hiObject, boundsRect);
+      require_noerr(status, exitCreation);
+      }
+
+   // return the view
+   *outHICustomView = (HIViewRef)hiObject;
+
+exitCreation:
+   return status;
+   }   // HICreateCustomView</pre>
+</div>
+
+<p>
+And our private data and the HICustomViewHandler are:
+</p>
+
+<div class="mycodebox">
+<pre>typedef struct
+   {
+   HIViewRef view;                             // our view
+   }
+HICustomViewData;
+
+static pascal OSStatus Internal_HICustomViewHandler(EventHandlerCallRef inHandlerCallRef, EventRef inEvent, void * inUserData)
+   {
+   OSStatus status = eventNotHandledErr;
+   HICustomViewData * myData = (HICustomViewData *)inUserData;
+
+   switch (GetEventClass(inEvent))
+      {
+      case kEventClassHIObject:
+         switch (GetEventKind(inEvent))
+            {
+            case kEventHIObjectConstruct:
+               {
+               // allocate some instance data
+               myData = (HICustomViewData *) calloc(1, sizeof(HICustomViewData));
+               require_action(myData != NULL, ConstructExit, status = memFullErr);
+               
+               // get our superclass instance
+               HIViewRef epView;
+               status = GetEventParameter(inEvent, kEventParamHIObjectInstance, typeHIObjectRef, NULL, sizeof(epView), NULL, &epView);
+               require_noerr(status, ConstructExit);
+               
+               // remember our superclass in our instance data
+               myData->view = epView;
+               
+               // store our instance data into the event
+               status = SetEventParameter(inEvent, kEventParamHIObjectInstance, typeVoidPtr, sizeof(myData), &myData);
+               require_noerr(status, ConstructExit);
+
+ConstructExit:
+               break;
+               }
+               
+            case kEventHIObjectDestruct:
+               {
+               // freeing our storage
+               if (myData != NULL) free(myData);
+               status = noErr;
+               break;
+               }
+            }
+         break;
+
+      case kEventClassControl:
+         switch (GetEventKind(inEvent))
+            {
+            case kEventControlDraw:
+               {
+               CGContextRef context;
+               status = GetEventParameter(inEvent, kEventParamCGContextRef, typeCGContextRef, NULL, sizeof(context), NULL, &context);
+               require_noerr(status, ControlDrawExit);
+
+               HIRect bounds, viewBounds;
+               HIViewGetBounds(myData->view, &viewBounds);
+
+               // drawing a blue-framed red circle
+               CGContextSetRGBFillColor(context, 1, 0, 0, 0.8);
+               CGContextSetRGBStrokeColor(context, 0, 0, 1, 0.8);
+
+               CGContextSetLineWidth(context, 3);
+               bounds = CGRectInset(viewBounds, 3, 3);
+               float minDim = (bounds.size.height < bounds.size.width) ? bounds.size.height / 2 : bounds.size.width / 2;
+               float cx = bounds.origin.x + minDim, cy = bounds.origin.y + minDim;
+
+               CGContextAddArc(context, cx, cy, minDim, 0, 2 * pi, true);
+               CGContextDrawPath(context, kCGPathFillStroke);
+
+               status = noErr;
+ControlDrawExit:
+               break;
+               }
+            }
+         break;
+      }
+   
+   return status;
+   }   // Internal_HICustomViewHandler</pre>
+</div>
+
+<p>
+You can test the custom HIView for this step by using the project located in the folder “1_Definition_Registration_Drawing”.
+</p>
+
+<p>
+Do all of your custom HIView's drawing in the kEventControlDraw event handler. Do not draw in any other event handler. The HIView architecture has been optimized to render all the views in a single one-pass compositing loop. You may be tempted to draw in other handlers because you are accustomed to do so in other view models, but this approach is incorrect in a compositing view hierarchy and it will lead to visual problems in your application.
+</p>
+
+<div class="mybox">
+<strong>Note: The project HICustomView_Tester has a double role: it shows how to write a custom HIView which can handle fancy drawing, custom tracking, and drag-and-dropping (HICustomView.c) and it provides a tester skeleton (HICustomView_Tester.c) providing basic testing functionalities (setting of values and states, scrolling, etc.) and which can be enhanced with your own testing requirements. For more details on this tester application, read <a href="../0_Tutorial/Skeleton%20Tester.html">Skeleton Tester</a>.
+</strong></div>
+
+<p>
+Running the application with the custom view as implemented at this step will show:
+</p>
+
+<img src="../0_Tutorial/Picture%201.png" alt="" width="536" height="470">
+
+<p>
+We have a running custom HIView, albeit very basic. In a typical application you will need HIViews that you can interact with but also HIViews which will just display results or data. For those latter views, the custom HIView sample as it is at this step is all you need since it handles definition/declaration, registration, and drawing. You need only read further if you want to know how to handle User interaction with your custom HIView.
+</p>
+
+<div class="mybox">
+<strong>Note: in the kEventControlDraw handler, the drawing code is using Quartz, aka Core Graphics. You may still use QuickDraw in this handler, and, if you choose to do so, the GrafPort is already setup for you. If you need to port quickly from an existing code base, either a custom CDEF-based control or a direct QuickDraw drawing done to respond to a Window Update event, then you may just transfer all your existing QuickDraw code in the kEventControlDraw handler and you only need to pay attention to the coordinate system (local to your view instead of being local to your window). Since QuickDraw has already been deprecated in Mac OS X v10.4, it would be advantageous to switch to Quartz at the same time as you move to the HIView architecture.
+</strong></div>
+
+<br>
+
+<a href="../0_Tutorial/Value%20and%20State.html">Next Page
+</a>
+
+<br>
+<br>
+
+<a href="../0_%20Tutorial%20Start%20Here.html">Return to Main Page
+</a>
+
+</body>
+</html>

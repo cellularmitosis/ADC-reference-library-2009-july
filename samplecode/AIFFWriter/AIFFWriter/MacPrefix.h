@@ -1,0 +1,1 @@
+// MacPrefix.h// prefix file for our Mac projects#ifndef __Prefix_File__#define __Prefix_File__#include <ConditionalMacros.h>// definitions for the project#define PASCAL_RTN						pascal#define INITBUILD#endif	// __Prefix_File__

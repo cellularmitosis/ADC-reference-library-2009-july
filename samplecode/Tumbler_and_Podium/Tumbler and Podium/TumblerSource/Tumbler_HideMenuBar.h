@@ -1,0 +1,1 @@
+#ifndef _SKANKYMENUBARHACK_#define _SKANKYMENUBARHACK_void ToggleMenuBar(void) ;void FixGrayRgnAfterContextSwitch( void ) ;#endif

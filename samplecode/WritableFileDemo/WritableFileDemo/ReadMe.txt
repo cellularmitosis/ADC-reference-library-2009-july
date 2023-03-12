@@ -1,0 +1,1 @@
+This sample illustrates how to create a writable, empty movie file that is associated with a QTMovie object.

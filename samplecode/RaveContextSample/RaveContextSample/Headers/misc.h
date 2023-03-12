@@ -1,0 +1,1 @@
+//// misc.h//extern	void ShowSystemErr(long err);extern void	ErrorHandler(short);extern void	DoAlert(Str255);extern void	DoFatalAlert(Str255);extern	void CleanQuit(void);extern	float RandomFloat(void);

@@ -1,0 +1,144 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!--
+
+File:InstallationCheck.dist
+
+Abstract: Installer Distribution Sample
+Version: <1.0>
+
+Disclaimer: IMPORTANT:  This Apple software is supplied to you by Apple
+Computer, Inc. ("Apple") in consideration of your agreement to the
+following terms, and your use, installation, modification or
+redistribution of this Apple software constitutes acceptance of these
+terms.  If you do not agree with these terms, please do not use,
+install, modify or redistribute this Apple software.
+
+In consideration of your agreement to abide by the following terms, and
+subject to these terms, Apple grants you a personal, non-exclusive
+license, under Apple's copyrights in this original Apple software (the
+"Apple Software"), to use, reproduce, modify and redistribute the Apple
+Software, with or without modifications, in source and/or binary forms;
+provided that if you redistribute the Apple Software in its entirety and
+without modifications, you must retain this notice and the following
+text and disclaimers in all such redistributions of the Apple Software. 
+Neither the name, trademarks, service marks or logos of Apple Computer,
+Inc. may be used to endorse or promote products derived from the Apple
+Software without specific prior written permission from Apple.  Except
+as expressly stated in this notice, no other rights or licenses, express
+or implied, are granted by Apple herein, including but not limited to
+any patent rights that may be infringed by your derivative works or by
+other works in which the Apple Software may be incorporated.
+
+The Apple Software is provided by Apple on an "AS IS" basis.  APPLE
+MAKES NO WARRANTIES, EXPRESS OR IMPLIED, INCLUDING WITHOUT LIMITATION
+THE IMPLIED WARRANTIES OF NON-INFRINGEMENT, MERCHANTABILITY AND FITNESS
+FOR A PARTICULAR PURPOSE, REGARDING THE APPLE SOFTWARE OR ITS USE AND
+OPERATION ALONE OR IN COMBINATION WITH YOUR PRODUCTS.
+
+IN NO EVENT SHALL APPLE BE LIABLE FOR ANY SPECIAL, INDIRECT, INCIDENTAL
+OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+INTERRUPTION) ARISING IN ANY WAY OUT OF THE USE, REPRODUCTION,
+MODIFICATION AND/OR DISTRIBUTION OF THE APPLE SOFTWARE, HOWEVER CAUSED
+AND WHETHER UNDER THEORY OF CONTRACT, TORT (INCLUDING NEGLIGENCE),
+STRICT LIABILITY OR OTHERWISE, EVEN IF APPLE HAS BEEN ADVISED OF THE
+POSSIBILITY OF SUCH DAMAGE.
+
+Copyright © 2005 Apple Computer, Inc., All Rights Reserved
+
+-->
+
+<installer-script minSpecVersion="1.0">
+<!-- 
+	Purpose: Shows how to use an installation-check script and some built in functions to restrict the installation of your software.				
+	Overview: Introduces installation-check, my.result object, my.sysctl, my.ioregistry, and my.localizedString....  Shows how to check specific requirements and return errors (disallow install) or warnings to the user.													
+-->
+
+    <title>My Great Software</title>
+
+<!-- 
+	The installation-check and volume-check scripts allow the distribution script to restrict the software from being installed on certain hardware or on a certain volume.				
+-->
+	<installation-check script="MyInstallCheck()"/>
+
+	<script>
+<!-- 
+	All JavaScripts in a distribution script have access to the system object.  Both the installation-check and volume-check scripts have access to a special object my.result. "my.result" object has three attributes that can be set to specify how the user will be presented with a failure.  See below for examples of this.	
+		
+	This installation-check script will not allow install on a machine with less then 1GB of memory and will warn if the machine does not have an iSight plugged in.  This will show various methods of getting information about a system, as well as showing how to display an error or a warning.	
+-->
+		function MyInstallCheck()
+		{
+<!-- 
+	system.sysctl has access to any of the values you could get from calling sysctl in c or from a shell.  man sysctl for possible attributes you can lookup.	In this example we are retrieving the system memory.												
+-->
+			var systemMemory = system.sysctl('hw.physmem');
+			
+<!-- 
+	Check the system memory, if it is less then 1 GB, then we want to return an error. Because we are embedded in XML, the '<' character must be escaped to '&lt;'.  Similarly, > and & are &gt; and &amp; respectively.									
+-->
+			if(systemMemory &lt; (1024*1024*1024) ){
+				<!--my.result.type can be 'Fatal' (Do not allow install) or 'Warn' (Display a warning).-->
+				my.result.type = 'Fatal';
+
+				<!-- my.result.title is the title for the installer warning.  If not set, a default title is used.-->
+				my.result.title = 'Requirements not met';
+
+<!-- 
+	my.result.message is the reason why the software cannot be installed.  This must be set if my.result.type is set to 'Fatal' or 'Warn'. system.localizedStringWithFormat() can be used to get a localized string. The formatter, regardless of the type is %@.  For every %@ encountered in the string, the argument (after the string) will replace that value.  The first string is the "key" to be looked up for localization either in the bundle containing the distribution script or embedded in the distribution script.		
+-->
+				my.result.message = system.localizedStringWithFormat('This software requires at least %@ of RAM.',"1 GB");
+				
+				return false;
+			}
+
+<!-- 
+	You can use the system.ioregistry.* calls to find objects by name, class, or path when searching by name or class an array is retruned.  Both matchingClass() and matchingName() functions take optionally a second argument specifing the plane. IOServicePlane is the default.														
+-->
+			var firewireObjects = system.ioregistry.matchingClass('IOFireWireDevice');
+			var foundiSight = false;
+			
+<!-- 
+	Always make sure the object you are going to work with actually exists, since calling accessors or functions on a nil object will throw a JavaScript exception which could cause unexpected results and is unpleasant for customers.				
+-->
+			if(firewireObjects){
+				
+				<!-- Loop through all the firewireObjects.  										-->
+				for( var i = 0; i &lt; firewireObjects.length; i++){
+					var obj = firewireObjects[i];
+					
+<!-- 
+	Once we have the object, we can check any of the attributes of the ioreg object.
+-->
+					if(obj['FireWire Product Name'] == 'iSight'){
+						foundiSight = true;
+						break;
+					}
+				}
+			}
+			
+<!-- 
+	If we have not found an iSight, just warn the user that they may need an iSight	camera.  There is no way of interacting with the user.  Installation-check scripts are only run once.																	-->
+			if(!foundiSight){
+				my.result.type = 'Warn';
+				my.result.message = 'Please ensure you have an iSight camera before using this software.';
+
+				return false;
+			}
+			
+			return true;
+		}
+	</script>
+
+    <choices-outline>
+        <line choice="TextEditChoice"/>
+    </choices-outline>
+
+    <choice id="TextEditChoice" title="TextEdit" description="Installs TextEdit.app compiled from source.">
+    	<pkg-ref id="com.apple.pkg.example.textedit"/>
+    </choice>
+
+	<pkg-ref id="com.apple.pkg.example.textedit" version="10.4.0.10.4" installKBytes="976" auth="None" onConclusion="None">file:../Packages/TextEdit.pkg</pkg-ref>
+
+</installer-script>

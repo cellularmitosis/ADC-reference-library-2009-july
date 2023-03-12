@@ -1,0 +1,1 @@
+/* Menu resource IDs */#define APPLE_MENU	128#define FILE_MENU	129#define	EDIT_MENU	130#define SLIM_MENU	131/* Menu item numbers */#define APPLE_ABOUT 1#define FILE_PRINT	1#define FILE_QUIT	2/* Test Menu items */#define SLIM_1		1#define SLIM_2		2#define SLIM_3		3#define SLIM_4		4/* resource ID of about box Alert */#define ABOUT_BOX_ID 129

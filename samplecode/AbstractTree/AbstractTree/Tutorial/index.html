@@ -1,0 +1,231 @@
+<html>
+<head>
+<title>AbstractTree</title>
+<link rel="stylesheet" type="text/css" href="css/styles.css">
+<script src="js/prototype.js" type="text/javascript"></script>
+<script type="text/javascript">
+function set_visibility(css_rule, option) {
+	if (option.checked) $$(css_rule).each(function(item) { item.show(); } );
+	else $$(css_rule).each(function(item) { item.hide(); } );
+}
+</script>
+</head>
+<body>
+<h1 style="text-align:center">AbstractTree</h1>
+<form name="set_level_of_detail" style="padding-left:40px; padding-right:20px; float:right;">
+<fieldset>
+<legend>Table of Contents</legend>
+<ol>
+<li><a href="#create">Create the Project</a></li>
+<li><a href="#model">Design the Data Model</a></li> 
+<li><a href="#code">Add Code to the Application Delegate</a></li>
+<li><a href="#build">Build the User Interface</a></li>
+<li><a href="#config">Mediator Attributes</a></li>
+<li><a href="#connect">Create IB Connections</a></li>
+<li><a href="#bind">Configure Bindings</a></li>
+<li><a href="#done">Build and Run!</a></li>
+</ol>
+<p>View Options*:</p>
+<input type="checkbox" onclick="set_visibility('.implementation', this);if (this.checked) $('media_checkbox').removeAttribute('disabled'); else $('media_checkbox').setAttribute('disabled');">Implementation Details<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<input id="media_checkbox" type="checkbox" disabled onclick="set_visibility('.media', this);">Screenshots and Media<br>
+<p class='footnote'>* You will still be able to show/hide individual sections of the content.</p>
+</fieldset>
+</form>
+
+<p>AbstractTree is a Cocoa sample application that demonstrates how to use Core Data and Bindings with NSTreeController. The data model is intentionally simple and abstract - you can extend it to any hierarchical model suitable for your problem domain. Likewise, the user interface is minimal - just an outline view and buttons for creating and removing nodes in the tree. In addition, the project shows how to implement drag and drop for managing parent-child relationships of the Core Data content.</p>
+
+<p>This tutorial will cover each step necessary for creating the project. By default, many detailed sections are not displayed, but can be viewed by clicking links found in the document.</p>
+
+
+<!-- ********************************************************************** -->
+<!-- ********************* Project **************************************** -->
+<!-- ********************************************************************** -->
+<h2><a name="create"></a>Create the Project</h2>
+<p>Using Xcode, create a new Core Data Application project.</p>
+<h4><a href="javascript:;" onclick="$('create_project').toggle()">Step by step</a></h4>
+<div id="create_project" class="implementation" style="display:none">
+<ol>
+<li>Launch Xcode.
+<li>From the File menu, select New Project and scroll to "Core Data Application". <a href="javascript:;" onclick="$('create_project_img').toggle()">screenshot</a>
+<img id="create_project_img" style="display:none;" class="media" src="images/new_project.tiff">
+<li>Click "Next".
+<li>Name the project appropriately.
+<li>Click "Finish". 
+</ol>
+<p>Xcode will prepare a blank Core Data Application project for you.</p>
+</div>
+
+<h4>Additional Documentation:</h4>
+<ul>
+<li><a target="_blank" href="http://developer.apple.com/documentation/DeveloperTools/Conceptual/XcodeUserGuide/Contents/Resources/en.lproj/01_20_tasks_creating_projects/chapter_5_section_1.html">Creating Projects</a></li>
+</ul>
+
+<!-- ********************************************************************** -->
+<!-- ********************* Data Model ************************************* -->
+<!-- ********************************************************************** -->
+<h2><a name="model"></a>Design the Data Model</h2>
+<p>AbstractTree's data model consists of a single entity, "Node", representing a generic tree node. Most importantly, nodes have a to-one "parent" relationship and a to-many "children" relationship. (Nodes also have a name, so that there's something to display in the UI of the application.) In a general sense, trees have several types of nodes - root nodes, container nodes, and leaf nodes. A root node is a node without a parent; containers have children; leaves have no children. A data model could represent a tree in many different ways - we're just keeping things simple in this sample. So, in AbstractTree, a root node is implicitly any node with a nil parent, and a leaf node is implicitly any node that has no children.</p>
+<p>The children relationship is the key to NSTreeController functionality. AbstractTree has a single entity in its hierarchy, so this is not an issue, but if there are multiple entities in a hierarchy they must all have a common key for accessing children. Without a common key, NSTreeController will be unable to manage its content. The parent relationship is present for two reasons: (1) modeling inverse relationships is a strongly encouraged practice when using Core Data, and (2) we test the parent relationship to determine the root(s) of our tree in the UI.</p>
+<h4><a href="javascript:;" onclick="$('design_model').toggle()">Step-by-step</a></h4>
+<div id="design_model" class="implementation" style="display:none">
+<ol>
+<li>In your project, find the data model file and open it. <a href="javascript:;" onclick="$('open_model_img').toggle()">screenshot</a></li>
+<img id="open_model_img" style="display:none;" class="media" src="images/open_model.tiff">
+<li>Create a new Entity and set its name to "Node". (This is case-sensitive!)</li>
+<li>Add an attribute, set its Name to "name" and Type to "string". Give it a Default Value of "tree node".</li>
+<li>Add a relationship. Name it "children", set the Destination to "Node", and make it a "To-Many Relationship". Also, make the Delete Rule "Cascade".</li>
+<li>Add another relationship. Name it "parent", set the Destination to "Node", and set the Inverse to "children".</li>
+</ol>
+<p>The data model for AbstractTree is complete. <a href="javascript:;" onclick="$('finished_model_img').toggle()">screenshot</a><img style="display:none;" id="finished_model_img" class="media" src="images/node_entity.tiff"></p>
+</div>
+
+<h4>Additional Documentation</h4>
+<ul>
+<li><a target="_blank" href="http://developer.apple.com/documentation/DeveloperTools/Conceptual/XcodeUserGuide/Contents/Resources/en.lproj/02_40_design_data_modeling/chapter_17_section_1.html">Data Modeling for Core Data</a></li>
+<li><a target="_blank" href="http://developer.apple.com/documentation/Cocoa/Conceptual/CoreData/Articles/cdMOM.html">Managed Object Models</a></li>
+</ul>
+
+<!-- ********************************************************************** -->
+<!-- ********************* Application Delegate *************************** -->
+<!-- ********************************************************************** -->
+<h2><a name="code"></a>Add Code to the Application Delegate</h2>
+<p>The application delegate object provides the necessary Core Data support by loading the managed object model and creating the persistent store coordinator and managed object context objects. All of this is in boiler-plate code provided by the Xcode template - you don't have to do anything here, unless you wish to customize these actions for your application. For this project, we need to add some IBOutlets and implement some additional methods to manage drag and drop.</p>
+
+<p>We need an outlet to the NSOutlineView so we can register it for receiving drag operations, and to the NSTreeController to use it as a mediator in the drag operation.</p>
+
+<p>For drag and drop, we make the application delegate the data source of the NSOutlineView. This does not obligate us to implement the "standard" data source methods, because that functionality will be provided by binding to the NSTreeController. Instead, we simply implement the data source methods specific to drag operations. In the drag, we use a URL representation of the Core Data objects, a simple but clean way of uniquely specifying them ideal for pasteboard operations.</p>
+
+<p>If you are following along with your own project, add the outlets to your application delegate and copy the source implementations found below the line "#pragma mark Code Added for AbstractTree Drag and Drop".</p>
+
+<h4><a href="javascript:;" onclick="$('app_delegate_code').toggle()">Step-by-step</a></h4>
+<div id="app_delegate_code" class="implementation" style="display:none">
+<p>The source code for AbstractTree_AppDelegate.m is the best step-by-step guide for this section. Look for the line "#pragma mark Code Added for AbstractTree Drag and Drop" - everything above that line is boilerplate generated when you create an Xcode project with the Core Data Application template. Everything below the pragma is specific to this project. Almost every line is commented, so it should be fairly easy to understand what is happening in the code - read the "Conceptual" section below for a discussion of how everything fits together. Also, be sure to check the header file (AbstractTree_AppDelegate.h) and note the additional Interface Builder outlets and actions that have been added. These additions are necessary for making the connections in IB.</p>
+</div>
+
+<h4>Additional Documentation</h4>
+<ul>
+<li><a target="_blank" href="http://developer.apple.com/documentation/Cocoa/Reference/ApplicationKit/Protocols/NSOutlineViewDataSource_Protocol/Reference/Reference.html">NSOutlineViewDataSource Protocol Reference</a></li>
+<li><a target="_blank" href="http://developer.apple.com/documentation/Cocoa/Conceptual/EventOverview/EventHandlingBasics/chapter_4_section_3.html">Implementing Action Methods</a></li>
+</ul>
+
+<!-- ********************************************************************** -->
+<!-- ********************* User Interface ********************************* -->
+<!-- ********************************************************************** -->
+<h2><a name="build"></a>Build the User Interface</h2>
+<p>AbstractTree’s UI is minimal: it consists of a single window containing a NSOutlineView and two NSButtons. The outline view shows the nodes in the tree, hierarchically arranged, and the buttons allow you to create new nodes and remove existing nodes. Node names will be editable by double-clicking them directly in the tree. We will use a NSTreeController to mediate between the outline view, the buttons, and the data model for the tree.</p>
+
+<h4><a href="javascript:;" onclick="$('build_ui').toggle()">Step-by-step</a></h4>
+<div id="build_ui" class="implementation" style="display:none">
+<ol>
+<li>In your project, find MainMenu.nib and open it. <a href="javascript:;" onclick="$('open_nib_img').toggle()">screenshot</a></li>
+<img id="open_nib_img" style="display:none;" class="all" src="images/open_nib.tiff">
+<li>Add a NSTreeController to the nib. In Interface Builder 3, you add objects to a nib by dragging them from the Library panel. <a href="javascript:;" onclick="$('nib_objects_img').toggle()">screenshot</a></li>
+<img id="nib_objects_img" style="display:none;" class="media" src="images/nib_objects.tiff">
+<li>Open the window object in the nib by double-clicking it.</li>
+<li>Add a NSOutlineView and two NSButtons to the window. <a href="javascript:;" onclick="$('nib_window_layout_img').toggle()">screenshot</a></li>
+<img id="nib_window_layout_img" style="display:none;" class="media" src="images/nib_window_layout.tiff"></li>
+</ol>
+</div>
+
+<h4>Additional Documentation</h4>
+<ul>
+<li><a target="_blank" href="http://developer.apple.com/documentation/DeveloperTools/Conceptual/IB_UserGuide/ApplicationBasics/chapter_3_section_3.html">Interface Builder Workflow Tools</a></li>
+</ul>
+
+<!-- ********************************************************************** -->
+<!-- ********************* Attributes ************************************* -->
+<!-- ********************************************************************** -->
+<h2><a name="config"></a>Mediator Attributes</h2>
+<p>In MainMenu.nib, the NSTreeController needs to be configured. Set it to "Entity" Mode, with an Entity Name of "Node". In addition, the "Prepares Content" should be checked and the Fetch Predicate should be "parent == nil". This predicate will constrain the controller to objects which are root nodes because those nodes will not have any value for their parent relationship. It is also necessary to configure the Key Path for Children, which will be simply "children" - matching the name of the appropriate relationship in the data model. The Count and Leaf key paths can be left blank.</p>
+
+<h4><a href="javascript:;" onclick="$('attributes').toggle()">Step-by-step</a></h4>
+<div id="attributes" class="implementation" style="display:none">
+<ol>
+<li>In Interface Builder, find the document window for MainMenu.nib and select the NSTreeController. <a href="javascript:;" onclick="$('select_tree_controller_img').toggle()">screenshot</a></li>
+<img id="select_tree_controller_img" style="display:none;" class="all" src="images/select_tree_controller.tiff">
+<li>Open the Attributes Inspector (from the Tools menu or &#8984;1). <a href="javascript:;" onclick="$('tree_controller_attributes_img').toggle()">screenshot</a></li>
+<img id="tree_controller_attributes_img" style="display:none;" class="media" src="images/tree_controller_attributes.tiff">
+<li>Set the Mode to "Entity"</li>
+<li>Set the Entity Name to "Node"</li>
+<li>Set Prepares Content</li>
+<li>Set the Fetch Predicate to "parent == nil"</li>
+<li>Set Key Paths:Children to "children"</li>
+</ol>
+</div>
+
+<h4>Additional Documentation</h4>
+<ul>
+<li><a target="_blank" href="http://developer.apple.com/documentation/DeveloperTools/Conceptual/IB_UserGuide/EditingNibFileObjects/chapter_5_section_3.html">Changing Object Attributes</a></li>
+<li><a target="_blank" href="http://developer.apple.com/documentation/Cocoa/Conceptual/CocoaBindings/Concepts/CntrlContent.html">Providing Controller Content</a></li>
+</ul>
+
+<!-- ********************************************************************** -->
+<!-- ********************* IB Connections ********************************* -->
+<!-- ********************************************************************** -->
+<h2><a name="connect"></a>Create IB Connections</h2>
+<p>We need to connect a number of outlets and actions in Interface Builder in order for messages to pass between the objects in the application. Some of these connections are already in place when the project is created, so we'll just focus on the ones you have to add. Specifically, the connections needed are:</p>
+
+<ul>
+<li>AbstractTree_AppDelegate's treeController outlet to NSTreeController object</li>
+<li>AbstractTree_AppDelegate's outlineView outlet to NSOutlineView object</li>
+<li>NSOutlineView object's dataSource outlet to AbstractTree_AppDelegate</li>
+<li>NSButton "Add" to NSTreeController addChild: action</li>
+<li>NSButton "Remove" to NSTreeController remove: action</li>
+</ul>
+
+<h4><a href="javascript:;" onclick="$('connections').toggle()">Step-by-step</a></h4>
+<div id="connections" class="implementation" style="display:none">
+<p>Interface Builder connections can be created several different ways. For a complete description, see the external documentation links below. One method is described here:</p>
+<ol>
+<li>Press the "Control" key.</li>
+<li>Click on the object that is the source of the connection. This is the object with the <b>outlet</b>, or that object that will connect to an <b>action</b>.</li>
+<li>Drag the mouse to the destination object. This is the target of the outlet or object with the <b>action</b>. A blue connection line will appear during the drag. <a href="javascript:;" onclick="$('ib_connection_img').toggle()">screenshot</a></li>
+<img id="ib_connection_img" style="display:none;" class="media" src="images/ib_connection.tiff"></li>
+<li>Release the mouse button when the destination is reached. A panel showing the destination options will appear. Click the appropriate option to complete the connection. <a href="javascript:;" onclick="$('ib_connection_panel_img').toggle()">screenshot</a></li>
+<img id="ib_connection_panel_img" style="display:none;" class="media" src="images/ib_connection_panel.tiff"></li>
+</ol>
+</div>
+
+<h4>Additional Documentation</h4>
+<ul>
+<li><a target="_blank" href="http://developer.apple.com/documentation/DeveloperTools/Conceptual/IB_UserGuide/ConnectionsandBindings/chapter_6_section_4.html">Creating and Managing Outlet and Action Connections (Interface Builder User Guide)</a></li>
+<li><a target="_blank" href="http://developer.apple.com/documentation/Cocoa/Conceptual/CocoaFundamentals/CommunicatingWithObjects/chapter_6_section_3.html">Outlets (Cocoa Fundamentals Guide)</a></li>
+</ul>
+
+<!-- ********************************************************************** -->
+<!-- ********************* Bindings *************************************** -->
+<!-- ********************************************************************** -->
+<h2><a name="bind"></a>Configure Bindings</h2>
+<p>Bindings are the final step in making the application come together. Two objects will be bound - the tree controller and the outline view's table column. The tree controller will bind its managedObjectContext to that of the application delegate. The table column will bind its value to the tree controller. The bindings are:</p>
+<ul>
+<li>NSTreeController.managedObjectContext -> AbstractTree_AppDelegate.managedObjectContext</li>
+<li>NSTableColumn.value -> NSTreeController.arrangedObjects.name</li>
+</ul>
+
+<h4><a href="javascript:;" onclick="$('bindings').toggle()">Step-by-step</a></h4>
+<div id="bindings" class="implementation" style="display:none">
+<ol>
+<li>In Interface Builder, select the NSTreeController.
+<li>Open the Bindings Inspector (from the Tools menu or &#8984;4).
+<li>Bind the Managed Object Context to AbstractTree_AppDelegate.managedObjectContext. <a href="javascript:;" onclick="$('tree_controller_bindings_img').toggle()">screenshot</a></li>
+<img id="tree_controller_bindings_img" style="display:none;" class="media" src="images/tree_controller_bindings.tiff">
+
+</ol>
+</div>
+
+<h4>Additional Documentation</h4>
+<ul>
+<li><a target="_blank" href="http://developer.apple.com/documentation/DeveloperTools/Conceptual/IB_UserGuide/ConnectionsandBindings/chapter_6_section_5.html">Configuring Cocoa Bindings (Interface Builder User Guide)</a></li>
+<li><a target="_blank" href="http://developer.apple.com/documentation/Cocoa/Conceptual/CocoaBindings/Concepts/WhatAreBindings.html">What Are Cocoa Bindings? (Cocoa Bindings Programming Topics)</a></li>
+<li><a target="_blank" href="http://developer.apple.com/documentation/Cocoa/Conceptual/CocoaBindings/Articles/ControllerKey-ValueObservingCompliance.html">Controller Key-Value Observing Compliance (Cocoa Bindings Programming Topics)</a></li>
+</ul>
+
+<!-- ********************************************************************** -->
+<!-- ********************* Build/Run ************************************** -->
+<!-- ********************************************************************** -->
+<h2><a name="done"></a>Build and Run!</h2>
+<p>You should be able to build and run the project from Xcode now. Try the Add and Remove buttons, they should create and destroy nodes displayed in the outline. Double-clicking a node in the outline should allow you to edit its name. Dragging nodes in the outline should allow you to reorganize the node hierarchy.</p>
+
+<p>Copyright © 2007 Apple Inc. All rights reserved.</p>
+</body>
+</html>

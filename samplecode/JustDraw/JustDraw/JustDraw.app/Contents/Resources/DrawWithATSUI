@@ -1,0 +1,35 @@
+//----------------------------------------------------------------------------------------------
+static void DrawWithATSUI(CGContextRef ctx, float posX, float posY, CFStringRef str, short qdFontID, float fontSize)
+{
+    size_t textLength = CFStringGetLength(str);
+    UniChar* theUnicodeText = (UniChar*)calloc(textLength, sizeof(UniChar));
+    CFStringGetCharacters(str, CFRangeMake(0, textLength), theUnicodeText);
+
+    ATSUFontID atsuFontID;
+    FMGetFontFromFontFamilyInstance(qdFontID, normal, &atsuFontID, NULL);
+    Fixed atsuSize = FloatToFixed(fontSize);
+    
+    ATSUAttributeTag	    theTags  [2] = { kATSUFontTag, kATSUSizeTag };
+    ByteCount		    theSizes [2] = { sizeof(ATSUFontID), sizeof(Fixed) };
+    ATSUAttributeValuePtr   theValues[2];
+    theValues[0] = &atsuFontID;
+    theValues[1] = &atsuSize;
+
+    ATSUStyle theStyle;
+    ATSUCreateStyle(&theStyle);
+    ATSUSetAttributes( theStyle, 2, theTags, theSizes, theValues );
+
+    ATSUTextLayout theLayout;
+    ATSUCreateTextLayoutWithTextPtr(theUnicodeText, 0, textLength, textLength, 1, &textLength, &theStyle, &theLayout);
+    // Ask ATSUI to use our ctx
+    theTags  [0] = kATSUCGContextTag;
+    theSizes [0] = sizeof(CGContextRef);
+    theValues[0] = &ctx;
+    ATSUSetLayoutControls(theLayout, 1, theTags, theSizes, theValues);
+
+    ATSUDrawText(theLayout, kATSUFromTextBeginning, kATSUToTextEnd, FloatToFixed(posX), FloatToFixed(posY) );
+    
+    free(theUnicodeText);
+    ATSUDisposeStyle(theStyle);
+    ATSUDisposeTextLayout(theLayout);
+}

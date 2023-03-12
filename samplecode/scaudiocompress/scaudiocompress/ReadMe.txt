@@ -1,0 +1,10 @@
+scaudiocompress is a command line utility that illustrates usage of the SCAudio component SCAudioFillBuffer API's.  Since QuickTime 7, the SCAudio (aka Standard Audio Compression component, aka StdAudio, aka StdAudio dialog, aka 'scdi'/'audi') has allowed clients to configure an audio export operation, given an input format, (optionally) a starting output format, and (optionally) some rules about the kinds of output allowed.  StdAudio exposes all of its functionality via properties and the QTSet/GetComponentProperty{Info} API's.  In addition, it allows a client to display the standard QuickTime audio compression dialog using SCRequestImageSettings().
+
+New in QuickTime 7.1, the StdAudio component not only allows one to configure an export, it can actually perform the export using an interface identical to AudioConverter's AudioConverterFillComplexBuffer API.  The value added is that (1) the StdAudio path incorporates a mixer into its chain, so it can perform mix-downs in addition to encodes, decodes, and transcodes.  (2) It is available on MacOSX/Windows as part of the QuickTime 7.1 SDK.  SCAudioFillBuffer's processing chain uses:
+    (1) an AudioConverter for decode (if necessary)
+    (2) a MatrixMixer for mixing (if necessary)
+    (3) another AudioConverter for encode (if necessary)
+
+The scaudiocompress tool demonstrates how to read source packets of audio using AudioFile API (when reading from audio files) or MovieAudioExtraction (when sourcing from a QuickTime movie).  The source data is pulled through the StdAudio compression chain, then written to an output file using AddMediaSample2 (if writing to a QuickTime movie), AudioFileWritePackets (if writing a .caf file), or fwrite (if writing a raw interleaved headerless pcm file).  scaudiocompress can be run headlessly, or in "interactive" mode, popping up the StdAudio dialog to allow a user to select an output format, if desired.
+
+The code runs on Mac OS X or Windows (NOTE: on Windows, reading/writing is limited to QuickTime movies, as the AudioFile API is not available in the Windows environment).

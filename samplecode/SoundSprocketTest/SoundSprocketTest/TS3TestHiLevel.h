@@ -1,0 +1,1 @@
+/* *	File:		TS3TestHiLevel.h * *	Copyright © 1996 Apple Computer, Inc. */#ifndef __TS3TestHiLevel__#define __TS3TestHiLevel__void TestHiLevel_Init(	void);void TestHiLevel_Exit(	void);void TestHiLevel_Preset(	UInt32			index);#endif /* __TS3TestHiLevel__ */

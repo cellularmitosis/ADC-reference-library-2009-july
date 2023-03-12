@@ -1,0 +1,1 @@
+#define kTtDebug				/* If defined, turn on debugging */#define	kQAMacOS	1			/* Target is MacOS					*/#define kQAGeneric	2			/* Target is generic platform		*/#define kQAPlatform	kQAMacOS	/* Compile for MacOS */

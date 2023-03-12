@@ -1,0 +1,1 @@
+#   File:       HLE.make#   Target:     HLE#   Sources:    HLE.r#               HLE.c#   Created:    Friday, February 10, 1995 01:17:00 AMOBJECTS = HLE.c.oHLE  ÄÄ HLE.make HLE.r	Rez HLE.r -append -o HLEHLE ÄÄ HLE.make  {OBJECTS}	Link -t APPL -c '????' ¶		{OBJECTS} ¶ 		"{Libraries}"Runtime.o ¶ 		"{Libraries}"Interface.o ¶		-o HLEHLE.c.o Ä HLE.make HLE.c	 C -r  HLE.c

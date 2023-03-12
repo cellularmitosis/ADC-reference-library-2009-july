@@ -1,0 +1,1 @@
+README - QTActionTargetsSample code for working with wired action targets.Enjoy,QuickTime Team

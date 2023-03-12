@@ -1,0 +1,18 @@
+README - QTText
+
+
+QTText is a sample application that shows how to do searches on text
+media, how to use a simple text procedure to retrieve the text from a
+text media sample, and how to edit that text. It is based on the code
+provided with the develop article on QuickTime text by Nick Thompson
+(issue 20). Make sure to read that article for complete details on the
+techniques employed in QTText.
+
+For Windows builds using Microsoft Visual C++, the Makefile (QTText.mak)
+automatically calls Rez to create the resource file QTText.qtr from the
+input file QTText.r. The .qtr file must reside in the same directory as the
+application QTText.exe. For final delivery of your product, you should
+insert the .qtr file into the .exe file by using the tool RezWack.
+
+Enjoy,
+QuickTime Team

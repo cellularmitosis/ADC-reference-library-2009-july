@@ -1,0 +1,1 @@
+#pragma once#include <Types.h>pascal StringPtr 	PLstrcpy(StringPtr str1, StringPtr str2);pascal StringPtr	PLstrcat(StringPtr str1, StringPtr str2);

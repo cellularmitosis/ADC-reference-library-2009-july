@@ -1,0 +1,1 @@
+/* * NewAppletDialog.h */#pragma once#ifdef __cplusplusextern "C" {#endif	void newAppletDialog();	void getSelectedURL(Str255 urlText, Str255 urlLabel);#ifdef __cplusplus}#endif

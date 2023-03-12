@@ -1,0 +1,1 @@
+#pragma once// defines for Finder extensions#define kFinderExtension			'fext'#define kPrintingExtension			'pxtn'#define kFinderSignature			'MACS'#define kSetDefaultPrinterType		'pfpr'typedef struct {	OSType		pfeCreator;	OSType		extensionType;	Str31		dtpName;} SetDTPEvent;OSErr SASendAEToFinder(Ptr dataPtr,Size dataSize);OSErr SendTestAE(StringPtr dtpName);

@@ -1,0 +1,1 @@
+README - QTWiredSpritesJrThis sample illustrates the most basic ways of using wired sprites. It shows how to build a set of sprite "buttons" that can be used to control the playback of a linear QuickTime movie. It also shows how to build a movie that contains a sprite that can be dragged around within the movie.Enjoy,QuickTime Team

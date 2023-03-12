@@ -1,0 +1,1 @@
+#include <QuickTimeComponents.h>pascal void ConvertMovie(FSSpec *srcSpec, FSSpec *dstSpec, long newDisplayFlags, Boolean imageTrack, SCSpatialSettings *spatial);

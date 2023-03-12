@@ -1,0 +1,1 @@
+/*   *	WRay_Main.h * *	QuickDraw 3D 1.6 Sample *	Robert Dierkes * *	 07/28/98	RDD		Created. */#ifndef _HWRay_Main#define _HWRay_Mainenum {	kWindowRsrcID		= 128,	kStringRsrcID		= 128};/* STR# Indices */enum {	kQuickDraw3DNotInstalledStr = 1,	kQuickDraw3DNotCurrentStr};#define	kWindowOnTop		((WindowPtr) -1)#endif /* _HWRay_Main */

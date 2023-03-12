@@ -1,0 +1,1 @@
+public class BackwardButton extends RolloverButton{	protected void initImages()	{		//Initialize images for the BackwardButton		//Insert "BackwardButton initImages"	}}

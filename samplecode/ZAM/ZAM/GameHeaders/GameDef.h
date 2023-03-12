@@ -1,0 +1,1 @@
+#pragma once#define rNameDlogID	200#define ConnectBtnItem	1#define NameTextItem	4

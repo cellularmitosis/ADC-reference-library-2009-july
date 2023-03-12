@@ -1,0 +1,1 @@
+#include "IsPressed.proto.h"Boolean	IsPressed(unsigned short k, unsigned char km[16])/*	Checks if a given key is down by key Code*/{	return ((km[k>>3] >> (k & 7)) & 1);}

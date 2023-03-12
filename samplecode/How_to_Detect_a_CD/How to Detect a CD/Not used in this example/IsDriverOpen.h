@@ -1,0 +1,1 @@
+short IsDriverOpen(StringPtr driverName);DCtlHandle FindTheDriver(StringPtr driverName);

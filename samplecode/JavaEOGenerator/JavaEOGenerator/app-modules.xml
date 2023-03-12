@@ -1,0 +1,1089 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project default="all" basedir=".">
+
+<!-- ======================================================== -->
+<!--														  -->
+<!--		Build Module for WebObjects Applications          -->
+<!--		Version 1.0										  -->
+<!--		Since WebObjects 5.4							  -->
+<!-- ======================================================== -->
+
+
+    <!-- ==================================================== -->
+    <!--						      						  -->
+    <!--           Sets up global properties                  -->
+    <!--						      						  -->
+    <!-- ==================================================== -->
+	<property name="project_name" value="${ant.project.name}"/>
+
+    <!-- Stub install target.  Install should depend on the 'jar' target,
+         and copy the built objects to the 'dist' directory. -->
+    <target name="install" description="Install jar" depends="jar">
+			<echo message="starting install task"/>
+
+			<echo message="finished install task"/>
+    </target>
+
+    <!-- ==================================================== -->
+    <!--													  -->
+    <!--		Environment Initialization Tasks			  -->
+    <!--													  -->
+    <!-- ==================================================== -->
+    <target name="load-properties" description="Load properties from environment">
+			<echo message="starting load-properties task"/>
+
+			<!-- set global properties for from build properties file -->
+			<!-- <property file="build.properties"/> -->
+			<xmlproperty file="build-properties.xml" collapseAttributes="true" keepRoot="false"/>
+
+			<!-- Get properties from environment -->
+			<property environment="env"/>
+
+			<!-- verbose logging -->
+			<condition property="apple.isVerboseLogging">
+				<istrue value="${apple.log.verbose}"/>
+			</condition>
+
+			<!-- Check if we should supporting build files and jars -->
+			<condition property="wo.do_update">
+				<isset property="wo.update_build_files"/>
+			</condition>
+
+			<!-- Check if we are building a woa or a framework -->
+			<condition property="wo.isApp">
+				<equals arg1="woa" arg2="${wo.project_type}" trim="true"/>
+			</condition>
+
+			<!-- Create Contents dir if building app bundle -->
+			<condition property="wo.path.contents_dir" value="Contents/">
+				<isset property="wo.isApp"/>
+			</condition>
+
+			<condition property="wo.path.contents_dir" value="">
+				<not>
+					<isset property="wo.isApp"/>
+				</not>
+			</condition>
+
+			<!-- Check if we're building a legacy bundle -->
+			<condition property="wo.build.create_legacy_bundle">
+				<equals arg1="true" arg2="${wo.create_legacy_bundle}" trim="true"/>
+			</condition>
+
+			<!-- Check if we're building a single woa bundle -->
+			<condition property="wo.build.create_selfcontained_bundle">
+				<equals arg1="true" arg2="${wo.create_selfcontained_bundle}" trim="true"/>
+			</condition>
+
+			<!-- Check if we're building a war bundle -->
+			<condition property="wo.build.create_war_bundle">
+				<equals arg1="true" arg2="${wo.create_war_bundle}" trim="true"/>
+			</condition>
+
+			<!-- Check if we should add webservices support-->
+			<condition property="wo.build.create_webservices_support">
+				<equals arg1="true" arg2="${wo.webservices.enabled}" trim="true"/>
+			</condition>
+
+			<!-- check environment -->
+			<condition property="wo.useWindows" value="true">
+				<equals arg1="${file.separator}" arg2="\" trim="true"/>
+			</condition>
+
+			<condition property="wo.notWindows" value="true">
+				<not><equals arg1="${file.separator}" arg2="\" trim="true"/></not>
+			</condition>
+
+			<!-- Set JVMOpts to default value if not set in build properties -->
+			<condition property="apple.java.jvmopts" value="">
+				<not><isset property="apple.java.jvmopts"/></not>
+			</condition>
+
+			<!-- Set JDBOpts to default value if not set in build properties -->
+			<condition property="apple.jdb.jdbopts" value="">
+				<not><isset property="apple.jdb.jdbopts"/></not>
+			</condition>
+
+    		<!-- Set a default value if not set -->
+			<condition property="wo.path.other_java_class_path" value="">
+				<not><isset property="wo.path.other_java_class_path"/></not>
+			</condition>
+				
+			<echo message="finished load-properties task"/>
+    </target>
+
+
+
+    <!-- ==================================================== -->
+	<!--													  -->
+    <!--		Ant specific environment configuration        -->
+	<!--													  -->
+    <!-- ==================================================== -->
+    <target name="init-ant-properties" description="Init Pure Ant environment">
+			<echo message="starting init-ant-properties task"/>
+
+			<!-- project directory layout -->
+			<property name="wo.path.local.src_dir" location="src"/>
+			<property name="wo.path.local.bin_dir" location="bin"/>
+			<property name="wo.path.local.lib_dir" location="lib"/>
+			<property name="wo.path.local.dist_dir" location="dist"/>
+			<property name="wo.path.local.build_dir" location="build"/>
+
+			<property name="wo.path.local_lib_dir" value="${wo.path.localroot}"/>
+			<property name="wo.path.project_dir" value="${basedir}"/>
+			<property name="wo.config.WOINSTALLROOT" value="${wo.path.installroot}"/>
+
+			<condition property="wo.config.WOApplicationClassName" value="${wo.WOApplicationClassName}" else="Application">
+				<isset property="wo.WOApplicationClassName"/>
+			</condition>
+
+			<echo message="finished init-ant-properties task"/>
+    </target>
+
+    <!-- ==================================================== -->
+	<!--													  -->
+    <!--		Main environment initialization target         -->
+	<!--													  -->
+    <!-- ==================================================== -->
+    <target name="init" description="Intialize environment" depends="load-properties, init-ant-properties">
+			<echo message="starting init task"/>
+
+			<!-- WebObjects specific directory locations -->
+			<property name="wo.path.resources_dir" location="wo-resources"/>
+			<property name="wo.path.resources_server_dir" location="${wo.path.resources_dir}/Resources"/>
+			<property name="wo.path.resources_webserver_dir" location="${wo.path.resources_dir}/WebServerResources"/>
+			<property name="wo.path.dist.legacy_dir" location="${wo.path.local.dist_dir}/legacy"/>
+			<property name="wo.path.dist.war_dir" location="${wo.path.local.dist_dir}/war"/>
+			<property name="wo.path.dist.selfcontained_dir" location="${wo.path.local.dist_dir}/selfcontained"/>
+			<property name="wo.path.src.server_dir" location="${wo.path.local.src_dir}"/>
+			<property name="wo.path.build.server_dir" location="${wo.path.local.build_dir}/server"/>
+			<property name="wo.path.build.client_dir" location="${wo.path.local.build_dir}/client"/>
+			<property name="wo.path.build.jar_dir" location="${wo.path.local.build_dir}/jar"/>
+			<property name="wo.path.build.webapps_dir" location="${wo.path.local.build_dir}/webapps"/> <!--FIXME: not used yet -->
+			<property name="wo.path.bin.server_dir" location="${wo.path.local.bin_dir}"/>
+			<property name="wo.path.build.server_jarfile" location="${wo.path.build.server_dir}/${project_name}.jar"/>
+			<property name="wo.path.build.client_jarfile" location="${wo.path.build.client_dir}/${project_name}.jar"/>
+			<property name="wo.path.build.jarbundle_jarfile" location="${wo.path.build.jar_dir}/${project_name}.jar"/>
+
+			<!-- Where to get specified version of WebObjects libraries -->
+			<!-- /Library/WebObjects/lib or /opt/apple/Library/WebObjects/lib-->
+			<property name="wo.path.installed.lib_version_dir" location="${wo.path.local_lib_dir}/WebObjects/lib"/>
+			<property name="wo.path.installed.extensions_version_dir" location="${wo.path.local_lib_dir}/WebObjects/Extensions"/>
+
+			<!-- [path to project]/lib/[WO version] -->
+			<property name="wo.path.local.compile_lib_version_dir" location="${wo.path.local.lib_dir}"/>
+
+			<!-- Xcode/WO installed build support files locations -->		
+			<property name="wo.path.installed.jboss_webxml_file" location="${wo.path.installed.support_files_dir}/jboss-web.xml"/>
+			<property name="wo.path.installed.servlet_webxml_file" location="${wo.path.installed.support_files_dir}/ServletEnv_web.xml"/>
+			<property name="wo.path.installed.wobootstrap_file" location="${wo.path.installed.support_files_dir}/WOBootstrap.jar"/>
+
+			<!-- Xcode/WO App build support files locations -->
+			<property name="wo.path.local.build_files_dir" location="${wo.path.resources_dir}/BuildFiles"/>
+			<property name="wo.path.local.macos_classpath_file" location="${wo.path.local.build_dir}/MacOSClassPath.txt"/>
+			<property name="wo.path.local.win_classpath_file" location="${wo.path.local.build_dir}/CLSSPATH.TXT"/>
+			<property name="wo.path.local.pkginfo_file" location="${wo.path.local.build_files_dir}/PkgInfo"/> <!--no one references, remove? -->
+			<property name="wo.path.local.pbdevelopment_file" location="${wo.path.installed.support_files_dir}/pbdevelopment"/>
+			<property name="wo.path.local.client_wsdd_file" location="${wo.path.local.build_dir}/client.wsdd"/>
+			<property name="wo.path.local.server_wsdd_file" location="${wo.path.local.build_dir}/server.wsdd"/>
+			<property name="wo.path.local.infoplist" location="${wo.path.local.build_files_dir}/Info"/>
+
+			<!-- Core frameworks specified in /Library/WebObjects/lib to be picked up -->
+			<property name="wo.path.local.frameworks_include_patternset" location="${wo.path.local.build_files_dir}/frameworks.include.patternset"/>
+			<property name="wo.path.local.frameworks_exclude_patternset" location="${wo.path.local.build_files_dir}/frameworks.exclude.patternset"/>
+
+			<!-- 3rd party jars should be put into /Library/WebObjects/Extensions to be picked up-->
+			<property name="wo.path.local.extensions_include_patternset" location="${wo.path.local.build_files_dir}/extensions.include.patternset"/>
+			<property name="wo.path.local.extensions_exclude_patternset" location="${wo.path.local.build_files_dir}/extensions.exclude.patternset"/>
+
+			<!-- Used for filtering classes that compose the server-side classes (jar in Resources/Java) -->
+			<property name="wo.path.local.server_include_patternset" location="${wo.path.local.build_files_dir}/serverclasses.include.patternset"/>
+			<property name="wo.path.local.server_exclude_patternset" location="${wo.path.local.build_files_dir}/serverclasses.exclude.patternset"/>
+
+			<!-- Used for filtering classes that compose the client-side classes (jar in WebServerResources/Java) -->
+			<property name="wo.path.local.client_include_patternset" location="${wo.path.local.build_files_dir}/clientclasses.include.patternset"/>
+			<property name="wo.path.local.client_exclude_patternset" location="${wo.path.local.build_files_dir}/clientclasses.exclude.patternset"/>
+
+			<!-- Used for filtering files in Resources directory to be copied into the bundle -->
+			<property name="wo.path.local.resources_include_patternset" location="${wo.path.local.build_files_dir}/resources.include.patternset"/>
+			<property name="wo.path.local.resources_exclude_patternset" location="${wo.path.local.build_files_dir}/resources.exclude.patternset"/>
+
+			<!-- Used for filtering files in WebServer Resources directory to be copied into the bundle -->
+			<property name="wo.path.local.webserverresources_include_patternset" location="${wo.path.local.build_files_dir}/webserverresources.include.patternset"/>
+			<property name="wo.path.local.webserverresources_exclude_patternset" location="${wo.path.local.build_files_dir}/webserverresources.exclude.patternset"/>
+
+			<!-- patternsets to specify resources, frameworks, etc -->
+			<patternset id="wo.patternset.frameworks">
+				<includesfile name="${wo.path.local.frameworks_include_patternset}"/>
+				<excludesfile name="${wo.path.local.frameworks_exclude_patternset}"/>
+			</patternset>
+
+			<patternset id="wo.patternset.extensions">
+				<includesfile name="${wo.path.local.extensions_include_patternset}"/>
+				<excludesfile name="${wo.path.local.extensions_exclude_patternset}"/>
+			</patternset>
+
+			<patternset id="wo.patternset.serverclasses">
+				<includesfile name="${wo.path.local.server_include_patternset}"/>
+				<excludesfile name="${wo.path.local.server_exclude_patternset}"/>
+			</patternset>
+
+			<patternset id="wo.patternset.clientclasses">
+				<includesfile name="${wo.path.local.client_include_patternset}"/>
+				<excludesfile name="${wo.path.local.client_exclude_patternset}"/>
+			</patternset>
+
+			<patternset id="wo.patternset.resources">
+				<includesfile name="${wo.path.local.resources_include_patternset}"/>
+				<excludesfile name="${wo.path.local.resources_exclude_patternset}"/>
+			</patternset>
+
+			<patternset id="wo.patternset.webserverresources">
+				<includesfile name="${wo.path.local.webserverresources_include_patternset}"/>
+				<excludesfile name="${wo.path.local.webserverresources_exclude_patternset}"/>
+			</patternset>
+
+			<!-- WAR bundle references -->
+			<property name="wo.path.j2ee.warbundle_file" location="${wo.path.dist.war_dir}/${project_name}.war"/>
+			<property name="wo.path.j2ee.web_xml_file" location="${wo.path.local.build_dir}/web.xml"/>
+			<property name="wo.j2ee.config.WOROOT" value="${wo.path.systemroot}"/>
+			<property name="wo.j2ee.config.LOCALROOT" value="${wo.path.woroot}"/>
+
+			<!-- Legacy bundle references for launching app-->
+			<property name="wo.path.dist.legacy_bundle_dir" location="${wo.path.dist.legacy_dir}/${project_name}.${wo.project_type}"/>
+			<property name="wo.path.dist.legacy_unixlaunchscript" location="${wo.path.dist.legacy_bundle_dir}/${project_name}"/>
+			<property name="wo.path.dist.legacy_windowslaunchscript" location="${wo.path.dist.legacy_bundle_dir}/${project_name}.CMD"/>
+
+			<!--Self contained woa bundle reference launching app-->
+			<property name="wo.path.dist.selfcontained_bundle_dir" location="${wo.path.dist.selfcontained_dir}/${project_name}.${wo.project_type}"/>
+			<property name="wo.path.dist.selfcontained_unixlaunchscript" location="${wo.path.dist.selfcontained_bundle_dir}/${project_name}"/>
+			<property name="wo.path.dist.selfcontained_windowslaunchscript" location="${wo.path.dist.selfcontained_bundle_dir}/${project_name}.CMD"/>
+
+			<!-- Create filtersets for later use when configuring bundles -->
+			<filterset id="filterset.womainbundle" begintoken="%" endtoken="%">
+				<filter token="WOMainBundle" value="${project_name}"/>
+			</filterset>
+
+			<filterset id="filterset.woapplicationclass" begintoken="%" endtoken="%">
+				<filter token="WOApplicationClass" value="${wo.config.WOApplicationClassName}"/>
+			</filterset>
+
+			<filterset id="filterset.jvmopts" begintoken="%" endtoken="%">
+				<filter token="JVMOPTS" value="${apple.java.jvmopts}"/>
+			</filterset>
+
+			<filterset id="filterset.jdbopts" begintoken="%" endtoken="%">
+				<filter token="JDBOPTS" value="${apple.jdb.jdbopts}"/>
+			</filterset>
+
+			<filterset id="filterset.xcode_project_source_path" begintoken="%" endtoken="%">
+				<filter token="XCODE_PROJECT_SOURCE_PATH" value="${wo.path.project_dir}"/>
+			</filterset>
+
+    		<!-- javac classpath -->
+		<path id="javac_classpath">
+			<pathelement location="${wo.path.bin.common_dir}"/>
+			<pathelement location="${wo.path.installed.lib_version_dir}"/>
+			<pathelement location="${wo.path.installed.extensions_version_dir}"/>
+			<fileset dir="${wo.path.installed.lib_version_dir}">
+				<include name="*.jar"/>
+				<include name="*.zip"/>
+			</fileset>
+			<fileset dir="${wo.path.installed.extensions_version_dir}">
+				<include name="*.jar"/>
+				<include name="*.zip"/>
+			</fileset>
+			<fileset dir="${wo.path.local.lib_dir}">
+				<include name="*.jar"/>
+				<include name="*.zip"/>
+			</fileset>
+			<pathelement path="${java.class.path}"/>
+		</path>
+    	
+    	
+			<!-- Create the top level directories -->
+			<mkdir dir="${wo.path.local.dist_dir}"/>
+			<mkdir dir="${wo.path.local.bin_dir}"/>
+			<mkdir dir="${wo.path.local.lib_dir}"/>
+			<mkdir dir="${wo.path.local.build_dir}"/>
+
+			<!-- Create the build directories -->
+			<mkdir dir="${wo.path.build.client_dir}"/>
+			<mkdir dir="${wo.path.build.server_dir}"/>
+			<mkdir dir="${wo.path.build.jar_dir}"/>
+
+			<!-- Create the binary directories -->
+			<mkdir dir="${wo.path.bin.server_dir}"/>
+
+			<!-- Create the base distribution directory -->
+			<mkdir dir="${wo.path.dist.legacy_dir}"/>
+			<mkdir dir="${wo.path.dist.war_dir}"/>
+			<mkdir dir="${wo.path.dist.selfcontained_dir}"/>
+
+			<!-- webservices support -->
+			<copy file="${wo.path.client_wsdd_file}" tofile="${wo.path.local.client_wsdd_file}"/>
+			<copy file="${wo.path.server_wsdd_file}" tofile="${wo.path.local.server_wsdd_file}"/>
+
+			<echo message="finished init task"/>
+    </target>
+
+
+    <!-- ==================================================== -->
+	<!--													  -->
+    <!--		Server-side compiliation target				  -->
+	<!--													  -->
+    <!-- ==================================================== -->
+	<target name="server-compile" description="Compile the server-side code">
+		<echo message="started server-compile task"/>
+
+		<javac srcdir="${wo.path.src.server_dir}" destdir="${wo.path.bin.server_dir}"
+				source="${apple.javac.arg.source}"
+				target="${apple.javac.arg.target}"
+				includeAntRuntime="no"
+				debug="on"
+				failonerror="true">
+			<classpath refid="javac_classpath"/>
+		</javac>
+
+		<echo message="finished server-compile task"/>
+	</target>
+
+
+    <!-- ==================================================== -->
+	<!--													  -->
+    <!--			Main compiliation target				  -->
+	<!--													  -->
+    <!-- ==================================================== -->
+    <target name="compile" description="Compile code" depends="server-compile">
+		<echo message="starting compile task"/>
+
+		<!-- create server jar -->
+        <jar jarfile="${wo.path.build.server_jarfile}">
+			<fileset dir="${wo.path.local.bin_dir}">
+				<patternset refid="wo.patternset.serverclasses"/>
+			</fileset>
+		</jar>
+
+		<!-- create client jar -->
+        <jar jarfile="${wo.path.build.client_jarfile}">
+			<fileset dir="${wo.path.local.bin_dir}">
+				<patternset refid="wo.patternset.clientclasses"/>
+			</fileset>
+		</jar>
+
+		<echo message="finished compile task"/>
+    </target>
+
+    <!-- ==================================================== -->
+	<!--													  -->
+    <!--		Bundle Assembly targets						  -->
+	<!--													  -->
+    <!-- ==================================================== -->
+
+
+    <!-- ==================================================== -->
+	<!--													  -->
+    <!--		Assemble Legacy WOA Bundle target			  -->
+	<!--													  -->
+    <!-- ==================================================== -->
+	<target name="build-legacy-app" depends="configure-legacy" if="wo.build.create_legacy_bundle" description="Builds legacy framework bundle">
+		<echo message="starting build-legacy-app task"/>
+		<!-- Note: the Properties files are implicitly copied in Resource directory -->
+
+		<!-- Create the full distribution directory -->
+		<mkdir dir="${wo.path.dist.legacy_bundle_dir}/${wo.path.contents_dir}Resources/Java"/>
+		<mkdir dir="${wo.path.dist.legacy_bundle_dir}/${wo.path.contents_dir}WebServerResources/Java"/>
+		<mkdir dir="${wo.path.dist.legacy_bundle_dir}/${wo.path.contents_dir}MacOS"/>
+		<mkdir dir="${wo.path.dist.legacy_bundle_dir}/${wo.path.contents_dir}Windows"/>
+		<mkdir dir="${wo.path.dist.legacy_bundle_dir}/${wo.path.contents_dir}UNIX"/>
+
+		<!-- Create/Move launch scripts into place -->
+		<copy file="${wo.path.wobootstrap_file}" tofile="${wo.path.dist.legacy_bundle_dir}/WOBootstrap.jar" verbose="${apple.isVerboseLogging}"/>
+		<copy file="${wo.path.windowslaunchscript}" tofile="${wo.path.dist.legacy_bundle_dir}/${project_name}.CMD" verbose="${apple.isVerboseLogging}"/>
+		<copy file="${wo.path.unixlaunchscript}" tofile="${wo.path.dist.legacy_bundle_dir}/${project_name}" verbose="${apple.isVerboseLogging}"/>
+
+		<copy file="${wo.path.windowslaunchscript}" tofile="${wo.path.dist.legacy_bundle_dir}/${wo.path.contents_dir}Windows/${project_name}.CMD" verbose="${apple.isVerboseLogging}"/>
+		<copy file="${wo.path.unixlaunchscript}" tofile="${wo.path.dist.legacy_bundle_dir}/${wo.path.contents_dir}UNIX/${project_name}" verbose="${apple.isVerboseLogging}"/>
+		<copy file="${wo.path.unixlaunchscript}" tofile="${wo.path.dist.legacy_bundle_dir}/${wo.path.contents_dir}MacOS/${project_name}" verbose="${apple.isVerboseLogging}"/>
+
+		<!-- copy classpath files per platform into place and configure-->
+		<copy file="${wo.path.local.macos_classpath_file}" todir="${wo.path.dist.legacy_bundle_dir}/${wo.path.contents_dir}MacOS" verbose="${apple.isVerboseLogging}">
+			<filterset refid="filterset.womainbundle"/>
+			<filterset refid="filterset.woapplicationclass"/>
+			<filterset refid="filterset.jvmopts"/>
+			<filterset refid="filterset.jdbopts"/>
+		</copy>
+		<copy file="${wo.path.local.win_classpath_file}" todir="${wo.path.dist.legacy_bundle_dir}/${wo.path.contents_dir}Windows" verbose="${apple.isVerboseLogging}">
+			<filterset refid="filterset.womainbundle"/>
+			<filterset refid="filterset.woapplicationclass"/>
+			<filterset refid="filterset.jvmopts"/>
+			<filterset refid="filterset.jdbopts"/>
+		</copy>
+		<copy file="${wo.path.local.macos_classpath_file}" tofile="${wo.path.dist.legacy_bundle_dir}/${wo.path.contents_dir}UNIX/UNIXClassPath.txt" verbose="${apple.isVerboseLogging}">
+			<filterset refid="filterset.womainbundle"/>
+			<filterset refid="filterset.woapplicationclass"/>
+			<filterset refid="filterset.jvmopts"/>
+			<filterset refid="filterset.jdbopts"/>
+		</copy>
+
+		<!-- Copy MacOS/Xcode bundle files and configure support files (pbdevelopment.plist) -->
+		<copy file="${wo.path.local.pbdevelopment_file}" tofile="${wo.path.dist.legacy_bundle_dir}/${wo.path.contents_dir}Resources/pbdevelopment.plist" verbose="${apple.isVerboseLogging}" failonerror="true">
+			<filterset refid="filterset.xcode_project_source_path"/>
+		</copy>
+
+		<!-- Copy the Info.plist and configure -->
+		<copy file="${wo.path.local.infoplist}" tofile="${wo.path.dist.legacy_bundle_dir}/${wo.path.contents_dir}Info.plist" verbose="${apple.isVerboseLogging}">
+			<filterset refid="filterset.womainbundle"/>
+		</copy>
+
+		<!-- Ensure correct permissions -->
+		<chmod file="${wo.path.dist.legacy_bundle_dir}/${project_name}" perm="a+x"/>
+		<chmod file="${wo.path.dist.legacy_bundle_dir}/${wo.path.contents_dir}UNIX/${project_name}" perm="a+x"/>
+		<chmod file="${wo.path.dist.legacy_bundle_dir}/${wo.path.contents_dir}MacOS/${project_name}" perm="a+x"/>
+
+		<!-- Copy server side jar to Resources/Java -->
+		<copy file="${wo.path.build.server_jarfile}" todir="${wo.path.dist.legacy_bundle_dir}/${wo.path.contents_dir}Resources/Java" verbose="${apple.isVerboseLogging}" failonerror="true"></copy>
+
+		<!-- Copy in webservices support -->
+		<!--
+		<copy file="${wo.path.local.server_wsdd_file}" toDir="${wo.path.dist.legacy_bundle_dir}/${wo.path.contents_dir}Resources" verbose="${apple.isVerboseLogging}" failonerror="false"></copy>
+		<copy file="${wo.path.local.client_wsdd_file}" toDir="${wo.path.dist.legacy_bundle_dir}/${wo.path.contents_dir}Resources" verbose="${apple.isVerboseLogging}" failonerror="false"></copy>
+		-->
+
+		<!-- Copy in all the Resources except for wo component api files -->
+		<copy todir="${wo.path.dist.legacy_bundle_dir}/${wo.path.contents_dir}Resources" verbose="${apple.isVerboseLogging}" failonerror="true">
+			<fileset dir="${wo.path.resources_server_dir}">
+				<patternset refid="wo.patternset.resources"/>
+			</fileset>
+		</copy>
+
+		<!-- Copy in all the non-binary WebServerResources -->
+		<copy todir="${wo.path.dist.legacy_bundle_dir}/${wo.path.contents_dir}WebServerResources" verbose="${apple.isVerboseLogging}" failonerror="false">
+			<fileset dir="${wo.path.resources_webserver_dir}">
+				<patternset refid="wo.patternset.webserverresources"/>
+			</fileset>
+		</copy>
+
+		<!-- Copy client side jar to WebServerResources/Java -->
+		<copy file="${wo.path.build.client_jarfile}" todir="${wo.path.dist.legacy_bundle_dir}/${wo.path.contents_dir}WebServerResources/Java" verbose="${apple.isVerboseLogging}" failonerror="false"></copy>
+
+		<!-- Copy client side classes to WebServerResources/Java -->
+		<copy todir="${wo.path.dist.legacy_bundle_dir}/${wo.path.contents_dir}WebServerResources/Java" verbose="${apple.isVerboseLogging}" failonerror="false">
+			<fileset dir="${wo.path.local.bin_dir}">
+				<patternset refid="wo.patternset.clientclasses"/>
+			</fileset>
+		</copy>
+
+		<echo message="finished build-legacy-app task"/>
+	</target>
+
+    <!-- ==================================================== -->
+	<!--													  -->
+    <!--		Assemble War Bundle target					  -->
+	<!--													  -->
+    <!-- ==================================================== -->
+	<target name="build-war-bundle" if="wo.build.create_war_bundle" description="Builds self contained war bundle">
+		<echo message="starting build-war-bundle task"/>
+		<!-- Note: the Info.plist and Properties files don't need to be copied into war bundles -->
+
+		<!-- configure web.xml deployment descriptors -->
+		<copy file="${wo.path.j2ee.servletweb_xml_file}" tofile="${wo.path.j2ee.web_xml_file}">
+			<filterset refid="filterset.womainbundle"/>
+			<filterset refid="filterset.woapplicationclass"/>
+		</copy>
+		<replace file="${wo.path.j2ee.web_xml_file}" token="%WOJarBundle%" value="YES"/>
+		<replace file="${wo.path.j2ee.web_xml_file}" token="%WOROOT%" value="${wo.j2ee.config.WOROOT}"/>
+		<replace file="${wo.path.j2ee.web_xml_file}" token="%LOCALROOT%" value="${wo.j2ee.config.LOCALROOT}"/>
+		<replace file="${wo.path.j2ee.web_xml_file}" token="%WOAINSTALLROOT%" value="${wo.config.WOINSTALLROOT}"/>
+		<replace file="${wo.path.j2ee.web_xml_file}" token="%WOAppMode%" value="Deployment"/> <!-- Can either be 'Development' or 'Deployment' -->
+		<replace file="${wo.path.j2ee.web_xml_file}" token="%WOTagLib%" value="${wo.j2ee.taglib}"/>
+
+		<!--Generate classpath and substitute it in web.xml, jars are specified in the framework and extensions patternsets -->
+		<path id="wo.war_classpath">
+			<fileset dir="${wo.path.local.compile_lib_version_dir}">
+				<patternset refid="wo.patternset.frameworks"/>
+			</fileset>
+			<fileset dir="${wo.path.installed.lib_version_dir}">
+				<patternset refid="wo.patternset.frameworks"/>
+			</fileset>
+			<fileset dir="${wo.path.installed.extensions_version_dir}">
+				<patternset refid="wo.patternset.extensions"/>
+			</fileset>
+		</path>
+
+		<pathconvert property="wo.war_launch_classpath" refid="wo.war_classpath">
+			<map from=":/Library" to="${line.separator}LOCALROOT/Library"/>
+			<map from=":/System" to="${line.separator}WOROOT"/>
+		</pathconvert>
+
+		<replace file="${wo.path.j2ee.web_xml_file}" token="%WOClasspath%" value="${wo.war_launch_classpath}"/>
+		<replace file="${wo.path.j2ee.web_xml_file}" token="${path.separator}LOCALROOT/Library" value="${line.separator}LOCALROOT/Library"/>
+		<replace file="${wo.path.j2ee.web_xml_file}" token="${path.separator}" value="${line.separator}"/>
+
+		<!-- jar all app resources, everything and kitchen sink -->
+		<mkdir dir="${wo.path.local.build_dir}/JarResources"/>
+		<mkdir dir="${wo.path.local.build_dir}/JarResources/Resources"/>
+		<mkdir dir="${wo.path.local.build_dir}/JarResources/WebServerResources"/>
+
+		<copy todir="${wo.path.local.build_dir}/JarResources/Resources" verbose="${apple.isVerboseLogging}" failonerror="true">
+			<fileset dir="${wo.path.resources_server_dir}">
+				<patternset refid="wo.patternset.resources"/>
+			</fileset>
+		</copy>
+
+		<copy todir="${wo.path.local.build_dir}/JarResources/WebServerResources" verbose="${apple.isVerboseLogging}" failonerror="false">
+			<fileset dir="${wo.path.resources_webserver_dir}">
+				<patternset refid="wo.patternset.webserverresources"/>
+			</fileset>
+		</copy>
+
+		<jar destfile="${wo.path.build.jarbundle_jarfile}">
+			<fileset dir="${wo.path.local.build_dir}/JarResources"/>
+			<fileset dir="${wo.path.bin.server_dir}"/>
+		</jar>
+
+		<!-- stage the wotaglib -->
+		<mkdir dir="${wo.path.local.build_dir}/war/WEB-INF/tlds"/>
+		<copy file="${wo.path.j2ee.wo_taglib_file}" todir="${wo.path.local.build_dir}/war/WEB-INF/tlds" verbose="${apple.isVerboseLogging}" failonerror="false" />
+		<!-- create the war bundle -->
+		<war destfile="${wo.path.j2ee.warbundle_file}" webxml="${wo.path.j2ee.web_xml_file}">
+			  <lib file="${wo.path.build.jarbundle_jarfile}"/>
+			  <lib dir="${wo.path.installed.lib_version_dir}" includesfile="${wo.path.local.frameworks_include_patternset}" excludesfile="${wo.path.local.frameworks_exclude_patternset}"/>
+			  <lib dir="${wo.path.installed.extensions_version_dir}" includesfile="${wo.path.local.extensions_include_patternset}" excludesfile="${wo.path.local.extensions_exclude_patternset}"/>
+			  <webinf file="${wo.path.j2ee.jboss_webxml_file}"/>
+			  <webinf file="${wo.path.local.server_wsdd_file}"/>
+			  <webinf file="${wo.path.local.client_wsdd_file}"/>
+			  <webinf file="${wo.path.j2ee.license_file}"/>
+			  <!-- <webinf file="${wo.path.j2ee.wo_taglib_file}"/> --><!-- originally was in WEB-INF/tlds, configured current web.xml to be top level -->
+			  <zipfileset dir="${wo.path.local.build_dir}/war" />
+			  <lib dir="${wo.path.local.compile_lib_version_dir}">
+				<exclude name="servlet.jar"/>
+			  </lib>
+		</war>
+
+		<echo message="finished build-war-bundle task"/>
+	</target>
+
+    <!-- ======================================================================= -->
+    <!--		Assemble Legacy WOA Bundle target								 -->
+	<!--																		 -->
+	<!-- Compute the classpath from:											 -->
+	<!-- 1. The system's default classpath										 -->
+	<!-- 2. Hardcoded default frameworks										 -->
+	<!-- 3. The build setting wo.path.other_java_class_path						 -->
+	<!-- 4. The compiled Java files for this project							 -->
+	<!--																		 -->
+	<!-- NOTE: Classpath variables are resolved by launchscripts as follows:	 -->
+	<!-- APPROOT = top level of WO application bundle							 -->
+	<!-- WOROOT = Indicates the root where WebObjects frameworks are installed.	 -->
+	<!-- LOCALROOT = Indicates the root where local frameworks are installed.	 -->
+	<!-- HOMEROOT = Indicates the root where home directory frameworks are.		 -->
+    <!-- ======================================================================= -->
+	<target name="configure-legacy" if="wo.build.create_legacy_bundle" description="Configure various bundles">
+		<echo message="starting configure-legacy task"/>
+
+
+		<path id="wo.base_classpath">
+			<fileset dir="${wo.path.local.compile_lib_version_dir}">
+				<patternset refid="wo.patternset.frameworks"/>
+			</fileset>
+			<fileset dir="${wo.path.installed.lib_version_dir}">
+				<patternset refid="wo.patternset.frameworks"/>
+			</fileset>
+			<fileset dir="${wo.path.installed.extensions_version_dir}">
+				<patternset refid="wo.patternset.extensions"/>
+			</fileset>
+		</path>
+
+		<pathconvert property="wo.launch_classpath" targetos="unix" refid="wo.base_classpath">
+			<map from="/Library" to="LOCALROOT/Library"/>
+			<map from="/System" to="WOROOT"/>
+		</pathconvert>
+
+		<echo message="Configuring Mac OS X and Unix buildtime classpath"/>
+
+		<!-- WARNING: parts of this generation are whitespace sensitive -->
+		<echo message="Generating MacOSClassPath.txt"/>
+		<echo file="${wo.path.local.build_dir}/MacOSClassPath.txt" append="false"># JVM              == java
+# JVMOptions       == %JVMOPTS%
+# JDB              == jdb
+# JDBOptions       == %JDBOPTS%
+# ApplicationClass == %WOApplicationClass%
+APPROOT/Resources/Java/%WOMainBundle%.jar
+APPROOT/Resources/Java
+</echo>
+		<echo file="${wo.path.local.build_dir}/MacOSClassPath.txt" append="true" message="${wo.launch_classpath}"/>
+		<echo file="${wo.path.local.build_dir}/MacOSClassPath.txt" append="true" message="${line.separator}"/> <!-- hackish to force line break -->
+		<echo file="${wo.path.local.build_dir}/MacOSClassPath.txt" append="true" message="${wo.path.other_java_class_path}"/>
+		<replace file="${wo.path.local.build_dir}/MacOSClassPath.txt" token="${path.separator}" value="${line.separator}"/>
+		<echo file="${wo.path.local.build_dir}/MacOSClassPath.txt" append="true">
+HOMEROOT/Library/Java
+LOCALROOT/Library/Java
+WOROOT/Library/Java
+/Network/Library/Java
+WOROOT/Library/Frameworks/JavaVM.framework/Classes/classes.jar
+WOROOT/Library/Frameworks/JavaVM.framework/Classes/ui.jar</echo>
+
+		<!-- Configure Windows Classpath info file -->
+		<echo message="Configuring Windows buildtime classpath"/>
+		<pathconvert property="wo.win_launch_classpath" targetos="windows" refid="wo.base_classpath">
+			<map from="/Library" to="WOROOT\Library"/>
+			<map from="/System" to="WOROOT"/>
+		</pathconvert>
+
+
+		<echo file="${wo.path.local.build_dir}/CLSSPATH.TXT" append="false"># JVM              == java
+# JVMOptions       == %JVMOPTS%
+# JDB              == jdb
+# JDBOptions       == %JDBOPTS%
+# ApplicationClass == %WOApplicationClass%
+APPROOT\Resources\Java\%WOMainBundle%.jar
+APPROOT\Resources\Java
+</echo>
+		<echo file="${wo.path.local.build_dir}/CLSSPATH.TXT" append="true" message="${wo.win_launch_classpath}"/>
+		<echo file="${wo.path.local.build_dir}/CLSSPATH.TXT" append="true" message="${line.separator}"/> <!-- hackish to force line break -->
+		<echo file="${wo.path.local.build_dir}/CLSSPATH.TXT" append="true" message="${wo.path.other_java_class_path}"/>
+		<replace file="${wo.path.local.build_dir}/CLSSPATH.TXT" token="${path.separator}" value="${line.separator}"/>
+
+		<echo file="${wo.path.local.build_dir}/CLSSPATH.TXT" append="true">
+HOMEROOT\Library\Java
+LOCALROOT\Library\Java
+WOROOT\Library\Java
+\Network\Library\Java
+WOROOT\Library\Frameworks\JavaVM.framework\Classes\classes.jar
+WOROOT\Library\Frameworks\JavaVM.framework\Classes\ui.jar</echo>
+
+		<echo message="finished configure-legacy task"/>
+	</target>
+
+	<!-- ======================================================================= -->
+	<!--																		 -->
+    <!--			Assemble Self Containted WOA Bundle target					 -->
+	<!--																		 -->
+    <!-- ======================================================================= -->
+	<target name="build-selfcontained-app" depends="configure-selfcontained" if="wo.build.create_selfcontained_bundle" description="Builds legacy framework bundle">
+		<echo message="starting build-selfcontained-app task"/>
+		<!-- Note: the Properties files are implicitly copied in Resource directory -->
+
+		<!-- Create the full distribution directory -->
+		<mkdir dir="${wo.path.dist.selfcontained_bundle_dir}/${wo.path.contents_dir}Resources/Java"/>
+		<mkdir dir="${wo.path.dist.selfcontained_bundle_dir}/${wo.path.contents_dir}WebServerResources/Java"/>
+		<mkdir dir="${wo.path.dist.selfcontained_bundle_dir}/${wo.path.contents_dir}MacOS"/>
+		<mkdir dir="${wo.path.dist.selfcontained_bundle_dir}/${wo.path.contents_dir}Windows"/>
+		<mkdir dir="${wo.path.dist.selfcontained_bundle_dir}/${wo.path.contents_dir}UNIX"/>
+		<mkdir dir="${wo.path.dist.selfcontained_bundle_dir}/${wo.path.contents_dir}Extensions"/>
+
+		<!-- Create/Move launch scripts into place -->
+		<copy file="${wo.path.wobootstrap_file}" tofile="${wo.path.dist.selfcontained_bundle_dir}/WOBootstrap.jar" verbose="${apple.isVerboseLogging}"/>
+		<copy file="${wo.path.windowslaunchscript}" tofile="${wo.path.dist.selfcontained_bundle_dir}/${project_name}.CMD" verbose="${apple.isVerboseLogging}"/>
+		<copy file="${wo.path.unixlaunchscript}" tofile="${wo.path.dist.selfcontained_bundle_dir}/${project_name}" verbose="${apple.isVerboseLogging}"/>
+
+		<copy file="${wo.path.windowslaunchscript}" tofile="${wo.path.dist.selfcontained_bundle_dir}/${wo.path.contents_dir}Windows/${project_name}.CMD" verbose="${apple.isVerboseLogging}"/>
+		<copy file="${wo.path.unixlaunchscript}" tofile="${wo.path.dist.selfcontained_bundle_dir}/${wo.path.contents_dir}UNIX/${project_name}" verbose="${apple.isVerboseLogging}"/>
+		<copy file="${wo.path.unixlaunchscript}" tofile="${wo.path.dist.selfcontained_bundle_dir}/${wo.path.contents_dir}MacOS/${project_name}" verbose="${apple.isVerboseLogging}"/>
+
+		<!-- copy classpath files per platform into place and configure-->
+		<copy file="${wo.path.local.macos_classpath_file}" todir="${wo.path.dist.selfcontained_bundle_dir}/${wo.path.contents_dir}MacOS" verbose="${apple.isVerboseLogging}">
+			<filterset refid="filterset.womainbundle"/>
+			<filterset refid="filterset.woapplicationclass"/>
+			<filterset refid="filterset.jvmopts"/>
+			<filterset refid="filterset.jdbopts"/>
+		</copy>
+		<copy file="${wo.path.local.win_classpath_file}" todir="${wo.path.dist.selfcontained_bundle_dir}/${wo.path.contents_dir}Windows" verbose="${apple.isVerboseLogging}">
+			<filterset refid="filterset.womainbundle"/>
+			<filterset refid="filterset.woapplicationclass"/>
+			<filterset refid="filterset.jvmopts"/>
+			<filterset refid="filterset.jdbopts"/>
+		</copy>
+		<copy file="${wo.path.local.macos_classpath_file}" tofile="${wo.path.dist.selfcontained_bundle_dir}/${wo.path.contents_dir}UNIX/UNIXClassPath.txt" verbose="${apple.isVerboseLogging}">
+			<filterset refid="filterset.womainbundle"/>
+			<filterset refid="filterset.woapplicationclass"/>
+			<filterset refid="filterset.jvmopts"/>
+			<filterset refid="filterset.jdbopts"/>
+		</copy>
+
+		<!-- Copy MacOS/Xcode bundle files and configure support files (pbdevelopment.plist) -->
+		<copy file="${wo.path.local.pbdevelopment_file}" tofile="${wo.path.dist.selfcontained_bundle_dir}/${wo.path.contents_dir}Resources/pbdevelopment.plist" verbose="${apple.isVerboseLogging}" failonerror="true">
+			<filterset refid="filterset.xcode_project_source_path"/>
+		</copy>
+
+		<!-- Copy the Info.plist and configure -->
+		<copy file="${wo.path.local.infoplist}" tofile="${wo.path.dist.selfcontained_bundle_dir}/${wo.path.contents_dir}Info.plist" verbose="${apple.isVerboseLogging}">
+			<filterset refid="filterset.womainbundle"/>
+		</copy>
+
+		<!-- Ensure correct permissions -->
+		<chmod file="${wo.path.dist.selfcontained_bundle_dir}/${project_name}" perm="a+x"/>
+		<chmod file="${wo.path.dist.selfcontained_bundle_dir}/${wo.path.contents_dir}UNIX/${project_name}" perm="a+x"/>
+		<chmod file="${wo.path.dist.selfcontained_bundle_dir}/${wo.path.contents_dir}MacOS/${project_name}" perm="a+x"/>
+
+		<!-- Copy server side jar to Resources/Java -->
+		<copy file="${wo.path.build.server_jarfile}" todir="${wo.path.dist.selfcontained_bundle_dir}/${wo.path.contents_dir}Resources/Java" verbose="${apple.isVerboseLogging}" failonerror="true"></copy>
+
+		<!-- copy everything specified in the includes/excludes patternset files -->
+		<copy todir="${wo.path.dist.selfcontained_bundle_dir}/${wo.path.contents_dir}Extensions" verbose="${apple.isVerboseLogging}">
+			<fileset dir="${wo.path.local.compile_lib_version_dir}">
+				<patternset refid="wo.patternset.frameworks"/>
+			</fileset>
+			<fileset dir="${wo.path.installed.lib_version_dir}">
+				<patternset refid="wo.patternset.frameworks"/>
+			</fileset>
+			<fileset dir="${wo.path.local.compile_lib_version_dir}">
+				<patternset refid="wo.patternset.frameworks"/>
+			</fileset>
+			<fileset dir="${wo.path.installed.extensions_version_dir}">
+				<patternset refid="wo.patternset.extensions"/>
+			</fileset>
+		</copy>
+
+		<!-- Copy in webservices support -->
+		<!--
+		<copy file="${wo.path.local.server_wsdd_file}" todir="${wo.path.dist.selfcontained_bundle_dir}/${wo.path.contents_dir}Resources" verbose="${apple.isVerboseLogging}" failonerror="true"></copy>
+		<copy file="${wo.path.local.client_wsdd_file}" todir="${wo.path.dist.selfcontained_bundle_dir}/${wo.path.contents_dir}Resources" verbose="${apple.isVerboseLogging}" failonerror="true"></copy>
+		-->
+
+		<!-- Copy in all the Resources and exclude wo component api files -->
+		<copy todir="${wo.path.dist.selfcontained_bundle_dir}/${wo.path.contents_dir}Resources" verbose="${apple.isVerboseLogging}" failonerror="true">
+			<fileset dir="${wo.path.resources_server_dir}">
+				<patternset refid="wo.patternset.resources"/>
+			</fileset>
+		</copy>
+
+		<!-- Copy in all the non-binary WebServerResources -->
+		<copy todir="${wo.path.dist.selfcontained_bundle_dir}/${wo.path.contents_dir}WebServerResources" verbose="${apple.isVerboseLogging}" failonerror="false">
+			<fileset dir="${wo.path.resources_webserver_dir}">
+				<patternset refid="wo.patternset.webserverresources"/>
+			</fileset>
+		</copy>
+
+		<!-- Copy client side jar to WebServerResources/Java -->
+		<copy file="${wo.path.build.client_jarfile}" todir="${wo.path.dist.selfcontained_bundle_dir}/${wo.path.contents_dir}WebServerResources/Java" verbose="${apple.isVerboseLogging}" failonerror="false"></copy>
+
+		<!-- Copy client side classes to WebServerResources/Java -->
+		<copy todir="${wo.path.dist.selfcontained_bundle_dir}/${wo.path.contents_dir}WebServerResources/Java" verbose="${apple.isVerboseLogging}" failonerror="false">
+			<fileset dir="${wo.path.local.bin_dir}">
+				<patternset refid="wo.patternset.clientclasses"/>
+			</fileset>
+		</copy>
+
+		<echo message="finished build-selfcontained-app task"/>
+	</target>
+
+
+
+	<!-- ======================================================================= -->
+    <!--		Configure Self Containted WOA Bundle target						 -->
+	<!--																		 -->
+	<!-- Compute the classpath from:											 -->
+	<!-- 1. The system's default classpath										 -->
+	<!-- 2. Hardcoded default frameworks										 -->
+	<!-- 3. The build setting wo.path.other_java_class_path						 -->
+	<!-- 4. The compiled Java files for this project							 -->
+	<!-- 5. WO Runtime jars copied into .woa/Contents/lib						 -->
+	<!--																		 -->
+	<!-- NOTE: Launchscript variables resolve to								 -->
+	<!-- APPROOT = top level of WO application bundle							 -->
+	<!-- WOROOT = Indicates the root where WebObjects frameworks are installed.	 -->
+	<!-- LOCALROOT = Indicates the root where local frameworks are installed.	 -->
+	<!-- HOMEROOT = Indicates the root where home directory frameworks are.		 -->
+    <!-- ======================================================================= -->
+	<target name="configure-selfcontained" if="wo.build.create_selfcontained_bundle" description="Configure self contained woa bundle">
+		<echo message="starting configure-selfcontained task"/>
+
+		<echo message="Configuring Mac OS X and Unix buildtime classpath"/>
+
+		<!-- WARNING: parts of this generation are whitespace sensitive -->
+		<echo message="Generating MacOSClassPath.txt"/>
+		<echo file="${wo.path.local.build_dir}/MacOSClassPath.txt" append="false"># JVM              == java
+# JVMOptions       == %JVMOPTS%
+# JDB              == jdb
+# JDBOptions       == %JDBOPTS%
+# ApplicationClass == %WOApplicationClass%
+APPROOT/Resources/Java/%WOMainBundle%.jar
+APPROOT/Resources/Java
+APPROOT/Extensions/JavaWebObjects.jar
+APPROOT/Extensions/JavaFoundation.jar
+APPROOT/Extensions/JavaEOControl.jar
+APPROOT/Extensions/JavaEOAccess.jar
+APPROOT/Extensions/JavaJDBCAdaptor.jar
+APPROOT/Extensions/JavaXML.jar
+</echo>
+		<echo file="${wo.path.local.build_dir}/MacOSClassPath.txt" append="true" message="${wo.path.other_java_class_path}"/>
+		<replace file="${wo.path.local.build_dir}/MacOSClassPath.txt" token="${path.separator}" value="${line.separator}"/>
+		<echo file="${wo.path.local.build_dir}/MacOSClassPath.txt" append="true">
+HOMEROOT/Library/Java
+LOCALROOT/Library/Java
+WOROOT/Library/Java
+/Network/Library/Java
+WOROOT/Library/Frameworks/JavaVM.framework/Classes/classes.jar
+WOROOT/Library/Frameworks/JavaVM.framework/Classes/ui.jar</echo>
+
+		<!-- Configure Windows Classpath info file -->
+		<echo message="Configuring Windows runtime classpath"/>
+		<pathconvert property="wo.win_launch_classpath" targetos="windows" refid="wo.base_classpath">
+			<map from="/Library" to="WOROOT\Library"/>
+			<map from="/System" to="WOROOT"/>
+		</pathconvert>
+
+
+		<echo file="${wo.path.local.build_dir}/CLSSPATH.TXT" append="false"># JVM              == java
+# JVMOptions       == %JVMOPTS%
+# JDB              == jdb
+# JDBOptions       == %JDBOPTS%
+# ApplicationClass == %WOApplicationClass%
+APPROOT\Resources\Java\%WOMainBundle%.jar
+</echo>
+		<echo file="${wo.path.local.build_dir}/CLSSPATH.TXT" append="true" message="${wo.win_launch_classpath}"/>
+		<echo file="${wo.path.local.build_dir}/CLSSPATH.TXT" append="true" message="${line.separator}"/> <!-- hackish to force line break -->
+		<echo file="${wo.path.local.build_dir}/CLSSPATH.TXT" append="true" message="${wo.path.other_java_class_path}"/>
+		<replace file="${wo.path.local.build_dir}/CLSSPATH.TXT" token="${path.separator}" value="${line.separator}"/>
+
+		<echo file="${wo.path.local.build_dir}/CLSSPATH.TXT" append="true">
+HOMEROOT\Library\Java
+LOCALROOT\Library\Java
+WOROOT\Library\Java
+\Network\Library\Java
+WOROOT\Library\Frameworks\JavaVM.framework\Classes\classes.jar
+WOROOT\Library\Frameworks\JavaVM.framework\Classes\ui.jar</echo>
+
+		<echo message="finished configure-selfcontained task"/>
+	</target>
+
+    <!-- ==================================================== -->
+	<!--													  -->
+    <!--		Main Assemble Bundles target				  -->
+	<!--													  -->
+	<!-- Assembled bundles enabled through build properties:  -->
+	<!--	wo.create_legacy_bundle     					  -->
+	<!--	wo.create_selfcontained_bundle      			  -->
+	<!--	wo.create_war_bundle        					  -->
+	<!--													  -->
+    <!-- ==================================================== -->
+    <target name="jar" depends="build-legacy-app, build-selfcontained-app, build-war-bundle" description="Assemble specified bundles">
+		<echo message="starting jar task"/>
+
+
+		<!-- Do any clean-up here -->
+
+		<echo message="finished jar task"/>
+
+    </target>
+
+    <!-- ==================================================== -->
+	<!--													  -->
+    <!--	Update project files						  	  -->
+	<!--	1. Copies installed versions of runtime and       -->
+	<!--	resource to local project directory.			  -->
+	<!--	2. Updates installed build files into			  -->
+	<!--	to local project directory.						  -->
+	<!--    Enable wo.update_buildfiles property		  	  -->
+	<!--													  -->
+    <!-- ==================================================== -->
+
+	<!-- copy versions of jar files specified by wo_build_version to project lib directory to make the project portable -->
+
+	<target name="update" if="wo.do_update" depends="init" description="Update supporting build files and specified jar files for a version of WebObjects">
+		<echo message="starting update task"/>
+
+		<mkdir dir="${wo.path.local.compile_lib_version_dir}"/>
+
+		<!-- copy stuff in /Library/WebObjects/lib with given patternset filters-->
+		<copy toDir="${wo.path.local.compile_lib_version_dir}" failonerror="true" overwrite="true">
+			<fileset dir="${wo.path.installed.lib_version_dir}">
+				<patternset refid="wo.patternset.frameworks"/>
+			</fileset>
+		</copy>
+
+		<!-- copy stuff in /Library/WebObjects/Extensions with given patternset filters -->
+		<copy toDir="${wo.path.local.compile_lib_version_dir}" failonerror="true" overwrite="true">
+			<fileset dir="${wo.path.installed.extensions_version_dir}">
+				<patternset refid="wo.patternset.extensions"/>
+			</fileset>
+		</copy>
+
+		<!-- Grab the most current installed build and launch files -->
+		<copy file="${wo.path.installed.support_files_dir}/build-modules.xml" todir="${basedir}"/>
+		<copy file="${wo.path.installed.support_files_dir}/WOBootstrap.jar" todir="${wo.path.local.build_files_dir}"/>
+		<copy file="${wo.path.installed.support_files_dir}/WinLaunch.CMD" todir="${wo.path.local.build_files_dir}"/>
+		<copy file="${wo.path.installed.support_files_dir}/UnixLaunch.sh" todir="${wo.path.local.build_files_dir}"/>
+
+		<!-- Grab the current installed license -->
+		<copy file="${wo.path.installed.support_files_dir}/LICENSE.pdf" todir="${wo.path.local.build_files_dir}"/>
+
+		<!-- Grab latest J2EE file support -->
+		<copy file="${wo.path.installed.support_files_dir}/jboss-web.xml" todir="${wo.path.local.build_files_dir}"/>
+		<copy file="${wo.path.installed.support_files_dir}/ServletEnv_web.xml" todir="${wo.path.local.build_files_dir}"/>
+		<copy file="${wo.path.installed.support_files_dir}/${wo.j2ee.taglib}" todir="${wo.path.local.build_files_dir}"/>
+
+		<!-- Grab latest WebServices support files -->
+		<copy file="${wo.path.systemroot}/Library/Frameworks/JavaWebServicesClient.framework/Resources/template_client.wsdd" toFile="${wo.path.local.build_files_dir}/client.wsdd"/>
+		<copy file="${wo.path.systemroot}/Library/Frameworks/JavaWebObjects.framework/Resources/template_server.wsdd" toFile="${wo.path.local.build_files_dir}/server.wsdd"/>
+
+		<echo message="finished update task"/>
+	</target>
+
+    <!-- ==================================================== -->
+	<!--													  -->
+    <!--			Global Build target						  -->
+	<!--													  -->
+    <!-- ==================================================== -->
+    <target name="all" depends="init, logEnv, update, compile, jar" description="Build full project with configured options">
+		<echo message="starting jar task"/>
+
+
+		<echo message="finished jar task"/>
+    </target>
+
+    <!-- ==================================================== -->
+	<!--													  -->
+    <!--			Global Clean target						  -->
+	<!--													  -->
+    <!-- ==================================================== -->
+    <target name="clean" depends="init, logEnv" description="Remove build, bin and dist directories">
+		<echo message="starting clean task"/>
+
+        <delete dir="${wo.path.local.bin_dir}" verbose="false" failonerror="true"/>
+        <delete dir="${wo.path.local.dist_dir}" verbose="false" failonerror="true"/>
+        <delete dir="${wo.path.local.build_dir}" verbose="false" failonerror="true"/>
+        <delete dir="${env.wo.path.local.build_dir}" verbose="false" failonerror="true"/>
+
+		<echo message="finished clean task"/>
+
+    </target>
+
+
+    <!-- ==================================================== -->
+	<!--													  -->
+    <!--			Deployment targets						  -->
+	<!--													  -->
+    <!-- ==================================================== -->
+
+    <!-- ==================================================== -->
+	<!--													  -->
+    <!--			Split install target					  -->
+	<!-- For deployment where webserver resources are		  -->
+	<!-- separated from the application.					  -->
+	<!--													  -->
+    <!-- ==================================================== -->
+    <target name="split-install" depends="init, logEnv, update, compile, jar" description="Generate woa app with split install for deployment">
+		<echo message="starting split install task"/>
+
+    	<mkdir dir="${wo.path.installroot}/${project_name}.${wo.project_type}"/>
+		<copy todir="${wo.path.installroot}" verbose="${apple.isVerboseLogging}" failonerror="true">
+		    <fileset dir="${wo.path.dist.legacy_dir}" />
+		</copy>
+
+    	<mkdir dir="${wo.path.webobjects_documentroot}/${project_name}.${wo.project_type}/Contents/WebServerResources"/>
+		<copy todir="${wo.path.webobjects_documentroot}/${project_name}.${wo.project_type}/Contents/WebServerResources" verbose="${apple.isVerboseLogging}" failonerror="true">
+			<fileset dir="${wo.path.resources_webserver_dir}" />
+		</copy>
+
+		<echo message="finished split install task"/>
+    </target>
+
+    <!-- ==================================================== -->
+	<!--													  -->
+    <!--			Deployment targets						  -->
+	<!-- Deploy .war bundle into path specified by			  -->
+	<!-- wo.path.j2ee.servlet_deploy_dir build property		  -->
+	<!--													  -->
+    <!-- ==================================================== -->
+    <target name="servlet-deploy" depends="init, logEnv, update, compile, jar" description="Generate war bundle for deployment in j2ee container">
+		<echo message="starting servlet-deploy task"/>
+		<copy file="${wo.path.j2ee.warbundle_file}" todir="${wo.path.j2ee.servlet_deploy_dir}" verbose="${apple.isVerboseLogging}" failonerror="true"/>
+		<echo message="finished servlet-deploy task"/>
+
+    </target>
+
+    <!-- ==================================================== -->
+	<!--													  -->
+    <!--				Launch targets						  -->
+	<!--													  -->
+    <!-- ==================================================== -->
+
+
+    <!-- ==================================================== -->
+	<!--													  -->
+    <!--				Run on Unix-based System			  -->
+	<!--													  -->
+    <!-- ==================================================== -->
+	<target name="launch-unix" if="${wo.notWindows}" description="Launch if on unix based os">
+		<!-- launch script selection -->
+		<condition property="wo.run.unix.selectedlaunchscript" value="${wo.path.dist.legacy_unixlaunchscript}">
+			<equals arg1="${wo.run.launchscript}" arg2="legacy"/>
+		</condition>
+
+		<condition property="wo.run.unix.selectedlaunchscript" value="${wo.path.dist.selfcontained_unixlaunchscript}">
+			<equals arg1="${wo.run.launchscript}" arg2="selfcontained"/>
+		</condition>
+
+		<echo message="wo.run.unix.selectedlaunchscript = ${wo.run.unix.selectedlaunchscript}"/>
+		<exec executable="${wo.run.unix.selectedlaunchscript}"/>
+	</target>
+
+    <!-- ==================================================== -->
+	<!--													  -->
+    <!--			Run on Windows-based System				  -->
+	<!--													  -->
+    <!-- ==================================================== -->
+	<target name ="launch-windows" if="${wo.useWindows}" description="Launch if on windows based os">
+		<!-- launch script selection -->
+		<condition property="wo.run.win.selectedlaunchscript" value="${wo.path.dist.legacy_windowslaunchscript}">
+			<equals arg1="${wo.run.launchscript}" arg2="legacy"/>
+		</condition>
+
+		<condition property="wo.run.win.selectedlaunchscript" value="${wo.path.dist.selfcontained_windowslaunchscript}">
+			<equals arg1="${wo.run.launchscript}" arg2="selfcontained"/>
+		</condition>
+
+		<echo message="wwo.run.win.selectedlaunchscript = ${wo.run.win.selectedlaunchscript}"/>
+		<exec executable="${wo.run.win.selectedlaunchscript}"/>
+	</target>
+
+    <!-- ==================================================== -->
+	<!--													  -->
+    <!--				Main Run target						  -->
+	<!--													  -->
+    <!-- ==================================================== -->
+	<target name = "run-app" depends="init, logEnv" description="">
+		<echo message="starting run-app task"/>
+
+		<available file="${wo.path.dist.legacy_unixlaunchscript}" type="file" property="wo.launchscript_exists"/>
+		<!--
+		<fail unless="wo.launchscript_exists" message="ERROR: Application launch scripts do not exist.  Verify that ${wo.path.dist.legacy_unixlaunchscript} exists.  Problems include not building the right application bundle before running."/>
+		-->
+
+		<!--only one of the antcalls will work depending on the os -->
+		<antcall target="launch-unix" inheritAll="true">
+		    <param name="${wo.notWindows}" value="${wo.notWindows}"/>
+		</antcall>
+
+		<antcall target="launch-windows" inheritAll="true">
+		    <param name="${wo.useWindows}" value="${wo.useWindows}"/>
+		</antcall>
+
+		<echo message="starting run-app task"/>
+	</target>
+
+    <!-- ==================================================== -->
+	<!--													  -->
+    <!--				Debugging							  -->
+	<!-- Enable apple.log.verbose to get a log of environment -->
+	<!-- properties											  -->
+	<!--													  -->
+    <!-- ==================================================== -->
+	<target name="logEnv" if="apple.isVerboseLogging">
+			<echoproperties destfile="${wo.path.local.build_dir}/build_properties.log"/>
+			<echoproperties/>
+		
+			<!-- pretty print java classpath -->
+			<pathconvert pathsep="${line.separator}|   |-- "
+		             property="echo.path.compile"
+		             refid="javac_classpath">
+			</pathconvert>
+			<echo message="|-- javac compile classpath"/>
+			<echo message="|     |"/>
+			<echo message="|     |-- ${echo.path.compile}"/>
+	</target>
+
+</project>

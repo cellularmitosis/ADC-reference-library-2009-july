@@ -1,0 +1,3 @@
+CAPlayThrough Sample
+
+This sample shows how to use the HAL's Audio Output Unit (AUHAL) for device input and the Default Output Audio Unit for output. The code demonstrates how to use Audio Units and the Audio Unit Graph APIs to handle the 'complex' case of device input and output (play-thru). The 'complex' case is when there are two audio devices, one for input and a separate device for output. A good example is using a USB microphone for input then using speakers for output.

@@ -1,0 +1,1 @@
+ControlHandle NewVScrollBar(WindowPtr wp);void SizeVScrollBar(ControlHandle scroll, WindowPtr wp);

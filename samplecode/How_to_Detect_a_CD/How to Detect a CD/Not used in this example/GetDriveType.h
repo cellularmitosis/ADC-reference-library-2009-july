@@ -1,0 +1,1 @@
+pascal  OSErr GetDriveType(short ioRefNum, short *Type);

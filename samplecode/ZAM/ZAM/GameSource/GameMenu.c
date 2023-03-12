@@ -1,0 +1,1 @@
+/**/#include "MenuDispatch.h"#include "GameMenu.proto.h"void ChooseGame(short item){	switch(item) {		case 1:	SoundEnable();			break;	}}

@@ -1,0 +1,1 @@
+/*   *	WRay_Message.h * *	QuickDraw 3D 1.6 Sample *	Robert Dierkes * *	 07/28/98	RDD		Created. */#ifndef _HWRay_Message#define _HWRay_Message#ifdef __cplusplusextern "C" {#endifvoid Message_Register(void);#ifdef __cplusplus}#endif#endif /* _HWRay_Message */

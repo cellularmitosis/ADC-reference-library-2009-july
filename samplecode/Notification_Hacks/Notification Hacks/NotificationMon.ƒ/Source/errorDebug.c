@@ -1,0 +1,1 @@
+void error(Str255 msg, short err){	asm { move.w	err,d0 }	DebugStr(msg);}

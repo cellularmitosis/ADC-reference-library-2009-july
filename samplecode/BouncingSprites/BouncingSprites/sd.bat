@@ -1,0 +1,1 @@
+java -classpath %CLASSPATH%;..\media;SpriteDemoApp.zip SpriteDemoApp

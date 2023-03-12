@@ -1,0 +1,108 @@
+#! /bin/csh -f
+#
+# Brief verification of libCdsaCrypt using Examples programs. 
+#
+# While this is not an exhaustive test by any means, it does exercise
+# every public function in libCdsaCrypt.
+#
+# Run this with all of the Example executables and this script
+#    in the same directory.
+#
+#####################################################
+#
+# CryptTool, StagedCrypt test.
+# 
+# Parameters: Encrypt the CryptTool executable. 
+set PLAINTEXT_FILE=CryptTool
+set CIPHERTEXT_FILE=ctext
+set RECOVERED_FILE=rptext
+set ALG_SPEC="a=a"
+set KEYSIZE=128
+#
+echo === Testing CryptTool and StagedCrypt....
+# one-shot encrypt, decrypt both ways
+CryptTool e foobar $KEYSIZE $PLAINTEXT_FILE $CIPHERTEXT_FILE $ALG_SPEC || exit(1)
+CryptTool d foobar $KEYSIZE $CIPHERTEXT_FILE $RECOVERED_FILE $ALG_SPEC || exit(1)
+cmp $PLAINTEXT_FILE $RECOVERED_FILE
+if($status != 0) then
+    echo "*** Unexpected Data Miscompare on CryptTool decrypt 1 ***"
+	exit(1)
+endif
+StagedCrypt d foobar $KEYSIZE $CIPHERTEXT_FILE $RECOVERED_FILE $ALG_SPEC || exit(1)
+cmp $PLAINTEXT_FILE $RECOVERED_FILE
+if($status != 0) then
+    echo "*** Unexpected Data Miscompare on StagedCrypt decrypt 1 ***"
+	exit(1)
+endif
+# staged encrypt, decrypt both ways
+StagedCrypt e foobar $KEYSIZE $PLAINTEXT_FILE $CIPHERTEXT_FILE $ALG_SPEC || exit(1)
+CryptTool d foobar $KEYSIZE $CIPHERTEXT_FILE $RECOVERED_FILE $ALG_SPEC || exit(1)
+cmp $PLAINTEXT_FILE $RECOVERED_FILE
+if($status != 0) then
+    echo "*** Unexpected Data Miscompare on CryptTool decrypt 2 ***"
+	exit(1)
+endif
+StagedCrypt d foobar $KEYSIZE $CIPHERTEXT_FILE $RECOVERED_FILE $ALG_SPEC || exit(1)
+cmp $PLAINTEXT_FILE $RECOVERED_FILE
+if($status != 0) then
+    echo "*** Unexpected Data Miscompare on StagedCrypt decrypt 2 ***"
+	exit(1)
+endif
+#################################################################
+#
+# DigestTool test - generate digest of DigestTool binary both ways, compare
+#
+set DIGEST_SRC_FILE=DigestTool
+set DIGEST_FILE_1=digest1
+set DIGEST_FILE_2=digest2
+#
+echo === Testing DigestTool....
+DigestTool $DIGEST_SRC_FILE $DIGEST_FILE_1 || exit(1)
+DigestTool $DIGEST_SRC_FILE $DIGEST_FILE_2 s || exit(1)
+cmp $DIGEST_FILE_1 $DIGEST_FILE_2
+if($status != 0) then
+    echo "*** Unexpected Data Miscompare on DigestTool ***"
+	exit(1)
+endif
+#################################################################
+#
+# RsaTool test
+#
+set RSA_KEY_FILE=rsakey
+set RSA_PLAINTEXT_FILE=ptext
+set RSA_CIPHERTEXT_FILE=ctext
+set RSA_RECOVERED_FILE=rptext
+set RSA_SIG_FILE=rsasig
+echo === Testing RsaTool....
+# generate key pair
+RsaTool g k=$RSA_KEY_FILE || exit(1)
+# RSA encryption is slow, create small plaintext file
+echo "This is a simple plaintext file for demonstration." > $RSA_PLAINTEXT_FILE
+# encrypt
+RsaTool e k=$RSA_KEY_FILE p=$RSA_PLAINTEXT_FILE c=$RSA_CIPHERTEXT_FILE || exit(1)
+# decrypt
+RsaTool d k=$RSA_KEY_FILE p=$RSA_RECOVERED_FILE c=$RSA_CIPHERTEXT_FILE || exit(1)
+# compare
+cmp $RSA_PLAINTEXT_FILE $RSA_RECOVERED_FILE
+if($status != 0) then
+    echo "*** Unexpected Data Miscompare on RsaTool decrypt ***"
+	exit(1)
+endif
+# one-shot sign, verify both ways
+RsaTool s k=$RSA_KEY_FILE p=$RSA_PLAINTEXT_FILE s=$RSA_SIG_FILE || exit(1)
+RsaTool v k=$RSA_KEY_FILE p=$RSA_PLAINTEXT_FILE s=$RSA_SIG_FILE || exit(1)
+RsaTool v k=$RSA_KEY_FILE p=$RSA_PLAINTEXT_FILE s=$RSA_SIG_FILE g || exit(1)
+# staged sign, verify both ways
+RsaTool s k=$RSA_KEY_FILE p=$RSA_PLAINTEXT_FILE s=$RSA_SIG_FILE g || exit(1)
+RsaTool v k=$RSA_KEY_FILE p=$RSA_PLAINTEXT_FILE s=$RSA_SIG_FILE || exit(1)
+RsaTool v k=$RSA_KEY_FILE p=$RSA_PLAINTEXT_FILE s=$RSA_SIG_FILE g || exit(1)
+#################################################################
+#
+# DiffieHellman test
+#
+set DH_PARAM_FILE=dhblob
+echo === Testing DiffieHellman....
+DiffieHellman o=dhblob || exit(1)
+DiffieHellman i=dhblob || exit(1)
+#
+echo "...libCdsaCrypt test PASSED."

@@ -1,0 +1,1 @@
+ OSErr LaunchApplication (OSType creator);

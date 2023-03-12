@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+        "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+	<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+	<title>HIToolbox</title>
+	<link rel="stylesheet" href="SampleCode.css" type="text/css" />
+</head>
+<body>
+<h1>Tutorial: Updating a Classic application to modern Carbon</h1>
+<h2>6. HIToolbox</h2>
+<p>
+HIView (part of the HIToolbox) is the modern replacement for the older Control Manager and is adopted here. It is realized by using compositing mode, but the Data Browser control is not compatible with that until Mac OS X 10.3. Therefore much of the new code in this version is Mac OS X 10.3 and later. This version also adds support for Quartz 2D/Core Graphics drawing for Mac OS X 10.1 and later which replaces all of the QuickDraw drawing. Because of the varying level of Appearance Manager/Core Graphics integration across versions of Mac OS X, there are several different versions of the drawing code. In all cases, some extra work has to be done to set up the Core Graphics drawing context. The Mac OS X 10.4 drawing code looks like this.
+</p>
+<div class="mycodebox">
+<pre>
+pascal void DrawIconDataBrowserItem104CB(ControlRef browser, DataBrowserItemID item, 
+                                            DataBrowserPropertyID property, 
+                                            DataBrowserItemState itemState, 
+                                            const Rect *theRect, SInt16 gdDepth, 
+                                            Boolean colorDevice)
+{
+#pragma unused (theRect, gdDepth, colorDevice)
+    Rect enclosingRect, portBounds;
+    GrafPtr port;
+    CGRect enclosingCGRect, iconCGRect, textCGRect;
+    Boolean active;
+    CGContextRef context;
+    IconDBItemDataRec *itemData;
+    RGBColor labelColor;
+    HIThemeTextInfo textInfo;
+    
+        /* The data browser currently gives us the content part bounds in the theRect 
+           parameter but we want the enclosing part bounds to draw in so that we can 
+           draw a fill style highlight. */
+    GetDataBrowserItemPartBounds(browser, item, property, kDataBrowserPropertyEnclosingPart, 
+                                    &amp;enclosingRect);
+    
+        /* In Mac OS X we're going to use Quartz 2D/Core Graphics for the drawing, so we 
+           need to convert the enclosing part bounds to a CGRect */
+    GetPort(&amp;port);        // the data browser sets the port up for us so we just need to get it
+    GetPortBounds(port, &amp;portBounds);
+    enclosingCGRect = CGRectMake(enclosingRect.left, 
+                                    portBounds.bottom - portBounds.top - 
+                                    enclosingRect.bottom, 
+                                    enclosingRect.right - enclosingRect.left, 
+                                    enclosingRect.bottom - enclosingRect.top);
+    calculateCGDrawingBounds(enclosingCGRect, &amp;iconCGRect, &amp;textCGRect);
+    
+    active = IsControlActive(browser);
+    
+    if ((itemState &amp; kDataBrowserItemIsSelected) != 0)
+    {
+        CGRect clipRect;
+        
+        clipRect = getClipCGRect(&amp;portBounds);    // call this before beginning the context
+        
+        QDBeginCGContext(port, &amp;context);
+        CGContextClipToRect(context, clipRect);
+        CGContextSaveGState(context);
+        
+        HIThemeSetFill(active ? kThemeBrushPrimaryHighlightColor : kThemeBrushSecondaryHighlightColor, 
+                        NULL, context, kHIThemeOrientationInverted);
+        CGContextFillRect(context, enclosingCGRect);
+        
+        CGContextRestoreGState(context);
+    }
+    else
+    {
+            /* The data browser will redraw items on the edge of its content view.  
+               Because HIThemeDrawTextBox does not erase the drawing rectangle before 
+               it draws, the text becomes thicker with every draw due to anti-aliasing.  
+               As a workaround, this section erases the text rectangle (if the item was 
+               selected then the enclosing rectangle was erased above). */
+        CGRect clipRect;
+        RGBColor backgroundColor;
+        
+        clipRect = getClipCGRect(&amp;portBounds);    // call these before beginning the context
+        GetBackColor(&amp;backgroundColor);
+        
+        QDBeginCGContext(port, &amp;context);
+        CGContextClipToRect(context, clipRect);
+        CGContextSaveGState(context);
+        
+        CGContextSetRGBFillColor(context, (float)backgroundColor.red / (float)USHRT_MAX, 
+                                    (float)backgroundColor.green / (float)USHRT_MAX, 
+                                    (float)backgroundColor.blue / (float)USHRT_MAX, 1.0);
+        CGContextFillRect(context, textCGRect);
+        
+        CGContextRestoreGState(context);
+    }
+    
+    itemData = (IconDBItemDataRec *)item;
+    
+    labelColor.red = 0;
+    labelColor.green = 0;
+    labelColor.blue = 0;
+    PlotIconRefInContext(context, &amp;iconCGRect, kAlignNone, 
+                            active ? kTransformNone : kTransformDisabled, &amp;labelColor, 
+                            kPlotIconRefNormalFlags, itemData->icon);
+    
+    textInfo.version = kHIThemeTextInfoVersionZero;
+    textInfo.state = active ? kThemeStateActive : kThemeStateInactive;
+    textInfo.fontID = kThemeViewsFont;
+    textInfo.horizontalFlushness = kHIThemeTextHorizontalFlushCenter;
+    textInfo.verticalFlushness = kHIThemeTextVerticalFlushTop;
+    textInfo.options = kHIThemeTextBoxOptionNone;
+    textInfo.truncationPosition = kHIThemeTextTruncationNone;
+    HIThemeDrawTextBox(itemData->name, &amp;textCGRect, &amp;textInfo, context, 
+                        kHIThemeOrientationInverted);
+    
+    QDEndCGContext(port, &amp;context);
+} // DrawIconDataBrowserItem104CB
+</pre>
+</div>
+<p>
+This step also converts all of the Resource Manager resources to Interface Builder nib files. See ExamplePrefs.c, PrefsDialog.c, and PrefsWindow.c in the 6_HIToolbox folder for the nib loading code.
+</p>
+<p><a href="Universal%20Binary.html">Next Page</a></p>
+<p><a href="Data%20Browser.html">Previous Page</a></p>
+<p><a href="../0_%20Tutorial%20Start%20Here.html">Return to Main Page</a></p>
+</body>
+</html>

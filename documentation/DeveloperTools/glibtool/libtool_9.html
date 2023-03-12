@@ -1,0 +1,353 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html401/loose.dtd">
+<html>
+<!-- Created on February, 19 2008 by texi2html 1.70 -->
+<!--
+Written by: Lionel Cons <Lionel.Cons@cern.ch> (original author)
+            Karl Berry  <karl@freefriends.org>
+            Olaf Bachmann <obachman@mathematik.uni-kl.de>
+            and many others.
+Maintained by: Many creative people <dev@texi2html.cvshome.org>
+Send bugs and suggestions to <users@texi2html.cvshome.org>
+
+-->
+<head>
+<title>GNU Libtool: 9. Dlopened modules</title>
+
+<meta name="description" content="GNU Libtool: 9. Dlopened modules">
+<meta name="keywords" content="GNU Libtool: 9. Dlopened modules">
+<meta name="resource-type" content="document">
+<meta name="distribution" content="global">
+<meta name="Generator" content="texi2html 1.70">
+<meta http-equiv="Content-Type" content="text/html; charset=us-ascii">
+<style type="text/css">
+<!--
+a.summary-letter {text-decoration: none}
+pre.display {font-family: serif}
+pre.format {font-family: serif}
+pre.menu-comment {font-family: serif}
+pre.menu-preformatted {font-family: serif}
+pre.smalldisplay {font-family: serif; font-size: smaller}
+pre.smallexample {font-size: smaller}
+pre.smallformat {font-family: serif; font-size: smaller}
+pre.smalllisp {font-size: smaller}
+ul.toc {list-style: none}
+-->
+</style>
+
+
+</head>
+
+<body lang="en" bgcolor="#FFFFFF" text="#000000" link="#0000FF" vlink="#800080" alink="#FF0000">
+
+<a name="NOD41"></a>
+<a name="SEC40"></a>
+<table cellpadding="1" cellspacing="1" border="0">
+<tr><td valign="middle" align="left" scope="row">[<a href="libtool_8.html#SEC39" title="Previous section in reading order"> &lt; </a>]</td>
+<td valign="middle" align="left">[<a href="#SEC41" title="Next section in reading order"> &gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="libtool_8.html#SEC39" title="Beginning of this chapter or previous chapter"> &lt;&lt; </a>]</td>
+<td valign="middle" align="left">[<a href="libtool.html#SEC_Top" title="Up section"> Up </a>]</td>
+<td valign="middle" align="left">[<a href="libtool_10.html#SEC45" title="Next chapter"> &gt;&gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="libtool.html#SEC_Top" title="Cover (top) of document">Top</a>]</td>
+<td valign="middle" align="left">[<a href="libtool_toc.html#SEC_Contents" title="Table of contents">Contents</a>]</td>
+<td valign="middle" align="left">[<a href="libtool_15.html#SEC86" title="Index">Index</a>]</td>
+<td valign="middle" align="left">[<a href="libtool_abt.html#SEC_About" title="About (help)"> ? </a>]</td>
+</tr></table>
+<h1 class="chapter"> 9. Dlopened modules </h1>
+
+<p>It can sometimes be confusing to discuss <em>dynamic linking</em>, because
+the term is used to refer to two different concepts:
+
+</p><ol>
+<li>
+<p>Compiling and linking a program against a shared library, which is
+resolved automatically at run time by the dynamic linker.  In this
+process, dynamic linking is transparent to the application.
+
+</p></li><li>
+<p>The application calling functions such as <code>dlopen</code>,<a name="DOCF7" href="libtool_fot.html#FOOT7">(7)</a> which load
+arbitrary, user-specified modules at runtime.  This type of dynamic
+linking is explicitly controlled by the application.
+</p></li></ol>
+
+<p>To mitigate confusion, this manual refers to the second type of dynamic
+linking as <em>dlopening</em> a module.
+
+</p><p>The main benefit to dlopening object modules is the ability to access
+compiled object code to extend your program, rather than using an
+interpreted language.  In fact, dlopen calls are frequently used in
+language interpreters to provide an efficient way to extend the
+language.
+
+</p><p>As of version 1.5.22, libtool provides support for dlopened
+modules.  However, you should indicate that your package is willing to
+use such support, by using the macro `<samp>AC_LIBTOOL_DLOPEN</samp>' in
+`<tt>configure.in</tt>'.  If this macro is not used (or it is used
+<em>after</em> `<samp>AC_PROG_LIBTOOL</samp>'), libtool will assume no dlopening
+mechanism is available, and will try to simulate it.
+
+</p><p>This chapter discusses how you as a dlopen application developer might
+use libtool to generate dlopen-accessible modules.
+
+</p><table class="menu" border="0" cellspacing="0">
+<tr><td align="left" valign="top" scope="row"><a href="#SEC41">9.1 Building modules to dlopen</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">            Creating dlopenable objects and libraries.
+</td></tr>
+<tr><td align="left" valign="top" scope="row"><a href="#SEC42">9.2 Dlpreopening</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">                Dlopening that works on static platforms.
+</td></tr>
+<tr><td align="left" valign="top" scope="row"><a href="#SEC43">9.3 Finding the correct name to dlopen</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">          Choosing the right file to <code>dlopen</code>.
+</td></tr>
+<tr><td align="left" valign="top" scope="row"><a href="#SEC44">9.4 Unresolved dlopen issues</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">               Unresolved problems that need your attention.
+</td></tr>
+</table>
+
+<hr size="6">
+<a name="NOD42"></a>
+<a name="SEC41"></a>
+<table cellpadding="1" cellspacing="1" border="0">
+<tr><td valign="middle" align="left" scope="row">[<a href="#SEC40" title="Previous section in reading order"> &lt; </a>]</td>
+<td valign="middle" align="left">[<a href="#SEC42" title="Next section in reading order"> &gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="#SEC40" title="Beginning of this chapter or previous chapter"> &lt;&lt; </a>]</td>
+<td valign="middle" align="left">[<a href="#SEC40" title="Up section"> Up </a>]</td>
+<td valign="middle" align="left">[<a href="libtool_10.html#SEC45" title="Next chapter"> &gt;&gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="libtool.html#SEC_Top" title="Cover (top) of document">Top</a>]</td>
+<td valign="middle" align="left">[<a href="libtool_toc.html#SEC_Contents" title="Table of contents">Contents</a>]</td>
+<td valign="middle" align="left">[<a href="libtool_15.html#SEC86" title="Index">Index</a>]</td>
+<td valign="middle" align="left">[<a href="libtool_abt.html#SEC_About" title="About (help)"> ? </a>]</td>
+</tr></table>
+<h2 class="section"> 9.1 Building modules to dlopen </h2>
+
+<p>On some operating systems, a program symbol must be specially declared
+in order to be dynamically resolved with the <code>dlsym</code> (or
+equivalent) function.
+
+</p><p>Libtool provides the `<samp>-export-dynamic</samp>' and `<samp>-module</samp>'
+link flags (see section <a href="libtool_4.html#SEC17">Link mode</a>), which do this declaration.
+You need to use these flags if you are linking an application program that
+dlopens other modules or a libtool library that will also be dlopened.
+
+</p><p>For example, if we wanted to build a shared library, `<tt>libhello</tt>',
+that would later be dlopened by an application, we would add
+`<samp>-module</samp>' to the other link flags:
+
+</p><table><tr><td scope="row">&nbsp;</td><td><pre class="example">burger$ <kbd>libtool --mode=link gcc -module -o libhello.la foo.lo \
+                hello.lo -rpath /usr/local/lib -lm</kbd>
+burger$
+</pre></td></tr></table>
+<p>If symbols from your <em>executable</em> are needed to satisfy unresolved
+references in a library you want to dlopen you will have to use the flag
+`<samp>-export-dynamic</samp>'.
+You should use `<samp>-export-dynamic</samp>' while linking the executable that calls
+dlopen:
+
+</p><table><tr><td scope="row">&nbsp;</td><td><pre class="example">burger$ <kbd>libtool --mode=link gcc -export-dynamic -o hell-dlopener main.o</kbd>
+burger$
+</pre></td></tr></table>
+<hr size="6">
+<a name="NOD43"></a>
+<a name="SEC42"></a>
+<table cellpadding="1" cellspacing="1" border="0">
+<tr><td valign="middle" align="left" scope="row">[<a href="#SEC41" title="Previous section in reading order"> &lt; </a>]</td>
+<td valign="middle" align="left">[<a href="#SEC43" title="Next section in reading order"> &gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="#SEC40" title="Beginning of this chapter or previous chapter"> &lt;&lt; </a>]</td>
+<td valign="middle" align="left">[<a href="#SEC40" title="Up section"> Up </a>]</td>
+<td valign="middle" align="left">[<a href="libtool_10.html#SEC45" title="Next chapter"> &gt;&gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="libtool.html#SEC_Top" title="Cover (top) of document">Top</a>]</td>
+<td valign="middle" align="left">[<a href="libtool_toc.html#SEC_Contents" title="Table of contents">Contents</a>]</td>
+<td valign="middle" align="left">[<a href="libtool_15.html#SEC86" title="Index">Index</a>]</td>
+<td valign="middle" align="left">[<a href="libtool_abt.html#SEC_About" title="About (help)"> ? </a>]</td>
+</tr></table>
+<h2 class="section"> 9.2 Dlpreopening </h2>
+
+<p>Libtool provides special support for dlopening libtool object and
+libtool library files, so that their symbols can be resolved <em>even
+on platforms without any <code>dlopen</code> and <code>dlsym</code>
+functions</em>.
+
+</p><p>Consider the following alternative ways of loading code into your
+program, in order of increasing &quot;laziness&quot;:
+
+</p><ol>
+<li>
+<p>Linking against object files that become part of the program executable,
+whether or not they are referenced.  If an object file cannot be found,
+then the linker refuses to create the executable.
+
+</p></li><li>
+<p>Declaring a static library to the linker, so that it is searched at link
+time in order to satisfy any undefined references in the above object
+files.  If the static library cannot be found, then the linker refuses
+to link the executable.
+
+</p></li><li>
+<p>Declaring a shared library to the runtime linker, so that it is searched
+at runtime in order to satisfy any undefined references in the above
+files.  If the shared library cannot be found, then the dynamic linker
+aborts the program before it runs.
+
+</p></li><li>
+<p>Dlopening a module, so that the application can resolve its own,
+dynamically-computed references.  If there is an error opening the
+module, or the module is not found, then the application can recover
+without crashing.
+</p></li></ol>
+
+<p>Libtool emulates `<samp>-dlopen</samp>' on static platforms by linking objects
+into the program at compile time, and creating data structures that
+represent the program's symbol table.
+
+</p><p>In order to use this feature, you must declare the objects you want your
+application to dlopen by using the `<samp>-dlopen</samp>' or `<samp>-dlpreopen</samp>'
+flags when you link your program (see section <a href="libtool_4.html#SEC17">Link mode</a>).
+
+</p><dl>
+<dt><u>Structure:</u> struct <b>lt_dlsymlist</b><i> { const char *<var>name</var>; lt_ptr <var>address</var>; }</i>
+<a name="IDX69"></a>
+</dt>
+<dd><p>The <var>name</var> attribute is a null-terminated character string of the
+symbol name, such as <code>&quot;fprintf&quot;</code>.  The <var>address</var> attribute is a
+generic pointer to the appropriate object, such as <code>&amp;fprintf</code>.
+</p></dd></dl>
+
+<dl>
+<dt><u>Variable:</u> const lt_dlsymlist * <b>lt_preloaded_symbols</b>
+<a name="IDX70"></a>
+</dt>
+<dd><p>An array of <var>lt_symbol</var> structures, representing all the preloaded
+symbols linked into the program. For each `<samp>-dlpreloaded</samp>' file
+there is an element with the <var>name</var> of the file and a <var>address</var>
+of <code>0</code>, followed by all symbols exported from this file.
+For the executable itself the special name @PROGRAM@ is used.
+The last element has a <var>name</var> and <var>address</var> of <code>0</code>.
+</p></dd></dl>
+
+<p>Some compilers may allow identifiers which are not valid in ANSI C, such
+as dollar signs.  Libtool only recognizes valid ANSI C symbols (an
+initial ASCII letter or underscore, followed by zero or more ASCII
+letters, digits, and underscores), so non-ANSI symbols will not appear
+in <var>lt_preloaded_symbols</var>.
+
+</p><hr size="6">
+<a name="NOD44"></a>
+<a name="SEC43"></a>
+<table cellpadding="1" cellspacing="1" border="0">
+<tr><td valign="middle" align="left" scope="row">[<a href="#SEC42" title="Previous section in reading order"> &lt; </a>]</td>
+<td valign="middle" align="left">[<a href="#SEC44" title="Next section in reading order"> &gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="#SEC40" title="Beginning of this chapter or previous chapter"> &lt;&lt; </a>]</td>
+<td valign="middle" align="left">[<a href="#SEC40" title="Up section"> Up </a>]</td>
+<td valign="middle" align="left">[<a href="libtool_10.html#SEC45" title="Next chapter"> &gt;&gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="libtool.html#SEC_Top" title="Cover (top) of document">Top</a>]</td>
+<td valign="middle" align="left">[<a href="libtool_toc.html#SEC_Contents" title="Table of contents">Contents</a>]</td>
+<td valign="middle" align="left">[<a href="libtool_15.html#SEC86" title="Index">Index</a>]</td>
+<td valign="middle" align="left">[<a href="libtool_abt.html#SEC_About" title="About (help)"> ? </a>]</td>
+</tr></table>
+<h2 class="section"> 9.3 Finding the correct name to dlopen </h2>
+
+<p>After a library has been linked with `<samp>-module</samp>', it can be dlopened.
+Unfortunately, because of the variation in library names,
+your package needs to determine the correct file to dlopen.
+
+</p><p>The most straightforward and flexible implementation is to determine the
+name at runtime, by finding the installed `<samp>.la</samp>' file, and searching
+it for the following lines:
+
+</p><table><tr><td scope="row">&nbsp;</td><td><pre class="example"># The name that we can <code>dlopen</code>.
+dlname='<var>dlname</var>'
+</pre></td></tr></table>
+<p>If <var>dlname</var> is empty, then the library cannot be dlopened.
+Otherwise, it gives the dlname of the library.  So, if the library was
+installed as `<tt>/usr/local/lib/libhello.la</tt>', and the <var>dlname</var> was
+`<tt>libhello.so.3</tt>', then `<tt>/usr/local/lib/libhello.so.3</tt>' should be
+dlopened.
+
+</p><p>If your program uses this approach, then it should search the
+directories listed in the <code>LD_LIBRARY_PATH</code><a name="DOCF8" href="libtool_fot.html#FOOT8">(8)</a> environment variable, as well as
+the directory where libraries will eventually be installed.  Searching
+this variable (or equivalent) will guarantee that your program can find
+its dlopened modules, even before installation, provided you have linked
+them using libtool.
+
+</p><hr size="6">
+<a name="NOD45"></a>
+<a name="SEC44"></a>
+<table cellpadding="1" cellspacing="1" border="0">
+<tr><td valign="middle" align="left" scope="row">[<a href="#SEC43" title="Previous section in reading order"> &lt; </a>]</td>
+<td valign="middle" align="left">[<a href="libtool_10.html#SEC45" title="Next section in reading order"> &gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="#SEC40" title="Beginning of this chapter or previous chapter"> &lt;&lt; </a>]</td>
+<td valign="middle" align="left">[<a href="#SEC40" title="Up section"> Up </a>]</td>
+<td valign="middle" align="left">[<a href="libtool_10.html#SEC45" title="Next chapter"> &gt;&gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="libtool.html#SEC_Top" title="Cover (top) of document">Top</a>]</td>
+<td valign="middle" align="left">[<a href="libtool_toc.html#SEC_Contents" title="Table of contents">Contents</a>]</td>
+<td valign="middle" align="left">[<a href="libtool_15.html#SEC86" title="Index">Index</a>]</td>
+<td valign="middle" align="left">[<a href="libtool_abt.html#SEC_About" title="About (help)"> ? </a>]</td>
+</tr></table>
+<h2 class="section"> 9.4 Unresolved dlopen issues </h2>
+
+<p>The following problems are not solved by using libtool's dlopen support:
+
+</p><ul>
+<li>
+<p>Dlopen functions are generally only available on shared library
+platforms.  If you want your package to be portable to static platforms,
+you have to use either libltdl (see section <a href="libtool_10.html#SEC45">Using libltdl</a>) or develop your
+own alternatives to dlopening dynamic code.
+Most reasonable solutions involve writing wrapper functions for the
+<code>dlopen</code> family, which do package-specific tricks when dlopening
+is unsupported or not available on a given platform.
+
+</p></li><li>
+<p>There are major differences in implementations of the <code>dlopen</code>
+family of functions.  Some platforms do not even use the same function
+names (notably HP-UX, with its <code>shl_load</code> family).
+
+</p></li><li>
+<p>The application developer must write a custom search function in order
+to discover the correct module filename to supply to <code>dlopen</code>.
+</p></li></ul>
+
+<hr size="6">
+<table cellpadding="1" cellspacing="1" border="0">
+<tr><td valign="middle" align="left" scope="row">[<a href="#SEC40" title="Beginning of this chapter or previous chapter"> &lt;&lt; </a>]</td>
+<td valign="middle" align="left">[<a href="libtool_10.html#SEC45" title="Next chapter"> &gt;&gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="libtool.html#SEC_Top" title="Cover (top) of document">Top</a>]</td>
+<td valign="middle" align="left">[<a href="libtool_toc.html#SEC_Contents" title="Table of contents">Contents</a>]</td>
+<td valign="middle" align="left">[<a href="libtool_15.html#SEC86" title="Index">Index</a>]</td>
+<td valign="middle" align="left">[<a href="libtool_abt.html#SEC_About" title="About (help)"> ? </a>]</td>
+</tr></table>
+<p>
+ <font size="-1">
+  This document was generated by <em>System Administrator</em> on <em>February, 19 2008</em> using <a href="http://texi2html.cvshome.org/"><em>texi2html 1.70</em></a>.
+ </font>
+ <br>
+
+</p>
+</body>
+</html>

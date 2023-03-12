@@ -1,0 +1,123 @@
+<html><head><title>Managing State</title></head>
+<body bgcolor="#ffffff">
+
+<!--start of banner -->
+<!--#include virtual="/includes/framesetheader" -->
+<!-- end of banner -->
+
+<!--start of path -->
+<font face="Geneva,Helvetica,Arial" size="1">
+<b>PATH<spacer type="horizontal" size="5">&nbsp;</b>
+ <a href="../../../../../webobjects.html" target="_top">WebObjects 4.0 Documentation</a> <b>&gt;</b>
+ <a href="DevGuideTOC.html" target="_top">WebObjects Developer's Guide</a>
+</font>
+<br><br>
+<!--end of path -->
+
+ 
+<a href="StateTOC.html"><IMG SRC="ArrowUp.gif">Table of Contents</a> <a href="ManagingState4.html"><IMG SRC="ArrowLeft.gif">Previous Section</a>
+ 
+<a name="5780">
+<h2> Component Objects and Component State</h2>
+</a><a name="5781">
+In WebObjects, state can also be scoped to a component, such as a dynamically generated page or a reusable component within a page. Common uses for component state include storing:<p>
+</a><ul><a name="5782">
+<li>A list of items that a user can choose from within a particular page
+</a><a name="5783">
+<li>The user's selection from that list
+</a><a name="5784">
+<li>Information that the users enters in a form
+</a><a name="5792">
+<li>Default values for a component's attributes
+</a></ul><a name="5795">
+Component state typically includes the data that a page displays, such as a list of choices to present to the user. Suppose a user requests the page that lists these choices. The component that represents the page must initialize itself with the choice data and then return the response page. This completes one cycle of the request-response loop. Now, suppose the user looks at the list of choices, selects the third item, and submits a new request. The same component must be present in this second cycle to identify the choice and take the appropriate action. In short, component state often needs to persist from one cycle of the request-response loop to the next. <p>
+</a><a name="5798">
+A simple example of component state can be seen in the first page of this sample application, which lists models, prices, and types of vehicles for the user to choose from (see <a href="ManagingState5.html#4733">Figure &#32;36</a>).<p>
+</a><a name="4732">
+<p><center><img src="ManagingState.gif"></center><p>
+</a><a name="4733">
+<p><CENTER>Figure 36.	  Sample Application First Page</CENTER><p>
+</a><a name="4734">
+This component declares instance variables for the values displayed in the browser and for the user's selection from the browsers. Before the page can be sent to the user, the instance variables that hold the values to &#32;be displayed (model, price, type) are initialized:<p>
+</a><pre><a name="7249">// Java Main.java<br>
+NSArray models, prices, types;<br>
+NSMutableArray selectedModels, selectedPrices, selectedTypes;<br>
+String model, price, type;<br>
+<br>
+public Main() {<br>
+	super();<br>
+	NSEnumerator en;<br>
+<br>
+	Application woApp = (Application)application();<br>
+	en = woApp.modelsDict().objectEnumerator();<br>
+	models = new NSMutableArray();<br>
+	while (en.hasMoreElements())<br>
+		((NSMutableArray)models).addElement(en.nextElement());<br>
+	en = woApp.typesDict().elements();<br>
+	while (en.hasMoreElements()) <br>
+		((NSMutableArray)types.addElement(en.nextElement());<br>
+	prices = woApp.prices();<br>
+}
+</a><a name="4735">// WebScript Cars Main.wos<br>
+id models, model, selectedModels;<br>
+id prices, price, selectedPrices;<br>
+id types, type, selectedTypes;<br>
+<br>
+- init {<br>
+	id anApplication = [WOApplication application];<br>
+	[super init];<br>
+	models = [[anApplication modelsDict] allValues];<br>
+	types = [[anApplication typesDict] allValues];<br>
+	prices = [anApplication prices];<br>
+	return self;<br>
+}
+</a></pre><a name="4736">
+(The selectedModels, selectedPrices, and selectedTypes instance variables are bound to the selections attributes of the three WOBrowsers and so will contain the user's selections when the Display Cars button is clicked.)<p>
+</a><a name="4737">
+When a user starts a session of the above application, the Main component's initialization method is invoked, initializing the component's instance variables from data accessed through the application object. From this point on, the Main component and its instance variables become part of the state stored for that user's session of &#32;the application. When the session is released, the component is also released. However, there are other techniques that allow you to control resource allocation on a component basis, as you'll see later in this chapter.<p>
+</a><a name="4762">
+As with the session state, a component's state is accessible to other objects within the same session. As the result of a user's action, for example, it's quite common for one component to create the component for the next page and set its state. Consider what happens in the above sample application when the user makes a selection in the first page and clicks Display Cars. The displayCars method in the Main component is invoked:<p>
+</a><pre><a name="5932">// Java Main.java<br>
+public WOComponent displayCars() <br>
+{<br>
+	SelectedCars selectedCarsPage = <br>
+		(SelectedCars)this.pageWithName("SelectedCars");<br>
+<br>
+	... <br>
+<br>
+	selectedCarsPage.setModels(selectedModels);<br>
+	selectedCarsPage.setTypes(selectedTypes);<br>
+	selectedCarsPage.setPrices(selectedPrices);<br>
+	... <br>
+	selectedCarsPage.fetchSelectedCars(); <br>
+<br>
+	return (WOComponent)selectedCarsPage;<br>
+}
+</a><a name="4763">// WebScript Cars Main.wos<br>
+- displayCars <br>
+{<br>
+	id selectedCarsPage = [this pageWithName:@"SelectedCars"];<br>
+<br>
+	... <br>
+<br>
+	[selectedCarsPage setModels:selectedModels];<br>
+	[selectedCarsPage setTypes:selectedTypes];<br>
+	[selectedCarsPage setPrices:selectedPrices];<br>
+	... <br>
+	[selectedCarsPage fetchSelectedCars]; <br>
+<br>
+	return selectedCarsPage;<br>
+}
+</a></pre><a name="4764">
+The new component is created by sending a pageWithName: message to a WOComponent object or a WODirectAction object. A series of messages is then sent to this new object to set its state before the object is returned as the response page.<p>
+</a><a name="639">
+Component state persists until the component object is deallocated, an &#32;action that can occur for various reasons, as described in the section <a href="ManagingState16.html#667">"Controlling Component State"</a>.<p>
+</a>
+<P>
+ 
+<a href="StateTOC.html"><IMG SRC="ArrowUp.gif">Table of Contents</a> <a href="ManagingState6.html"><IMG SRC="ArrowRight.gif">Next Section</a>
+<P>
+
+
+</body>
+</html>

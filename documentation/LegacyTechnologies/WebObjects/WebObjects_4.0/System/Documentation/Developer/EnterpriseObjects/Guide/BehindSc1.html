@@ -1,0 +1,414 @@
+<html><head><title>Behind the Scenes</title></head>
+<body bgcolor="#ffffff">
+
+<!--start of banner -->
+<!--#include virtual="/includes/framesetheader" -->
+<!-- end of banner -->
+
+<!--start of path -->
+<font face="Geneva,Helvetica,Arial" size="1">
+<b>PATH<spacer type="horizontal" size="5">&nbsp;</b>
+ <a href="../../../../../webobjects.html" target="_top">WebObjects 4.0 Documentation</a> <b>&gt;</b>
+ <a href="GuideTOC.html" target="_top">EOF Developer's Guide</a>
+</font>
+<br><br>
+<!--end of path -->
+
+ 
+<a href="BehindSc.html"><IMG SRC="ArrowUp.gif">Table of Contents</a> <a href="BehindSc.html"><IMG SRC="ArrowLeft.gif">Previous Section</a>
+ 
+<a name="272">
+<h1> Fetching Objects</h1>
+</a><a name="232">
+This section describes the sequence of events that occurs when objects are fetched from the database. It's broken down into the following major sections:<p>
+</a><ul><a name="414">
+<li><a href="BehindSc1.html#209">"EODisplayGroup Receives a fetch Message"</a>
+</a><a name="427">
+<li><a href="BehindSc1.html#8480">"Inside EODatabaseContext"</a>
+</a><a name="430">
+<li><a href="BehindSc1.html#6273">"Inside EODatabaseChannel"</a>
+</a></ul><a name="239">
+<a href="BehindSc1.html#261">Figure &#32;47</a> provides a high-level view of what happens in Enterprise Objects Framework when you fetch an object. <p>
+</a><a name="261">
+<p><img src="BehindSc.gif"><p>
+</a><a name="275">
+<p>Figure 47.	  What Happens During a Fetch<p>
+</a><a name="3460">
+<B>Note: </B> <a href="BehindSc1.html#261">Figure &#32;47</a> is intended to show the flow of data, not the Enterprise Objects Framework architecture as such. For a graphical depiction of the Enterprise Objects Framework architecture, see the chapter<a href="WhatsEOF.html#5610"> "What Is Enterprise Objects Framework?"</a><p>
+</a><a name="3461">
+The steps illustrated in <a href="BehindSc1.html#261">Figure &#32;47</a> are described in detail in the following sections.<p>
+</a><a name="209">
+<h2> EODisplayGroup Receives a fetch Message</h2>
+</a><a name="880">
+A fetch most often begins with an EODisplayGroup receiving a <strong>fetch</strong> message. If you've configured the display group to "fetch on load," the fetch occurs at the end of display group initialization.<p>
+</a><a name="6101">
+When a display group receives a <strong>fetch</strong> message, the following sequence of events occurs:<p>
+</a><ol>
+<a name="225">
+<P><li>The display group sends its EODataSource a <strong>fetchObjects</strong> message, which for the EODatabaseDataSource subclass results in a fetch against a specific EOEntity. 
+</a><a name="766">
+<P><li>The EODatabaseDataSource constructs an EOFetchSpecification for the database data source's EOEntity (if a fetch specification doesn't already exist) and passes the specification to its EOEditingContext in an <strong>objectsWithFetchSpecification</strong> message (<strong>objectsWithFetchSpecification:</strong> in Objective-C).
+</a><a name="4547">
+<p>The database data source would already have a fetch specification if you assigned one programmatically or if you assigned one in Interface Builder (or WebObjects Builder in a WebObjects application). Fetch specifications are handled differently depending on how they're configured. This discussion assumes that the fetch specification is a "regular" fetch specification-one that isn't configured to fetch raw rows, to use a custom SQL statement, or to use a stored procedure. <p>
+</a><a name="767">
+<P><li>The receiving editing context forwards this request, in the form of a <strong>objectsWithFetchSpecification </strong>message<strong> </strong>(<strong>objectsWithFetchSpecification:editingContext:</strong> in Objective-C), to &#32;its parent object store, eventually reaching the root object store &#32;(which is usually an EOObjectStoreCoordinator). An &#32;EOObjectStoreCoordinator manages one or more EODatabaseContexts or other EOCooperatingObjectStores. 
+</a><a name="768">
+<P><li>The EOObjectStoreCoordinator determines which of its &#32;EOCooperatingObjectStores should service the fetch specification &#32;and forwards the EOCooperatingObjectStore an &#32;<strong>objectsWithFetchSpecification </strong>message<strong> </strong>(<strong>objectsWithFetchSpecification:editingContext:</strong> in Objective-C) to &#32;ask it to actually retrieve data from the database.
+</a></ol>
+<a name="266">
+<B>Note: </B> A fetch operation is always performed with an editing context, which holds all of the objects it fetches (an editing context usually performs multiple fetches over the course of an application). Objects are kept unique within an editing context, so if an enterprise object instance already exists for a fetched row, that object is simply returned as the fetched object (possibly with updated values, as described below). Any faults created for fetched objects likewise belong to the editing context and are kept unique within it.<p>
+</a><a name="8480">
+<h2> Inside EODatabaseContext</h2>
+</a><a name="8481">
+When an EODatabaseContext receives a fetch request in the form of an <strong>objectsWithFetchSpecification </strong>message<strong> </strong>(<strong>objectsWithFetchSpecification:editingContext:</strong> in Objective-C), it fetches a number of rows from the database, transforms them into enterprise objects, and registers them as needed with the EOEditingContext that received the initial <strong>objectsWithFetchSpecification</strong> message. <p>
+</a><a name="769">
+To do this it uses an EODatabaseChannel, whose job is specifically to &#32;fetch enterprise objects. The database channel in turn uses an EOAdaptorChannel for low-level communication with the database, along with whatever model objects-EOEntities, EOAttributes, and EORelationships-are needed to perform the fetch. <p>
+</a><a name="215">
+Fetching objects happens in two major steps:<p>
+</a><ol>
+<a name="972">
+<P><li>The database context uses the database channel to select the rows in the database for which objects are being fetched. To do this, it uses the EODatabaseChannel <strong>selectObjectsWithFetchSpecification </strong>method<strong> </strong>(<strong>selectObjectsWithFetchSpecification:editingContext:</strong> in Objective-C), passing in the fetch specification. Minimally, the fetch specification identifies the EOEntity for the objects, which in &#32;turn specifies the enterprise object class to instantiate for every object fetched. If you provided the fetch specification that's used, it can also contain a qualifier that restricts the objects to fetch to those that meet specified criteria and a sort ordering with which to &#32;sort the objects. The section<a href="BehindSc1.html#6273"> "Inside EODatabaseChannel"</a>" describes in detail how the fetch specification is handled.
+</a><a name="973">
+<P><li>The database channel fetches each enterprise object, one at a time, as the database context repeatedly sends it the message <strong>fetchObject</strong>. This method uses state built up in the select step to get data for the object, create an instance if necessary, and register the new object with the editing context.
+</a></ol>
+<a name="4596">
+<h3> Customizing Framework Behavior</h3>
+</a><a name="6250">
+At this stage in the fetching process, there are several ways you can customize the Framework's default behavior. To get fine-grained control over a database context, you can assign a delegate to it and implement any of the following methods. 
+<Table Border="3">
+<caption></caption>
+<tr><th colspan=3 rowspan=1><a name="6203">
+EODatabaseContext Delegate Methods &#32;
+</a></th></tr>
+<tr><th><a name="6205">
+Java Method
+</a></th><th><a name="4649">
+Objective-C Method
+</a></th><th><a name="4651">
+Description
+</a></th></tr>
+<tr><td scope="row"><a name="6207">
+databaseContext<br>ShouldSelectObjects
+</a></td><td><a name="4653">
+databaseContext:<br>shouldSelectObjects<br>WithFetchSpecification:<br>databaseChannel:
+</a></td><td><a name="4655">
+This method is invoked right before a SELECT occurs. You can return <strong>false</strong> (NO) to tell the channel to skip the SELECT and return; you might want to do this to issue your own custom SQL against the adaptor.
+</a></td></tr>
+<tr><td scope="row"><a name="6209">
+databaseContext<br>ShouldUsePessimisticLock
+</a></td><td><a name="4657">
+databaseContext:<br>shouldUsePessimisticLock<br>WithFetchSpecification:<br>databaseChannel:
+</a></td><td><a name="4659">
+You can use this delegate method to selectively turn off the locking of rows when you're using a pessimistic locking strategy.
+</a></td></tr>
+<tr><td scope="row"><a name="6211">
+databaseContext<br>DidSelectObjects
+</a></td><td><a name="4661">
+databaseContext:<br>didSelectObjects<br>WithFetchSpecification:<br>databaseChannel:
+</a></td><td><a name="4663">
+This method is invoked immediately after a SELECT occurs. You can use it to log diagnostic information or set up internal state for the coming fetch.
+</a></td></tr>
+<tr><td scope="row"><a name="6213">
+databaseContext<br>ShouldFetchObjects
+</a></td><td><a name="4665">
+databaseContext:<br>shouldFetchObjects<br>WithFetchSpecification:<br>editingContext:
+</a></td><td><a name="4667">
+You can use this method to satisfy the EOEditingContext's fetch request from a local cache.
+</a></td></tr>
+<tr><td scope="row"><a name="6215">
+databaseContext<br>DidFetchObjects
+</a></td><td><a name="4669">
+databaseContext:<br>didFetchObjects:<br>fetchSpecification:<br>editingContext:
+</a></td><td><a name="4671">
+This method is invoked after an EODatabaseContext fetches objects. You can use this method to record in a local cache the results of a fetch.
+</a></td></tr>
+
+</Table>
+
+<Table>
+<tr><td scope="row">
+</Table>
+<p>
+</a><a name="6547">
+With respect to locking, note that in addition to setting an overall locking strategy, you can take advantage of EODatabaseContext's "on demand" locking feature to lock individual rows. For more information, see<a href="BehindSc3.html#7166"> "Locking and Update Strategies"</a>.<p>
+</a><a name="6262">
+An EODatabaseContext also posts notifications that your objects can receive and react to. 
+<Table Border="3">
+<caption></caption>
+<tr><th colspan=2 rowspan=1><a name="4718">
+EODatabaseContext Notifications
+</a></th></tr>
+<tr><th><a name="4710">
+Notification
+</a></th><th><a name="4712">
+Description
+</a></th></tr>
+<tr><td scope="row"><a name="4714">
+DatabaseChannelNeededNotification (EODatabaseChannelNeededNotification in Objective-C)
+</a></td><td><a name="4716">
+This notification is broadcast whenever an EODatabaseContext is asked to perform an object store operation and it doesn't have an available EODatabaseChannel. Subscribers can create a new channel and add it to the EODatabaseContext at this time. 
+</a></td></tr>
+
+</Table>
+
+<Table>
+<tr><td scope="row">
+</Table>
+<p>
+</a><a name="6273">
+<h2> Inside EODatabaseChannel</h2>
+</a><a name="6279">
+In <strong>fetchObject</strong>, an EODatabaseChannel performs several tasks:<p>
+</a><ol>
+<a name="252">
+<P><li>Before anything else can be done, the EODatabaseChannel must read some data from the database. It does so by having its EOAdaptorChannel retrieve a record for the EOEntity being fetched, including the primary key, class properties, attributes used for locking, and any foreign keys used by EORelationships.
+</a><a name="212">
+<P><li>The first thing the database channel does with the fetched record is to get an EOGlobalID for it from the EOEntity by invoking <strong>globalIDForRow</strong> (<strong>globalIDForRow:</strong> in Objective-C).
+</a><a name="3239">
+<P><li>The EODatabaseChannel records a snapshot for the fetched row. This step can be fairly complicated, as there may already be a snapshot recorded under the globalID. If there isn't, the EODatabase object is simply sent a <strong>recordSnapshotForGlobalID </strong>message (<strong>recordSnapshot:forGlobalID:</strong> in Objective-C). If there is a snapshot, however, a decision must be made on how to update the recorded snapshot. You can use the EODatabaseContext delegate method <strong>databaseContextShouldUpdateCurrentSnapshot </strong>to intervene at this point<strong> </strong>(in Objective-C, <strong>databaseContext: shouldUpdateCurrentSnapshot:newSnapshot:globalID: databaseChannel:</strong>).
+</a><a name="3253">
+<p>If the fetch specification is set to refresh refetched objects, an ObjectsChangedInStoreNotification (EOObjectsChangedInStoreNotification in Objective-C) is posted to invalidate (refault) any existing instances corresponding to this globalID.<p>
+</a><a name="3240">
+<P><li>The database channel records whether the object was locked when it was selected.
+</a><a name="770">
+<P><li>The database channel then checks with the editing context, using <strong>objectForGlobalID</strong> (<strong>objectForGlobalID:</strong> in Objective-C), to see whether a copy of the object already exists in that context.
+</a><a name="3243">
+<P><li>If the editing context already has an enterprise object for the global ID-and if it isn't a fault-then it's simply returned; otherwise it returns <strong>null</strong> (<strong>nil</strong> in Objective-C).
+</a><a name="6393">
+<P><li>If the editing context has no object or fault for the globalID, the database channel invokes the EOEntityClassDescription method <strong>createInstanceWithEditingContext</strong> (<strong>createInstanceWithEditingContext:globalID:zone:</strong> in Objective-C).This method finds out what the object's class should be from the EOEntity and creates an object of that class.
+</a><a name="255">
+<p>The <strong>createInstanceWithEditingContext</strong> method provides the enterprise object class's constructor with an editing context, the entity class description, and a globalID. You'll rarely need to use this information at this point, but you might choose to if, for example, you need to extract the primary key from the globalID to &#32;do some processing on it.<p>
+</a><a name="6438">
+<p>Note that in Objective-C, the entity class description creates objects and initializes them with the method <strong>initWithEditingContext:classDescription:globalID:</strong>, if it exists (it uses <strong>init</strong> otherwise). Your enterprise object class can implement <strong>initWithEditingContext:classDescription:globalID:</strong> instead of simply <strong>init</strong> if you need to do anything with the object's editing context, class description, or globalID at this stage in the process. <p>
+</a><a name="6441">
+<P><li>The database channel invokes the editing context's <strong>recordObject</strong> method (<strong>recordObject:globalID:</strong> in Objective-C), in which the newly created object gets uniqued.
+</a><a name="6461">
+<P><li>If the editing context has a fault for the globalID, the fault is cleared and initialization proceeds just as if an empty enterprise object had been created and registered.
+</a><a name="6477">
+<P><li>To initialize the object, database channel sends the editing context an <strong>initializeObject</strong> message (<strong>initializeObject:withGlobalID:editingContext:</strong> in Objective-C), which is passed down the object store hierarchy. If the editing context is nested, it passes the message to its parent EOEditingContext. If the parent EOEditingContext has an object with a matching globalID, that object is used to initialize the child object. Otherwise, the message is passed down to the EODatabaseContext, which initializes the new instance from the appropriate snapshot and creates faults for its relationships. The EODatabaseContext's <strong>initializeObject</strong> method sets the object's properties using the key-value coding method <strong>takeStoredValueForKey</strong> (<strong>takeStoredValue:forKey:</strong> in Objective-C).
+</a><a name="254">
+<P><li>The database channel sends the enterprise object an <strong>awakeFromFetch</strong> message (<strong>awakeFromFetchInEditingContext:</strong> in Objective-C). Custom enterprise object classes can override this method to perform additional initialization after an object has been created from a database row and initialized from database values.
+</a><a name="253">
+<p>Your custom enterprise object classes can also implement the method <strong>awakeFromInsertion</strong> (<strong>awakeFromInsertionInEditingContext:</strong> in Objective-C), which is invoked immediately after your application creates a new object and inserts it into an EOEditingContext. This method lets you assign values to newly created enterprise objects. For more discussion of this topic, see the chapter<a href="EOsI.html#14081"> "Designing Enterprise Objects"</a>.<p>
+</a></ol>
+<a name="6560">
+<h3> Customizing Framework Behavior</h3>
+</a><a name="4805">
+At this stage in the fetching process, you can intervene during step 5 above by assigning a delegate to the EODatabaseContext and implementing any of the following methods. 
+<Table Border="3">
+<caption></caption>
+<tr><th><a name="6525">
+Java Method
+</a></th><th><a name="4808">
+Objective-C Method
+</a></th><th><a name="4810">
+Description
+</a></th></tr>
+<tr><td scope="row"><a name="6527">
+databaseContext<br>FailedToFetchObject
+</a></td><td><a name="4812">
+databaseContext:<br>failedToFetchObject:<br>globalID:
+</a></td><td><a name="4814">
+This method is invoked when a to-one fault can't find its data in the database. This often occurs due to referential integrity problems in the database. You can use this method to intervene and take appropriate action (for example, by displaying an alert panel or initializing a fault object with new values).
+</a></td></tr>
+<tr><td scope="row"><a name="6529">
+databaseContext<br>ShouldLockObject<br>WithGlobalID
+</a></td><td><a name="4816">
+databaseContext:<br>shouldLockObject<br>WithGlobalID:<br>snapshot:
+</a></td><td><a name="4819">
+This method is invoked from lockObjectWithGlobalID:editingContext:. You can use this method to implement your own locking procedure.
+</a></td></tr>
+<tr><td scope="row"><a name="6531">
+databaseContext<br>ShouldRaiseException<br>ForLockFailure
+</a></td><td><a name="4821">
+databaseContext:<br>shouldRaiseException<br>ForLockFailure:
+</a></td><td><a name="4824">
+You can use this method to suppress an exception that occurred during an EODatabaseContext's attempt to lock an object.
+</a></td></tr>
+<tr><td scope="row"><a name="6533">
+databaseContext<br>ShouldUpdate<br>CurrentSnapshot
+</a></td><td><a name="4826">
+databaseContext:<br>shouldUpdate<br>CurrentSnapshot:<br>newSnapshot:<br>globalID:<br>databaseChannel:
+</a></td><td><a name="4829">
+This method is invoked when an EODatabaseContext already has a snapshot for a row fetched from the database. You can use this method to compare the snapshots, possibly resolve conflicts, and instruct the EODatabaseContext to use the new snapshot instead of the existing one.
+</a></td></tr>
+
+</Table>
+
+<Table>
+<tr><td scope="row">
+</Table>
+<p>
+</a><a name="974">
+<h2> Flow of Data During a Fetch</h2>
+</a><a name="416">
+The preceding sections describe what happens in Enterprise Objects Framework when you fetch objects from the database. This section describes the flow of data that occurs during a fetch.<p>
+</a><a name="412">
+<a href="BehindSc1.html#413">Figure &#32;48</a> shows how a new object gets instantiated with database data. The scenario it depicts is fetching a single, new object from the database. <p>
+</a><a name="413">
+<p><img src="BehindSc3.gif"><p>
+</a><a name="621">
+<p>Figure 48.	  Flow of Data During a Fetch<p>
+</a><a name="419">
+This process is described in greater detail below.<p>
+</a><a name="3816">
+The following sequence of events occurs when an object is fetched from the database:<p>
+</a><ol>
+<a name="411">
+<P><li>A database row is fetched as raw binary data.
+</a><a name="6623">
+<P><li>The values retrieved from the database are converted from their database-specific types to instances of standard value classes: 
+<Table Border="3">
+<caption></caption>
+<tr><th><a name="8501">
+Java Class
+</a></th><th><a name="8503">
+Objective-C Class
+</a></th><th><a name="8505">
+Type of Data
+</a></th></tr>
+<tr><td scope="row"><a name="8507">
+String
+</a></td><td><a name="8509">
+NSString
+</a></td><td><a name="8511">
+character strings
+</a></td></tr>
+<tr><td scope="row"><a name="8513">
+NSGregorianDate
+</a></td><td><a name="8515">
+NSCalendarDate
+</a></td><td><a name="8517">
+dates and times
+</a></td></tr>
+<tr><td scope="row"><a name="8519">
+Number or<br>BigDecimal (java.math)
+</a></td><td><a name="8521">
+NSNumber or NSDecimalNumber
+</a></td><td><a name="8523">
+numbers
+</a></td></tr>
+<tr><td scope="row"><a name="8525">
+NSData
+</a></td><td><a name="8527">
+NSData
+</a></td><td><a name="8529">
+arbitrary binary data (BLOBs)
+</a></td></tr>
+
+</Table>
+
+<Table>
+<tr><td>
+</Table>
+
+</a><a name="6715">
+<p>NULL values in the database are mapped to instances of EONullValue (EONull in Objective-C).<p>
+</a><a name="6712">
+<p>Additionally, you can map external data types to custom value classes defined by your application. For more discussion of this subject, see the chapter<a href="EOsII.html#14046"> "Advanced Enterprise Object Modeling"</a>.<p>
+</a><a name="428">
+<P><li>Once the data has been converted to objects, these objects are put in an NSDictionary. The elements of the dictionary correspond to columns (attributes) in the database table: Their names are the names of the attributes as used by the client application, and their values are the values in the database. The EOModel is used to determine the mapping from external (database) data types to internal (Objective-C) types.
+</a><a name="429">
+<p>The dictionary provides a snapshot of the database row, and it's later used to initialize the enterprise object. The snapshot also comes into play when changes to the object are saved to the database; for more discussion of this topic see the section<a href="BehindSc1.html#256"> "Snapshots"</a>.<p>
+</a><a name="975">
+<p>The EOModel, which is used to convert database data to objects, is also used when a newly allocated enterprise object is initialized. Whereas the dictionary contains an entry for each of the row's columns (those returned by sending <strong>attributesToFetch</strong> to an EOEntity), the enterprise object initialized from the dictionary only contains the attributes that are defined in the EOModel as class properties.<p>
+</a><a name="623">
+<P><li>A new enterprise object is allocated by EOEntityClassDescription as an object of the Employee class, as determined from the EOModel.
+</a><a name="624">
+<P><li>The enterprise object is initialized from a row snapshot, using the EOModel. Only objects that are class properties are included.
+</a><a name="6724">
+<p>When an enterprise object is initialized, EONullValue objects (or EONull objects in Objective-C) are passed to the object as <strong>null</strong> (<strong>nil</strong> in Objective-C) so you don't have to write code to handle NULLs.<p>
+</a><a name="6730">
+<p>Also, relationship references are initialized for any relationship properties defined in the EOModel. For example, an Employee object might have a reference to the employee's department, which in database terms represents a join between the EMPLOYEE and DEPARTMENT tables. Class properties that are relationships are represented in the object graph as faults until they're accessed.<p>
+</a></ol>
+<a name="417">
+<h2> Uniquing, Snapshots, and Faults</h2>
+</a><a name="773">
+When you fetch objects in an Enterprise Objects Framework application, the Framework has mechanisms for ensuring that the integrity of the fetched data is maintained. To this end, the Framework implements these features:<p>
+</a><ul><a name="774">
+<p><li>Uniquing
+</a><a name="777">
+<p>Enterprise Objects Framework maintains the mapping of each enterprise object to its corresponding database row, and uses this information to ensure that your object graph does not have two (possibly inconsistent) objects for the same database row. <p>
+</a><a name="775">
+<p><li>Snapshots
+</a><a name="778">
+<p>When objects are fetched, Enterprise Objects Framework records the state of the corresponding database row. This information is used when changes are saved back out to the database to ensure that the row data has not been changed by someone else since it was last fetched. The information is also used to only update attributes that have changed, rather than all of them.<p>
+</a><a name="776">
+<p><li>Faults
+</a><a name="779">
+<p>The objects at the destination of a fetched object's relationships are only fetched on demand; however, these objects are represented in your application by stand-in objects called <em>faults</em> to make retrieval of the actual objects easier.<p>
+</a></ul><a name="780">
+These topics are discussed in more detail in the following sections.<p>
+</a><a name="251">
+<h3> Uniquing</h3>
+</a><a name="727">
+In marrying relational databases to object-oriented programming, one of the key requirements is that a row in the database be associated with only one enterprise object in a given context in your application. Uniquing of enterprise objects limits memory usage and allows you to know with confidence that the object you're interacting with represents the true state of its associated row as it was last fetched into the object graph.<p>
+</a><a name="728">
+Without uniquing, you'd get a new enterprise object every time you fetch its corresponding row, whether explicitly or through resolution of relationships. This is illustrated in <a href="BehindSc1.html#729">Figure &#32;49</a>.<p>
+</a><a name="729">
+<p><img src="BehindSc1.gif"><p>
+</a><a name="730">
+<p>Figure 49.	  Uniquing of Enterprise Objects<p>
+</a><a name="736">
+Uniquing occurs in the control layer, and it's based on an object's globalID. A globalID consists of an object's primary key and its associated entity. When a row is fetched to create an object in a particular EOEditingContext, its globalID is checked against the objects already in &#32;the EOEditingContext. If a match is found, the newly fetched object isn't added to the context.<p>
+</a><a name="737">
+A single enterprise object instance exists in one and only one EOEditingContext, but multiple copies of an object can exist in different editing contexts. In other words, object uniquing is scoped to a particular editing context.<p>
+</a><a name="256">
+<h3> Snapshots</h3>
+</a><a name="732">
+When an EODatabaseContext fetches objects from the database, it asks its EODatabase to record a <em>snapshot</em> of the state of the corresponding database row. <p>
+</a><a name="7896">
+A snapshot is a dictionary object recording a row's primary key, class properties, foreign keys for class property relationships, and the attributes of that object that are used for locking during an update. (Primary keys and attributes used for locking are defined in a model; see the book <em>Enterprise Objects Framework Tools and Techniques</em>.) A snapshot is recorded under the globalID of its enterprise object whenever the object is fetched or modified.<p>
+</a><a name="738">
+When changes to an object are saved to the database, the snapshot is compared with the corresponding database row to ensure that the row data hasn't changed since the object was last fetched. For a discussion of how this relates to the update strategy you set for your application, see the section <a href="BehindSc3.html#7166"> "Locking and Update Strategies"</a>.<p>
+</a><a name="733">
+For more information on snapshots, see the EODatabaseContext class specification in the <em>Enterprise Objects Framework Reference</em>.<p>
+</a><a name="222">
+<h3> Faults</h3>
+</a><a name="221">
+One of the most powerful and useful features of the Framework's database level is that it automatically resolves the relationships defined in a model. It does so by delaying the actual retrieval of data-and communication with the database-until the data is needed. This delayed resolution of relationships occurs in two stages: the creation of a placeholder object for the data to be fetched, and the fetching of that data only when it's needed.<p>
+</a><a name="744">
+When the database level fetches an object, it examines the relationships defined in the model and creates objects representing the destinations of the fetched object's relationships. For example, if you fetch an employee object, you can ask for its manager and immediately receive an object; you don't have to get the manager's employee ID from the object you just fetched and fetch the manager yourself.<p>
+</a><a name="745">
+The database level doesn't immediately fetch data for the destination objects of relationships, however. Fetching is fairly expensive, and further, if the database level fetched objects related to the one explicitly asked for, it would also have to fetch the objects related to those, and so on, until all of the interrelated rows in the database had been retrieved. To avoid this waste of time and resources, the destination objects created are stand-ins, or <em>faults</em>.<p>
+</a><a name="6766">
+Faults come in two varieties: single-object faults for to-one relationships, and array faults for to-many relationships. In Java, a single-object fault is merely a partially initialized enterprise object. It's been created with a constructor of the form:<p>
+</a><pre><a name="6746">public MyCustomEO (<br>
+	EOEditingContext &#32;anEOEditingContext,<br>
+	EOClassDescription &#32;anEOClassDescription,<br>
+	EOGlobalID &#32;anEOGlobalID)
+</a></pre><a name="6742">
+and so is already associated with a particular editing context, a class description, and a globalID. However, the object's data hasn't yet been fetched from the database. This part of the object's initialization is delayed until the object receives a message which requires it to fetch its data.<p>
+</a><a name="6749">
+In Objective-C on the other hand, single-object faults are objects of a special class (EOFault) whose instances transform themselves into actual enterprise objects-and fetch their data-the first time they're accessed. These Objective-C faults occupies the same amount of memory as an instance of the target class (into which it's eventually transformed), and stores the information needed to retrieve the data associated with the fault (the source globalID and relationship name). A fault object thus consumes about as much memory as an empty instance of its target class.<p>
+</a><a name="746">
+An Objective-C fault behaves in every way possible as an instance of its target class until it receives a message it can't cover for. For example, if you fetch an Employee object and ask for its manager, you get a fault object representing another Employee object. If you send a <strong>class</strong> message to this fault object, it returns the Employee class. If you send the &#32;fault object a message requesting the value of an attribute, such as <strong>lastName</strong>, however, it uses the EODatabaseContext that created it to retrieve its data from the database, overwrites its class identity, and invokes the target class's implementation of <strong>lastName</strong>.<p>
+</a><a name="3135">
+<a href="BehindSc1.html#3150">Figure &#32;50</a> illustrates this process. <p>
+</a><a name="3150">
+<p><img src="BehindSc2.gif"><p>
+</a><a name="3152">
+<p>Figure 50.	  Resolution of a Fault Object<p>
+</a><a name="6780">
+Array faults are treated similarly by both languages. They behave as instances of the NSMutableArray class, and are triggered to fetch their objects by any request for a member object or for the number of objects in the array (the number of objects for a to-many relationship can't be determined without actually fetching them all).<p>
+</a><a name="277">
+For more information on faults, see the EOFaulting interface specification (Java only), the EOFault class specification (Objective-C only), and the EOFaultHandler class specification (or both languages) in &#32;the <em>Enterprise Objects Framework Reference</em>.<p>
+</a><a name="748">
+ Uniquing and Faults<p>
+</a><a name="734">
+When an EODatabaseChannel constructs a fault for a to-one relationship, it checks the globalID for the destination to see whether that object already exists in the EOEditingContext. If so, it simply uses that object to immediately resolve the relationship. This preserves the uniqueness requirement for enterprise objects, in that there's never more than one <strong>globalID</strong> representing the same row in the database. Whether that <strong>globalID</strong> represents an actual enterprise object or a fault doesn't matter, since the data will be fetched when it's needed.<p>
+</a><a name="735">
+Similarly, if an EODatabaseChannel fetches data for an object that's already been created as a fault, the EODatabaseChannel <em>fires</em> the fault. In &#32;Java, this simply means that it finishes initializing the object with the data it's fetched. In Objective-C, this means that the database channel turns the fault into an instance of its target class, <em>without changing its id</em>, and then initializes the resulting enterprise object. In either case, the process is essentially the same whether you fetch the fault's data or whether the fault fetches the data itself upon being sent a message.<p>
+</a>
+<P>
+ 
+<a href="BehindSc.html"><IMG SRC="ArrowUp.gif">Table of Contents</a> <a href="BehindSc2.html"><IMG SRC="ArrowRight.gif">Next Section</a>
+<P>
+
+
+<!--start of footer -->
+<!--#include virtual="/includes/framesetfooter" -->
+<!-- end of footer -->
+
+</body>
+</html>

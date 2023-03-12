@@ -1,0 +1,256 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML EXPERIMENTAL 970324//EN">
+<HTML>
+<HEAD>
+<META NAME="GENERATOR" CONTENT="Adobe FrameMaker 5.5/HTML Export Filter">
+<LINK REL="STYLESHEET" HREF="Optimistic_Locking.css">
+<TITLE> </TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+<!--start of banner -->
+<!--#include virtual="/includes/framesetheader" -->
+<!-- end of banner -->
+<!--start of path -->
+<font face="Geneva,Helvetica,Arial" size="1">
+<b>PATH<spacer type="horizontal" size="5">&nbsp;</b>
+ <a href="../../../../../webobjects.html" target="_top">WebObjects 4.0 Documentation</a> <b>&gt;</b>
+ <a href="TopicsTOC.html" target="_top">WebObjects Programming Topics</a>
+</font>
+<br><br>
+<!--end of path -->
+
+
+<H1 CLASS="TopictTitleTOC">
+Optimistic Locking
+</H1>
+<DIV>
+<H2 CLASS="Synopsis">
+<A NAME="pgfId=606101">
+ </A>
+Synopsis<DIV>
+<IMG SRC="Optimistic_Locking-1.gif">
+</DIV>
+</H2>
+<P CLASS="Body">
+<A NAME="pgfId=606102">
+ </A>
+Describes optimistic locking.</P>
+</DIV>
+<DIV>
+<H2 CLASS="Heading1">
+<A NAME="pgfId=606103">
+ </A>
+Discussion<DIV>
+<IMG SRC="Optimistic_Locking-1.gif">
+</DIV>
+</H2>
+<P CLASS="Body">
+<A NAME="pgfId=614354">
+ </A>
+The default locking mechanism in the Enterprise Objects Framework is optimistic locking. Optimistic locking stores a snapshot of a database row as it is fetched. When EOF updates the record, it appends a qualifier to the update statement that ensures that the record will be updated only if none of the locking columns has been modified.</P>
+<P CLASS="Body">
+<A NAME="pgfId=606104">
+ </A>
+The only thing that you must do to support optimistic locking is to select an attribute's locking column in EOModeler. When the column is selected, a small lock icon appears in it. (This column is selected by default, so if you haven't unselected that column, you are using optimistic locking.)</P>
+<P CLASS="Body">
+<A NAME="pgfId=606106">
+ </A>
+As an example of optimistic locking in action, suppose you are updating the name of a Talent object from the Movies EOModel from &quot;John Doe&quot; to &quot;Joe Doe&quot;. The Talent entity has optimistic locking enabled on all of its three columns (firstName, lastName, and talentID). When EOF updates the record, it creates a qualifier that ensures that none of those columns has been updated. The SQL statement looks something like the following:</P>
+<DIV>
+<pre>update TALENT set FIRST_NAME = `Joe' where TALENT_ID = `123' and FIRST_NAME = `John' and LAST_NAME = `Doe';</pre></DIV>
+<A NAME="pgfId=606107">
+ </A>
+<P CLASS="Body">
+<A NAME="pgfId=606108">
+ </A>
+By adding the first and last names prior to the change as part of the qualifier, this update only succeeds if no one else has modified this record. This mechanism ensures that two users will not overwrite one another's updates.</P>
+<DIV>
+<H4 CLASS="Heading2">
+<A NAME="pgfId=606109">
+ </A>
+Lock on Some or All Columns?</H4>
+<P CLASS="Body">
+<A NAME="pgfId=606110">
+ </A>
+You can specify optimistic locking on some or all columns of an entity. If you select locking on every column, all updates will fail if someone else has modified the record. However, if you know that a column will never be updated then there is no reason to lock on it. Either approach is easy and requires no additional database-table space. However, they both have disadvantages:</P>
+<UL>
+<P CLASS="Bulleted">
+<A NAME="pgfId=606115">
+ </A>
+&#183;	Locking on all columns causes complex where clauses because EOF includes all previous values in the update's qualifier; these large where clauses could slow down your database. Locking on some columns, of course, mitigates this problem, but you can still have large where clauses.</P>
+<P CLASS="Bulleted">
+<A NAME="pgfId=606116">
+ </A>
+&#183;	Some <EM CLASS="Code">
+BLOB</EM>
+ data types (such as Oracle's RAW) may not be used as part of the qualifier. If you have an Oracle table with a primary key and a single <EM CLASS="Code">
+LONG RAW</EM>
+ column, you cannot use this method of locking.</P>
+</UL>
+</DIV>
+<DIV>
+<H4 CLASS="Heading2">
+<A NAME="pgfId=606126">
+ </A>
+<A NAME="19641">
+ </A>
+Using a Single Locking Column</H4>
+<P CLASS="Body">
+<A NAME="pgfId=614429">
+ </A>
+If you want to trim the where clauses for updates, you can add a single class attribute whose value always changes during an update. Then set that attribute in EOModeler as the only one used for locking. When EOF updates the record, the only extra qualifier added is for this locking attribute. This approach has several advantages:</P>
+<UL>
+<P CLASS="Bulleted">
+<A NAME="pgfId=606129">
+ </A>
+&#183;	It creates simpler and faster qualifiers. And by using this mechanism, you always know what the update qualifier looks like. With this information you can create a compound index between the locking attribute and the primary key of the table.</P>
+<P CLASS="Bulleted">
+<A NAME="pgfId=606130">
+ </A>
+&#183;	This technique can be used with tables that have <EM CLASS="Code">
+BLOB</EM>
+ columns.</P>
+<P CLASS="Bulleted">
+<A NAME="pgfId=614456">
+ </A>
+&#183;	It requires no extra database-table space.</P>
+</UL>
+<P CLASS="Body">
+<A NAME="pgfId=606132">
+ </A>
+However, this technique is harder then standard optimistic locking. You must figure out a way to update the locking attribute when the object is changed (such as overriding the <EM CLASS="Code">
+willChange</EM>
+ method or by catching the EOObjectsChangedInEditingContextNotification).</P>
+</DIV>
+<DIV>
+<H4 CLASS="Heading2">
+<A NAME="pgfId=606134">
+ </A>
+Using a Single Locking Column with Database Trigger</H4>
+<P CLASS="Body">
+<A NAME="pgfId=606135">
+ </A>
+You can use a technique similar to the one described in &quot;<A HREF="Optimistic_Locking.html#19641" CLASS="XRef">
+See Using a Single Locking Column.</A>
+&quot; but this time use a database-insert trigger to modify the locking attribute. (Note that triggers are specific to certain database.) You simply use an insert trigger to modify the locking attribute. The attribute should still be the only column that is selected for locking, but it should not be a class attribute.</P>
+<P CLASS="Body">
+<A NAME="pgfId=614538">
+ </A>
+As with the technique for using a single locking column, this one can be used with tables that have <EM CLASS="Code">
+BLOB</EM>
+ columns and it requires no extra database-table space. It also creates simpler and faster qualifiers. This mechanism also allows you to know what the updates qualifier will look like and thus you can create a compound index between the locking column and the primary key of the table.</P>
+<P CLASS="Body">
+<A NAME="pgfId=606140">
+ </A>
+As with the technique described in &quot;<A HREF="Optimistic_Locking.html#19641" CLASS="XRef">
+See Using a Single Locking Column.</A>
+,&quot; you must figure out a way to update the locking column when the object is changed (such as overriding the <EM CLASS="Code">
+willChange</EM>
+ method or by catching the <EM CLASS="Code">
+EOObjectsChangedInEditingContextNotification</EM>
+).</P>
+</DIV>
+</DIV>
+<DIV>
+<H2 CLASS="Heading1">
+<A NAME="pgfId=606143">
+ </A>
+See Also<DIV>
+<IMG SRC="Optimistic_Locking-1.gif">
+</DIV>
+</H2>
+<UL>
+<P CLASS="Bulleted">
+<A NAME="pgfId=606144">
+ </A>
+&#183;	Choosing an Approach for Locking</P>
+<P CLASS="Bulleted">
+<A NAME="pgfId=606145">
+ </A>
+&#183;	Pessimistic Locking</P>
+<P CLASS="Bulleted">
+<A NAME="pgfId=606146">
+ </A>
+&#183;	Locking on a Column</P>
+</UL>
+</DIV>
+<DIV>
+<H2 CLASS="Heading1">
+<A NAME="pgfId=606149">
+ </A>
+Questions<DIV>
+<IMG SRC="Optimistic_Locking-1.gif">
+</DIV>
+</H2>
+<UL>
+<P CLASS="Bulleted">
+<A NAME="pgfId=606150">
+ </A>
+&#183;		What is optimistic locking?</P>
+<P CLASS="Bulleted">
+<A NAME="pgfId=606151">
+ </A>
+&#183;		How can I prevent users from overwriting the work of others?</P>
+<P CLASS="Bulleted">
+<A NAME="pgfId=614688">
+ </A>
+&#183;	Which columns should I lock on?</P>
+</UL>
+</DIV>
+<DIV>
+<H2 CLASS="Heading1">
+<A NAME="pgfId=606152">
+ </A>
+Keywords<DIV>
+<IMG SRC="Optimistic_Locking-1.gif">
+</DIV>
+</H2>
+<UL>
+<P CLASS="Bulleted">
+<A NAME="pgfId=606153">
+ </A>
+&#183;	Locking</P>
+<P CLASS="Bulleted">
+<A NAME="pgfId=606154">
+ </A>
+&#183;	Optimistic Locking</P>
+<P CLASS="Bulleted">
+<A NAME="pgfId=614687">
+ </A>
+&#183;	Snapshot</P>
+</UL>
+</DIV>
+<DIV>
+<H2 CLASS="Heading1">
+<A NAME="pgfId=606155">
+ </A>
+Revision History<DIV>
+<IMG SRC="Optimistic_Locking-1.gif">
+</DIV>
+</H2>
+<P CLASS="Body">
+<A NAME="pgfId=606156">
+ </A>
+14 July, 1998. Paul Haddad. First Draft.</P>
+<P CLASS="Body">
+<A NAME="pgfId=614686">
+ </A>
+18 November, 1998. Terry Donoghue. Second Draft.</P>
+<DIV>
+<H5 CLASS="Body-Text">
+<A NAME="pgfId=606157">
+ </A>
+&nbsp;</H5>
+<DIV>
+<pre></pre></DIV>
+<A NAME="pgfId=602450">
+ </A>
+</DIV>
+</DIV>
+
+
+<!--start of footer -->
+<!--#include virtual="/includes/framesetfooter" -->
+<!-- end of footer -->
+
+</body>
+</HTML>

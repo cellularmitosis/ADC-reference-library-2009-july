@@ -1,0 +1,113 @@
+<html><head><title>Application Configurations</title></head>
+<body bgcolor="#ffffff">
+
+<!--start of banner -->
+<!--#include virtual="/includes/framesetheader" -->
+<!-- end of banner -->
+
+<!--start of path -->
+<font face="Geneva,Helvetica,Arial" size="1">
+<b>PATH<spacer type="horizontal" size="5">&nbsp;</b>
+ <a href="../../../../../webobjects.html" target="_top">WebObjects 4.0 Documentation</a> <b>&gt;</b>
+ <a href="GuideTOC.html" target="_top">EOF Developer's Guide</a>
+</font>
+<br><br>
+<!--end of path -->
+
+ 
+<a href="AppConfs.html"><IMG SRC="ArrowUp.gif">Table of Contents</a> <a href="AppConfs1.html"><IMG SRC="ArrowLeft.gif">Previous Section</a>
+ 
+<a name="3833">
+<h1> Non-Graphical User Interface Applications</h1>
+</a><a name="3835">
+Command line tools, background processes, and other non-graphical user &#32;interface applications have a very similar configuration to that of applications with an interface. However, they don't use display groups, and they typically don't use EODatabaseDataSources either.<p>
+</a><a name="3838">
+<p><img src="AppConfs7.gif"><p>
+</a><a name="3840">
+<p>Figure 37.	  Typical Configuration of a Non-Graphical-User-Interface Application<p>
+</a><a name="3842">
+In an application that doesn't have a graphical user interface, your code &#32;must initiate the creation of the network of the behind-the-scenes objects. This creation process is typically begun when you allocate and initialize an EOEditingContext.<p>
+</a><a name="3844">
+<h2> Creating an Editing Context</h2>
+</a><a name="3846">
+You create an EOEditingContext the same way you'd create any other object:<p>
+</a><a name="14278">
+In Java:<p>
+</a><pre><a name="14284">EOEditingContext editingContext = new EOEditingContext();
+</a></pre><a name="14279">
+In Objective-C:<p>
+</a><pre><a name="3848">EOEditingContext *editingContext =<br>
+		[[EOEditingContext alloc] init];
+</a></pre><a name="5897">
+Both of the examples above create a new editing context and connect it &#32;to &#32;an EOObjectStoreCoordinator. By default, the editing context is &#32;connected to the default object store coordinator as determined by &#32;EOObjectStoreCoordinator's <strong>defaultCoordinator</strong> static method (class &#32;method in Objective-C).<p>
+</a><a name="3859">
+<p><img src="AppConfs8.gif"><p>
+</a><a name="3861">
+<p>Figure 38.	  Allocating and Initializing an EOEditingContext<p>
+</a><a name="3863">
+The first time <strong>defaultCoordinator</strong> is invoked, it creates an EOObjectStoreCoordinator. Subsequent invocations return the same instance. Consequently, all the editing contexts in an application are connected to EODatabaseContext objects through the same EOObjectStoreCoordinator by default.<p>
+</a><a name="3865">
+The remaining objects in the network are created on demand. When a database operation is initiated with a message to an editing context, the request is passed on to its object store coordinator. In the case of a nested editing context configuration, the message is passed down the object network until reaches the editing context's root object store-usually an &#32;EOObjectStoreCoordinator.<p>
+</a><a name="3871">
+For example, an <strong>objectsWithFetchSpecification</strong> message sent to an EOEditingContext percolates through its parent object stores until it &#32;reaches the coordinator as shown in <a href="AppConfs2.html#3874">Figure &#32;39</a>.<p>
+</a><a name="3874">
+<p><img src="AppConfs1.gif"><p>
+</a><a name="3876">
+<p>Figure 39.	  How Messages Percolate Down to an EOObjectStoreCoordinator<p>
+</a><a name="3880">
+<h2> Inside &#32;EOObjectStoreCoordinator</h2>
+</a><a name="3882">
+When an EOObjectStoreCoordinator receives a message requiring interaction with the database, it attempts to locate an EOCooperatingObjectStore-usually an EODatabaseContext-that can &#32;handle the request. The coordinator generally builds its list of cooperating stores on demand as follows:<p>
+</a><ol>
+<a name="3884">
+<P><li>When a coordinator needs to forward a request to a database, it checks to see if it has an cooperating stores in its list that can handle the interaction. If it finds one, it uses it.
+</a><a name="3886">
+<P><li>If the coordinator does not have a cooperating store to handle the &#32;interaction (either because none of its cooperating stores can handle this specific database request or because the coordinator doesn't have any cooperating stores), it posts a CooperatingObjectStoreNeeded notification (EOCooperatingObjectStoreNeeded in Objective-C) so that another object can register a new cooperating store. After posting the notification, the coordinator checks its list of cooperating stores a second time. If it finds an available store (because an object registered a new one in response to the notification), it uses the newly registered store.
+</a><a name="3888">
+<p>In a typical Enterprise Objects Framework application, an &#32;EOObjectStoreCoordinator's cooperating stores are EODatabaseContexts. The EODatabaseContext class registers for the CooperatingObjectStoreNeeded notification, and provides the coordinator with a new database context that can accommodate the request. Consequently, you don't have to provide cooperating stores to a coordinator yourself unless you're using a subclass of EOCooperatingObjectStore that isn't an EODatabaseContext.<p>
+</a><a name="3890">
+<P><li>Once the coordinator has a cooperating store to use, it forwards the request to the store.
+</a></ol>
+<a name="3892">
+<B>Note: </B> In the case of an application with a graphical user interface, an &#32;EODatabaseDataSource generally forces a connection to an EOCooperatingObjectStore when it's unarchived from a nib or component. Thus, the EOObjectStoreCoordinator may never post a &#32;CooperatingObjectStoreNeeded notification.<p>
+</a><a name="3899">
+<h2> Inside &#32;EODatabaseContext</h2>
+</a><a name="3901">
+An EODatabaseContext performs a database operation using an EODatabaseChannel. When a database context receives a message that requires database interaction (such as <strong>objectsWithFetchSpecification</strong>), it attempts to obtain a channel to perform the corresponding database operation as follows:	<p>
+</a><ol>
+<a name="3903">
+<P><li>If the database context has a registered channel that isn't busy (that &#32;is, a channel that doesn't have a fetch in progress), it uses the &#32;available channel.
+</a><a name="3905">
+<P><li>If the EODatabaseContext doesn't have an available channel (either because all the channels are busy or because the context doesn't have any channels), it posts a DatabaseChannelNeededNotification (EODatabaseChannelNeededNotification in Objective-C) so that &#32;another object can register a new channel. After posting the notification, the context checks its list of registered channels a second time. If it finds an available channel (because an object registered a new channel), it uses the newly registered channel.
+</a><a name="3907">
+<P><li>If the database context doesn't have any registered channels after posting a DatabaseChannelNeededNotification, it creates one, puts it in its list of registered channels, and uses the new channel to &#32;perform the database operation.
+</a></ol>
+<a name="3909">
+<B>Note: </B> By default, an EODatabaseContext has one EODatabaseChannel, but you can register additional channels programmatically. For more information, see the chapter<a href="Connect.html#6371"> "Connecting to a Database"</a>.<p>
+</a><a name="7751">
+<h2> Substituting a Custom EOCooperatingObjectStore</h2>
+</a><a name="7758">
+There are two approaches to providing a custom EOCooperatingObjectStore to an EOObjectStoreCoordinator:<p>
+</a><ul><a name="7759">
+<p><li>Tell EODatabaseContext what class to register.
+</a><a name="7760">
+<p>If the EOCooperatingObjectStore is a subclass of EODatabaseContext, you can simply tell EODatabaseContext to register instances of the subclass instead of EODatabaseContext instances. Use the EODatabaseContext static method <strong>setContextClassToRegister</strong> (<strong>setContextClassToRegister:</strong> class method in Objective-C) to specify your subclass.<p>
+</a><a name="7762">
+<p><li>Register the custom EOCooperatingObjectStore yourself.
+</a><a name="7763">
+<p>To register your own cooperating store, add yourself as an observer of CooperatingObjectStoreNeeded notifications. When you receive a notification, create an instance of your custom store and &#32;use the EOObjectStoreCoordinator method <strong>addCooperatingObjectStore</strong> (<strong>addCooperatingObjectStore:</strong> in Objective-C) to register your cooperating store with the coordinator. To prevent EODatabaseContext from registering competing object stores, invoke the EODatabaseContext static method <strong>setContextClassToRegister</strong> with <strong>null</strong> (<strong>nil</strong> in Objective-C) as &#32;the argument.<p>
+</a></ul><a name="7766">
+For more information, see the EODatabaseContext class specification in the <em>Enterprise Objects Framework Reference</em>.<p>
+</a>
+<P>
+ 
+<a href="AppConfs.html"><IMG SRC="ArrowUp.gif">Table of Contents</a> <a href="AppConfs3.html"><IMG SRC="ArrowRight.gif">Next Section</a>
+<P>
+
+
+<!--start of footer -->
+<!--#include virtual="/includes/framesetfooter" -->
+<!-- end of footer -->
+
+</body>
+</html>

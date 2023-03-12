@@ -1,0 +1,2821 @@
+<HTML>
+<HEAD>
+<!-- This HTML file has been created by texi2html 1.51
+     from /SourceCache/gdb/gdb-960/src/gdb/doc/gdb.texinfo on 18 May 2008 -->
+
+<TITLE>Debugging with gdb - gdb Remote Serial Protocol</TITLE>
+</HEAD>
+<BODY>
+Go to the <A HREF="gdb_1.html">first</A>, <A HREF="gdb_32.html">previous</A>, <A HREF="gdb_34.html">next</A>, <A HREF="gdb_36.html">last</A> section, <A HREF="gdb_toc.html">table of contents</A>.
+<P><HR><P>
+
+
+<H1><A NAME="SEC302" HREF="gdb_toc.html#TOC302">GDB Remote Serial Protocol</A></H1>
+
+
+
+<H2><A NAME="SEC303" HREF="gdb_toc.html#TOC303">Overview</A></H2>
+
+<P>
+There may be occasions when you need to know something about the
+protocol--for example, if there is only one serial port to your target
+machine, you might want your program to do something special if it
+recognizes a packet meant for GDB.
+
+</P>
+<P>
+In the examples below, <SAMP>`-&#62;'</SAMP> and <SAMP>`&#60;-'</SAMP> are used to indicate
+transmitted and received data respectfully.
+
+</P>
+<P>
+<A NAME="IDX1717"></A>
+<A NAME="IDX1718"></A>
+<A NAME="IDX1719"></A>
+All GDB commands and responses (other than acknowledgments) are
+sent as a <VAR>packet</VAR>.  A <VAR>packet</VAR> is introduced with the character
+<SAMP>`$'</SAMP>, the actual <VAR>packet-data</VAR>, and the terminating character
+<SAMP>`#'</SAMP> followed by a two-digit <VAR>checksum</VAR>:
+
+</P>
+
+<PRE>
+<CODE>$</CODE><VAR>packet-data</VAR><CODE>#</CODE><VAR>checksum</VAR>
+</PRE>
+
+<P>
+
+</P>
+<P>
+<A NAME="IDX1720"></A>
+The two-digit <VAR>checksum</VAR> is computed as the modulo 256 sum of all
+characters between the leading <SAMP>`$'</SAMP> and the trailing <SAMP>`#'</SAMP> (an
+eight bit unsigned checksum).
+
+</P>
+<P>
+Implementors should note that prior to GDB 5.0 the protocol
+specification also included an optional two-digit <VAR>sequence-id</VAR>:
+
+</P>
+
+<PRE>
+<CODE>$</CODE><VAR>sequence-id</VAR><CODE>:</CODE><VAR>packet-data</VAR><CODE>#</CODE><VAR>checksum</VAR>
+</PRE>
+
+<P>
+<A NAME="IDX1721"></A>
+That <VAR>sequence-id</VAR> was appended to the acknowledgment.  GDB
+has never output <VAR>sequence-id</VAR>s.  Stubs that handle packets added
+since GDB 5.0 must not accept <VAR>sequence-id</VAR>.
+
+</P>
+<P>
+<A NAME="IDX1722"></A>
+When either the host or the target machine receives a packet, the first
+response expected is an acknowledgment: either <SAMP>`+'</SAMP> (to indicate
+the package was received correctly) or <SAMP>`-'</SAMP> (to request
+retransmission):
+
+</P>
+
+<PRE>
+-&#62; <CODE>$</CODE><VAR>packet-data</VAR><CODE>#</CODE><VAR>checksum</VAR>
+&#60;- <CODE>+</CODE>
+</PRE>
+
+<P>
+
+</P>
+<P>
+The host (GDB) sends <VAR>command</VAR>s, and the target (the
+debugging stub incorporated in your program) sends a <VAR>response</VAR>.  In
+the case of step and continue <VAR>command</VAR>s, the response is only sent
+when the operation has completed (the target has again stopped).
+
+</P>
+<P>
+<VAR>packet-data</VAR> consists of a sequence of characters with the
+exception of <SAMP>`#'</SAMP> and <SAMP>`$'</SAMP> (see <SAMP>`X'</SAMP> packet for additional
+exceptions).
+
+</P>
+<P>
+Fields within the packet should be separated using <SAMP>`,'</SAMP> <SAMP>`;'</SAMP> or
+<A NAME="IDX1723"></A>
+<SAMP>`:'</SAMP>.  Except where otherwise noted all numbers are represented in
+HEX with leading zeros suppressed.
+
+</P>
+<P>
+Implementors should note that prior to GDB 5.0, the character
+<SAMP>`:'</SAMP> could not appear as the third character in a packet (as it
+would potentially conflict with the <VAR>sequence-id</VAR>).
+
+</P>
+<P>
+Response <VAR>data</VAR> can be run-length encoded to save space.  A <SAMP>`*'</SAMP>
+means that the next character is an ASCII encoding giving a repeat count
+which stands for that many repetitions of the character preceding the
+<SAMP>`*'</SAMP>.  The encoding is <CODE>n+29</CODE>, yielding a printable character
+where <CODE>n &#62;=3</CODE> (which is where rle starts to win).  The printable
+characters <SAMP>`$'</SAMP>, <SAMP>`#'</SAMP>, <SAMP>`+'</SAMP> and <SAMP>`-'</SAMP> or with a numeric
+value greater than 126 should not be used.
+
+</P>
+<P>
+So:
+
+<PRE>
+"<CODE>0* </CODE>"
+</PRE>
+
+<P>
+means the same as "0000".
+
+</P>
+<P>
+The error response returned for some packets includes a two character
+error number.  That number is not well defined.
+
+</P>
+<P>
+For any <VAR>command</VAR> not supported by the stub, an empty response
+(<SAMP>`$#00'</SAMP>) should be returned.  That way it is possible to extend the
+protocol.  A newer GDB can tell if a packet is supported based
+on that response.
+
+</P>
+<P>
+A stub is required to support the <SAMP>`g'</SAMP>, <SAMP>`G'</SAMP>, <SAMP>`m'</SAMP>, <SAMP>`M'</SAMP>,
+<SAMP>`c'</SAMP>, and <SAMP>`s'</SAMP> <VAR>command</VAR>s.  All other <VAR>command</VAR>s are
+optional.
+
+</P>
+
+
+<H2><A NAME="SEC304" HREF="gdb_toc.html#TOC304">Packets</A></H2>
+
+<P>
+The following table provides a complete list of all currently defined
+<VAR>command</VAR>s and their corresponding response <VAR>data</VAR>.
+See section <A HREF="gdb_33.html#SEC309">File-I/O remote protocol extension</A>, for details about the File
+I/O extension of the remote protocol.
+
+</P>
+<DL COMPACT>
+
+<DT><CODE>!</CODE> -- extended mode
+<DD>
+<A NAME="IDX1724"></A>
+
+Enable extended mode.  In extended mode, the remote server is made
+persistent.  The <SAMP>`R'</SAMP> packet is used to restart the program being
+debugged.
+
+Reply:
+<DL COMPACT>
+
+<DT><SAMP>`OK'</SAMP>
+<DD>
+The remote target both supports and has enabled extended mode.
+</DL>
+
+<DT><CODE>?</CODE> -- last signal
+<DD>
+<A NAME="IDX1725"></A>
+
+Indicate the reason the target halted.  The reply is the same as for
+step and continue.
+
+Reply:
+See section <A HREF="gdb_33.html#SEC305">Stop Reply Packets</A>, for the reply specifications.
+
+<DT><CODE>a</CODE> -- reserved
+<DD>
+Reserved for future use.
+
+<DT><CODE>A</CODE><VAR>arglen</VAR><CODE>,</CODE><VAR>argnum</VAR><CODE>,</CODE><VAR>arg</VAR><CODE>,...</CODE> --  set program arguments <STRONG>(reserved)</STRONG>
+<DD>
+<A NAME="IDX1726"></A>
+
+Initialized <SAMP>`argv[]'</SAMP> array passed into program. <VAR>arglen</VAR>
+specifies the number of bytes in the hex encoded byte stream <VAR>arg</VAR>.
+See <CODE>gdbserver</CODE> for more details.
+
+Reply:
+<DL COMPACT>
+
+<DT><SAMP>`OK'</SAMP>
+<DD>
+<DT><SAMP>`E<VAR>NN</VAR>'</SAMP>
+<DD>
+</DL>
+
+<DT><CODE>b</CODE><VAR>baud</VAR> -- set baud <STRONG>(deprecated)</STRONG>
+<DD>
+<A NAME="IDX1727"></A>
+
+Change the serial line speed to <VAR>baud</VAR>.
+
+JTC: <EM>When does the transport layer state change?  When it's
+received, or after the ACK is transmitted.  In either case, there are
+problems if the command or the acknowledgment packet is dropped.</EM>
+
+Stan: <EM>If people really wanted to add something like this, and get
+it working for the first time, they ought to modify ser-unix.c to send
+some kind of out-of-band message to a specially-setup stub and have the
+switch happen "in between" packets, so that from remote protocol's point
+of view, nothing actually happened.</EM>
+
+<DT><CODE>B</CODE><VAR>addr</VAR>,<VAR>mode</VAR> -- set breakpoint <STRONG>(deprecated)</STRONG>
+<DD>
+<A NAME="IDX1728"></A>
+
+Set (<VAR>mode</VAR> is <SAMP>`S'</SAMP>) or clear (<VAR>mode</VAR> is <SAMP>`C'</SAMP>) a
+breakpoint at <VAR>addr</VAR>.
+
+This packet has been replaced by the <SAMP>`Z'</SAMP> and <SAMP>`z'</SAMP> packets
+(@xref{insert breakpoint or watchpoint packet}).
+
+<DT><CODE>c</CODE><VAR>addr</VAR> -- continue
+<DD>
+<A NAME="IDX1729"></A>
+
+<VAR>addr</VAR> is address to resume.  If <VAR>addr</VAR> is omitted, resume at
+current address.
+
+Reply:
+See section <A HREF="gdb_33.html#SEC305">Stop Reply Packets</A>, for the reply specifications.
+
+<DT><CODE>C</CODE><VAR>sig</VAR><CODE>;</CODE><VAR>addr</VAR> -- continue with signal
+<DD>
+<A NAME="IDX1730"></A>
+
+Continue with signal <VAR>sig</VAR> (hex signal number).  If
+<CODE>;</CODE><VAR>addr</VAR> is omitted, resume at same address.
+
+Reply:
+See section <A HREF="gdb_33.html#SEC305">Stop Reply Packets</A>, for the reply specifications.
+
+<DT><CODE>d</CODE> -- toggle debug <STRONG>(deprecated)</STRONG>
+<DD>
+<A NAME="IDX1731"></A>
+
+Toggle debug flag.
+
+<DT><CODE>D</CODE> -- detach
+<DD>
+<A NAME="IDX1732"></A>
+
+Detach GDB from the remote system.  Sent to the remote target
+before GDB disconnects via the <CODE>detach</CODE> command.
+
+Reply:
+<DL COMPACT>
+
+<DT><SAMP>`OK'</SAMP>
+<DD>
+for success
+<DT><SAMP>`E<VAR>NN</VAR>'</SAMP>
+<DD>
+for an error
+</DL>
+
+<DT><CODE>e</CODE> -- reserved
+<DD>
+Reserved for future use.
+
+<DT><CODE>E</CODE> -- reserved
+<DD>
+Reserved for future use.
+
+<DT><CODE>f</CODE> -- reserved
+<DD>
+Reserved for future use.
+
+<DT><CODE>F</CODE><VAR>RC</VAR><CODE>,</CODE><VAR>EE</VAR><CODE>,</CODE><VAR>CF</VAR><CODE>;</CODE><VAR>XX</VAR> -- Reply to target's F packet.
+<DD>
+<A NAME="IDX1733"></A>
+
+This packet is send by GDB as reply to a <CODE>F</CODE> request packet
+sent by the target.  This is part of the File-I/O protocol extension.
+See section <A HREF="gdb_33.html#SEC309">File-I/O remote protocol extension</A>, for the specification.
+
+<DT><CODE>g</CODE> -- read registers
+<DD>
+@anchor{read registers packet}
+<A NAME="IDX1734"></A>
+
+Read general registers.
+
+Reply:
+<DL COMPACT>
+
+<DT><SAMP>`<VAR>XX...</VAR>'</SAMP>
+<DD>
+Each byte of register data is described by two hex digits.  The bytes
+with the register are transmitted in target byte order.  The size of
+each register and their position within the <SAMP>`g'</SAMP> <VAR>packet</VAR> are
+determined by the GDB internal macros
+<VAR>DEPRECATED_REGISTER_RAW_SIZE</VAR> and <VAR>REGISTER_NAME</VAR> macros.  The
+specification of several standard <CODE>g</CODE> packets is specified below.
+<DT><SAMP>`E<VAR>NN</VAR>'</SAMP>
+<DD>
+for an error.
+</DL>
+
+<DT><CODE>G</CODE><VAR>XX...</VAR> -- write regs
+<DD>
+<A NAME="IDX1735"></A>
+
+@xref{read registers packet}, for a description of the <VAR>XX...</VAR>
+data.
+
+Reply:
+<DL COMPACT>
+
+<DT><SAMP>`OK'</SAMP>
+<DD>
+for success
+<DT><SAMP>`E<VAR>NN</VAR>'</SAMP>
+<DD>
+for an error
+</DL>
+
+<DT><CODE>h</CODE> -- reserved
+<DD>
+Reserved for future use.
+
+<DT><CODE>H</CODE><VAR>c</VAR><VAR>t...</VAR> -- set thread
+<DD>
+<A NAME="IDX1736"></A>
+
+Set thread for subsequent operations (<SAMP>`m'</SAMP>, <SAMP>`M'</SAMP>, <SAMP>`g'</SAMP>,
+<SAMP>`G'</SAMP>, et.al.).  <VAR>c</VAR> depends on the operation to be performed: it
+should be <SAMP>`c'</SAMP> for step and continue operations, <SAMP>`g'</SAMP> for other
+operations.  The thread designator <VAR>t...</VAR> may be -1, meaning all
+the threads, a thread number, or zero which means pick any thread.
+
+Reply:
+<DL COMPACT>
+
+<DT><SAMP>`OK'</SAMP>
+<DD>
+for success
+<DT><SAMP>`E<VAR>NN</VAR>'</SAMP>
+<DD>
+for an error
+</DL>
+
+<DT><CODE>i</CODE><VAR>addr</VAR><CODE>,</CODE><VAR>nnn</VAR> -- cycle step <STRONG>(draft)</STRONG>
+<DD>
+@anchor{cycle step packet}
+<A NAME="IDX1737"></A>
+
+Step the remote target by a single clock cycle.  If <CODE>,</CODE><VAR>nnn</VAR> is
+present, cycle step <VAR>nnn</VAR> cycles.  If <VAR>addr</VAR> is present, cycle
+step starting at that address.
+
+<DT><CODE>I</CODE> -- signal then cycle step <STRONG>(reserved)</STRONG>
+<DD>
+<A NAME="IDX1738"></A>
+
+@xref{step with signal packet}.  @xref{cycle step packet}.
+
+<DT><CODE>j</CODE> -- reserved
+<DD>
+Reserved for future use.
+
+<DT><CODE>J</CODE> -- reserved
+<DD>
+Reserved for future use.
+
+<DT><CODE>k</CODE> -- kill request
+<DD>
+<A NAME="IDX1739"></A>
+
+FIXME: <EM>There is no description of how to operate when a specific
+thread context has been selected (i.e. does 'k' kill only that
+thread?)</EM>.
+
+<DT><CODE>K</CODE> -- reserved
+<DD>
+Reserved for future use.
+
+<DT><CODE>l</CODE> -- reserved
+<DD>
+Reserved for future use.
+
+<DT><CODE>L</CODE> -- reserved
+<DD>
+Reserved for future use.
+
+<DT><CODE>m</CODE><VAR>addr</VAR><CODE>,</CODE><VAR>length</VAR> -- read memory
+<DD>
+<A NAME="IDX1740"></A>
+
+Read <VAR>length</VAR> bytes of memory starting at address <VAR>addr</VAR>.
+Neither GDB nor the stub assume that sized memory transfers are
+assumed using word aligned accesses. FIXME: <EM>A word aligned memory
+transfer mechanism is needed.</EM>
+
+Reply:
+<DL COMPACT>
+
+<DT><SAMP>`<VAR>XX...</VAR>'</SAMP>
+<DD>
+<VAR>XX...</VAR> is mem contents. Can be fewer bytes than requested if able
+to read only part of the data.  Neither GDB nor the stub assume
+that sized memory transfers are assumed using word aligned
+accesses. FIXME: <EM>A word aligned memory transfer mechanism is
+needed.</EM>
+<DT><SAMP>`E<VAR>NN</VAR>'</SAMP>
+<DD>
+<VAR>NN</VAR> is errno
+</DL>
+
+<DT><CODE>M</CODE><VAR>addr</VAR>,<VAR>length</VAR><CODE>:</CODE><VAR>XX...</VAR> -- write mem
+<DD>
+<A NAME="IDX1741"></A>
+
+Write <VAR>length</VAR> bytes of memory starting at address <VAR>addr</VAR>.
+<VAR>XX...</VAR> is the data.
+
+Reply:
+<DL COMPACT>
+
+<DT><SAMP>`OK'</SAMP>
+<DD>
+for success
+<DT><SAMP>`E<VAR>NN</VAR>'</SAMP>
+<DD>
+for an error (this includes the case where only part of the data was
+written).
+</DL>
+
+<DT><CODE>n</CODE> -- reserved
+<DD>
+Reserved for future use.
+
+<DT><CODE>N</CODE> -- reserved
+<DD>
+Reserved for future use.
+
+<DT><CODE>o</CODE> -- reserved
+<DD>
+Reserved for future use.
+
+<DT><CODE>O</CODE> -- reserved
+<DD>
+<DT><CODE>p</CODE><VAR>hex number of register</VAR> -- read register packet
+<DD>
+<A NAME="IDX1742"></A>
+
+@xref{read registers packet}, for a description of how the returned
+register value is encoded.
+
+Reply:
+<DL COMPACT>
+
+<DT><SAMP>`<VAR>XX...</VAR>'</SAMP>
+<DD>
+the register's value
+<DT><SAMP>`E<VAR>NN</VAR>'</SAMP>
+<DD>
+for an error
+<DT><SAMP>`'</SAMP>
+<DD>
+Indicating an unrecognized <VAR>query</VAR>.
+</DL>
+
+<DT><CODE>P</CODE><VAR>n...</VAR><CODE>=</CODE><VAR>r...</VAR> -- write register
+<DD>
+@anchor{write register packet}
+<A NAME="IDX1743"></A>
+
+Write register <VAR>n...</VAR> with value <VAR>r...</VAR>, which contains two hex
+digits for each byte in the register (target byte order).
+
+Reply:
+<DL COMPACT>
+
+<DT><SAMP>`OK'</SAMP>
+<DD>
+for success
+<DT><SAMP>`E<VAR>NN</VAR>'</SAMP>
+<DD>
+for an error
+</DL>
+
+<DT><CODE>q</CODE><VAR>query</VAR> -- general query
+<DD>
+@anchor{general query packet}
+<A NAME="IDX1744"></A>
+
+Request info about <VAR>query</VAR>.  In general GDB queries have a
+leading upper case letter.  Custom vendor queries should use a company
+prefix (in lower case) ex: <SAMP>`qfsf.var'</SAMP>.  <VAR>query</VAR> may optionally
+be followed by a <SAMP>`,'</SAMP> or <SAMP>`;'</SAMP> separated list.  Stubs must ensure
+that they match the full <VAR>query</VAR> name.
+
+Reply:
+<DL COMPACT>
+
+<DT><SAMP>`<VAR>XX...</VAR>'</SAMP>
+<DD>
+Hex encoded data from query.  The reply can not be empty.
+<DT><SAMP>`E<VAR>NN</VAR>'</SAMP>
+<DD>
+error reply
+<DT><SAMP>`'</SAMP>
+<DD>
+Indicating an unrecognized <VAR>query</VAR>.
+</DL>
+
+<DT><CODE>Q</CODE><VAR>var</VAR><CODE>=</CODE><VAR>val</VAR> -- general set
+<DD>
+<A NAME="IDX1745"></A>
+
+Set value of <VAR>var</VAR> to <VAR>val</VAR>.
+
+@xref{general query packet}, for a discussion of naming conventions.
+
+<DT><CODE>r</CODE> -- reset <STRONG>(deprecated)</STRONG>
+<DD>
+<A NAME="IDX1746"></A>
+
+Reset the entire system.
+
+<DT><CODE>R</CODE><VAR>XX</VAR> -- remote restart
+<DD>
+<A NAME="IDX1747"></A>
+
+Restart the program being debugged.  <VAR>XX</VAR>, while needed, is ignored.
+This packet is only available in extended mode.
+
+Reply:
+<DL COMPACT>
+
+<DT><SAMP>`<EM>no reply</EM>'</SAMP>
+<DD>
+The <SAMP>`R'</SAMP> packet has no reply.
+</DL>
+
+<DT><CODE>s</CODE><VAR>addr</VAR> -- step
+<DD>
+<A NAME="IDX1748"></A>
+
+<VAR>addr</VAR> is address to resume.  If <VAR>addr</VAR> is omitted, resume at
+same address.
+
+Reply:
+See section <A HREF="gdb_33.html#SEC305">Stop Reply Packets</A>, for the reply specifications.
+
+<DT><CODE>S</CODE><VAR>sig</VAR><CODE>;</CODE><VAR>addr</VAR> -- step with signal
+<DD>
+@anchor{step with signal packet}
+<A NAME="IDX1749"></A>
+
+Like <SAMP>`C'</SAMP> but step not continue.
+
+Reply:
+See section <A HREF="gdb_33.html#SEC305">Stop Reply Packets</A>, for the reply specifications.
+
+<DT><CODE>t</CODE><VAR>addr</VAR><CODE>:</CODE><VAR>PP</VAR><CODE>,</CODE><VAR>MM</VAR> -- search
+<DD>
+<A NAME="IDX1750"></A>
+
+Search backwards starting at address <VAR>addr</VAR> for a match with pattern
+<VAR>PP</VAR> and mask <VAR>MM</VAR>.  <VAR>PP</VAR> and <VAR>MM</VAR> are 4 bytes.
+<VAR>addr</VAR> must be at least 3 digits.
+
+<DT><CODE>T</CODE><VAR>XX</VAR> -- thread alive
+<DD>
+<A NAME="IDX1751"></A>
+
+Find out if the thread XX is alive.
+
+Reply:
+<DL COMPACT>
+
+<DT><SAMP>`OK'</SAMP>
+<DD>
+thread is still alive
+<DT><SAMP>`E<VAR>NN</VAR>'</SAMP>
+<DD>
+thread is dead
+</DL>
+
+<DT><CODE>u</CODE> -- reserved
+<DD>
+Reserved for future use.
+
+<DT><CODE>U</CODE> -- reserved
+<DD>
+Reserved for future use.
+
+<DT><CODE>v</CODE> -- verbose packet prefix
+<DD>
+Packets starting with <CODE>v</CODE> are identified by a multi-letter name,
+up to the first <CODE>;</CODE> or <CODE>?</CODE> (or the end of the packet).
+
+<DT><CODE>vCont</CODE>[;<VAR>action</VAR>[<CODE>:</CODE><VAR>tid</VAR>]]... -- extended resume
+<DD>
+<A NAME="IDX1752"></A>
+
+Resume the inferior.  Different actions may be specified for each thread.
+If an action is specified with no <VAR>tid</VAR>, then it is applied to any
+threads that don't have a specific action specified; if no default action is
+specified then other threads should remain stopped.  Specifying multiple
+default actions is an error; specifying no actions is also an error.
+Thread IDs are specified in hexadecimal.  Currently supported actions are:
+
+<DL COMPACT>
+
+<DT><CODE>c</CODE>
+<DD>
+Continue.
+<DT><CODE>C<VAR>sig</VAR></CODE>
+<DD>
+Continue with signal <VAR>sig</VAR>.  <VAR>sig</VAR> should be two hex digits.
+<DT><CODE>s</CODE>
+<DD>
+Step.
+<DT><CODE>S<VAR>sig</VAR></CODE>
+<DD>
+Step with signal <VAR>sig</VAR>.  <VAR>sig</VAR> should be two hex digits.
+</DL>
+
+The optional <VAR>addr</VAR> argument normally associated with these packets is
+not supported in <CODE>vCont</CODE>.
+
+Reply:
+See section <A HREF="gdb_33.html#SEC305">Stop Reply Packets</A>, for the reply specifications.
+
+<DT><CODE>vCont?</CODE> -- extended resume query
+<DD>
+<A NAME="IDX1753"></A>
+
+Query support for the <CODE>vCont</CODE> packet.
+
+Reply:
+<DL COMPACT>
+
+<DT><SAMP>`<CODE>vCont</CODE>[;<VAR>action</VAR>]...'</SAMP>
+<DD>
+The <CODE>vCont</CODE> packet is supported.  Each <VAR>action</VAR> is a supported
+command in the <CODE>vCont</CODE> packet.
+<DT><SAMP>`'</SAMP>
+<DD>
+The <CODE>vCont</CODE> packet is not supported.
+</DL>
+
+<DT><CODE>V</CODE> -- reserved
+<DD>
+Reserved for future use.
+
+<DT><CODE>w</CODE> -- reserved
+<DD>
+Reserved for future use.
+
+<DT><CODE>W</CODE> -- reserved
+<DD>
+Reserved for future use.
+
+<DT><CODE>x</CODE> -- reserved
+<DD>
+Reserved for future use.
+
+<DT><CODE>X</CODE><VAR>addr</VAR><CODE>,</CODE><VAR>length</VAR><VAR>:</VAR><VAR>XX...</VAR> -- write mem (binary)
+<DD>
+<A NAME="IDX1754"></A>
+
+<VAR>addr</VAR> is address, <VAR>length</VAR> is number of bytes, <VAR>XX...</VAR>
+is binary data.  The characters <CODE>$</CODE>, <CODE>#</CODE>, and <CODE>0x7d</CODE> are
+escaped using <CODE>0x7d</CODE>, and then XORed with <CODE>0x20</CODE>.
+For example, <CODE>0x7d</CODE> would be transmitted as <CODE>0x7d 0x5d</CODE>.
+
+Reply:
+<DL COMPACT>
+
+<DT><SAMP>`OK'</SAMP>
+<DD>
+for success
+<DT><SAMP>`E<VAR>NN</VAR>'</SAMP>
+<DD>
+for an error
+</DL>
+
+<DT><CODE>y</CODE> -- reserved
+<DD>
+Reserved for future use.
+
+<DT><CODE>Y</CODE> reserved
+<DD>
+Reserved for future use.
+
+<DT><CODE>z</CODE><VAR>type</VAR><CODE>,</CODE><VAR>addr</VAR><CODE>,</CODE><VAR>length</VAR> -- remove breakpoint or watchpoint <STRONG>(draft)</STRONG>
+<DD>
+<DT><CODE>Z</CODE><VAR>type</VAR><CODE>,</CODE><VAR>addr</VAR><CODE>,</CODE><VAR>length</VAR> -- insert breakpoint or watchpoint <STRONG>(draft)</STRONG>
+<DD>
+@anchor{insert breakpoint or watchpoint packet}
+<A NAME="IDX1755"></A>
+<A NAME="IDX1756"></A>
+
+Insert (<CODE>Z</CODE>) or remove (<CODE>z</CODE>) a <VAR>type</VAR> breakpoint or
+watchpoint starting at address <VAR>address</VAR> and covering the next
+<VAR>length</VAR> bytes.
+
+Each breakpoint and watchpoint packet <VAR>type</VAR> is documented
+separately.
+
+<EM>Implementation notes: A remote target shall return an empty string
+for an unrecognized breakpoint or watchpoint packet <VAR>type</VAR>.  A
+remote target shall support either both or neither of a given
+<CODE>Z</CODE><VAR>type</VAR>... and <CODE>z</CODE><VAR>type</VAR>... packet pair.  To
+avoid potential problems with duplicate packets, the operations should
+be implemented in an idempotent way.</EM>
+
+<DT><CODE>z</CODE><CODE>0</CODE><CODE>,</CODE><VAR>addr</VAR><CODE>,</CODE><VAR>length</VAR> -- remove memory breakpoint <STRONG>(draft)</STRONG>
+<DD>
+<DT><CODE>Z</CODE><CODE>0</CODE><CODE>,</CODE><VAR>addr</VAR><CODE>,</CODE><VAR>length</VAR> -- insert memory breakpoint <STRONG>(draft)</STRONG>
+<DD>
+<A NAME="IDX1757"></A>
+<A NAME="IDX1758"></A>
+
+Insert (<CODE>Z0</CODE>) or remove (<CODE>z0</CODE>) a memory breakpoint at address
+<CODE>addr</CODE> of size <CODE>length</CODE>.
+
+A memory breakpoint is implemented by replacing the instruction at
+<VAR>addr</VAR> with a software breakpoint or trap instruction.  The
+<CODE>length</CODE> is used by targets that indicates the size of the
+breakpoint (in bytes) that should be inserted (e.g., the ARM and
+MIPS can insert either a 2 or 4 byte breakpoint).
+
+<EM>Implementation note: It is possible for a target to copy or move
+code that contains memory breakpoints (e.g., when implementing
+overlays).  The behavior of this packet, in the presence of such a
+target, is not defined.</EM>
+
+Reply:
+<DL COMPACT>
+
+<DT><SAMP>`OK'</SAMP>
+<DD>
+success
+<DT><SAMP>`'</SAMP>
+<DD>
+not supported
+<DT><SAMP>`E<VAR>NN</VAR>'</SAMP>
+<DD>
+for an error
+</DL>
+
+<DT><CODE>z</CODE><CODE>1</CODE><CODE>,</CODE><VAR>addr</VAR><CODE>,</CODE><VAR>length</VAR> -- remove hardware breakpoint <STRONG>(draft)</STRONG>
+<DD>
+<DT><CODE>Z</CODE><CODE>1</CODE><CODE>,</CODE><VAR>addr</VAR><CODE>,</CODE><VAR>length</VAR> -- insert hardware breakpoint <STRONG>(draft)</STRONG>
+<DD>
+<A NAME="IDX1759"></A>
+<A NAME="IDX1760"></A>
+
+Insert (<CODE>Z1</CODE>) or remove (<CODE>z1</CODE>) a hardware breakpoint at
+address <CODE>addr</CODE> of size <CODE>length</CODE>.
+
+A hardware breakpoint is implemented using a mechanism that is not
+dependant on being able to modify the target's memory.
+
+<EM>Implementation note: A hardware breakpoint is not affected by code
+movement.</EM>
+
+Reply:
+<DL COMPACT>
+
+<DT><SAMP>`OK'</SAMP>
+<DD>
+success
+<DT><SAMP>`'</SAMP>
+<DD>
+not supported
+<DT><SAMP>`E<VAR>NN</VAR>'</SAMP>
+<DD>
+for an error
+</DL>
+
+<DT><CODE>z</CODE><CODE>2</CODE><CODE>,</CODE><VAR>addr</VAR><CODE>,</CODE><VAR>length</VAR> -- remove write watchpoint <STRONG>(draft)</STRONG>
+<DD>
+<DT><CODE>Z</CODE><CODE>2</CODE><CODE>,</CODE><VAR>addr</VAR><CODE>,</CODE><VAR>length</VAR> -- insert write watchpoint <STRONG>(draft)</STRONG>
+<DD>
+<A NAME="IDX1761"></A>
+<A NAME="IDX1762"></A>
+
+Insert (<CODE>Z2</CODE>) or remove (<CODE>z2</CODE>) a write watchpoint.
+
+Reply:
+<DL COMPACT>
+
+<DT><SAMP>`OK'</SAMP>
+<DD>
+success
+<DT><SAMP>`'</SAMP>
+<DD>
+not supported
+<DT><SAMP>`E<VAR>NN</VAR>'</SAMP>
+<DD>
+for an error
+</DL>
+
+<DT><CODE>z</CODE><CODE>3</CODE><CODE>,</CODE><VAR>addr</VAR><CODE>,</CODE><VAR>length</VAR> -- remove read watchpoint <STRONG>(draft)</STRONG>
+<DD>
+<DT><CODE>Z</CODE><CODE>3</CODE><CODE>,</CODE><VAR>addr</VAR><CODE>,</CODE><VAR>length</VAR> -- insert read watchpoint <STRONG>(draft)</STRONG>
+<DD>
+<A NAME="IDX1763"></A>
+<A NAME="IDX1764"></A>
+
+Insert (<CODE>Z3</CODE>) or remove (<CODE>z3</CODE>) a read watchpoint.
+
+Reply:
+<DL COMPACT>
+
+<DT><SAMP>`OK'</SAMP>
+<DD>
+success
+<DT><SAMP>`'</SAMP>
+<DD>
+not supported
+<DT><SAMP>`E<VAR>NN</VAR>'</SAMP>
+<DD>
+for an error
+</DL>
+
+<DT><CODE>z</CODE><CODE>4</CODE><CODE>,</CODE><VAR>addr</VAR><CODE>,</CODE><VAR>length</VAR> -- remove access watchpoint <STRONG>(draft)</STRONG>
+<DD>
+<DT><CODE>Z</CODE><CODE>4</CODE><CODE>,</CODE><VAR>addr</VAR><CODE>,</CODE><VAR>length</VAR> -- insert access watchpoint <STRONG>(draft)</STRONG>
+<DD>
+<A NAME="IDX1765"></A>
+<A NAME="IDX1766"></A>
+
+Insert (<CODE>Z4</CODE>) or remove (<CODE>z4</CODE>) an access watchpoint.
+
+Reply:
+<DL COMPACT>
+
+<DT><SAMP>`OK'</SAMP>
+<DD>
+success
+<DT><SAMP>`'</SAMP>
+<DD>
+not supported
+<DT><SAMP>`E<VAR>NN</VAR>'</SAMP>
+<DD>
+for an error
+</DL>
+
+</DL>
+
+
+
+<H2><A NAME="SEC305" HREF="gdb_toc.html#TOC305">Stop Reply Packets</A></H2>
+<P>
+<A NAME="IDX1767"></A>
+
+</P>
+<P>
+The <SAMP>`C'</SAMP>, <SAMP>`c'</SAMP>, <SAMP>`S'</SAMP>, <SAMP>`s'</SAMP> and <SAMP>`?'</SAMP> packets can
+receive any of the below as a reply.  In the case of the <SAMP>`C'</SAMP>,
+<SAMP>`c'</SAMP>, <SAMP>`S'</SAMP> and <SAMP>`s'</SAMP> packets, that reply is only returned
+when the target halts.  In the below the exact meaning of <SAMP>`signal
+number'</SAMP> is poorly defined.  In general one of the UNIX signal numbering
+conventions is used.
+
+</P>
+<DL COMPACT>
+
+<DT><SAMP>`S<VAR>AA</VAR>'</SAMP>
+<DD>
+<VAR>AA</VAR> is the signal number
+
+<DT><SAMP>`<CODE>T</CODE><VAR>AA</VAR><VAR>n...</VAR><CODE>:</CODE><VAR>r...</VAR><CODE>;</CODE><VAR>n...</VAR><CODE>:</CODE><VAR>r...</VAR><CODE>;</CODE><VAR>n...</VAR><CODE>:</CODE><VAR>r...</VAR><CODE>;</CODE>'</SAMP>
+<DD>
+<A NAME="IDX1768"></A>
+
+<VAR>AA</VAR> = two hex digit signal number; <VAR>n...</VAR> = register number
+(hex), <VAR>r...</VAR>  = target byte ordered register contents, size defined
+by <CODE>DEPRECATED_REGISTER_RAW_SIZE</CODE>; <VAR>n...</VAR> = <SAMP>`thread'</SAMP>,
+<VAR>r...</VAR> = thread process ID, this is a hex integer; <VAR>n...</VAR> =
+(<SAMP>`watch'</SAMP> | <SAMP>`rwatch'</SAMP> | <SAMP>`awatch'</SAMP>, <VAR>r...</VAR> = data
+address, this is a hex integer; <VAR>n...</VAR> = other string not starting
+with valid hex digit.  GDB should ignore this <VAR>n...</VAR>,
+<VAR>r...</VAR> pair and go on to the next.  This way we can extend the
+protocol.
+
+<DT><SAMP>`W<VAR>AA</VAR>'</SAMP>
+<DD>
+The process exited, and <VAR>AA</VAR> is the exit status.  This is only
+applicable to certain targets.
+
+<DT><SAMP>`X<VAR>AA</VAR>'</SAMP>
+<DD>
+The process terminated with signal <VAR>AA</VAR>.
+
+<DT><SAMP>`O<VAR>XX...</VAR>'</SAMP>
+<DD>
+<VAR>XX...</VAR> is hex encoding of ASCII data.  This can happen at
+any time while the program is running and the debugger should continue
+to wait for <SAMP>`W'</SAMP>, <SAMP>`T'</SAMP>, etc.
+
+<DT><SAMP>`F<VAR>call-id</VAR><CODE>,</CODE><VAR>parameter...</VAR>'</SAMP>
+<DD>
+<VAR>call-id</VAR> is the identifier which says which host system call should
+be called.  This is just the name of the function.  Translation into the
+correct system call is only applicable as it's defined in GDB.
+See section <A HREF="gdb_33.html#SEC309">File-I/O remote protocol extension</A>, for a list of implemented
+system calls.
+
+<VAR>parameter...</VAR> is a list of parameters as defined for this very
+system call.
+
+The target replies with this packet when it expects GDB to call
+a host system call on behalf of the target.  GDB replies with
+an appropriate <CODE>F</CODE> packet and keeps up waiting for the next reply
+packet from the target.  The latest <SAMP>`C'</SAMP>, <SAMP>`c'</SAMP>, <SAMP>`S'</SAMP> or
+<SAMP>`s'</SAMP> action is expected to be continued.
+See section <A HREF="gdb_33.html#SEC309">File-I/O remote protocol extension</A>, for more details.
+
+</DL>
+
+
+
+<H2><A NAME="SEC306" HREF="gdb_toc.html#TOC306">General Query Packets</A></H2>
+<P>
+<A NAME="IDX1769"></A>
+
+</P>
+<P>
+The following set and query packets have already been defined.
+
+</P>
+<DL COMPACT>
+
+<DT><CODE>q</CODE><CODE>C</CODE> -- current thread
+<DD>
+<A NAME="IDX1770"></A>
+<A NAME="IDX1771"></A>
+Return the current thread id.
+
+Reply:
+<DL COMPACT>
+
+<DT><SAMP>`<CODE>QC</CODE><VAR>pid</VAR>'</SAMP>
+<DD>
+Where <VAR>pid</VAR> is an unsigned hexidecimal process id.
+<DT><SAMP>`*'</SAMP>
+<DD>
+Any other reply implies the old pid.
+</DL>
+
+<DT><CODE>q</CODE><CODE>fThreadInfo</CODE> -- all thread ids
+<DD>
+<A NAME="IDX1772"></A>
+<A NAME="IDX1773"></A>
+<CODE>q</CODE><CODE>sThreadInfo</CODE>
+
+Obtain a list of active thread ids from the target (OS).  Since there
+may be too many active threads to fit into one reply packet, this query
+works iteratively: it may require more than one query/reply sequence to
+obtain the entire list of threads.  The first query of the sequence will
+be the <CODE>qf</CODE><CODE>ThreadInfo</CODE> query; subsequent queries in the
+sequence will be the <CODE>qs</CODE><CODE>ThreadInfo</CODE> query.
+
+NOTE: replaces the <CODE>qL</CODE> query (see below).
+
+Reply:
+<DL COMPACT>
+
+<DT><SAMP>`<CODE>m</CODE><VAR>id</VAR>'</SAMP>
+<DD>
+A single thread id
+<DT><SAMP>`<CODE>m</CODE><VAR>id</VAR>,<VAR>id</VAR>...'</SAMP>
+<DD>
+a comma-separated list of thread ids
+<DT><SAMP>`<CODE>l</CODE>'</SAMP>
+<DD>
+(lower case 'el') denotes end of list.
+</DL>
+
+In response to each query, the target will reply with a list of one or
+more thread ids, in big-endian unsigned hex, separated by commas.
+GDB will respond to each reply with a request for more thread
+ids (using the <CODE>qs</CODE> form of the query), until the target responds
+with <CODE>l</CODE> (lower-case el, for <CODE>'last'</CODE>).
+
+<DT><CODE>q</CODE><CODE>ThreadExtraInfo</CODE><CODE>,</CODE><VAR>id</VAR> -- extra thread info
+<DD>
+<A NAME="IDX1774"></A>
+<A NAME="IDX1775"></A>
+Where <VAR>id</VAR> is a thread-id in big-endian hex.  Obtain a printable
+string description of a thread's attributes from the target OS.  This
+string may contain anything that the target OS thinks is interesting for
+GDB to tell the user about the thread.  The string is displayed
+in GDB's <SAMP>`info threads'</SAMP> display.  Some examples of
+possible thread extra info strings are "Runnable", or "Blocked on
+Mutex".
+
+Reply:
+<DL COMPACT>
+
+<DT><SAMP>`<VAR>XX...</VAR>'</SAMP>
+<DD>
+Where <VAR>XX...</VAR> is a hex encoding of ASCII data, comprising
+the printable string containing the extra information about the thread's
+attributes.
+</DL>
+
+<DT><CODE>q</CODE><CODE>L</CODE><VAR>startflag</VAR><VAR>threadcount</VAR><VAR>nextthread</VAR> -- query <VAR>LIST</VAR> or <VAR>threadLIST</VAR> <STRONG>(deprecated)</STRONG>
+<DD>
+Obtain thread information from RTOS.  Where: <VAR>startflag</VAR> (one hex
+digit) is one to indicate the first query and zero to indicate a
+subsequent query; <VAR>threadcount</VAR> (two hex digits) is the maximum
+number of threads the response packet can contain; and <VAR>nextthread</VAR>
+(eight hex digits), for subsequent queries (<VAR>startflag</VAR> is zero), is
+returned in the response as <VAR>argthread</VAR>.
+
+NOTE: this query is replaced by the <CODE>q</CODE><CODE>fThreadInfo</CODE> query
+(see above).
+
+Reply:
+<DL COMPACT>
+
+<DT><SAMP>`<CODE>q</CODE><CODE>M</CODE><VAR>count</VAR><VAR>done</VAR><VAR>argthread</VAR><VAR>thread...</VAR>'</SAMP>
+<DD>
+Where: <VAR>count</VAR> (two hex digits) is the number of threads being
+returned; <VAR>done</VAR> (one hex digit) is zero to indicate more threads
+and one indicates no further threads; <VAR>argthreadid</VAR> (eight hex
+digits) is <VAR>nextthread</VAR> from the request packet; <VAR>thread...</VAR>
+is a sequence of thread IDs from the target.  <VAR>threadid</VAR> (eight hex
+digits).  See <CODE>remote.c:parse_threadlist_response()</CODE>.
+</DL>
+
+<DT><CODE>q</CODE><CODE>CRC:</CODE><VAR>addr</VAR><CODE>,</CODE><VAR>length</VAR> -- compute CRC of memory block
+<DD>
+<A NAME="IDX1776"></A>
+<A NAME="IDX1777"></A>
+Reply:
+<DL COMPACT>
+
+<DT><SAMP>`<CODE>E</CODE><VAR>NN</VAR>'</SAMP>
+<DD>
+An error (such as memory fault)
+<DT><SAMP>`<CODE>C</CODE><VAR>CRC32</VAR>'</SAMP>
+<DD>
+A 32 bit cyclic redundancy check of the specified memory region.
+</DL>
+
+<DT><CODE>q</CODE><CODE>Offsets</CODE> -- query sect offs
+<DD>
+<A NAME="IDX1778"></A>
+<A NAME="IDX1779"></A>
+Get section offsets that the target used when re-locating the downloaded
+image.  <EM>Note: while a <CODE>Bss</CODE> offset is included in the
+response, GDB ignores this and instead applies the <CODE>Data</CODE>
+offset to the <CODE>Bss</CODE> section.</EM>
+
+Reply:
+<DL COMPACT>
+
+<DT><SAMP>`<CODE>Text=</CODE><VAR>xxx</VAR><CODE>;Data=</CODE><VAR>yyy</VAR><CODE>;Bss=</CODE><VAR>zzz</VAR>'</SAMP>
+<DD>
+</DL>
+
+<DT><CODE>q</CODE><CODE>P</CODE><VAR>mode</VAR><VAR>threadid</VAR> -- thread info request
+<DD>
+<A NAME="IDX1780"></A>
+<A NAME="IDX1781"></A>
+Returns information on <VAR>threadid</VAR>.  Where: <VAR>mode</VAR> is a hex
+encoded 32 bit mode; <VAR>threadid</VAR> is a hex encoded 64 bit thread ID.
+
+Reply:
+<DL COMPACT>
+
+<DT><SAMP>`*'</SAMP>
+<DD>
+</DL>
+
+See <CODE>remote.c:remote_unpack_thread_info_response()</CODE>.
+
+<DT><CODE>q</CODE><CODE>Rcmd,</CODE><VAR>command</VAR> -- remote command
+<DD>
+<A NAME="IDX1782"></A>
+<A NAME="IDX1783"></A>
+<VAR>command</VAR> (hex encoded) is passed to the local interpreter for
+execution.  Invalid commands should be reported using the output string.
+Before the final result packet, the target may also respond with a
+number of intermediate <CODE>O</CODE><VAR>output</VAR> console output packets.
+<EM>Implementors should note that providing access to a stubs's
+interpreter may have security implications</EM>.
+
+Reply:
+<DL COMPACT>
+
+<DT><SAMP>`OK'</SAMP>
+<DD>
+A command response with no output.
+<DT><SAMP>`<VAR>OUTPUT</VAR>'</SAMP>
+<DD>
+A command response with the hex encoded output string <VAR>OUTPUT</VAR>.
+<DT><SAMP>`<CODE>E</CODE><VAR>NN</VAR>'</SAMP>
+<DD>
+Indicate a badly formed request.
+<DT><SAMP>`<SAMP>`'</SAMP>'</SAMP>
+<DD>
+When <SAMP>`q'</SAMP><SAMP>`Rcmd'</SAMP> is not recognized.
+</DL>
+z
+<DT><CODE>qSymbol::</CODE> -- symbol lookup
+<DD>
+<A NAME="IDX1784"></A>
+<A NAME="IDX1785"></A>
+Notify the target that GDB is prepared to serve symbol lookup
+requests.  Accept requests from the target for the values of symbols.
+
+Reply:
+<DL COMPACT>
+
+<DT><SAMP>`<CODE>OK</CODE>'</SAMP>
+<DD>
+The target does not need to look up any (more) symbols.
+<DT><SAMP>`<CODE>qSymbol:</CODE><VAR>sym_name</VAR>'</SAMP>
+<DD>
+The target requests the value of symbol <VAR>sym_name</VAR> (hex encoded).
+GDB may provide the value by using the
+<CODE>qSymbol:</CODE><VAR>sym_value</VAR>:<VAR>sym_name</VAR> message, described below.
+</DL>
+
+<DT><CODE>qSymbol:</CODE><VAR>sym_value</VAR>:<VAR>sym_name</VAR> -- symbol value
+<DD>
+Set the value of <VAR>sym_name</VAR> to <VAR>sym_value</VAR>.
+
+<VAR>sym_name</VAR> (hex encoded) is the name of a symbol whose value the
+target has previously requested.
+
+<VAR>sym_value</VAR> (hex) is the value for symbol <VAR>sym_name</VAR>.  If
+GDB cannot supply a value for <VAR>sym_name</VAR>, then this field
+will be empty.
+
+Reply:
+<DL COMPACT>
+
+<DT><SAMP>`<CODE>OK</CODE>'</SAMP>
+<DD>
+The target does not need to look up any (more) symbols.
+<DT><SAMP>`<CODE>qSymbol:</CODE><VAR>sym_name</VAR>'</SAMP>
+<DD>
+The target requests the value of a new symbol <VAR>sym_name</VAR> (hex
+encoded).  GDB will continue to supply the values of symbols
+(if available), until the target ceases to request them.
+</DL>
+
+<DT><CODE>qPart</CODE>:<VAR>object</VAR>:<CODE>read</CODE>:<VAR>annex</VAR>:<VAR>offset</VAR>,<VAR>length</VAR> -- read special data
+<DD>
+<A NAME="IDX1786"></A>
+<A NAME="IDX1787"></A>
+Read uninterpreted bytes from the target's special data area
+identified by the keyword <CODE>object</CODE>.
+Request <VAR>length</VAR> bytes starting at <VAR>offset</VAR> bytes into the data.
+The content and encoding of <VAR>annex</VAR> is specific to the object;
+it can supply additional details about what data to access.
+
+Here are the specific requests of this form defined so far.
+All <SAMP>`<CODE>qPart</CODE>:<VAR>object</VAR>:<CODE>read</CODE>:...'</SAMP>
+requests use the same reply formats, listed below.
+
+<DL COMPACT>
+
+<DT><CODE>qPart</CODE>:<CODE>auxv</CODE>:<CODE>read</CODE>::<VAR>offset</VAR>,<VAR>length</VAR>
+<DD>
+Access the target's <STRONG>auxiliary vector</STRONG>.  See section <A HREF="gdb_9.html#SEC69">Operating system auxiliary information</A>, and see section <A HREF="gdb_18.html#SEC160">Remote configuration</A>.  Note <VAR>annex</VAR> must be empty.
+</DL>
+
+Reply:
+<DL COMPACT>
+
+<DT><CODE>OK</CODE>
+<DD>
+The <VAR>offset</VAR> in the request is at the end of the data.
+There is no more data to be read.
+
+<DT><VAR>XX...</VAR>
+<DD>
+Hex encoded data bytes read.
+This may be fewer bytes than the <VAR>length</VAR> in the request.
+
+<DT><CODE>E00</CODE>
+<DD>
+The request was malformed, or <VAR>annex</VAR> was invalid.
+
+<DT><CODE>E</CODE><VAR>nn</VAR>
+<DD>
+The offset was invalid, or there was an error encountered reading the data.
+<VAR>nn</VAR> is a hex-encoded <CODE>errno</CODE> value.
+
+<DT><CODE>""</CODE> (empty)
+<DD>
+An empty reply indicates the <VAR>object</VAR> or <VAR>annex</VAR> string was not
+recognized by the stub.
+</DL>
+
+<DT><CODE>qPart</CODE>:<VAR>object</VAR>:<CODE>write</CODE>:<VAR>annex</VAR>:<VAR>offset</VAR>:<VAR>data...</VAR>
+<DD>
+<A NAME="IDX1788"></A>
+Write uninterpreted bytes into the target's special data area
+identified by the keyword <CODE>object</CODE>,
+starting at <VAR>offset</VAR> bytes into the data.
+<VAR>data...</VAR> is the hex-encoded data to be written.
+The content and encoding of <VAR>annex</VAR> is specific to the object;
+it can supply additional details about what data to access.
+
+No requests of this form are presently in use.  This specification
+serves as a placeholder to document the common format that new
+specific request specifications ought to use.
+
+Reply:
+<DL COMPACT>
+
+<DT><VAR>nn</VAR>
+<DD>
+<VAR>nn</VAR> (hex encoded) is the number of bytes written.
+This may be fewer bytes than supplied in the request.
+
+<DT><CODE>E00</CODE>
+<DD>
+The request was malformed, or <VAR>annex</VAR> was invalid.
+
+<DT><CODE>E</CODE><VAR>nn</VAR>
+<DD>
+The offset was invalid, or there was an error encountered writing the data.
+<VAR>nn</VAR> is a hex-encoded <CODE>errno</CODE> value.
+
+<DT><CODE>""</CODE> (empty)
+<DD>
+An empty reply indicates the <VAR>object</VAR> or <VAR>annex</VAR> string was not
+recognized by the stub, or that the object does not support writing.
+</DL>
+
+<DT><CODE>qPart</CODE>:<VAR>object</VAR>:<VAR>operation</VAR>:...
+<DD>
+Requests of this form may be added in the future.  When a stub does
+not recognize the <VAR>object</VAR> keyword, or its support for
+<VAR>object</VAR> does not recognize the <VAR>operation</VAR> keyword,
+the stub must respond with an empty packet.
+
+<DT><CODE>qGetTLSAddr</CODE>:<VAR>thread-id</VAR>,<VAR>offset</VAR>,<VAR>lm</VAR> -- get thread local storage address
+<DD>
+<A NAME="IDX1789"></A>
+<A NAME="IDX1790"></A>
+Fetch the address associated with thread local storage specified
+by <VAR>thread-id</VAR>, <VAR>offset</VAR>, and <VAR>lm</VAR>.
+
+<VAR>thread-id</VAR> is the (big endian, hex encoded) thread id associated with the
+thread for which to fetch the TLS address.
+
+<VAR>offset</VAR> is the (big endian, hex encoded) offset associated with the
+thread local variable.  (This offset is obtained from the debug
+information associated with the variable.)
+
+<VAR>lm</VAR> is the (big endian, hex encoded) OS/ABI specific encoding of the
+the load module associated with the thread local storage.  For example,
+a GNU/Linux system will pass the link map address of the shared
+object associated with the thread local storage under consideration. 
+Other operating environments may choose to represent the load module
+differently, so the precise meaning of this parameter will vary.
+
+Reply:
+<DL COMPACT>
+
+<DT><VAR>XX...</VAR>
+<DD>
+Hex encoded (big endian) bytes representing the address of the thread
+local storage requested.
+
+<DT><CODE>E</CODE><VAR>nn</VAR> (where <VAR>nn</VAR> are hex digits)
+<DD>
+An error occurred.
+
+<DT><CODE>""</CODE> (empty)
+<DD>
+An empty reply indicates that <CODE>qGetTLSAddr</CODE> is not supported by the stub.
+</DL>
+
+Use of this request packet is controlled by the <CODE>set remote
+get-thread-local-storage-address</CODE> command (see section <A HREF="gdb_18.html#SEC160">Remote configuration</A>).
+
+</DL>
+
+
+
+<H2><A NAME="SEC307" HREF="gdb_toc.html#TOC307">Register Packet Format</A></H2>
+
+<P>
+The following <SAMP>`g'</SAMP>/<SAMP>`G'</SAMP> packets have previously been defined.
+In the below, some thirty-two bit registers are transferred as
+sixty-four bits.  Those registers should be zero/sign extended (which?)
+to fill the space allocated.  Register bytes are transfered in target
+byte order.  The two nibbles within a register byte are transfered
+most-significant - least-significant.
+
+</P>
+<DL COMPACT>
+
+<DT>MIPS32
+<DD>
+All registers are transfered as thirty-two bit quantities in the order:
+32 general-purpose; sr; lo; hi; bad; cause; pc; 32 floating-point
+registers; fsr; fir; fp.
+
+<DT>MIPS64
+<DD>
+All registers are transfered as sixty-four bit quantities (including
+thirty-two bit registers such as <CODE>sr</CODE>).  The ordering is the same
+as <CODE>MIPS32</CODE>.
+
+</DL>
+
+
+
+<H2><A NAME="SEC308" HREF="gdb_toc.html#TOC308">Examples</A></H2>
+
+<P>
+Example sequence of a target being re-started.  Notice how the restart
+does not get any direct output:
+
+</P>
+
+<PRE>
+-&#62; <CODE>R00</CODE>
+&#60;- <CODE>+</CODE>
+<EM>target restarts</EM>
+-&#62; <CODE>?</CODE>
+&#60;- <CODE>+</CODE>
+&#60;- <CODE>T001:1234123412341234</CODE>
+-&#62; <CODE>+</CODE>
+</PRE>
+
+<P>
+Example sequence of a target being stepped by a single instruction:
+
+</P>
+
+<PRE>
+-&#62; <CODE>G1445...</CODE>
+&#60;- <CODE>+</CODE>
+-&#62; <CODE>s</CODE>
+&#60;- <CODE>+</CODE>
+<EM>time passes</EM>
+&#60;- <CODE>T001:1234123412341234</CODE>
+-&#62; <CODE>+</CODE>
+-&#62; <CODE>g</CODE>
+&#60;- <CODE>+</CODE>
+&#60;- <CODE>1455...</CODE>
+-&#62; <CODE>+</CODE>
+</PRE>
+
+
+
+<H2><A NAME="SEC309" HREF="gdb_toc.html#TOC309">File-I/O remote protocol extension</A></H2>
+<P>
+<A NAME="IDX1791"></A>
+
+</P>
+
+
+
+<H3><A NAME="SEC310" HREF="gdb_toc.html#TOC310">File-I/O Overview</A></H3>
+<P>
+<A NAME="IDX1792"></A>
+
+</P>
+<P>
+The <STRONG>File I/O remote protocol extension</STRONG> (short: File-I/O) allows the
+target to use the host's file system and console I/O when calling various
+system calls.  System calls on the target system are translated into a
+remote protocol packet to the host system which then performs the needed
+actions and returns with an adequate response packet to the target system.
+This simulates file system operations even on targets that lack file systems.
+
+</P>
+<P>
+The protocol is defined host- and target-system independent.  It uses
+its own independent representation of datatypes and values.  Both,
+GDB and the target's GDB stub are responsible for
+translating the system dependent values into the unified protocol values
+when data is transmitted.
+
+</P>
+<P>
+The communication is synchronous.  A system call is possible only
+when GDB is waiting for the <SAMP>`C'</SAMP>, <SAMP>`c'</SAMP>, <SAMP>`S'</SAMP> or <SAMP>`s'</SAMP>
+packets.  While GDB handles the request for a system call,
+the target is stopped to allow deterministic access to the target's
+memory.  Therefore File-I/O is not interuptible by target signals.  It
+is possible to interrupt File-I/O by a user interrupt (Ctrl-C), though.
+
+</P>
+<P>
+The target's request to perform a host system call does not finish
+the latest <SAMP>`C'</SAMP>, <SAMP>`c'</SAMP>, <SAMP>`S'</SAMP> or <SAMP>`s'</SAMP> action.  That means,
+after finishing the system call, the target returns to continuing the
+previous activity (continue, step).  No additional continue or step
+request from GDB is required.
+
+</P>
+
+<PRE>
+(gdb) continue
+  &#60;- target requests 'system call X'
+  target is stopped, GDB executes system call
+  -&#62; GDB returns result
+  ... target continues, GDB returns to wait for the target
+  &#60;- target hits breakpoint and sends a Txx packet
+</PRE>
+
+<P>
+The protocol is only used for files on the host file system and
+for I/O on the console.  Character or block special devices, pipes,
+named pipes or sockets or any other communication method on the host
+system are not supported by this protocol.
+
+</P>
+
+
+<H3><A NAME="SEC311" HREF="gdb_toc.html#TOC311">Protocol basics</A></H3>
+<P>
+<A NAME="IDX1793"></A>
+
+</P>
+<P>
+The File-I/O protocol uses the <CODE>F</CODE> packet, as request as well
+as as reply packet.  Since a File-I/O system call can only occur when
+GDB is waiting for the continuing or stepping target, the
+File-I/O request is a reply that GDB has to expect as a result
+of a former <SAMP>`C'</SAMP>, <SAMP>`c'</SAMP>, <SAMP>`S'</SAMP> or <SAMP>`s'</SAMP> packet.
+This <CODE>F</CODE> packet contains all information needed to allow GDB
+to call the appropriate host system call:
+
+</P>
+
+<UL>
+<LI>
+
+A unique identifier for the requested system call.
+
+<LI>
+
+All parameters to the system call.  Pointers are given as addresses
+in the target memory address space.  Pointers to strings are given as
+pointer/length pair.  Numerical values are given as they are.
+Numerical control values are given in a protocol specific representation.
+
+</UL>
+
+<P>
+At that point GDB has to perform the following actions.
+
+</P>
+
+<UL>
+<LI>
+
+If parameter pointer values are given, which point to data needed as input
+to a system call, GDB requests this data from the target with a
+standard <CODE>m</CODE> packet request.  This additional communication has to be
+expected by the target implementation and is handled as any other <CODE>m</CODE>
+packet.
+
+<LI>
+
+GDB translates all value from protocol representation to host
+representation as needed.  Datatypes are coerced into the host types.
+
+<LI>
+
+GDB calls the system call
+
+<LI>
+
+It then coerces datatypes back to protocol representation.
+
+<LI>
+
+If pointer parameters in the request packet point to buffer space in which
+a system call is expected to copy data to, the data is transmitted to the
+target using a <CODE>M</CODE> or <CODE>X</CODE> packet.  This packet has to be expected
+by the target implementation and is handled as any other <CODE>M</CODE> or <CODE>X</CODE>
+packet.
+
+</UL>
+
+<P>
+Eventually GDB replies with another <CODE>F</CODE> packet which contains all
+necessary information for the target to continue.  This at least contains
+
+</P>
+
+<UL>
+<LI>
+
+Return value.
+
+<LI>
+
+<CODE>errno</CODE>, if has been changed by the system call.
+
+<LI>
+
+"Ctrl-C" flag.
+
+</UL>
+
+<P>
+After having done the needed type and value coercion, the target continues
+the latest continue or step action.
+
+</P>
+
+
+<H3><A NAME="SEC312" HREF="gdb_toc.html#TOC312">The <CODE>F</CODE> request packet</A></H3>
+<P>
+<A NAME="IDX1794"></A>
+<A NAME="IDX1795"></A>
+
+</P>
+<P>
+The <CODE>F</CODE> request packet has the following format:
+
+</P>
+<DL COMPACT>
+
+
+<PRE>
+<CODE>F</CODE><VAR>call-id</VAR><CODE>,</CODE><VAR>parameter...</VAR>
+</PRE>
+
+<VAR>call-id</VAR> is the identifier to indicate the host system call to be called.
+This is just the name of the function.
+
+<VAR>parameter...</VAR> are the parameters to the system call.
+
+</DL>
+
+<P>
+Parameters are hexadecimal integer values, either the real values in case
+of scalar datatypes, as pointers to target buffer space in case of compound
+datatypes and unspecified memory areas or as pointer/length pairs in case
+of string parameters.  These are appended to the call-id, each separated
+from its predecessor by a comma.  All values are transmitted in ASCII
+string representation, pointer/length pairs separated by a slash.
+
+</P>
+
+
+<H3><A NAME="SEC313" HREF="gdb_toc.html#TOC313">The <CODE>F</CODE> reply packet</A></H3>
+<P>
+<A NAME="IDX1796"></A>
+<A NAME="IDX1797"></A>
+
+</P>
+<P>
+The <CODE>F</CODE> reply packet has the following format:
+
+</P>
+<DL COMPACT>
+
+
+<PRE>
+<CODE>F</CODE><VAR>retcode</VAR><CODE>,</CODE><VAR>errno</VAR><CODE>,</CODE><VAR>Ctrl-C flag</VAR><CODE>;</CODE><VAR>call specific attachment</VAR>
+</PRE>
+
+<VAR>retcode</VAR> is the return code of the system call as hexadecimal value.
+
+<VAR>errno</VAR> is the errno set by the call, in protocol specific representation.
+This parameter can be omitted if the call was successful.
+
+<VAR>Ctrl-C flag</VAR> is only send if the user requested a break.  In this
+case, <VAR>errno</VAR> must be send as well, even if the call was successful.
+The <VAR>Ctrl-C flag</VAR> itself consists of the character 'C':
+
+
+<PRE>
+F0,0,C
+</PRE>
+
+or, if the call was interupted before the host call has been performed:
+
+
+<PRE>
+F-1,4,C
+</PRE>
+
+assuming 4 is the protocol specific representation of <CODE>EINTR</CODE>.
+
+</DL>
+
+
+
+<H3><A NAME="SEC314" HREF="gdb_toc.html#TOC314">Memory transfer</A></H3>
+<P>
+<A NAME="IDX1798"></A>
+
+</P>
+<P>
+Structured data which is transferred using a memory read or write as e.g.
+a <CODE>struct stat</CODE> is expected to be in a protocol specific format with
+all scalar multibyte datatypes being big endian.  This should be done by
+the target before the <CODE>F</CODE> packet is sent resp. by GDB before
+it transfers memory to the target.  Transferred pointers to structured
+data should point to the already coerced data at any time.
+
+</P>
+
+
+<H3><A NAME="SEC315" HREF="gdb_toc.html#TOC315">The Ctrl-C message</A></H3>
+<P>
+<A NAME="IDX1799"></A>
+
+</P>
+<P>
+A special case is, if the <VAR>Ctrl-C flag</VAR> is set in the GDB
+reply packet.  In this case the target should behave, as if it had
+gotten a break message.  The meaning for the target is "system call
+interupted by <CODE>SIGINT</CODE>".  Consequentially, the target should actually stop
+(as with a break message) and return to GDB with a <CODE>T02</CODE>
+packet.  In this case, it's important for the target to know, in which
+state the system call was interrupted.  Since this action is by design
+not an atomic operation, we have to differ between two cases:
+
+</P>
+
+<UL>
+<LI>
+
+The system call hasn't been performed on the host yet.
+
+<LI>
+
+The system call on the host has been finished.
+
+</UL>
+
+<P>
+These two states can be distinguished by the target by the value of the
+returned <CODE>errno</CODE>.  If it's the protocol representation of <CODE>EINTR</CODE>, the system
+call hasn't been performed.  This is equivalent to the <CODE>EINTR</CODE> handling
+on POSIX systems.  In any other case, the target may presume that the
+system call has been finished -- successful or not -- and should behave
+as if the break message arrived right after the system call.
+
+</P>
+<P>
+GDB must behave reliable.  If the system call has not been called
+yet, GDB may send the <CODE>F</CODE> reply immediately, setting <CODE>EINTR</CODE> as
+<CODE>errno</CODE> in the packet.  If the system call on the host has been finished
+before the user requests a break, the full action must be finshed by
+GDB.  This requires sending <CODE>M</CODE> or <CODE>X</CODE> packets as they fit.
+The <CODE>F</CODE> packet may only be send when either nothing has happened
+or the full action has been completed.
+
+</P>
+
+
+<H3><A NAME="SEC316" HREF="gdb_toc.html#TOC316">Console I/O</A></H3>
+<P>
+<A NAME="IDX1800"></A>
+
+</P>
+<P>
+By default and if not explicitely closed by the target system, the file
+descriptors 0, 1 and 2 are connected to the GDB console.  Output
+on the GDB console is handled as any other file output operation
+(<CODE>write(1, ...)</CODE> or <CODE>write(2, ...)</CODE>).  Console input is handled
+by GDB so that after the target read request from file descriptor
+0 all following typing is buffered until either one of the following
+conditions is met:
+
+</P>
+
+<UL>
+<LI>
+
+The user presses <KBD>Ctrl-C</KBD>.  The behaviour is as explained above, the
+<CODE>read</CODE>
+system call is treated as finished.
+
+<LI>
+
+The user presses <KBD>Enter</KBD>.  This is treated as end of input with a trailing
+line feed.
+
+<LI>
+
+The user presses <KBD>Ctrl-D</KBD>.  This is treated as end of input.  No trailing
+character, especially no Ctrl-D is appended to the input.
+
+</UL>
+
+<P>
+If the user has typed more characters as fit in the buffer given to
+the read call, the trailing characters are buffered in GDB until
+either another <CODE>read(0, ...)</CODE> is requested by the target or debugging
+is stopped on users request.
+
+</P>
+
+
+<H3><A NAME="SEC317" HREF="gdb_toc.html#TOC317">The <SAMP>`isatty'</SAMP> function call</A></H3>
+<P>
+<A NAME="IDX1801"></A>
+
+</P>
+<P>
+A special case in this protocol is the library call <CODE>isatty</CODE> which
+is implemented as its own call inside of this protocol.  It returns
+1 to the target if the file descriptor given as parameter is attached
+to the GDB console, 0 otherwise.  Implementing through system calls
+would require implementing <CODE>ioctl</CODE> and would be more complex than
+needed.
+
+</P>
+
+
+<H3><A NAME="SEC318" HREF="gdb_toc.html#TOC318">The <SAMP>`system'</SAMP> function call</A></H3>
+<P>
+<A NAME="IDX1802"></A>
+
+</P>
+<P>
+The other special case in this protocol is the <CODE>system</CODE> call which
+is implemented as its own call, too.  GDB is taking over the full
+task of calling the necessary host calls to perform the <CODE>system</CODE>
+call.  The return value of <CODE>system</CODE> is simplified before it's returned
+to the target.  Basically, the only signal transmitted back is <CODE>EINTR</CODE>
+in case the user pressed <KBD>Ctrl-C</KBD>.  Otherwise the return value consists
+entirely of the exit status of the called command.
+
+</P>
+<P>
+Due to security concerns, the <CODE>system</CODE> call is by default refused
+by GDB.  The user has to allow this call explicitly with the
+<KBD>set remote system-call-allowed 1</KBD> command.
+
+</P>
+<DL COMPACT>
+
+<DT><CODE>set remote system-call-allowed</CODE>
+<DD>
+<A NAME="IDX1803"></A>
+Control whether to allow the <CODE>system</CODE> calls in the File I/O
+protocol for the remote target.  The default is zero (disabled).
+
+<DT><CODE>show remote system-call-allowed</CODE>
+<DD>
+<A NAME="IDX1804"></A>
+Show the current setting of system calls for the remote File I/O
+protocol.
+</DL>
+
+
+
+<H3><A NAME="SEC319" HREF="gdb_toc.html#TOC319">List of supported calls</A></H3>
+<P>
+<A NAME="IDX1805"></A>
+
+</P>
+
+
+
+<H4><A NAME="SEC320" HREF="gdb_toc.html#TOC320">open</A></H4>
+<P>
+<A NAME="IDX1806"></A>
+
+</P>
+
+<PRE>
+Synopsis:
+int open(const char *pathname, int flags);
+int open(const char *pathname, int flags, mode_t mode);
+
+Request:
+Fopen,pathptr/len,flags,mode
+</PRE>
+
+<P>
+<CODE>flags</CODE> is the bitwise or of the following values:
+
+</P>
+<DL COMPACT>
+
+<DT><CODE>O_CREAT</CODE>
+<DD>
+If the file does not exist it will be created.  The host
+rules apply as far as file ownership and time stamps
+are concerned.
+
+<DT><CODE>O_EXCL</CODE>
+<DD>
+When used with O_CREAT, if the file already exists it is
+an error and open() fails.
+
+<DT><CODE>O_TRUNC</CODE>
+<DD>
+If the file already exists and the open mode allows
+writing (O_RDWR or O_WRONLY is given) it will be
+truncated to length 0.
+
+<DT><CODE>O_APPEND</CODE>
+<DD>
+The file is opened in append mode.
+
+<DT><CODE>O_RDONLY</CODE>
+<DD>
+The file is opened for reading only.
+
+<DT><CODE>O_WRONLY</CODE>
+<DD>
+The file is opened for writing only.
+
+<DT><CODE>O_RDWR</CODE>
+<DD>
+The file is opened for reading and writing.
+
+Each other bit is silently ignored.
+
+</DL>
+
+<P>
+<CODE>mode</CODE> is the bitwise or of the following values:
+
+</P>
+<DL COMPACT>
+
+<DT><CODE>S_IRUSR</CODE>
+<DD>
+User has read permission.
+
+<DT><CODE>S_IWUSR</CODE>
+<DD>
+User has write permission.
+
+<DT><CODE>S_IRGRP</CODE>
+<DD>
+Group has read permission.
+
+<DT><CODE>S_IWGRP</CODE>
+<DD>
+Group has write permission.
+
+<DT><CODE>S_IROTH</CODE>
+<DD>
+Others have read permission.
+
+<DT><CODE>S_IWOTH</CODE>
+<DD>
+Others have write permission.
+
+Each other bit is silently ignored.
+
+</DL>
+
+
+<PRE>
+Return value:
+open returns the new file descriptor or -1 if an error
+occured.
+
+Errors:
+</PRE>
+
+<DL COMPACT>
+
+<DT><CODE>EEXIST</CODE>
+<DD>
+pathname already exists and O_CREAT and O_EXCL were used.
+
+<DT><CODE>EISDIR</CODE>
+<DD>
+pathname refers to a directory.
+
+<DT><CODE>EACCES</CODE>
+<DD>
+The requested access is not allowed.
+
+<DT><CODE>ENAMETOOLONG</CODE>
+<DD>
+pathname was too long.
+
+<DT><CODE>ENOENT</CODE>
+<DD>
+A directory component in pathname does not exist.
+
+<DT><CODE>ENODEV</CODE>
+<DD>
+pathname refers to a device, pipe, named pipe or socket.
+
+<DT><CODE>EROFS</CODE>
+<DD>
+pathname refers to a file on a read-only filesystem and
+write access was requested.
+
+<DT><CODE>EFAULT</CODE>
+<DD>
+pathname is an invalid pointer value.
+
+<DT><CODE>ENOSPC</CODE>
+<DD>
+No space on device to create the file.
+
+<DT><CODE>EMFILE</CODE>
+<DD>
+The process already has the maximum number of files open.
+
+<DT><CODE>ENFILE</CODE>
+<DD>
+The limit on the total number of files open on the system
+has been reached.
+
+<DT><CODE>EINTR</CODE>
+<DD>
+The call was interrupted by the user.
+</DL>
+
+
+
+<H4><A NAME="SEC321" HREF="gdb_toc.html#TOC321">close</A></H4>
+<P>
+<A NAME="IDX1807"></A>
+
+</P>
+
+<PRE>
+Synopsis:
+int close(int fd);
+
+Request:
+Fclose,fd
+
+Return value:
+close returns zero on success, or -1 if an error occurred.
+
+Errors:
+</PRE>
+
+<DL COMPACT>
+
+<DT><CODE>EBADF</CODE>
+<DD>
+fd isn't a valid open file descriptor.
+
+<DT><CODE>EINTR</CODE>
+<DD>
+The call was interrupted by the user.
+</DL>
+
+
+
+<H4><A NAME="SEC322" HREF="gdb_toc.html#TOC322">read</A></H4>
+<P>
+<A NAME="IDX1808"></A>
+
+</P>
+
+<PRE>
+Synopsis:
+int read(int fd, void *buf, unsigned int count);
+
+Request:
+Fread,fd,bufptr,count
+
+Return value:
+On success, the number of bytes read is returned.
+Zero indicates end of file.  If count is zero, read
+returns zero as well.  On error, -1 is returned.
+
+Errors:
+</PRE>
+
+<DL COMPACT>
+
+<DT><CODE>EBADF</CODE>
+<DD>
+fd is not a valid file descriptor or is not open for
+reading.
+
+<DT><CODE>EFAULT</CODE>
+<DD>
+buf is an invalid pointer value.
+
+<DT><CODE>EINTR</CODE>
+<DD>
+The call was interrupted by the user.
+</DL>
+
+
+
+<H4><A NAME="SEC323" HREF="gdb_toc.html#TOC323">write</A></H4>
+<P>
+<A NAME="IDX1809"></A>
+
+</P>
+
+<PRE>
+Synopsis:
+int write(int fd, const void *buf, unsigned int count);
+
+Request:
+Fwrite,fd,bufptr,count
+
+Return value:
+On success, the number of bytes written are returned.
+Zero indicates nothing was written.  On error, -1
+is returned.
+
+Errors:
+</PRE>
+
+<DL COMPACT>
+
+<DT><CODE>EBADF</CODE>
+<DD>
+fd is not a valid file descriptor or is not open for
+writing.
+
+<DT><CODE>EFAULT</CODE>
+<DD>
+buf is an invalid pointer value.
+
+<DT><CODE>EFBIG</CODE>
+<DD>
+An attempt was made to write a file that exceeds the
+host specific maximum file size allowed.
+
+<DT><CODE>ENOSPC</CODE>
+<DD>
+No space on device to write the data.
+
+<DT><CODE>EINTR</CODE>
+<DD>
+The call was interrupted by the user.
+</DL>
+
+
+
+<H4><A NAME="SEC324" HREF="gdb_toc.html#TOC324">lseek</A></H4>
+<P>
+<A NAME="IDX1810"></A>
+
+</P>
+
+<PRE>
+Synopsis:
+long lseek (int fd, long offset, int flag);
+
+Request:
+Flseek,fd,offset,flag
+</PRE>
+
+<P>
+<CODE>flag</CODE> is one of:
+
+</P>
+<DL COMPACT>
+
+<DT><CODE>SEEK_SET</CODE>
+<DD>
+The offset is set to offset bytes.
+
+<DT><CODE>SEEK_CUR</CODE>
+<DD>
+The offset is set to its current location plus offset
+bytes.
+
+<DT><CODE>SEEK_END</CODE>
+<DD>
+The offset is set to the size of the file plus offset
+bytes.
+</DL>
+
+
+<PRE>
+Return value:
+On success, the resulting unsigned offset in bytes from
+the beginning of the file is returned.  Otherwise, a
+value of -1 is returned.
+
+Errors:
+</PRE>
+
+<DL COMPACT>
+
+<DT><CODE>EBADF</CODE>
+<DD>
+fd is not a valid open file descriptor.
+
+<DT><CODE>ESPIPE</CODE>
+<DD>
+fd is associated with the GDB console.
+
+<DT><CODE>EINVAL</CODE>
+<DD>
+flag is not a proper value.
+
+<DT><CODE>EINTR</CODE>
+<DD>
+The call was interrupted by the user.
+</DL>
+
+
+
+<H4><A NAME="SEC325" HREF="gdb_toc.html#TOC325">rename</A></H4>
+<P>
+<A NAME="IDX1811"></A>
+
+</P>
+
+<PRE>
+Synopsis:
+int rename(const char *oldpath, const char *newpath);
+
+Request:
+Frename,oldpathptr/len,newpathptr/len
+
+Return value:
+On success, zero is returned.  On error, -1 is returned.
+
+Errors:
+</PRE>
+
+<DL COMPACT>
+
+<DT><CODE>EISDIR</CODE>
+<DD>
+newpath is an existing directory, but oldpath is not a
+directory.
+
+<DT><CODE>EEXIST</CODE>
+<DD>
+newpath is a non-empty directory.
+
+<DT><CODE>EBUSY</CODE>
+<DD>
+oldpath or newpath is a directory that is in use by some
+process.
+
+<DT><CODE>EINVAL</CODE>
+<DD>
+An attempt was made to make a directory a subdirectory
+of itself.
+
+<DT><CODE>ENOTDIR</CODE>
+<DD>
+A  component used as a directory in oldpath or new
+path is not a directory.  Or oldpath is a directory
+and newpath exists but is not a directory.
+
+<DT><CODE>EFAULT</CODE>
+<DD>
+oldpathptr or newpathptr are invalid pointer values.
+
+<DT><CODE>EACCES</CODE>
+<DD>
+No access to the file or the path of the file.
+
+<DT><CODE>ENAMETOOLONG</CODE>
+<DD>
+oldpath or newpath was too long.
+
+<DT><CODE>ENOENT</CODE>
+<DD>
+A directory component in oldpath or newpath does not exist.
+
+<DT><CODE>EROFS</CODE>
+<DD>
+The file is on a read-only filesystem.
+
+<DT><CODE>ENOSPC</CODE>
+<DD>
+The device containing the file has no room for the new
+directory entry.
+
+<DT><CODE>EINTR</CODE>
+<DD>
+The call was interrupted by the user.
+</DL>
+
+
+
+<H4><A NAME="SEC326" HREF="gdb_toc.html#TOC326">unlink</A></H4>
+<P>
+<A NAME="IDX1812"></A>
+
+</P>
+
+<PRE>
+Synopsis:
+int unlink(const char *pathname);
+
+Request:
+Funlink,pathnameptr/len
+
+Return value:
+On success, zero is returned.  On error, -1 is returned.
+
+Errors:
+</PRE>
+
+<DL COMPACT>
+
+<DT><CODE>EACCES</CODE>
+<DD>
+No access to the file or the path of the file.
+
+<DT><CODE>EPERM</CODE>
+<DD>
+The system does not allow unlinking of directories.
+
+<DT><CODE>EBUSY</CODE>
+<DD>
+The file pathname cannot be unlinked because it's
+being used by another process.
+
+<DT><CODE>EFAULT</CODE>
+<DD>
+pathnameptr is an invalid pointer value.
+
+<DT><CODE>ENAMETOOLONG</CODE>
+<DD>
+pathname was too long.
+
+<DT><CODE>ENOENT</CODE>
+<DD>
+A directory component in pathname does not exist.
+
+<DT><CODE>ENOTDIR</CODE>
+<DD>
+A component of the path is not a directory.
+
+<DT><CODE>EROFS</CODE>
+<DD>
+The file is on a read-only filesystem.
+
+<DT><CODE>EINTR</CODE>
+<DD>
+The call was interrupted by the user.
+</DL>
+
+
+
+<H4><A NAME="SEC327" HREF="gdb_toc.html#TOC327">stat/fstat</A></H4>
+<P>
+<A NAME="IDX1813"></A>
+<A NAME="IDX1814"></A>
+
+</P>
+
+<PRE>
+Synopsis:
+int stat(const char *pathname, struct stat *buf);
+int fstat(int fd, struct stat *buf);
+
+Request:
+Fstat,pathnameptr/len,bufptr
+Ffstat,fd,bufptr
+
+Return value:
+On success, zero is returned.  On error, -1 is returned.
+
+Errors:
+</PRE>
+
+<DL COMPACT>
+
+<DT><CODE>EBADF</CODE>
+<DD>
+fd is not a valid open file.
+
+<DT><CODE>ENOENT</CODE>
+<DD>
+A directory component in pathname does not exist or the
+path is an empty string.
+
+<DT><CODE>ENOTDIR</CODE>
+<DD>
+A component of the path is not a directory.
+
+<DT><CODE>EFAULT</CODE>
+<DD>
+pathnameptr is an invalid pointer value.
+
+<DT><CODE>EACCES</CODE>
+<DD>
+No access to the file or the path of the file.
+
+<DT><CODE>ENAMETOOLONG</CODE>
+<DD>
+pathname was too long.
+
+<DT><CODE>EINTR</CODE>
+<DD>
+The call was interrupted by the user.
+</DL>
+
+
+
+<H4><A NAME="SEC328" HREF="gdb_toc.html#TOC328">gettimeofday</A></H4>
+<P>
+<A NAME="IDX1815"></A>
+
+</P>
+
+<PRE>
+Synopsis:
+int gettimeofday(struct timeval *tv, void *tz);
+
+Request:
+Fgettimeofday,tvptr,tzptr
+
+Return value:
+On success, 0 is returned, -1 otherwise.
+
+Errors:
+</PRE>
+
+<DL COMPACT>
+
+<DT><CODE>EINVAL</CODE>
+<DD>
+tz is a non-NULL pointer.
+
+<DT><CODE>EFAULT</CODE>
+<DD>
+tvptr and/or tzptr is an invalid pointer value.
+</DL>
+
+
+
+<H4><A NAME="SEC329" HREF="gdb_toc.html#TOC329">isatty</A></H4>
+<P>
+<A NAME="IDX1816"></A>
+
+</P>
+
+<PRE>
+Synopsis:
+int isatty(int fd);
+
+Request:
+Fisatty,fd
+
+Return value:
+Returns 1 if fd refers to the GDB console, 0 otherwise.
+
+Errors:
+</PRE>
+
+<DL COMPACT>
+
+<DT><CODE>EINTR</CODE>
+<DD>
+The call was interrupted by the user.
+</DL>
+
+
+
+<H4><A NAME="SEC330" HREF="gdb_toc.html#TOC330">system</A></H4>
+<P>
+<A NAME="IDX1817"></A>
+
+</P>
+
+<PRE>
+Synopsis:
+int system(const char *command);
+
+Request:
+Fsystem,commandptr/len
+
+Return value:
+The value returned is -1 on error and the return status
+of the command otherwise.  Only the exit status of the
+command is returned, which is extracted from the hosts
+system return value by calling WEXITSTATUS(retval).
+In case /bin/sh could not be executed, 127 is returned.
+
+Errors:
+</PRE>
+
+<DL COMPACT>
+
+<DT><CODE>EINTR</CODE>
+<DD>
+The call was interrupted by the user.
+</DL>
+
+
+
+<H3><A NAME="SEC331" HREF="gdb_toc.html#TOC331">Protocol specific representation of datatypes</A></H3>
+<P>
+<A NAME="IDX1818"></A>
+
+</P>
+
+
+
+<H4><A NAME="SEC332" HREF="gdb_toc.html#TOC332">Integral datatypes</A></H4>
+<P>
+<A NAME="IDX1819"></A>
+
+</P>
+<P>
+The integral datatypes used in the system calls are
+
+</P>
+
+<PRE>
+int, unsigned int, long, unsigned long, mode_t and time_t
+</PRE>
+
+<P>
+<CODE>Int</CODE>, <CODE>unsigned int</CODE>, <CODE>mode_t</CODE> and <CODE>time_t</CODE> are
+implemented as 32 bit values in this protocol.
+
+</P>
+<P>
+<CODE>Long</CODE> and <CODE>unsigned long</CODE> are implemented as 64 bit types.
+
+</P>
+<P>
+See section <A HREF="gdb_33.html#SEC341">Limits</A>, for corresponding MIN and MAX values (similar to those
+in <TT>`limits.h'</TT>) to allow range checking on host and target.
+
+</P>
+<P>
+<CODE>time_t</CODE> datatypes are defined as seconds since the Epoch.
+
+</P>
+<P>
+All integral datatypes transferred as part of a memory read or write of a
+structured datatype e.g. a <CODE>struct stat</CODE> have to be given in big endian
+byte order.
+
+</P>
+
+
+<H4><A NAME="SEC333" HREF="gdb_toc.html#TOC333">Pointer values</A></H4>
+<P>
+<A NAME="IDX1820"></A>
+
+</P>
+<P>
+Pointers to target data are transmitted as they are.  An exception
+is made for pointers to buffers for which the length isn't
+transmitted as part of the function call, namely strings.  Strings
+are transmitted as a pointer/length pair, both as hex values, e.g.
+
+</P>
+
+<PRE>
+<CODE>1aaf/12</CODE>
+</PRE>
+
+<P>
+which is a pointer to data of length 18 bytes at position 0x1aaf.
+The length is defined as the full string length in bytes, including
+the trailing null byte.  Example:
+
+</P>
+
+<PRE>
+"hello, world" at address 0x123456
+</PRE>
+
+<P>
+is transmitted as
+
+</P>
+
+<PRE>
+<CODE>123456/d</CODE>
+</PRE>
+
+
+
+<H4><A NAME="SEC334" HREF="gdb_toc.html#TOC334">struct stat</A></H4>
+<P>
+<A NAME="IDX1821"></A>
+
+</P>
+<P>
+The buffer of type struct stat used by the target and GDB is defined
+as follows:
+
+</P>
+
+<PRE>
+struct stat {
+    unsigned int  st_dev;      /* device */
+    unsigned int  st_ino;      /* inode */
+    mode_t        st_mode;     /* protection */
+    unsigned int  st_nlink;    /* number of hard links */
+    unsigned int  st_uid;      /* user ID of owner */
+    unsigned int  st_gid;      /* group ID of owner */
+    unsigned int  st_rdev;     /* device type (if inode device) */
+    unsigned long st_size;     /* total size, in bytes */
+    unsigned long st_blksize;  /* blocksize for filesystem I/O */
+    unsigned long st_blocks;   /* number of blocks allocated */
+    time_t        st_atime;    /* time of last access */
+    time_t        st_mtime;    /* time of last modification */
+    time_t        st_ctime;    /* time of last change */
+};
+</PRE>
+
+<P>
+The integral datatypes are conforming to the definitions given in the
+approriate section (see section <A HREF="gdb_33.html#SEC332">Integral datatypes</A>, for details) so this
+structure is of size 64 bytes.
+
+</P>
+<P>
+The values of several fields have a restricted meaning and/or
+range of values.
+
+</P>
+
+<PRE>
+st_dev:     0       file
+            1       console
+
+st_ino:     No valid meaning for the target.  Transmitted unchanged.
+
+st_mode:    Valid mode bits are described in Appendix C.  Any other
+            bits have currently no meaning for the target.
+
+st_uid:     No valid meaning for the target.  Transmitted unchanged.
+
+st_gid:     No valid meaning for the target.  Transmitted unchanged.
+
+st_rdev:    No valid meaning for the target.  Transmitted unchanged.
+
+st_atime, st_mtime, st_ctime:
+            These values have a host and file system dependent
+            accuracy.  Especially on Windows hosts the file systems
+            don't support exact timing values.
+</PRE>
+
+<P>
+The target gets a struct stat of the above representation and is
+responsible to coerce it to the target representation before
+continuing.
+
+</P>
+<P>
+Note that due to size differences between the host and target
+representation of stat members, these members could eventually
+get truncated on the target.
+
+</P>
+
+
+<H4><A NAME="SEC335" HREF="gdb_toc.html#TOC335">struct timeval</A></H4>
+<P>
+<A NAME="IDX1822"></A>
+
+</P>
+<P>
+The buffer of type struct timeval used by the target and GDB
+is defined as follows:
+
+</P>
+
+<PRE>
+struct timeval {
+    time_t tv_sec;  /* second */
+    long   tv_usec; /* microsecond */
+};
+</PRE>
+
+<P>
+The integral datatypes are conforming to the definitions given in the
+approriate section (see section <A HREF="gdb_33.html#SEC332">Integral datatypes</A>, for details) so this
+structure is of size 8 bytes.
+
+</P>
+
+
+<H3><A NAME="SEC336" HREF="gdb_toc.html#TOC336">Constants</A></H3>
+<P>
+<A NAME="IDX1823"></A>
+
+</P>
+<P>
+The following values are used for the constants inside of the
+protocol.  GDB and target are resposible to translate these
+values before and after the call as needed.
+
+</P>
+
+
+
+<H4><A NAME="SEC337" HREF="gdb_toc.html#TOC337">Open flags</A></H4>
+<P>
+<A NAME="IDX1824"></A>
+
+</P>
+<P>
+All values are given in hexadecimal representation.
+
+</P>
+
+<PRE>
+  O_RDONLY        0x0
+  O_WRONLY        0x1
+  O_RDWR          0x2
+  O_APPEND        0x8
+  O_CREAT       0x200
+  O_TRUNC       0x400
+  O_EXCL        0x800
+</PRE>
+
+
+
+<H4><A NAME="SEC338" HREF="gdb_toc.html#TOC338">mode_t values</A></H4>
+<P>
+<A NAME="IDX1825"></A>
+
+</P>
+<P>
+All values are given in octal representation.
+
+</P>
+
+<PRE>
+  S_IFREG       0100000
+  S_IFDIR        040000
+  S_IRUSR          0400
+  S_IWUSR          0200
+  S_IXUSR          0100
+  S_IRGRP           040
+  S_IWGRP           020
+  S_IXGRP           010
+  S_IROTH            04
+  S_IWOTH            02
+  S_IXOTH            01
+</PRE>
+
+
+
+<H4><A NAME="SEC339" HREF="gdb_toc.html#TOC339">Errno values</A></H4>
+<P>
+<A NAME="IDX1826"></A>
+
+</P>
+<P>
+All values are given in decimal representation.
+
+</P>
+
+<PRE>
+  EPERM           1
+  ENOENT          2
+  EINTR           4
+  EBADF           9
+  EACCES         13
+  EFAULT         14
+  EBUSY          16
+  EEXIST         17
+  ENODEV         19
+  ENOTDIR        20
+  EISDIR         21
+  EINVAL         22
+  ENFILE         23
+  EMFILE         24
+  EFBIG          27
+  ENOSPC         28
+  ESPIPE         29
+  EROFS          30
+  ENAMETOOLONG   91
+  EUNKNOWN       9999
+</PRE>
+
+<P>
+  EUNKNOWN is used as a fallback error value if a host system returns
+  any error value not in the list of supported error numbers.
+
+</P>
+
+
+<H4><A NAME="SEC340" HREF="gdb_toc.html#TOC340">Lseek flags</A></H4>
+<P>
+<A NAME="IDX1827"></A>
+
+</P>
+
+<PRE>
+  SEEK_SET      0
+  SEEK_CUR      1
+  SEEK_END      2
+</PRE>
+
+
+
+<H4><A NAME="SEC341" HREF="gdb_toc.html#TOC341">Limits</A></H4>
+<P>
+<A NAME="IDX1828"></A>
+
+</P>
+<P>
+All values are given in decimal representation.
+
+</P>
+
+<PRE>
+  INT_MIN       -2147483648
+  INT_MAX        2147483647
+  UINT_MAX       4294967295
+  LONG_MIN      -9223372036854775808
+  LONG_MAX       9223372036854775807
+  ULONG_MAX      18446744073709551615
+</PRE>
+
+
+
+<H3><A NAME="SEC342" HREF="gdb_toc.html#TOC342">File-I/O Examples</A></H3>
+<P>
+<A NAME="IDX1829"></A>
+
+</P>
+<P>
+Example sequence of a write call, file descriptor 3, buffer is at target
+address 0x1234, 6 bytes should be written:
+
+</P>
+
+<PRE>
+&#60;- <CODE>Fwrite,3,1234,6</CODE>
+<EM>request memory read from target</EM>
+-&#62; <CODE>m1234,6</CODE>
+&#60;- XXXXXX
+<EM>return "6 bytes written"</EM>
+-&#62; <CODE>F6</CODE>
+</PRE>
+
+<P>
+Example sequence of a read call, file descriptor 3, buffer is at target
+address 0x1234, 6 bytes should be read:
+
+</P>
+
+<PRE>
+&#60;- <CODE>Fread,3,1234,6</CODE>
+<EM>request memory write to target</EM>
+-&#62; <CODE>X1234,6:XXXXXX</CODE>
+<EM>return "6 bytes read"</EM>
+-&#62; <CODE>F6</CODE>
+</PRE>
+
+<P>
+Example sequence of a read call, call fails on the host due to invalid
+file descriptor (EBADF):
+
+</P>
+
+<PRE>
+&#60;- <CODE>Fread,3,1234,6</CODE>
+-&#62; <CODE>F-1,9</CODE>
+</PRE>
+
+<P>
+Example sequence of a read call, user presses Ctrl-C before syscall on
+host is called:
+
+</P>
+
+<PRE>
+&#60;- <CODE>Fread,3,1234,6</CODE>
+-&#62; <CODE>F-1,4,C</CODE>
+&#60;- <CODE>T02</CODE>
+</PRE>
+
+<P>
+Example sequence of a read call, user presses Ctrl-C after syscall on
+host is called:
+
+</P>
+
+<PRE>
+&#60;- <CODE>Fread,3,1234,6</CODE>
+-&#62; <CODE>X1234,6:XXXXXX</CODE>
+&#60;- <CODE>T02</CODE>
+</PRE>
+
+<P><HR><P>
+Go to the <A HREF="gdb_1.html">first</A>, <A HREF="gdb_32.html">previous</A>, <A HREF="gdb_34.html">next</A>, <A HREF="gdb_36.html">last</A> section, <A HREF="gdb_toc.html">table of contents</A>.
+</BODY>
+</HTML>

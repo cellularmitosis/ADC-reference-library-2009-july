@@ -1,0 +1,126 @@
+<html><head><title>The EOControl Framework</title></head>
+<body bgcolor="#ffffff">
+
+<!-- start of header -->
+<!--#include virtual="/includes/framesetheader" -->
+<!-- end of header -->
+
+<!--start of path -->
+<font face="Geneva,Helvetica,Arial" size="1">
+<b>PATH<spacer type="horizontal" size="5">&nbsp;</b>
+ <a href="../../../../../../../../../webobjects.html" target="_top">WebObjects 4.0 Documentation</a> <b>&gt;</b>
+ <a href="frameset.html" target="_top">EOControl Reference</a>
+</font>
+<br><br>
+<!--end of path -->
+
+<!-- start of navigation -->
+<a href="Classes/EOArrayDataSource.html"><img src="../../../../../../../../../images/next.gif" border="0"></a>
+<!-- end of navigation -->
+
+		<hr>
+		<br>
+		<h1><a name="//apple_ref/java/cl/The EOControl Framework">The EOControl Framework</a> <br>
+		</h1>
+		<p><b>Framework:</b><br>
+		com.apple.client.eocontrol (Java Client)<br>
+		com.apple.yellow.eocontrol (Yellow Box) 
+		<p>System/Developer/Java/Headers 
+		<p>
+		<h2><br>
+		</h2>
+		<p>The EOInterface framework defines one of the layers of the Enterprise Objects Framework architecture-the control layer. It provides an infrastructure for enterprise objects that is independent of your application's user interface and its storage mechanism. The control layer dynamically manages the interaction between enterprise objects, the access layer, and the interface layer by: 
+		<p>
+		<ul>
+			<li>Tracking changes to enteprise objects 
+			<p>
+			<li>Prompting the user interface to change when object values change 
+			<p>
+			<li>Prompting the database to change when changes to objects are committed 
+			<p>
+			<li>Managing undo in the object graph 
+			<p>
+			<li>Managing uniquing (the mechanism by which Enterprise Objects Framework uniquely identifies enterprise objects and maintains their mapping to stored data in the database) 
+			<p>
+		</ul>
+		The control layer's major areas of responsibility and the key classes involved are described in the following table: 
+		<p><table border="3">
+			<caption></caption>
+			<tr>
+				<th><b>Responsibility </b></th>
+				<th><b>Classes </b></th>
+			</tr>
+			<tr>
+				<td scope="row"><a href="EOControl.html">Tracking Enterprise Objects ChangesEOControl</a> </td>
+				<td><a href="Classes/EOObserverCenter.html">EOObserverCenter</a><br>
+					<a href="Classes/EODelayedObserverQueue.html">EODelayedObserverQueue</a><br>
+					<a href="Classes/EODelayedObserver.html">EODelayedObserver</a><br>
+					<a href="Classes/EOObserverProxy.html">EOObserverProxy</a><br>
+					<a href="Protocols/EOObserving.html">EOObserving</a> (interface) </td>
+			</tr>
+			<tr>
+				<td scope="row"><a href="EOControl.html">Object Storage Abstraction</a> </td>
+				<td><a href="Classes/EOObjectStore.html">EOObjectStore</a> <a href="Classes/EOCooperatingObjectStore.html">EOCooperatingObjectStore</a> (Yellow Box only) <a href="Classes/EOObjectStoreCoordinator.html">EOObjectStoreCoordinator</a> (Yellow Box only) <a href="Classes/EOGlobalID.html">EOGlobalID</a> <a href="Classes/EOKeyGlobalID.html">EOKeyGlobalID</a> <a href="Classes/EOTemporaryGlobalID.html">EOTemporaryGlobalID</a> </td>
+			</tr>
+			<tr>
+				<td scope="row">Query specification </td>
+				<td>EOFetchSpecification<br>
+					EOQualifier<br>
+					EOSortOrdering </td>
+			</tr>
+			<tr>
+				<td scope="row">Interaction with enterprise objects </td>
+				<td>EOClassDescription (validation)<br>
+					NSObjectAdditions (basic enterprise object behavior) </td>
+			</tr>
+			<tr>
+				<td scope="row">Simple source of objects (for display groups) </td>
+				<td>EODataSource, EODetailDataSource </td>
+			</tr>
+		</table><table>
+			<tr>
+				<td>
+				</table>
+				<p>The following sections describe each responsibility in greater detail. 
+				<p><a name="2905">
+				<h4>Tracking Enterprise Objects Changes</h4>
+				</a>EOControl provides four classes and an interface that form an efficient, specialized mechanism for tracking changes to enterprise objects and for managing the notification of those changes to interested observers. EOObserverCenter is the central manager of change notification. It records observers and the objects they observe, and it distributes notifications when the observable objects change. Observers implement the EOObserving interface, which defines one method, <a href="Protocols/EOObserving.html"><b>objectWillChange </b></a>. Observable objects (generally enterprise objects) invoke their <a href="Protocols/EOEnterpriseObject.html"><b>willChange </b></a>method before altering their state, which causes all observers to receive an <a href="Protocols/EOObserving.html"><b>objectWillChange </b></a>message. 
+				<p>The other three classes add to the basic observation mechanism. EODelayedObserverQueue alters the basic, synchronous change notification mechanism by offering different priority levels, which allows observers to specify the order in which they're notified of changes. EODelayedObserver is an abstract superclass for objects that observe other objects (such as the EOInterface layer's EOAssociation classes). Finally, EOObserverProxy is a subclass of EODelayedObserver that forwards change messages to a target object, allowing objects that don't inherit from EODelayedObserver to take advantage of this mechanism. 
+				<p>The major observer in Enterprise Objects Framework is EOEditingContext, which implements its <a href="Protocols/EOObserving.html"><b>objectWillChange </b></a>method to record a snapshot for the object about to change, register undo operations in an NSUndoManager, and record the changes needed to update objects in its EOObjectStore. Because some of these actions-such as examining the object's new state-can only be performed after the object has changed, an EOEditingContext sets up a delayed message to itself, which it gets at the end of the run loop. Observers that only need to examine an object after it has changed can use the delayed observer mechanism, described in the EODelayedObserver and EODelayedObserverQueue class specifications. 
+				<p><a name="2639">
+				<hr width="50%" align="left">
+				<h3>Object Storage Abstraction</h3>
+				</a>The control layer provides an infrastructure that's independent of your application's storage mechanism (typically a database) by defining an API for an &quot;intelligent&quot; repository of objects, whether it's based on external data or whether it manages objects entirely in memory. EOObjectStore is an abstract class that defines that basic API, setting up the framework for constructing and registering enterprise objects, servicing object faults, and committing changes made in an EOEditingContext. Subclasses of EOObjectStore implement the API in terms of their specific storage mechanism. 
+				<p><a name="3200">
+				<hr width="25%" align="left">
+				<h4>Subclasses of EOObjectStore</h4>
+				</a>EOEditingContext is the principal subclass of EOObjectStore and is used for managing objects in memory. For stores based on external data, there are several subclasses. EOCooperatingObjectStore defines stores that work together to manage data from several distinct sources (such as different databases). The access layer's EODatabaseContext is actually a subclass of this class. A group of cooperating stores is managed by another subclass of EOObjectStore, EOObjectStoreCoordinator. If you're defining a subclass of EOObjectStore, it's probably one based on an external data repository, and it should therefore inherit from EOCooperatingObjectStore so as to work well with an EOObjectStoreCoordinator-though this isn't required. 
+				<p>EODatabaseContext provides objects from relational databases and is therefore provided by Enterprise Objects Framework's access layer. It is the class that defines the interaction between the control and access layers. Database contexts and other object stores based on external data are often shared by several editing contexts to conserve database connections. 
+				<p>Object store subclasses cooperate with one another as illustrated in the following: 
+				<p><img src="EOControl.anc.gif"> 
+				<p>Note that EOCooperatingObjectStore, EOObjectStoreCoordinator, and EODatabaseContext are not provided by Java Client. 
+				<p><a name="3340">
+				<hr width="25%" align="left">
+				<h4>Registering Enterprise Objects</h4>
+				</a>An object store identifies its objects in two ways: 
+				<p>
+				<ul>
+					<li>By reference for identification within a specific editing context<br>
+					<li>By global ID for universal identification of the same record among multiple stores.<br>
+				</ul>
+				<p>A global ID is defined by three classes: EOGlobalID, EOKeyGlobalID, and EOTemporaryGlobalID. EOGlobalID is an abstract class that forms the basis for uniquing in Enterprise Objects Framework. EOKeyGlobalID is a concrete subclass of EOGlobalID whose instances represent persistent IDs based on the access layer's EOModel information: an entity and the primary key values for the object being identified. An EOTemporaryGlobalID object is used to identify a newly created enterprise object before it's saved to an external store. For more information, see the <a href="Classes/EOGlobalID.html">EOGlobalID</a> class specification. 
+				<p><a name="3207">
+				<hr width="25%" align="left">
+				<h4>Servicing Faults</h4>
+				</a>For external repositories, an object store might delay fetching an object's data, instead creating an empty enterprise object (called a <em>fault</em>). When a fault is accessed (sent a message), it triggers its object store to fetch its data and fill the fault with its data. This preserves both the object's reference and its EOGlobalID, while saving the cost of fetching data that might not be used. Faults are typically created for the destinations of relationships for objects that are explicitly fetched. See the <a href="Classes/EOFaultHandler.html">EOFaultHandler</a> class specification for more information. 
+				<p>
+				<p>
+				<hr>
+				<br>
+				<a href="EOControlTOC.html">[TOC]</a> [Prev] <a href="Classes/EOArrayDataSource.html">[Next]</a> 
+				<hr>
+				<br>
+				<i>Copyright &copy; 1998, Apple Computer, Inc. All rights reserved.</i> <!-- Last updated: 09/21/98 18:02:17 -->
+			</body>
+
+		</html>

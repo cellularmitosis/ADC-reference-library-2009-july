@@ -1,0 +1,1055 @@
+<html>
+
+<body bgcolor="#FFFFFF">
+
+<CENTER><H1>Class next.wo.DisplayGroup</H1></CENTER>
+
+<DL>
+
+<DT><B>Extends:</B></DT><DD>next.util.NextObject</DD>
+
+</DL>
+
+<HR>
+<CENTER><A name="classataglance"><h2>CLASS AT A GLANCE</h2></a></CENTER>
+<h4>Purpose</h4>
+<P>
+A DisplayGroup collects a vector of objects from a next.eo.DataSource and displays and edits properties of those objects.
+<H4>Principal Attributes</h4>
+<UL>
+<LI>Vector of objects supplied by a next.eo.DataSource
+<LI>next.eo.Qualifier and next.eo.SortOrderings to filter the objects for display
+<LI>Vector of selection indexes
+<LI>Delegate
+</UL>
+<H4>Creation</H4>
+WebObjects Builder
+<br>
+DisplayGroup()
+<H4>Commonly Used Methods</H4>
+<TABLE><TR>
+<TD>allObjects</td>
+<td>Returns all objects in the DisplayGroup.</td>
+</TR><TR>
+<TD>displayedObjects</td><TD>Returns the subset of all objects made available for display.</td>
+</TR><TR>
+<td>selectedObjects</td><td>Returns the selected objects.</td>
+</TR><TR>
+<td>setQualifier</td><td>Sets a filter that limits the objects displayed.</td>
+</TR><TR>
+<td>setSortOrdering</td><td>Sets the ordering used to sort the objects.</td>
+</TR><TR>
+<td>updateDisplayedObjects</td><td>Filters, sorts, and redisplays the objects</td>
+</TR><TR>
+<td>insert</td><td>Creates a new object and inserts it into the DataSource.</td>
+</tr></table>
+<HR>
+<a name="description"></a><CENTER><H2>CLASS DESCRIPTION</H2></CENTER>
+
+<!-- extends:next.util.NextObject -->
+
+<P>
+
+A next.wo.DisplayGroup is the basic user interface manager for a WebObjects application that accesses a database. It collects objects from a next.eo.DataSource, filters and sorts them, and maintains a selection in the filtered subset. You bind WebObjects dynamic elements to DisplayGroup attributes and methods to display information from the database on your web page. 
+<P>
+A DisplayGroup manipulates its DataSource by sending it <b>fetchObjects</b>, <b>insertObject</b>, and other messages, and registers itself as an editor and message handler of the DataSource's next.eo.EditingContext. The EditingContext then monitors the DisplayGroup for changes to objects.
+<P>
+Most of a DisplayGroup's interactions are with its DataSource and its EditingContext. See the 
+<!--
+<A HREF="../../eo/DataSource/DataSource.html" target=_top>
+-->
+next.eo.DataSource,
+<!-- </a>
+-->
+ and 
+<!-- <A HREF="../../eo/EditingContext/EditingContext.html" target=_top>
+-->
+next.eo.EditingContext
+<!-- </a>
+--> 
+class specifications for more information on these interactions.
+<P>
+<H3>Creating a DisplayGroup</H3>
+<P>
+You create most DisplayGroups in WebObjects Builder in one of these ways:
+<UL>
+<P><LI>By using the Database Wizard to create the DisplayGroup and the dynamic elements that are bound to it. 
+<P><LI>By dragging an entity icon from the EOModeler application to create a DisplayGroup associated with the model's data source.
+<P><LI>By choosing the Tools->Script->Add Display Group menu item to create a DisplayGroup not bound to a data source.
+</UL>
+<P>DisplayGroups with DataSources operate independent of other DisplayGroups, while those without DataSources must be set up in a master-detail association with another DisplayGroup. For more information on setting up DisplayGroups in WebObjects Builder, see:
+<UL>
+<LI>
+"<A HREF="../../../../../GettingStarted/Movies/Movies.book.html" target=_top>Creating a Web-Based Database Application With WebObjects Builder</a>" in <i>Getting Started</i>.
+<P><LI>
+"<A HREF="../../../../../WOBuilder/Script/Script.book.html" target=_top>Writing WebScript in WebObjects Builder</a>" in <i>Using WebObjects Builder</i>.
+</UL>
+<P>
+To create a DisplayGroup programmatically, simply initialize it and set its DataSource:
+<P><PRE>import next.eo.*;
+import next.wo.*;
+
+...
+
+DataSource myDataSource;    /* Assume this exists. */
+DisplayGroup myDisplayGroup;
+
+myDisplayGroup = DisplayGroup();
+myDisplayGroup.setDataSource(myDataSource);
+</PRE>
+<H3>Getting Objects</H3>
+<P>
+Since a DisplayGroup isn't much use without objects to manage, the first thing you do with a DisplayGroup is send it a <b>fetch</b> message. You can use the basic <b>fetch</b> method, or you can configure the DisplayGroup in WebObjects Builder to fetch automatically when its component is loaded. The <b>fetch</b> method asks the DisplayGroup's DataSource to fetch from its persistent store with a <b>fetchObjects</b> message.
+
+<H4>Filtering and Sorting</H4>
+<P>
+A DisplayGroup's fetched objects are available through its <b>allObjects</b> method. These objects are treated only as candidates for display, however. The vector of objects actually displayed is filtered and sorted by the DisplayGroup's delegate or by a qualifier and a sort ordering vector. You set the qualifier and sort orderings using the <b>setQualifier</b> and <b>setSortOrdering</B> methods. The <b>displayedObjects</b> method returns this filtered and sorted vector; index arguments to other DisplayGroup methods are defined in terms of this vector.
+<P>
+If the DisplayGroup has a delegate that responds to <B>displayArrayForObjects</B> (defined in the <A HREF="../DisplayGroupDelegate/DisplayGroupDelegate.html" target=_top>next.wo.DisplayGroupDelegate</a> interface), it invokes this method rather than using its own qualifier and sort ordering vector. The delegate is then responsible for filtering the objects and returning a sorted vector. If the delegate only needs to perform one of these steps, it can get the qualifier or sort orderings from the DisplayGroup and apply either itself using the 
+<!-- <A HREF="../../eo/Qualifier/Qualifier.html" target=_top>
+-->
+next.eo.Qualifier
+<!-- </A> 
+-->
+method 
+<b>vectorByFilteringWithQualifier</b> and the 
+<!-- <A HREF="../../eo/SortOrdering/SortOrdering.html" target=_top>
+-->
+next.eo.SortOrdering
+<!-- </A> 
+-->
+method 
+<b>sortedVectorUsingKeyOrders</b>.
+<P>
+If you change the qualifier or sort ordering, or alter the delegate in a way that changes how it filters and sorts the DisplayGroup's objects, you can send <B>updateDisplayedObjects</b> to the DisplayGroup to get it to refilter and resort its objects. Note that this doesn't cause the DisplayGroup to refetch.
+
+<H4>Batching the Output</H4>
+<P>
+Even after the output has been qualifier and sorted, there might be too many objects to display on a single HTML page. For this reason and to improve your application's performance, DisplayGroup supports batching the display. When batching is used, the HTML page shows only a certain number of objects at a time. If you create the DisplayGroup using WebObjects Builder, the default batch size is 10. Thus if there are one hundred objects to display, <b>displayedObjects</b> returns only the first ten of those objects when the page is drawn. If <b>displayNextBatch</b> is invoked, <b>displayedObjects</b> is updated to contain the next ten objects, and the page is redrawn.
+<P>
+You use <b>displayNextBatch</b> and <b>displayPreviousBatch</b> to move back and forth through the displayed objects. The <b>setNumberOfObjectsPerBatch</b> method changes the batch size. You can also change batch size using WebObjects Builder.  
+
+<H3>Changing and Examining the Selection</H3>
+<P>
+A DisplayGroup keeps a selection in terms of indexes into the vector of displayed objects. Components that display values for multiple objects are responsible for updating the selection in their DisplayGroups according to user actions on their dynamic elements. This is typically done with the <b>setSelectionIndexes</b> method. Other methods available for indirect manipulation of the selection are the action methods <b>selectNext</b> and <b>selectPrevious</b>.
+<P>
+To get the selection, you can use the <b>selectionIndexes</b> method, which returns a vector of Integers, or <b>selectedObjects</b>, which returns a vector containing the selected objects themselves. Another method, <b>selectedObject</b>, returns the first selected object if there is one.
+<P>
+<B>Note:  </B>The selection is a programmatical selection only. The selected objects don't actually appear highlighted on the web page. 
+
+<H3>The Delegate</H3>
+<P>
+The interface <A HREF="../DisplayGroupDelegate/DisplayGroupDelegate.html" target=_top>next.wo.DisplayGroupDelegate</a> offers a number of methods for the DisplayGroup's delegate to implement; if the delegate does, DisplayGroup invokes them as appropriate. Besides the aforementioned <b>displayArrayForObjects</b>, there are methods that inform the delegate that the DisplayGroup has fetched, created an object (or failed to create one), inserted or deleted an object, changed the selection, or set a value for a property. There are also methods that request permission from the delegate to perform most of these same actions. The delegate can return <b>true</b> to permit the action or <b>false</b> to deny it. See each method's description in the next.wo.DisplayGroupDelegate interface specification for more information.
+
+<H3>Performing Queries</H3>
+<P>
+If you are building a component that allows users to perform database queries, you use a DisplayGroup to construct a qualifier that reflects the query. 
+<P>
+Instead of performing the <b>fetch</b> method and then using <b>updateDisplayedObjects</b> to qualify and sort the objects returned by <b>fetch</b>, you use <b>executeQuery</b>. The <b>executeQuery</b> method builds a qualifier based on user input, performs a fetch using that qualifier, and then invokes the <b>setQualifier</b> method to set the DisplayGroup's qualifier to <b>null</b>. In this way, subsequent <b>updateDisplayedObjects</b> messages apply only the sort ordering to the displayed objects vector, as the qualifier has already been applied.
+<P>
+The method <b>inputObjectForQualifier</b> specifies the input values used to build the query. <b>inputObjectForQualifier</b> returns a MutableHashTable that you can modify to specify the query. Typically, you modify the hashtable through WebObjects Builder, by binding the hashtable's possible keys to dynamic elements in the component. When the user enters or chooses a value from the dynamic element, <b>inputObjectForQualifier</b>'s hashtable is updated to include the appropriate key/value pair.
+<P>
+If you want to support "from-to" queries, the hashtable returned by <b>inputObjectForQualifier</b> specifies only the values in the "from" part of the query. To specify the values for the "to" part of the query, use the hashtable returned by the <b>secondObjectForQualifier</b> method. You bind objects to the hashtable returned by <b>secondObjectForQualifier</b> in the same way that you bind object to <b>inputObjectForQualifier</b>. Because you are specifying a "from-to" query, the keys in the <b>secondObjectForQualifier</b> hashtable must be identical to the keys in the <b>inputObjectForQualifier</b>. 
+<P>
+For example, you might use <b>secondObjectForQualifier</b> if you were trying to construct a query that returned all movies that were released between two dates. Both the <b>inputObjectForQualifier</b> and the <b>secondObjectForQualifier</b> hashtables would have the "dateReleased" property. The <b>inputObjectForQualifier</b> value would be the starting date, and the <b>secondObjectForQualifier</b> value would be the ending date. 
+<P>
+The qualifier built by <b>executeQuery</b> differs from the qualifier associated with the DisplayGroup (using <b>setQualifier</b>) in when and where it is applied. The qualifier associated with the DisplayGroup filters objects after they are fetched into memory. The qualifier built by <b>executeQuery</b> is associated with the DataSource and thus is applied <i>before</i> the objects are fetched into memory. You can use both qualifiers on the same DisplayGroup; however, after you perform an <b>executeQuery</b> the qualifier associated with the DisplayGroup is set to <b>null</b> so that subsequent <b>updateDisplayedObjects</b> messages apply only the sort ordering to update the displayed objects vector. 
+<P>
+<hr>
+
+<!-- constructors -->
+
+<a name="constructors"><CENTER><H2>CONSTRUCTORS</H2></CENTER></a>
+
+<!-- consKey:DisplayGroup(public) cons:DisplayGroup descr:<TT>public  <B>DisplayGroup</B>()</TT> -->
+
+<H3><a name="DisplayGroup(public)">DisplayGroup</a></H3>
+
+   <TT>public  <B>DisplayGroup</B>()</TT>
+
+<P>
+
+Returns a newly allocated DisplayGroup. The new DisplayGroup then needs to have a next.eo.DataSource set with <b>setDataSource</b>.
+
+<P>
+<hr>
+
+<!-- methods -->
+
+<a name="methods"><CENTER><H2>METHODS</H2></CENTER></a>
+
+<!-- methKey:allObjects(public) meth:allObjects descr:<TT>public next.util.ImmutableVector <B>allObjects</B>()</TT> -->
+
+<H3><a name="allObjects(public)">allObjects</a></H3>
+
+<TT>public next.util.ImmutableVector <B>allObjects</B>()</TT>
+
+<P>
+
+Returns all of the objects collected by the receiver.
+<P>
+
+<B>See Also: displayedObjects, fetch
+</B>
+<hr>
+
+<!-- methKey:batchCount(public) meth:batchCount descr:<TT>public int <B>batchCount</B>()</TT> -->
+
+<H3><a name="batchCount(public)">batchCount</a></H3>
+
+<TT>public int <B>batchCount</B>()</TT>
+
+<P>
+
+The number of batches to display. For example, if the displayed objects vector contains two hundred records and the batch size is ten, <b>batchCount</b> returns twenty (twenty batches of ten records each). 
+<P>
+
+<B>See Also: currentBatchIndex, displayNextBatch, displayPreviousBatch, numberOfObjectsPerBatch</B>
+
+<hr>
+
+<!-- methKey:buildsQualifierFromInput(public) meth:buildsQualifierFromInput descr:<TT>public boolean <B>buildsQualifierFromInput</B>()</TT> -->
+
+<H3><a name="buildsQualifierFromInput(public)">buildsQualifierFromInput</a></H3>
+
+<TT>public boolean <B>buildsQualifierFromInput</B>()</TT>
+
+<P>
+
+Returns whether the receiver should build a qualifier before fetching. If <b>true</b>, the receiver performs database fetches using the <b>executeQuery</b> method, which first builds a qualifier using the method <b>qualifierFromInputValues</b> and then performs the fetch.
+
+<P>
+
+<B>See Also: lastQualifierFromInputValues, setBuildsQualifierFromInput </B>
+
+<hr>
+
+<!-- methKey:clearSelection(public) meth:clearSelection descr:<TT>public boolean <B>clearSelection</B>()</TT> -->
+
+<H3><a name="clearSelection(public)">clearSelection</a></H3>
+
+<TT>public boolean <B>clearSelection</B>()</TT>
+
+<P>
+
+Invokes <b>setSelectionIndexes</b> to clear the selection, returning <b>true</b> on success and <b>false</b> on failure.
+<P>
+
+<hr>
+
+<!-- methKey:currentBatchIndex(public) meth:currentBatchIndex descr:<TT>public int <B>currentBatchIndex</B>()</TT> -->
+
+<H3><a name="currentBatchIndex(public)">currentBatchIndex</a></H3>
+
+<TT>public int <B>currentBatchIndex</B>()</TT>
+
+<P>
+
+Returns the index of the batch currently being displayed. The total batch count equals the number of displayed objects divided by the batch size. For example, if the DisplayGroup has one hundred objects to display and the batch size is twenty, there are five batches. The first batch has a batch index of 1. 
+
+<P>
+
+<B>See Also: batchCount, numberOfObjectsPerBatch, setCurrentBatchIndex</B>
+
+<hr>
+
+<!-- methKey:dataSource(public) meth:dataSource descr:<TT>public next.eo.DataSource <B>dataSource</B>()</TT> -->
+
+<H3><a name="dataSource(public)">dataSource</a></H3>
+
+<TT>public next.eo.DataSource <B>dataSource</B>()</TT>
+
+<P>
+
+Returns the receiver's next.eo.DataSource.
+<P>
+
+<B>See Also: setDataSource</B>
+
+<hr>
+
+<!-- methKey:delegate(public) meth:delegate descr:<TT>public java.lang.Object <B>delegate</B>()</TT> -->
+
+<H3><a name="delegate(public)">delegate</a></H3>
+
+<TT>public java.lang.Object <B>delegate</B>()</TT>
+
+<P>
+
+Returns the receiver's delegate.
+<P>
+
+<B>See Also: setDelegate</b>, <A HREF="../DisplayGroupDelegate/DisplayGroupDelegate.html" target=_top>next.wo.DisplayGroupDelegate</a> interface
+<hr>
+
+<!-- methKey:delete(public) meth:delete descr:<TT>public java.lang.Object <B>delete</B>()</TT> -->
+
+<H3><a name="delete(public)">delete</a></H3>
+
+<TT>public java.lang.Object <B>delete</B>()</TT>
+
+<P>
+
+Uses <b>deleteSelection</b> to attempt to delete the selected objects and then causes the page to be reloaded. Returns <b>null</b> to force reloading of the web page.
+<P>
+
+<B>See Also: deleteObjectAtIndex</B>
+
+<hr>
+
+<!-- methKey:deleteObjectAtIndex(public) meth:deleteObjectAtIndex descr:<TT>public boolean <B>deleteObjectAtIndex</B>(int <I>anInt</I>)</TT> -->
+
+<H3><a name="deleteObjectAtIndex(public)">deleteObjectAtIndex</a></H3>
+
+<TT>public boolean <B>deleteObjectAtIndex</B>(int <I>index</I>)</TT>
+
+<P>
+
+Attempts to delete the object at <i>index</i>, returning <b>true</b> if successful and <b>false</b> if not. Checks with the delegate using <b>shouldDeleteObject</b> (defined in the <A HREF="../DisplayGroupDelegate/DisplayGroupDelegate.html" target=_top>next.wo.DisplayGroupDelegate</a> interface). If the delegate returns <b>false</b>, this method fails and returns <b>false</b>. If successful, sends the delegate a <b>didDeleteObject</b> message.
+<P>
+This method performs the delete by sending <b>deleteObject</b> to the next.eo.DataSource. If that message raises an exception, this method fails and returns <b>false</b>.
+<P>
+
+<B>See Also: delete, deleteSelection</B>
+<hr>
+
+<!-- methKey:deleteSelection(public) meth:deleteSelection descr:<TT>public boolean <B>deleteSelection</B>()</TT> -->
+
+<H3><a name="deleteSelection(public)">deleteSelection</a></H3>
+
+<TT>public boolean <B>deleteSelection</B>()</TT>
+
+<P>
+
+Attempts to delete the selected objects, returning <b>true</b> if successful and <b>false</b> if not.
+<P>
+
+<B>See Also: delete, deleteObjectAtIndex</B>
+
+<hr>
+
+<!-- methKey:displayBatchContainingSelectedObject(public) meth:displayBatchContainingSelectedObject descr:<TT>public java.lang.Object <B>displayBatchContainingSelectedObject</B>()</TT> -->
+
+<H3><a name="displayBatchContainingSelectedObject(public)">displayBatchContainingSelectedObject</a></H3>
+
+<TT>public java.lang.Object <B>displayBatchContainingSelectedObject</B>()</TT>
+
+<P>
+
+Displays the batch containing the selection and sets the current batch index to that batch's index. Returns <b>null</b> to force the page to be reloaded.
+<P>
+
+<B>See Also: displayNextBatch, displayPreviousBatch, setCurrentBatchIndex</B>
+<hr>
+
+<!-- methKey:displayNextBatch(public) meth:displayNextBatch descr:<TT>public java.lang.Object <B>displayNextBatch</B>()</TT> -->
+
+<H3><a name="displayNextBatch(public)">displayNextBatch</a></H3>
+
+<TT>public java.lang.Object <B>displayNextBatch</B>()</TT>
+
+<P>
+
+Increments the current batch index, displays that batch of objects, and clears the selection. If batch currently being displayed is the last batch, this method displays the first batch of objects.  Returns <b>null</b> to force the page to be reloaded. 
+<P>
+
+<B>See Also: batchCount, currentBatchIndex, displayBatchContainingSelectedObject, displayPreviousBatch</B>
+
+<hr>
+
+<!-- methKey:displayPreviousBatch(public) meth:displayPreviousBatch descr:<TT>public java.lang.Object <B>displayPreviousBatch</B>()</TT> -->
+
+<H3><a name="displayPreviousBatch(public)">displayPreviousBatch</a></H3>
+
+<TT>public java.lang.Object <B>displayPreviousBatch</B>()</TT>
+
+<P>
+
+Decrements the current batch index, displays that batch of objects, and clears the selection. If batch currently being displayed is the first batch, this method displays the last batch of objects.   Returns <b>null</b> to force the page to be reloaded.
+
+<P>
+
+<B>See Also: batchCount, currentBatchIndex, displayBatchContainingSelectedObject, displayNextBatch</B>
+
+<hr>
+
+<!-- methKey:displayedObjects(public) meth:displayedObjects descr:<TT>public next.util.ImmutableVector <B>displayedObjects</B>()</TT> -->
+
+<H3><a name="displayedObjects(public)">displayedObjects</a></H3>
+
+<TT>public next.util.ImmutableVector <B>displayedObjects</B>()</TT>
+
+<P>
+
+Returns the objects that should be displayed or otherwise made available to the user, as filtered by the receiver's delegate, by the receivers qualifier and sort ordering, or by a query built using <b>inputObjectForQualifier</b> and <b>secondObjectForQualifier</b>.
+<P>
+If batching is in effect, <b>displayedObjects</b> returns the current batch of objects.
+
+<P>
+<B>See Also: allObjects, updateDisplayedObjects, qualifier, qualifierFromInputValues, sortOrdering, displayArrayForObjects</B> (in <A HREF="../DisplayGroupDelegate/DisplayGroupDelegate.html" target=_top>next.wo.DisplayGroupDelegate</a> interface)
+<hr>
+
+<!-- methKey:endEditing(public) meth:endEditing descr:<TT>public boolean <B>endEditing</B>()</TT> -->
+
+<H3><a name="endEditing(public)">endEditing</a></H3>
+
+<TT>public boolean <B>endEditing</B>()</TT>
+
+<P>
+
+Ends any editing taking place and returns <b>true</b>.
+<P>
+
+
+<hr>
+
+<!-- methKey:executeQuery(public) meth:executeQuery descr:<TT>public java.lang.Object <B>executeQuery</B>()</TT> -->
+
+<H3><a name="executeQuery(public)">executeQuery</a></H3>
+
+<TT>public java.lang.Object <B>executeQuery</B>()</TT>
+
+<P>
+
+Builds a qualifier using <b>qualifierFromInputValues</b> and then fetches the objects that match that qualifier. The DisplayGroup's qualifier is set to <b>null</b> at the end of this method so that subsequent <B>updateDisplayedObjects</b> messages only apply the sort ordering. Returns <b>null</b> to force the page to be reloaded.
+<P>
+<b>qualifierFromInputValues</b> builds a qualifier using <b>inputObjectForQualifier</b> and <b>secondObjectForQualifier</b>. It does not use the DisplayGroup's qualifier (the one returned by the <b>qualifier</b> method). 
+<P>
+
+<B>See Also: buildsQualifierFromInput, fetch, lastQualifierFromInputValues, setBuildsQualifierFromInput</B>
+<hr>
+
+<!-- methKey:fetch(public) meth:fetch descr:<TT>public java.lang.Object <B>fetch</B>()</TT> -->
+
+<H3><a name="fetch(public)">fetch</a></H3>
+
+<TT>public java.lang.Object <B>fetch</B>()</TT>
+
+<P>
+
+Attempts to fetch objects from the next.eo.DataSource. 
+<P>
+Before fetching, invokes <b>endEditing</b> and sends <b>displayGroupShouldFetch</b> (defined in the <A HREF="../DisplayGroupDelegate/DisplayGroupDelegate.html" target=_top>next.wo.DisplayGroupDelegate</a> interface) to the delegate. If both of those methods were successful, it then sends a <b>fetchObjects</b> message to the receiver's next.eo.DataSource to replace the object vector, and if successful sends the delegate a <b>didFetchObjects</b> message.
+
+<P>
+This method returns <b>null</b> to force the page to be reloaded.
+<P>
+<B>See Also:  allObjects, executeQuery, updateDisplayedObjects</b>
+
+<hr>
+
+<!-- methKey:fetchesOnLoad(public) meth:fetchesOnLoad descr:<TT>public boolean <B>fetchesOnLoad</B>()</TT> -->
+
+<H3><a name="fetchesOnLoad(public)">fetchesOnLoad</a></H3>
+
+<TT>public boolean <B>fetchesOnLoad</B>()</TT>
+
+<P>
+
+Returns <b>true</b> if the receiver fetches automatically after being loaded, <b>false</b> if it must be told explicitly to fetch. The default is <b>true</b>. You can set this behavior in WebObjects Builder using the Display Group Options panel.
+
+<P>
+
+<B>See Also: fetch, setFetchesOnLoad
+</B>
+<hr>
+
+<!-- methKey:inputObjectForQualifier(public) meth:inputObjectForQualifier descr:<TT>public next.util.MutableHashtable <B>inputObjectForQualifier</B>()</TT> -->
+
+<H3><a name="inputObjectForQualifier(public)">inputObjectForQualifier</a></H3>
+
+<TT>public next.util.MutableHashtable <B>inputObjectForQualifier</B>()</TT>
+
+<P>
+
+Returns a MutableHashTable that is used by <b>qualifierFromInputValues</b> to build a qualifier. The MutableHashTable contains keys and values that the user has entered as a query. For example, if the user wants a list of all movies released in 1995 that made over $100 million, the hashtable returned by <b>inputObjectForQualifier</b> would contain two key/value pairs: releaseDate = "1995" and gross = "$100,000,000.00". 
+<P>
+When the DisplayGroup receives an <b>executeQuery</b> message, it uses <b>qualifierFromInputValues</b> to build a query from the key/value pairs in the hashtable returned by this method. 
+<P>
+To construct a "from-to" query, use the hashtable returned by this method to construct the "from" part of the query and the hashtable returned by <b>secondObjectForQualifier</b> to construct the "to" part of the query. 
+<P>
+
+<B>See Also: buildsQualifierFromInput, lastQualifierFromInputValues, 
+setBuildsQualifierFromInput
+</B>
+<hr>
+
+<!-- methKey:insert(public) meth:insert descr:<TT>public java.lang.Object <B>insert</B>()</TT> -->
+
+<H3><a name="insert(public)">insert</a></H3>
+
+<TT>public java.lang.Object <B>insert</B>()</TT>
+
+<P>
+
+Asks the receiver's next.eo.DataSource to create a new object by sending it a <b>createObject</b> message, then inserts the new object just past the first index in the selection, or at 0 if there's no selection. If a new object can't be created, this method sends the delegate a <b>createObjectFailedForDataSource</b> message (defined in the <A HREF="../DisplayGroupDelegate/DisplayGroupDelegate.html" target=_top>next.wo.DisplayGroupDelegate</a> interface).
+<P>
+If the object is successfully created, this method then sets the default values specified by <b>insertedObjectDefaultValues</b>.
+<P>
+This method returns <b>null</b> to force the page to be reloaded.
+<P>
+
+<hr>
+
+<!-- methKey:insertedObjectDefaultValues(public) meth:insertedObjectDefaultValues descr:<TT>public next.util.ImmutableHashtable <B>insertedObjectDefaultValues</B>()</TT> -->
+
+<H3><a name="insertedObjectDefaultValues(public)">insertedObjectDefaultValues</a></H3>
+
+<TT>public next.util.ImmutableHashtable <B>insertedObjectDefaultValues</B>()</TT>
+
+<P>
+
+Returns the default values to be used for newly inserted objects. If the hashtable returned by this method is empty, the <b>insert</b> method adds an object that is initially empty. Because the object is empty, the display group has no value to display on the HTML page for that object, meaning that there is nothing for the user to select and modify. Use the <b>setInsertedObjectDefaultValues</b> method to set up a default value so that there is something to display on the page.
+<P>
+
+<hr>
+
+<!-- methKey:lastQualifierFromInputValues(public) meth:lastQualifierFromInputValues descr:<TT>public next.eo.Qualifier <B>lastQualifierFromInputValues</B>()</TT> -->
+
+<H3><a name="lastQualifierFromInputValues(public)">lastQualifierFromInputValues</a></H3>
+
+<TT>public next.eo.Qualifier <B>lastQualifierFromInputValues</B>()</TT>
+
+<P>
+
+If <b>qualifierFromInputValues</b> has previously been invoked to construct a qualifier, this method returns the qualifier that that method built. If <b>qualifierFromInputValues</b> has not been used, this method return <b>null</b>.
+<P>
+
+<hr>
+
+<!-- methKey:localKeys(public) meth:localKeys descr:<TT>public next.util.ImmutableVector <B>localKeys</B>()</TT> -->
+
+<H3><a name="localKeys(public)">localKeys</a></H3>
+
+<TT>public next.util.ImmutableVector <B>localKeys</B>()</TT>
+
+<P>
+
+Returns the additional keys that dynamic elements can be bound to. A DisplayGroup's basic keys are typically those of the attributes and relationships of its objects, as defined by their class descriptions through an entity in the model. Local keys are typically used to form associations with key paths, with arbitrary methods of objects, or with properties of objects not associated with an entity. 
+<P>
+
+<B>Hint:  </B>You can use this qualifier after the <b>executeQuery</b> method to further qualify the displayed objects. Use <b>setQualifier</b> to set the qualifier and then use <b>updateDisplayedObjects</b> to apply the qualifier and sort ordering. If you want to further restrict the displayed objects, you can join this qualifier with qualifier from previous queries. 
+<P>
+<B>See Also: setLocalKeys</B>
+
+<hr>
+
+<!-- methKey:numberOfObjectsPerBatch(public) meth:numberOfObjectsPerBatch descr:<TT>public int <B>numberOfObjectsPerBatch</B>()</TT> -->
+
+<H3><a name="numberOfObjectsPerBatch(public)">numberOfObjectsPerBatch</a></H3>
+
+<TT>public int <B>numberOfObjectsPerBatch</B>()</TT>
+
+<P>
+
+Returns the batch size. You can set the batch size using <b>setNumberOfObjectsPerBatch</b> or using WebObjects Builder's Display Group Options panel.
+<P>
+
+<B>See Also: setNumberOfObjectsPerBatch</B>
+<hr>
+
+<!-- methKey:qualifier(public) meth:qualifier descr:<TT>public next.eo.Qualifier <B>qualifier</B>()</TT> -->
+
+<H3><a name="qualifier(public)">qualifier</a></H3>
+
+<TT>public next.eo.Qualifier <B>qualifier</B>()</TT>
+
+<P>
+
+Returns the receiver's qualifier, which it uses to filter its vector of objects for display when the delegate doesn't do so itself.
+<P>
+This method returns the qualifier used by the <b>updateDisplayedObjects</b> method. If <b>executeQuery</b> has been used to construct a qualifier and fetch objects from the DataSource, this method returns <b>null</b> and the method <b>lastQualifierFromInputValues</b> returns the qualifier that <b>executeQuery</b> used.
+<P>
+
+<B>See Also:  displayedObjects, qualifierFromInputValues, setQualifier, updateDisplayedObjects </B>
+<hr>
+
+<!-- methKey:qualifierFromInputValues(public) meth:qualifierFromInputValues descr:<TT>public next.eo.Qualifier <B>qualifierFromInputValues</B>()</TT> -->
+
+<H3><a name="qualifierFromInputValues(public)">qualifierFromInputValues</a></H3>
+
+<TT>public next.eo.Qualifier <B>qualifierFromInputValues</B>()</TT>
+
+<P>
+
+Builds a qualifier from the hashtables returned by <b>inputObjectForQualifier</b> and <b>secondObjectForQualifier</b>. This qualifier is used by the <b>executeQuery</b> method to fetch records from the database.
+<P>
+
+<B>See Also: buildsQualifierFromInput, lastQualifierFromInputValues</B>
+<hr>
+
+<!-- methKey:redisplay(public) meth:redisplay descr:<TT>public void <B>redisplay</B>()</TT> -->
+
+<H3><a name="redisplay(public)">redisplay</a></H3>
+
+<TT>public void <B>redisplay</B>()</TT>
+
+<P>
+
+Sends out a contents changed notification.
+<P>
+<hr>
+
+<!-- methKey:secondObjectForQualifier(public) meth:secondObjectForQualifier descr:<TT>public next.util.MutableHashtable <B>secondObjectForQualifier</B>()</TT> -->
+
+<H3><a name="secondObjectForQualifier(public)">secondObjectForQualifier</a></H3>
+
+<TT>public next.util.MutableHashtable <B>secondObjectForQualifier</B>()</TT>
+
+<P>
+
+Returns a MutableHashTable that specifies the "to" value in from-to queries. For example, suppose the user has built a query to return all movies released between two dates: January 1, 1994 and December 31, 1994. The hashtable returned by <b>secondObjectForQualifier</b> would contain one key (such as "dateReleased") and the value for the key would be December 31, 1994. The hashtable returned by this method must always have the exactly the same keys as the hashtable returned by the <b>inputObjectForQualifier</b> method.
+<P>
+This method is used by the <b>qualifierFromInputValues</b> method to build a qualifier. 
+<P>
+
+<B>See Also: buildsQualifierFromInput, executeQuery, 
+setBuildsQualifierFromInput
+</B>
+<hr>
+
+<!-- methKey:selectNext(public) meth:selectNext descr:<TT>public java.lang.Object <B>selectNext</B>()</TT> -->
+
+<H3><a name="selectNext(public)">selectNext</a></H3>
+
+<TT>public java.lang.Object <B>selectNext</B>()</TT>
+
+<P>
+
+Attempts to select the object just after the currently selected one. The selection is altered in this way:
+<UL><LI>If there are no objects, does nothing.
+<P><LI>If there's no selection, selects the object at index zero.
+<P><LI>If the first selected object is the last object in the displayed objects vector, selects the first object.
+<P><LI>Otherwise selects the object after the first selected object.
+</UL>
+<P>
+This method  returns <b>null</b> to force the page to be reloaded.
+
+<P>
+<B>See Also: selectPrevious, setSelectionIndexes
+
+</B>
+<hr>
+
+<!-- methKey:selectObject(public) meth:selectObject descr:<TT>public boolean <B>selectObject</B>(java.lang.Object <I>anObject</I>)</TT> -->
+
+<H3><a name="selectObject(public)">selectObject</a></H3>
+
+<TT>public boolean <B>selectObject</B>(java.lang.Object <I>anObject</I>)</TT>
+
+<P>
+
+Attempts to select the object equal to <i>anObject</i> in the receiver's displayed objects vector, returning <b>true</b> if successful and <b>false</b> otherwise. <i>anObject</i> is equal to an object in the displayed objects vector if its address is the same as the object in the vector.
+<P>
+
+<B>See Also: selectNext, selectPrevious</B> 
+
+<hr>
+
+<!-- methKey:selectPrevious(public) meth:selectPrevious descr:<TT>public java.lang.Object <B>selectPrevious</B>()</TT> -->
+
+<H3><a name="selectPrevious(public)">selectPrevious</a></H3>
+
+<TT>public java.lang.Object <B>selectPrevious</B>()</TT>
+
+<P>
+
+Attempts to select the object just before the presently selected one. The selection is altered in this way:
+<UL><LI>If there are no objects, does nothing.
+<P><LI>If there's no selection, selects the object at index zero.
+<P><LI>If the first selected object is at index zero, selects the last object.
+<P><LI>Otherwise selects the object before the first selected object.
+
+</UL>
+<P>
+
+This method returns <b>null</b> to force the page to be reloaded.
+<P>
+<B>See Also: selectNext, redisplay</B>
+<hr>
+
+<!-- methKey:selectedObject(public) meth:selectedObject descr:<TT>public java.lang.Object <B>selectedObject</B>()</TT> -->
+
+<H3><a name="selectedObject(public)">selectedObject</a></H3>
+
+<TT>public java.lang.Object <B>selectedObject</B>()</TT>
+
+<P>
+
+Returns the first selected object in the displayed objects vector, or <b>null</b> if there's no such object.
+
+<P>
+
+<B>See Also: displayedObjects, 
+selectionIndexes,
+selectedObjects</B>
+<hr>
+
+<!-- methKey:selectedObjects(public) meth:selectedObjects descr:<TT>public next.util.ImmutableVector <B>selectedObjects</B>()</TT> -->
+
+<H3><a name="selectedObjects(public)">selectedObjects</a></H3>
+
+<TT>public next.util.ImmutableVector <B>selectedObjects</B>()</TT>
+
+<P>
+
+Returns the objects selected in the receiver's displayed objects vector.
+<P>
+
+<B>See Also: displayedObjects, 
+selectionIndexes, 
+selectedObject
+</B>
+<hr>
+
+<!-- methKey:selectionIndexes(public) meth:selectionIndexes descr:<TT>public next.util.ImmutableVector <B>selectionIndexes</B>()</TT> -->
+
+<H3><a name="selectionIndexes(public)">selectionIndexes</a></H3>
+
+<TT>public next.util.ImmutableVector <B>selectionIndexes</B>()</TT>
+
+<P>
+
+Returns the selection as a vector of integers. The integers are indexes into the vector returned by <b>displayedObjects</b>.
+<P>
+
+<B>See Also: selectedObject,
+
+selectedObjects,
+
+setSelectionIndexes
+</B>
+<hr>
+
+<!-- methKey:selectsFirstObjectAfterFetch(public) meth:selectsFirstObjectAfterFetch descr:<TT>public boolean <B>selectsFirstObjectAfterFetch</B>()</TT> -->
+
+<H3><a name="selectsFirstObjectAfterFetch(public)">selectsFirstObjectAfterFetch</a></H3>
+
+<TT>public boolean <B>selectsFirstObjectAfterFetch</B>()</TT>
+
+<P>
+
+Returns <b>true</b> if the receiver automatically selects its first displayed object after a fetch if there was no selection, <b>false</b> if it leaves an empty selection as-is. 
+<P>
+DisplayGroups by default do select the first object after a fetch when there was no previous selection.
+
+<P>
+
+<B>See Also: displayedObjects, 
+fetch, setSelectsFirstObjectAfterFetch</B>
+<hr>
+
+<!-- methKey:setBuildsQualifierFromInput(public) meth:setBuildsQualifierFromInput descr:<TT>public void <B>setBuildsQualifierFromInput</B>(boolean <I>flag</I>)</TT> -->
+
+<H3><a name="setBuildsQualifierFromInput(public)">setBuildsQualifierFromInput</a></H3>
+
+<TT>public void <B>setBuildsQualifierFromInput</B>(boolean <I>flag</I>)</TT>
+
+<P>
+
+Sets whether the receiver should build a qualifier before fetching. If <I>flag</i> is <b>true</b>, the receiver should perform database fetches using the <b>executeQuery</b> method, which first builds a qualifier using the method <b>qualifierFromInputValues</b> and then performs the fetch. 
+<P>
+
+<B>See Also: buildsQualifierFromInput, executeQuery, inputObjectForQualifier, secondObjectForQualifier
+</B>
+<hr>
+
+<!-- methKey:setCurrentBatchIndex(public) meth:setCurrentBatchIndex descr:<TT>public void <B>setCurrentBatchIndex</B>(int <I>anInt</I>)</TT> -->
+
+<H3><a name="setCurrentBatchIndex(public)">setCurrentBatchIndex</a></H3>
+
+<TT>public void <B>setCurrentBatchIndex</B>(int <I>anInt</I>)</TT>
+
+<P>
+
+Displays the <i>anInt</i> batch of objects. The total batch count equals the number of displayed objects divided by the batch size. For example, if the DisplayGroup has one hundred objects to display and the batch size is twenty, there are five batches. The first batch has a batch index of 1. <b>setCurrentBatchIndex(3)</b> would display the third batch of objects (objects 41 to 60 in this example).
+<P>
+If <i>anInt</i> is greater than the number of batches, this method displays the first batch.
+<P>
+
+<B>See Also: batchCount, 
+currentBatchIndex, 
+displayBatchContainingSelectedObject, 
+displayNextBatch, 
+
+displayPreviousBatch, 
+numberOfObjectsPerBatch
+</B>
+
+
+<hr>
+
+<!-- methKey:setDataSource(public) meth:setDataSource descr:<TT>public void <B>setDataSource</B>(next.eo.DataSource <I>aDataSource</I>)</TT> -->
+
+<H3><a name="setDataSource(public)">setDataSource</a></H3>
+
+<TT>public void <B>setDataSource</B>(next.eo.DataSource <I>aDataSource</I>)</TT>
+
+<P>
+
+Sets the receiver's next.eo.DataSource to <i>aDataSource</i>. In the process, it performs these actions:
+<UL>
+<LI>Unregisters itself as an editor and message handler for the previous DataSource's next.eo.EditingContext, if necessary, and registers itself with <i>aDataSource</i>'s next.eo.EditingContext. If the new EditingContext already has a message handler, however, the receiver doesn't assume that role.
+<P><LI>
+Clears the receiver's vector of objects.
+<P><LI>
+Sends <b>displayGroupDidChangeDataSource</B> (defined in the <A HREF="../DisplayGroupDelegate/DisplayGroupDelegate.html" target=_top>next.wo.DisplayGroupDelegate</a> interface) to the delegate if there is one.
+</UL>
+<!-- ME!!! What about notifications? -->
+<P>
+
+<B>See Also: dataSource</B>
+
+
+<hr>
+
+<!-- methKey:setDelegate(public) meth:setDelegate descr:<TT>public void <B>setDelegate</B>(java.lang.Object <I>anObject</I>)</TT> -->
+
+<H3><a name="setDelegate(public)">setDelegate</a></H3>
+
+<TT>public void <B>setDelegate</B>(java.lang.Object <I>anObject</I>)</TT>
+
+<P>
+
+Sets the receiver's delegate to <i>anObject</i>, without retaining it. 
+<P>
+
+<B>See Also: delegate</B>, <A HREF="../DisplayGroupDelegate/DisplayGroupDelegate.html" target=_top>next.wo.DisplayGroupDelegate</a> interface
+<hr>
+
+<!-- methKey:setFetchesOnLoad(public) meth:setFetchesOnLoad descr:<TT>public void <B>setFetchesOnLoad</B>(boolean <I>flag</I>)</TT> -->
+
+<H3><a name="setFetchesOnLoad(public)">setFetchesOnLoad</a></H3>
+
+<TT>public void <B>setFetchesOnLoad</B>(boolean <I>flag</I>)</TT>
+
+<P>
+
+Controls whether the receiver automatically fetches its objects after being loaded. If <i>flag</i> is <b>true</b> it does; if <i>flag</i> is <b>false</b> the receiver must be told explicitly to fetch. The default is <b>false</b>. You can also set this behavior in WebObjects Builder in the Display Group Options panel.
+<P>
+
+<B>See Also: fetch, 
+fetchesOnLoad
+</B>
+<hr>
+
+<!-- methKey:setInsertedObjectDefaultValues(public) meth:setInsertedObjectDefaultValues descr:<TT>public void <B>setInsertedObjectDefaultValues</B>(next.util.ImmutableHashtable <I>anImmutableHashtable</I>)</TT> -->
+
+<H3><a name="setInsertedObjectDefaultValues(public)">setInsertedObjectDefaultValues</a></H3>
+
+<TT>public void <B>setInsertedObjectDefaultValues</B>(next.util.ImmutableHashtable <I>defaultValues</I>)</TT>
+
+<P>
+
+Sets default values to be used for newly inserted objects. When you use the <b>insert</b> method to add an object, that object is initially empty. Because the object is empty, there is no value to be displayed on the HTML page, meaning there is nothing for the user to select and modify. You use this method to provide at least one field that can be displayed for the newly inserted object. For example, a component that displays a list of movie titles and allows the user to insert new movie titles might contain these statements to ensure that all new objects have something to display as a movie title:
+<P><PRE>	defaultValues.put("title", "New title");
+	movies.setInsertedObjectDefaultValues(defaultValues);
+</PRE>
+<P>
+
+<B>See Also: insertedObjectDefaultValues</B>
+<hr>
+
+<!-- methKey:setLocalKeys(public) meth:setLocalKeys descr:<TT>public void <B>setLocalKeys</B>(next.util.ImmutableVector <I>anImmutableVector</I>)</TT> -->
+
+<H3><a name="setLocalKeys(public)">setLocalKeys</a></H3>
+
+<TT>public void <B>setLocalKeys</B>(next.util.ImmutableVector <I>keys</I>)</TT>
+
+<P>
+
+Sets the additional keys to which dynamic elements can be bound to <i>keys</i>.
+<P>
+
+<B>See Also: localKeys</B>
+<hr>
+
+<!-- methKey:setNumberOfObjectsPerBatch(public) meth:setNumberOfObjectsPerBatch descr:<TT>public void <B>setNumberOfObjectsPerBatch</B>(int <I>anInt</I>)</TT> -->
+
+<H3><a name="setNumberOfObjectsPerBatch(public)">setNumberOfObjectsPerBatch</a></H3>
+
+<TT>public void <B>setNumberOfObjectsPerBatch</B>(int <I>anInt</I>)</TT>
+
+<P>
+
+Sets the number of objects the receiver displays at a time. For example, suppose you are displaying one hundred records. Instead of displaying all of these at once, you can set the batch size so that the page displays a more manageable number (for example, 10). WebObjects Builder allows you to set the number of objects per batch on the Display Group Options panel. 
+<P>
+
+<B>See Also: batchCount, 
+displayNextBatch, 
+displayPreviousBatch, 
+numberOfObjectsPerBatch</B>
+<hr>
+
+<!-- methKey:setObjectArray(public) meth:setObjectArray descr:<TT>public void <B>setObjectArray</B>(next.util.ImmutableVector <I>anImmutableVector</I>)</TT> -->
+
+<H3><a name="setObjectArray(public)">setObjectArray</a></H3>
+
+<TT>public void <B>setObjectArray</B>(next.util.ImmutableVector <I>objects</I>)</TT>
+
+<P>
+
+Sets the receiver's objects to <i>objects</i>, regardless of what its next.eo.DataSource provides. This method doesn't affect the DataSource's objects at all; specifically, it results in neither inserts nor deletes of objects in the DataSource. <i>objects</i> should contain objects with the same property names or methods as those accessed by the receiver. This method is used by <b>fetch</b> to set the vector of fetched objects; you should rarely need to invoke it directly. 
+<P>
+After setting the object vector, this method restores as much of the original selection as possible. If there's no match and the receiver selects after fetching, then the first object is selected.
+<P>
+
+<B>See Also: allObjects, displayedObjects, 
+fetch, 
+selectsFirstObjectAfterFetch
+</B>
+<hr>
+
+<!-- methKey:setQualifier(public) meth:setQualifier descr:<TT>public void <B>setQualifier</B>(next.eo.Qualifier <I>aQualifier</I>)</TT> -->
+
+<H3><a name="setQualifier(public)">setQualifier</a></H3>
+
+<TT>public void <B>setQualifier</B>(next.eo.Qualifier <I>aQualifier</I>)</TT>
+
+<P>
+
+Sets the receiver's qualifier to <i>aQualifier</i>. This qualifier is used to filter the receiver's vector of objects for display. Use <b>updateDisplayedObjects</b> to apply the qualifier. 
+<P>
+If the receiver's delegate responds to <b>displayArrayForObjects</b> (defined in the <A HREF="../DisplayGroupDelegate/DisplayGroupDelegate.html" target=_top>next.wo.DisplayGroupDelegate</a> interface), that method is used instead of the qualifier to filter the objects.
+<P>
+If you use <b>executeQuery</b> to perform a query based on use input, the qualifier set by this method is discarded. 
+<P>
+
+<B>See Also: displayedObjects, qualifier</B>
+
+<hr>
+
+<!-- methKey:setSelectionIndexes(public) meth:setSelectionIndexes descr:<TT>public boolean <B>setSelectionIndexes</B>(next.util.ImmutableVector <I>anImmutableVector</I>)</TT> -->
+
+<H3><a name="setSelectionIndexes(public)">setSelectionIndexes</a></H3>
+
+<TT>public boolean <B>setSelectionIndexes</B>(next.util.ImmutableVector <I>indexes</I>)</TT>
+
+<P>
+
+Selects the objects at <i>indexes</i> in the receiver's vector if possible, returning <b>true</b> if successful and <b>false</b> if not (in which case the selection remains unaltered). <i>indexes</i> is a vector of java.lang.Integers.
+This method is the primitive method for altering the selection; all other such methods invoke this one to make the change.
+<P>
+This method invokes <b>endEditing</b> to wrap up any changes being made by the user. If <b>endEditing</b> returns <b>false</b>, this method fails and returns <b>false</b>. This method then checks the delegate with a <b>shouldChangeSelectionToIndexes</b> message (defined in the <A HREF="../DisplayGroupDelegate/DisplayGroupDelegate.html" target=_top>next.wo.DisplayGroupDelegate</a> interface). If the delegate returns <b>false</b>, this method also fails and returns <b>false</b>. If the receiver successfully changes the selection, its observers each receive a <b>subjectChanged</b> message.
+<P>
+<B>Note:  </b>The selection set here is only a programmatic selection; the objects on the screen are not highlighted in any way.
+
+<P>
+<B>See Also: allObjects</B>
+<hr>
+
+<!-- methKey:setSelectsFirstObjectAfterFetch(public) meth:setSelectsFirstObjectAfterFetch descr:<TT>public void <B>setSelectsFirstObjectAfterFetch</B>(boolean <I>flag</I>)</TT> -->
+
+<H3><a name="setSelectsFirstObjectAfterFetch(public)">setSelectsFirstObjectAfterFetch</a></H3>
+
+<TT>public void <B>setSelectsFirstObjectAfterFetch</B>(boolean <I>flag</I>)</TT>
+
+<P>
+
+Controls whether the receiver automatically selects its first displayed object after a fetch when there were no selected objects before the fetch. If <i>flag</i> is <b>true</b> it does; if <i>flag</i> is <b>false</b> then no objects are selected.
+<P>
+DisplayGroups by default do select the first object after a fetch when there was no previous selection. 
+<P>
+
+<B>See Also: displayedObjects, 
+fetch, 
+selectsFirstObjectAfterFetch</B>
+<hr>
+
+<!-- methKey:setSortOrdering(public) meth:setSortOrdering descr:<TT>public void <B>setSortOrdering</B>(next.util.ImmutableVector <I>ordering</I>)</TT> -->
+
+<H3><a name="setSortOrdering(public)">setSortOrdering</a></H3>
+
+<TT>public void <B>setSortOrdering</B>(next.util.ImmutableVector <I>orderings</I>)</TT>
+
+<P>
+
+Sets the next.eo.SortOrdering objects that <b>updateDisplayedObjects</b> uses to sort the displayed objects to <i>orderings</i>. Use <b>updateDisplayedObjects</b> to apply the sort orderings.You can also set this value using the WebObjects Builder Display Group Options panel.
+<P>
+If the receiver's delegate responds to <b>displayArrayForObjects</b> (defined in the <A HREF="../DisplayGroupDelegate/DisplayGroupDelegate.html" target=_top>next.wo.DisplayGroupDelegate</a> interface), that method is used instead of the sort orderings to order the objects.
+<P>
+
+<B>See Also: displayedObjects, 
+sortOrdering, 
+updateDisplayedObjects
+</B>
+<hr>
+
+<!-- methKey:setValidatesChangesImmediately(public) meth:setValidatesChangesImmediately descr:<TT>public void <B>setValidatesChangesImmediately</B>(boolean <I>flag</I>)</TT> -->
+
+<H3><a name="setValidatesChangesImmediately(public)">setValidatesChangesImmediately</a></H3>
+
+<TT>public void <B>setValidatesChangesImmediately</B>(boolean <I>flag</I>)</TT>
+
+<P>
+
+Controls the receiver's behavior on encountering a validation error. In the Web context, this method has not effect.
+
+<P>
+DisplayGroups by default don't validate changes immediately.
+<P>
+
+<B>See Also: 
+saveChanges</B> (in 
+<!-- <A HREF="../../eo/EditingContext/EditingContext.html" target=_top>
+-->
+next.eo.EditingContext),
+<!-- 
+</a>
+-->
+<b>validatesChangesImmediately</B>
+<hr>
+
+<!-- methKey:sortOrdering(public) meth:sortOrdering descr:<TT>public next.util.ImmutableVector <B>sortOrdering</B>()</TT> -->
+
+<H3><a name="sortOrdering(public)">sortOrdering</a></H3>
+
+<TT>public next.util.ImmutableVector <B>sortOrdering</B>()</TT>
+
+<P>
+
+Returns a vector of next.eo.SortOrdering objects that <B>updateDisplayedObjects</B> uses to sort the displayed objects, as returned by the <B>displayedObjects</B> method.
+<P>
+
+<B>See Also: 
+setSortOrdering</B>
+<hr>
+
+<!-- methKey:updateDisplayedObjects(public) meth:updateDisplayedObjects descr:<TT>public void <B>updateDisplayedObjects</B>()</TT> -->
+
+<H3><a name="updateDisplayedObjects(public)">updateDisplayedObjects</a></H3>
+
+<TT>public void <B>updateDisplayedObjects</B>()</TT>
+
+<P>
+
+Recalculates the receiver's displayed objects vectors and redisplays. If the delegate responds to <b>displayArrayForObjects</b> (defined in the <A HREF="../DisplayGroupDelegate/DisplayGroupDelegate.html" target=_top>next.wo.DisplayGroupDelegate</a> interface), it's sent this message and the returned vector is set as the DisplayGroup's displayed object. Otherwise, the receiver applies its qualifier and sort ordering to its vector of objects. In either case, any objects that were selected before remain selected in the new displayed objects vector.
+<P>
+
+<B>See Also: redisplay, 
+allObjects, 
+displayedObjects, 
+qualifier, 
+selectedObjects, 
+sortOrdering</B>
+<hr>
+
+<!-- methKey:validatesChangesImmediately(public) meth:validatesChangesImmediately descr:<TT>public boolean <B>validatesChangesImmediately</B>()</TT> -->
+
+<H3><a name="validatesChangesImmediately(public)">validatesChangesImmediately</a></H3>
+
+<TT>public boolean <B>validatesChangesImmediately</B>()</TT>
+
+<P>
+
+Returns <b>true</b> if the receiver immediately handles validation errors, or leaves them for the next.eo.EditingContext to handle when saving changes.
+<P>
+By default, DisplayGroups don't validate changes immediately.
+<P>
+
+<B>See Also: setValidatesChangesImmediately</B>
+<hr>
+
+</body>
+
+</html>

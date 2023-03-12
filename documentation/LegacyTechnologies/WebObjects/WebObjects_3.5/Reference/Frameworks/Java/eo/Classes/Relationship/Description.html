@@ -1,0 +1,441 @@
+<html><head><title></title></head>
+<body bgcolor="#ffffff">
+ 
+ 
+<h1>
+<FONT COLOR="#000066">
+<a name="816">
+ <a name="//apple_ref/java/cl/Relationship">Relationship</a>
+</a>
+</FONT>
+</h1>
+<p><B>Extends:</B><BR>  
+next.util.NextObject
+
+<p><B>Implements:</B><BR>
+next.eo.<a href="../../Interfaces/PropertyListEncoding/Frameset.html#" target="_top">PropertyListEncoding</a>
+
+<p><a name="829"></a>
+<a name="description"></a>
+<H2>Class Description
+</H2>
+A Relationship describes an association between two entities, based on attributes of those two entities. By defining Relationships in your application's Model, you can cause the relationships defined in the database to be automatically resolved as enterprise objects are fetched. For example, a Movie entity may contain its <code>studioId</code> as an attribute, but without a Relationship <code>studioId</code> will only appear in a movie enterprise object as a number. With a Relationship explicitly connecting the Movie entity to a Studio entity, a movie enterprise object will automatically be given its studio enterprise object when a DatabaseChannel fetches it from the database. The two entities that make up a relationship can be in the same model or two different models, as long as they are in the same model group.<p>
+You usually define relationships in your Model with the EOModeler application, which is documented in the <em>Enterprise Objects Framework Developer's Guide</em>. Relationships are primarily for use by the Enterprise Objects Framework; unless you have special needs you shouldn't need to access them in your application's code.<p>
+A relationship is directional: One entity is considered the source, and the other is considered the destination. The relationship belongs to the source entity, and may only be traversed from source to destination. To simulate a two-way relationship you have to create a Relationship for each direction. Although the relationship is directional, no inverse is implied (although an inverse relationship may exist).<p>
+A relationship maintains an array of joins identifying attributes from the related entities (see the <a href="../Join/Frameset.html#816" target="_top">Join</a> class specification for more information). Most relationships simply relate the objects of one entity to those of another by comparing attribute values between them. Such a relationship must be defined as to-one or to-many based on how many objects of the destination match each object of the source. This is called the <em>cardinality</em> of the relationship. In a to-one relationship, there must be exactly one destination object for each source object; in a to-many relationship there can be any number of destination objects for each source object. See "<a href="#3152">Creating a Simple Relationship</a>" for more information.<p>
+A chain of relationships across several entities can be flattened, creating a single relationship that spans them all. For example, suppose you have a relationship between movies and directors, and a relationship between directors and talent. You can traverse these relationships to create a flattened relationship going directly from movies to talent. A flattened relationship is determined to be to-many or to-one based on the relationships it spans; if all are to-one, then the flattened relationship is to-one, but if any of them is to-many the flattened relationship is to-many. See "<a href="#3195">Creating a Flattened Relationship</a>," below, for more information.<p>
+Like the other major modeling classes, Relationship provides a user dictionary that the application can use to store application-specific information related to the relationship.<p>
+<h3>
+<a name="3149">
+ Specifying the Join Semantic
+</a>
+</h3>
+The relationship holds the join semantic; you specify this semantic with <a href="#2933"><code>setJoinSemantic</code></a>. There are four types of join semantic: InnerJoin, FullOuterJoin, LeftOuterJoin, and RightOuterJoin. An inner join produces results only for destinations of the join relationship that have non-NULL values. A full outer join produces results for all source records, regardless of the values of the relationships. A left outer join preserves rows in the left (source) table, keeping them even if there's no corresponding row in the right table, while a right outer join preserves rows in the right (destination) table.<p>
+<DT><B>Note:</B></DT>
+<DD>Not all join semantics are supported by all database servers.
+</DD><h3>
+<a name="3152">
+ Creating a Simple Relationship
+</a>
+</h3>
+A simple relationship is defined by the attributes it compares in connecting its source and destination entities. Each source-destination pair of attributes is encapsulated in a Join object. For example, to create a relationship from the Movie entity to the Studio entity, a join has to be created from the <code>studioId</code> attribute of the Movie entity to the same attribute of the Studio entity. The values of these two attributes must be equal for a match to result. Note that <code>studioId</code> is the primary key attribute for the Studio entity, so there can only be one studio per movie; this relationship is therefore to-one.<p>
+This code excerpt creates a Relationship for the relationship described above and adds it to the Entity for the Movie entity:<p>
+<blockquote><pre>Entity movieEntity;       // Assume this exists.  <br>Entity studioEntity;      // Assume this exists.<br>Attribute studioIDAttribute;<br>Attribute movieStudioIDAttribute;<br>Join toStudioJoin;<br>Relationship toStudioRelationship;<br>    <br>studioIDAttribute = studioEntity.attributeNamed("studioId");<br>movieStudioIDAttribute = movieEntity.attributeNamed("studioId");<br>    <br>toStudioJoin = new Join(movieStudioIDAttribute, studioIDAttribute);<br>    <br>toStudioRelationship = new Relationship();<br>toStudioRelationship.setName("studio");<br>movieEntity.addRelationship(toStudioRelationship);<br>toStudioRelationship.addJoin(toStudioJoin);<br>toStudioRelationship.setToMany(false);<br>toStudioRelationship.setJoinSemantic(InnerJoin);
+</pre></blockquote><p>This code first gets the attributes from the source and destination entities, and then creates a Join with them. Next, a new Relationship is created, its name is set, and it's added to <code>movieEntity</code>. The Join is added to the relationship and the relationship is set to be to-one. Finally, in the <code>setJoinSemantic</code> line, InnerJoin indicates that only objects that actually have a matching destination object will be included in the result when the relationship is traversed. <p>
+Creating a to-many relationship in the opposite direction merely swaps the source and destination attributes, and assigns the relationship to the Entity for the Studio entity:<p>
+<blockquote><pre>Join toMoviesJoin;<br>Relationship toMoviesRelationship;<br>    <br>toMoviesJoin = new Join(studioIDAttribute, movieStudioIDAttribute);<br>    <br>toMoviesRelationship = new Relationship();<br>toMoviesRelationship.setName("movies");<br>studioEntity.addRelationship(toMoviesRelationship);<br>toMoviesRelationship.addJoin(toMoviesJoin);<br>toMoviesRelationship.setToMany(true);<br>toMoviesRelationship.setJoinSemantic(InnerJoin);
+</pre></blockquote><p>Note that this relationship is to-many precisely because the destination attribute isn't the primary key for its entity (Movie), and therefore isn't unique with regard to that entity.<p>
+A relationship isn't restricted to only one Join. It's entirely possible for a relationship to be defined based on two or more attributes in the source and destination entities. For example, consider an employees database that contains a picture of each employee identified by first and last name. You'd define the relationship by joining each of the first and last names in the Employee entity to the same attribute in the <code>EmpPhoto</code> attribute.<p>
+A simple relationship is considered to reference all of the attributes in its joins. You can use the <a href="#2848"><code>referencesProperty</code></a> method to find out if a Relationship references a particular attribute.<p>
+<h3>
+<a name="3195">
+ Creating a Flattened Relationship
+</a>
+</h3>
+A flattened relationship depends on several simple relationships already existing. Assuming that several do exist, creating a flattened relationship is straightforward. For example, suppose that the Movie entity has a to-many relationship to the Director entity, called <code>toDirectors</code>. The Director entity in turn has a relationship to the Talent entity called <code>toTalent</code>. In the Movies database, the Director table acts as an intermediate table between Movie and Talent. In this situation, it make sense to flatten the relationship Movies has to Director (<code>toDirectors</code>) to give Movie access to the Talent table through Director's <code>toTalent</code> relationship. For more discussion of when to use flattened relationships, see the chapters "Designing Enterprise Objects" and "Advanced Enterprise Object Modeling" in the <em>Enterprise Objects Framework Developer's Guide</em>.<p>
+This code excerpt creates a flattened relationship from Movie to Talent:<p>
+<blockquote><pre>Entity movieEntity;   // Assume this exists.       <br>Relationship toDirectorsRelationship;<br>    <br>toDirectorsRelationship = new Relationship();<br>toDirectorsRelationship.setName("directors");<br>toDirectorsRelationship.setEntity(movieEntity);<br>movieEntity.addRelationship(toDirectorsRelationship);<br>toDirectorsRelationship.setDefinition:("toDirector.toTalent");
+</pre></blockquote><p>All that's needed to establish the relationship is a data path (also called the definition) naming each component relationship connected, with the names separated by periods. Note that because the cardinality of a flattened relationship is determinable from its components, no <a href="#2983"><code>setToMany</code></a> message is required here.<p>
+A simple relationship is considered to reference all of the relationships in its definition, plus every attribute referenced by the component relationships. You can use the <code>referencesProperty</code> method to find out if a Relationship references another relationship or attribute.<p>
+<HR WIDTH=50% ALIGN=LEFT>
+<h2>Interfaces Implemented</h2>  
+
+
+<dl>
+<dt>next.eo.<a href="../../Interfaces/PropertyListEncoding/Frameset.html#" target="_top">PropertyListEncoding</a><dl><dl><dl><dl>
+<dt><a href="../../Interfaces/PropertyListEncoding/Frameset.html#" target="_top">awakeWithPropertyList</a><dt><a href="../../Interfaces/PropertyListEncoding/Frameset.html#" target="_top">encodeIntoPropertyList</a></dl>
+</dl></dl></dl></dl>
+<a name="833">
+<HR WIDTH=50% ALIGN=LEFT>
+<h2>Method Types
+</h2>
+</a><dl>
+<dt>Constructors<dl><dl><dl><dl>
+<dt><a href="#2229">Relationship</a></dl>
+</dl></dl></dl><dt>Accessing the relationship name<dl><dl><dl><dl>
+<dt><a href="#2638">beautifyName</a><dt><a href="#2803">name</a><dt><a href="#2943">setName</a><dt><a href="#1322">validateName</a></dl>
+</dl></dl></dl><dt>Using joins<dl><dl><dl><dl>
+<dt><a href="#2605">addJoin</a><dt><a href="#2788">joins</a><dt><a href="#4551">joinSemantic</a><dt><a href="#2868">removeJoin</a><dt><a href="#2933">setJoinSemantic</a></dl>
+</dl></dl></dl><dt>Accessing attributes joined on<dl><dl><dl><dl>
+<dt><a href="#2673">destinationAttributes</a><dt><a href="#987">sourceAttributes</a></dl>
+</dl></dl></dl><dt>Accessing the definition<dl><dl><dl><dl>
+<dt><a href="#2643">componentRelationships</a><dt><a href="#2653">definition</a><dt><a href="#2873">setDefinition</a></dl>
+</dl></dl></dl><dt>Accessing the entities joined<dl><dl><dl><dl>
+<dt><a href="#2610">anyInverseRelationship</a><dt><a href="#2683">destinationEntity</a><dt><a href="#2703">entity</a><dt><a href="#2758">inverseRelationship</a><dt><a href="#2923">setEntity</a></dl>
+</dl></dl></dl><dt>Checking the relationship type<dl><dl><dl><dl>
+<dt><a href="#2763">isCompound</a><dt><a href="#2768">isFlattened</a><dt><a href="#2773">isMandatory</a><dt><a href="#2928">setIsMandatory</a><dt><a href="#2913">validateValue</a></dl>
+</dl></dl></dl><dt>Accessing whether the relationship is to-many<dl><dl><dl><dl>
+<dt><a href="#2778">isToMany</a><dt><a href="#2983">setToMany</a></dl>
+</dl></dl></dl><dt>Relationship qualifiers<dl><dl><dl><dl>
+<dt><a href="#2838">qualifierWithSourceRow</a></dl>
+</dl></dl></dl><dt>Checking references<dl><dl><dl><dl>
+<dt><a href="#2848">referencesProperty</a></dl>
+</dl></dl></dl><dt>Controlling batch fetches<dl><dl><dl><dl>
+<dt><a href="#2813">numberOfToManyFaultsToBatchFetch</a><dt><a href="#2953">setNumberOfToManyFaultsToBatchFetch</a></dl>
+</dl></dl></dl><dt>Taking action upon a change<dl><dl><dl><dl>
+<dt><a href="#2663">deleteRule</a><dt><a href="#2833">propagatesPrimaryKey</a><dt><a href="#2883">setDeleteRule</a><dt><a href="#2973">setPropagatesPrimaryKey</a><dt><a href="#2823">ownsDestination</a><dt><a href="#2963">setOwnsDestination</a></dl>
+</dl></dl></dl><dt>Accessing the user dictionary<dl><dl><dl><dl>
+<dt><a href="#2993">setUserInfo</a><dt><a href="#1096">userInfo</a></dl>
+</dl></dl></dl></dl>
+<HR WIDTH=50% ALIGN=LEFT>
+<a name="2205"></a>
+<a name="cons"></a>
+<h2>Constructors</h2>  
+
+
+<a name="2229"></a>
+<h3>
+ Relationship
+</h3>
+public <code>next.eo.Relationship</code>()
+
+<P>public <code>next.eo.Relationship</code>(next.util.ImmutableHashtable <em>propertyList</em>, java.lang.Object <em>owner</em>)
+
+<P>Creates and returns a new Relationship. You rarely create Relationships in code; instead you create them using the EOModeler application. <p>
+If <em>propertyList</em> and <em>owner</em> are provided, the new Relationship is initialized from <em>propertyList</em>-a dictionary containing only property list data types (that is, next.util.ImmutableHashtables, java.lang.Strings, next.util.ImmutableVectors, and next.util.ImmutableBytes). This constructor is used by EOModeler when it reads in a Model from a file, for example. The <em>owner</em> argument should be the Relationship's Entity. Relationships created from a property list must receive an <a href="../../Interfaces/PropertyListEncoding/Frameset.html#" target="_top"><code>awakeWithPropertyList</code></a> message immediately after creation before they are fully functional, but the <code>awake...</code> message should be deferred until the all of the other objects in the model have also been created.<p>
+<B>See also: </B>  
+<a href="../../Interfaces/PropertyListEncoding/Frameset.html#" target="_top"><code>awakeWithPropertyList</code></a> (PropertyListEncoding), <a href="../../Interfaces/PropertyListEncoding/Frameset.html#" target="_top"><code>encodeIntoPropertyList</code></a> 
+(PropertyListEncoding)
+<p><HR WIDTH=50% ALIGN=LEFT>
+<a name="instm"></a>
+<h2>Instance Methods</h2>  
+
+
+<a name="2605"></a>
+<h3>
+ <a name="//apple_ref/java/instm/Relationship/addJoin">addJoin</a>
+</h3>
+public void <code>addJoin</code>(next.eo.Join <em>aJoin</em>)
+
+<P>Adds a source-destination attribute pair to the relationship. Throws an exception if the relationship is flattened, if either the source or destination attributes are flattened, or if either of <em>aJoin</em>'s attributes already belongs to another join of the relationship.<p>
+<B>See also: </B>  
+<a href="#2788"><code>joins</code></a>, <a href="#2768"><code>isFlattened</code></a>, <a href="#2873"><code>setDefinition</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="2610"></a>
+<h3> <a name="//apple_ref/java/instm/Relationship/anyInverseRelationship">anyInverseRelationship</a></h3>
+public next.eo.Relationship <code>anyInverseRelationship</code>()
+
+<P>Searches the relationship's destination entity for a user-created, back-referencing relationship joining on the same keys. If none is found, it looks for a "hidden" inverse relationship that was manufactured by the Framework. If none is found, the Enterprise Objects Framework creates a "hidden" inverse relationship and returns that. Hidden relationships are used internally by the Framework.<p>
+<B>See also: </B>  
+<a href="#2758"><code>inverseRelationship</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="2638"></a>
+<h3> <a name="//apple_ref/java/instm/Relationship/beautifyName">beautifyName</a></h3>
+public void <code>beautifyName</code>()
+
+<P>Makes the relationship's name conform to a standard convention. Names that conform to this style are all lower-case except for the initial letter of each embedded word other than the first, which is upper case. Thus, "NAME" becomes "name", and "FIRST_NAME" becomes "firstName". This method is used in reverse-engineering a model.<p>
+<B>See also: </B>  
+<a href="#2943"><code>setName</code></a>, <a href="#1322"><code>validateName</code></a>, <a href="../Model/Frameset.html#2301" target="_top"><code>beautifyNames</code></a> (Model)
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="2643"></a>
+<h3> <a name="//apple_ref/java/instm/Relationship/componentRelationships">componentRelationships</a></h3>
+public next.util.ImmutableVector <code>componentRelationships</code>()
+
+<P>Returns an array of base relationships making up a flattened relationship, or <code>null</code> if the relationship isn't flattened.<p>
+<B>See also: </B>  
+<a href="#2653"><code>definition</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="2653"></a>
+<h3> <a name="//apple_ref/java/instm/Relationship/definition">definition</a></h3>
+public java.lang.String <code>definition</code>()
+
+<P>Returns the data path of a flattened relationship; for example "department.facility". If the relationship isn't flattened, <code>definition</code> returns <code>null</code>.<p>
+<B>See also: </B>  
+<a href="#2643"><code>componentRelationships</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="2663"></a>
+<h3> <a name="//apple_ref/java/instm/Relationship/deleteRule">deleteRule</a></h3>
+public int <code>deleteRule</code>()
+
+<P>Returns a rule that describes the action to take when an object is being deleted. The returned rule is one of the following:<p>
+<ul><li>DeleteRuleNullify<br>
+<li>DeleteRuleCascade<br>
+<li>DeleteRuleDeny<br>
+<li>DeleteRuleNoAction<br>
+</ul>For example, suppose you have a department with multiple employees. When a user tries to delete the department, your application could:<p>
+<ul><li>Delete the department and remove any back reference the employee has to the department (nullify)<br>
+<li>Delete the department and all of the employees it contains (cascade)<br>
+<li>Refuse the deletion if the department contains employees (deny)<br>
+<li>Delete the department, but ignore the department's <code>employees</code> relationship (no action). You should use this delete rule with caution since it can leave dangling references in your object graph.<br>
+</ul><hr WIDTH=25% ALIGN=LEFT>
+<a name="2673"></a>
+<h3> <a name="//apple_ref/java/instm/Relationship/destinationAttributes">destinationAttributes</a></h3>
+public next.util.ImmutableVector <code>destinationAttributes</code>()
+
+<P>Returns the destination attributes of the relationship. These correspond one-to-one with the attributes returned by <a href="#987"><code>sourceAttributes</code></a>. Returns <code>null</code> if the relationship is flattened.<p>
+<B>See also: </B>  
+<a href="#2788"><code>joins</code></a>, <a href="../Join/Frameset.html#1183" target="_top"><code>destinationAttribute</code></a> (Join)
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="2683"></a>
+<h3> <a name="//apple_ref/java/instm/Relationship/destinationEntity">destinationEntity</a></h3>
+public next.eo.Entity <code>destinationEntity</code>()
+
+<P>Returns the relationship's destination entity, which is determined by the destination entity of its joins for a simple relationship, and by whatever ends the data path for a flattened relationship. For example, if a flattened relationship's definition is "department.facility", the destination entity is the Facility entity.<p>
+<B>See also: </B>  
+<a href="#2703"><code>entity</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="2703"></a>
+<h3> <a name="//apple_ref/java/instm/Relationship/entity">entity</a></h3>
+public next.eo.Entity <code>entity</code>()
+
+<P>Returns the relationship's source entity.<p>
+<B>See also: </B>  
+<a href="#2683"><code>destinationEntity</code></a>, <a href="../Entity/Frameset.html#3702" target="_top"><code>addRelationship</code></a> (Entity)
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="2758"></a>
+<h3> <a name="//apple_ref/java/instm/Relationship/inverseRelationship">inverseRelationship</a></h3>
+public next.eo.Relationship <code>inverseRelationshi</code>p()
+
+<P>Searches the relationship's destination entity for a user-created, back-referencing relationship joining on the same keys. Returns the inverse relationship if one is found, <code>null</code> otherwise.<p>
+<B>See also: </B>  
+<a href="#2610"><code>anyInverseRelationship</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="2763"></a>
+<h3> <a name="//apple_ref/java/instm/Relationship/isCompound">isCompound</a></h3>
+public boolean <code>isCompound</code>()
+
+<P>Returns <code>true</code> if the relationship contains more than one join (that is, if it joins more than one pair of attributes), <code>false</code> if it has only one join. See "<a href="#3152">Creating a Simple Relationship</a>" in the class description for information on compound relationships.<p>
+<B>See also: </B>  
+<a href="#2788"><code>joins</code></a>, <a href="#4551"><code>joinSemantic</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="2768"></a>
+<h3> <a name="//apple_ref/java/instm/Relationship/isFlattened">isFlattened</a></h3>
+public boolean <code>isFlattened</code>()
+
+<P>Returns <code>true</code> if the relationship traverses more than two entities, <code>false</code> otherwise. See "<a href="#3195">Creating a Flattened Relationship</a>" in the class description for an example of a flattened relationship.<p>
+<hr WIDTH=25% ALIGN=LEFT>
+<a name="2773"></a>
+<h3> <a name="//apple_ref/java/instm/Relationship/isMandatory">isMandatory</a></h3>
+public boolean <code>isMandatory</code>()
+
+<P>Returns <code>true</code> if the target of the relationship is required, <code>false</code> if it can be <code>null</code>.<p>
+<B>See also: </B>  
+<a href="#2928"><code>setIsMandatory</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="2778"></a>
+<h3> <a name="//apple_ref/java/instm/Relationship/isToMany">isToMany</a></h3>
+public boolean <code>isToMany</code>()
+
+<P>Returns <code>true</code> if the relationship is to-many, <code>false</code> if it's to-one.<p>
+<B>See also: </B>  
+<a href="#2983"><code>setToMany</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="2788"></a>
+<h3> <a name="//apple_ref/java/instm/Relationship/joins">joins</a></h3>
+public next.util.ImmutableVector <code>joins</code>()
+
+<P>Returns the semantic used to create SQL expressions for this relationship. The returned join semantic is one of the following:<p>
+<ul><li>InnerJoin<br>
+<li>FullOuterJoin<br>
+<li>LeftOuterJoin<br>
+<li>RightOuterJoin<br>
+</ul><B>See also: </B>  
+<a href="#2788"><code>joins</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="4551"></a>
+<h3> <a name="//apple_ref/java/instm/Relationship/joinSemantic">joinSemantic</a></h3>
+public int <code>joinSemantic</code>()
+
+<P>Returns all joins used by relationship.<p>
+<B>See also: </B>  
+<a href="#2673"><code>destinationAttributes</code></a><code>, </code><a href="#4551"><code>joinSemantic</code></a>, <a href="#987"><code>sourceAttributes</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="2803"></a>
+<h3> <a name="//apple_ref/java/instm/Relationship/name">name</a></h3>
+public java.lang.String <code>name</code>()
+
+<P>Returns the relationship's name.<p>
+<hr WIDTH=25% ALIGN=LEFT>
+<a name="2813"></a>
+<h3> <a name="//apple_ref/java/instm/Relationship/numberOfToManyFaultsToBatchFetch">numberOfToManyFaultsToBatchFetch</a></h3>
+public int <code>numberOfToManyFaultsToBatchFetch</code>()
+
+<P>Returns the number of to-many faults that are triggered at one time.<p>
+<hr WIDTH=25% ALIGN=LEFT>
+<a name="2823"></a>
+<h3> <a name="//apple_ref/java/instm/Relationship/ownsDestination">ownsDestination</a></h3>
+public boolean <code>ownsDestination</code>()
+
+<P>Returns <code>true</code> if the receiver's source object owns its destination objects, <code>false</code> otherwise. See the method description for <a href="#2963"><code>setOwnsDestination</code></a> for more discussion of this topic.<p>
+<B>See also: </B>  
+<a href="#2673"><code>destinationAttributes</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="2833"></a>
+<h3> <a name="//apple_ref/java/instm/Relationship/propagatesPrimaryKey">propagatesPrimaryKey</a></h3>
+public boolean <code>propagatesPrimaryKey</code>()
+
+<P>Returns <code>true</code> if objects should propagate their primary key to related objects through this relationship. Objects only propagate their primary key values if the corresponding values in the destination object aren't already set.<p>
+<hr WIDTH=25% ALIGN=LEFT>
+<a name="2838"></a>
+<h3> <a name="//apple_ref/java/instm/Relationship/qualifierWithSourceRow">qualifierWithSourceRow</a></h3>
+public next.eo.Qualifier <code>qualifierWithSourceRow</code>(next.util.ImmutableHashtable <em>sourceRow</em>)
+
+<P>Returns a qualifier that can be used to fetch the destination of the receiving relationship, given <em>sourceRow</em>.<p>
+<hr WIDTH=25% ALIGN=LEFT>
+<a name="2848"></a>
+<h3> <a name="//apple_ref/java/instm/Relationship/referencesProperty">referencesProperty</a></h3>
+public boolean <code>referencesProperty</code>(java.lang.Object <em>aProperty</em>)
+
+<P>Returns <code>true</code> if <em>aProperty</em> is in the relationship's data path or is an attribute belonging to one of the relationship's joins; otherwise, it returns <code>false</code>. See the class description for information of how relationships reference properties.<p>
+<hr WIDTH=25% ALIGN=LEFT>
+<a name="2868"></a>
+<h3> <a name="//apple_ref/java/instm/Relationship/removeJoin">removeJoin</a></h3>
+public void <code>removeJoin</code>(next.eo.Join <em>aJoin</em>)
+
+<P>Deletes <em>aJoin</em> from the relationship. Does nothing if the relationship is flattened.<p>
+<B>See also: </B>  
+<a href="#2605"><code>addJoin</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="2873"></a>
+<h3> <a name="//apple_ref/java/instm/Relationship/setDefinition">setDefinition</a></h3>
+public void <code>setDefinition</code>(java.lang.String <em>definition</em>)
+
+<P>Changes the relationship to a flattened relationship by releasing any joins and attributes (both source and destination) associated with the relationship and setting <em>definition</em> as its data path. "department.facility" is an example of a definition that could be supplied to this method.<p>
+If the relationship's entity hasn't been set, this method won't work correctly. See "<a href="#3195">Creating a Flattened Relationship</a>" in the class description for more information on flattened relationships.<p>
+<B>See also: </B>  
+<a href="#2605"><code>addJoin</code></a>, <a href="#2923"><code>setEntity</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="2883"></a>
+<h3> <a name="//apple_ref/java/instm/Relationship/setDeleteRule">setDeleteRule</a></h3>
+public void <code>setDeleteRule</code>(int <em>deleteRule</em>)
+
+<P>Set a rule describing the action to take when object is being deleted. <em>deleteRule</em> can be one of the following:<p>
+<ul><li>DeleteRuleNullify<br>
+<li>DeleteRuleCascade<br>
+<li>DeleteRuleDeny<br>
+<li>DeleteRuleNoAction<br>
+</ul>For more discussion of what these rules mean, see the method description for <a href="#2663"><code>deleteRule</code></a>.<p>
+<hr WIDTH=25% ALIGN=LEFT>
+<a name="2923"></a>
+<h3> <a name="//apple_ref/java/instm/Relationship/setEntity">setEntity</a></h3>
+public void <code>setEntity</code>(next.eo.Entity <em>anEntity</em>)
+
+<P>Sets the entity of the relationship to <em>anEntity</em>. If the relationship is currently owned by a different entity, this method will remove the relationship from that entity. This method doesn't add the relationship to the new entity. Entity's <a href="../Entity/Frameset.html#3702" target="_top"><code>addRelationship</code></a> method invokes this method. <p>
+You only need to use this method when creating a flattened relationship; use Entity's <code>addRelationship</code> to associate an existing relationship with an entity.<p>
+<B>See also: </B>  
+<a href="#2873"><code>setDefinition</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="2928"></a>
+<h3> <a name="//apple_ref/java/instm/Relationship/setIsMandatory">setIsMandatory</a></h3>
+public void <code>setIsMandatory</code>(boolean <em>flag</em>)
+
+<P>Specifies according to <em>flag</em> whether the target of the relationship must be supplied or can be <code>null</code>.<p>
+<hr WIDTH=25% ALIGN=LEFT>
+<a name="2933"></a>
+<h3> <a name="//apple_ref/java/instm/Relationship/setJoinSemantic">setJoinSemantic</a></h3>
+public void <code>setJoinSemantic</code>(int <em>joinSemantic</em>)
+
+<P>Sets the semantic used to create SQL expressions for this relationship. <em>joinSemantic</em> should be one of the following:<p>
+<ul><li>InnerJoin<br>
+<li>FullOuterJoin<br>
+<li>LeftOuterJoin<br>
+<li>RightOuterJoin<br>
+</ul><B>See also: </B>  
+<a href="#2605"><code>addJoin</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="2943"></a>
+<h3> <a name="//apple_ref/java/instm/Relationship/setName">setName</a></h3>
+public void <code>setName</code>(java.lang.String <em>name</em>)
+
+<P>Sets the relationship's name to <em>name</em>. Throws a verification exception if <em>name</em> is not a valid relationship name, and an invalid argument exception if <em>name</em> is already in use by an attribute or another relationship in the same entity.<p>
+This method forces all objects in the model to be loaded into memory.<p>
+<B>See also: </B>  
+<a href="#2638"><code>beautifyName</code></a>, <a href="#1322"><code>validateName</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="2953"></a>
+<h3> <a name="//apple_ref/java/instm/Relationship/setNumberOfToManyFaultsToBatchFetch">setNumberOfToManyFaultsToBatchFetch</a></h3>
+public void <code>setNumberOfToManyFaultsToBatchFetch</code>(int <em>size</em>)
+
+<P>Sets the number of "toMany" faults that are fired at one time to <em>size</em>.<p>
+<B>See also: </B>  
+<a href="#2778"><code>isToMany</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="2963"></a>
+<h3> <a name="//apple_ref/java/instm/Relationship/setOwnsDestination">setOwnsDestination</a></h3>
+public void <code>setOwnsDestination</code>(boolean <em>flag</em>)
+
+<P>Sets according to <em>flag</em> whether a receiver's source object owns its destination objects. The default is <code>false</code>. When a source object owns its destination objects, it means that the destination objects can't exist independently. For example, in a personnel database, dependents can't exist without having an associated employee. Removing a dependent from an employee's <code>dependents</code> array would have the effect of also deleting the dependent from the database, unless you transferred the dependent to a different employee.<p>
+<B>See also: </B>  
+<a href="#2663"><code>deleteRule</code></a>, <a href="#2883"><code>setDeleteRule</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="2973"></a>
+<h3> <a name="//apple_ref/java/instm/Relationship/setPropagatesPrimaryKey">setPropagatesPrimaryKey</a></h3>
+public void <code>setPropagatesPrimaryKey</code>(boolean <em>flag</em>)
+
+<P>Specifies according to <em>flag</em> whether objects should propagate their primary key to related objects through this relationship. For example, an Employee object might propagate its primary key to an EmployeePhoto object. Objects only propagate their primary key values if the corresponding values in the destination object aren't already set.<p>
+<hr WIDTH=25% ALIGN=LEFT>
+<a name="2983"></a>
+<h3> <a name="//apple_ref/java/instm/Relationship/setToMany">setToMany</a></h3>
+public void <code>setToMany</code>(boolean <em>flag</em>)
+
+<P>Sets a simple relationship as to-many according to <em>flag</em>. Throws an exception if the receiver is flattened. See the class description for considerations in setting this flag.<p>
+<B>See also: </B>  
+<a href="#2768"><code>isFlattened</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="2993"></a>
+<h3> <a name="//apple_ref/java/instm/Relationship/setUserInfo">setUserInfo</a></h3>
+public void <code>setUserInfo</code>(next.util.ImmutableHashtable <em>dictionary</em>)
+
+<P>Sets the <em>dictionary</em> of auxiliary data, which your application can use for whatever it needs. <em>dictionary</em> can only contain property list data types (that is, ImmutableHashtable, MutableHashtable, String, ImmutableVector, MutableVector, ImmutableBytes, and MutableBytes).<p>
+<hr WIDTH=25% ALIGN=LEFT>
+<a name="987"></a>
+<h3> <a name="//apple_ref/java/instm/Relationship/sourceAttributes">sourceAttributes</a></h3>
+public next.util.ImmutableVector <code>sourceAttributes</code>()
+
+<P>Returns the source attributes of a simple (non-flattened) relationship. These correspond one-to-one with the attributes returned by <a href="#2673"><code>destinationAttributes</code></a>. Returns <code>null</code> if the relationship is flattened.<p>
+<B>See also: </B>  
+<a href="#2788"><code>joins</code></a>, <a href="../Join/Frameset.html#1321" target="_top"><code>sourceAttribute</code></a> (Join)
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="1096"></a>
+<h3> <a name="//apple_ref/java/instm/Relationship/userInfo">userInfo</a></h3>
+public next.util.ImmutableHashtable <code>userInfo</code>()
+
+<P>Returns a dictionary of user data. Your application can use this data for whatever it needs.<p>
+<hr WIDTH=25% ALIGN=LEFT>
+<a name="1322"></a>
+<h3> <a name="//apple_ref/java/instm/Relationship/validateName">validateName</a></h3>
+public java.lang.Throwable <code>validateName</code>(java.lang.String <em>name</em>)
+
+<P>Validates <em>name</em> and returns <code>null</code> if its a valid name, or an exception if it isn't. A name is invalid if it has zero length; starts with a character other than a letter, a number, or "@", "#", or "_"; or contains a character other than a letter, a number, "@", "#", "_", or "$". A name is also invalid if the receiver's Entity already has a Relationship with the same name, or if the model has a stored procedure that has an argument with the same name.<p>
+<a href="#2943"><code>setName</code></a> uses this method to validate its argument.<p>
+<hr WIDTH=25% ALIGN=LEFT>
+<a name="2913"></a>
+<h3> <a name="//apple_ref/java/instm/Relationship/validateValue">validateValue</a></h3>
+public java.lang.Throwable <code>validateValue</code>(next.util.MutableVector <em>valueP</em>)
+
+<P>For relationships marked as mandatory, returns a validation exception if the receiver is to-one and <em>valueP</em> is <code>null</code>, or if the receiver is to-many an <em>valueP</em> has a count of 0. A mandatory relationship is one in which the target of the relationship is required. Returns <code>null</code> to indicate success.<p>
+<B>See also: </B>  
+<a href="#2773"><code>isMandatory</code></a>, <a href="#2928"><code>setIsMandatory</code></a>
+<p><p>
+
+ 
+ 
+
+
+<i>Copyright &#169; 1998, Apple Computer, Inc.   All rights
+reserved.</i>
+
+<!-- Last updated: 01/18/98 16:13:14 -->
+
+</body>
+</html>

@@ -1,0 +1,178 @@
+<html><head><title></title></head>
+
+<body bgcolor="#ffffff">
+
+ 
+
+ 
+
+<h1>
+
+<FONT COLOR="#000066">
+
+<a name="107">
+
+ <a name="//apple_ref/occ/cl/NSAutoreleasePool">NSAutoreleasePool</a>
+
+</a>
+
+</FONT>
+
+</h1>
+
+<p><B>Inherits From:</B><BR>  
+
+NSObject
+
+
+
+<p><B>Conforms To:</B><BR>
+
+NSObject (NSObject) 
+
+
+
+<p><B>Declared In:	</B><BR>
+
+Foundation/NSAutoreleasePool.h 
+
+
+
+<p><a name="138"></a>
+
+<a name="description"></a>
+
+<H2>Class Description 
+
+</H2>
+
+The NSAutoreleasePool class is used to implement the Foundation Kit's autorelease mechanism.  An NSAutoreleasePool object simply contains objects that have received an <code>autorelease</code> message, and when deallocated sends a <code>release</code> message to each of those objects. An object can be put into the same pool several times, and receives a <code>release</code> message for each time it was put into the pool.  Thus, sending <code>autorelease</code> instead of <code>release</code> to an object extends the lifetime of that object until the pool itself is released or longer if the object is retained. This class specification contains information on fine-tuning your application's handling of autorelease pools; see "Object Ownership and Automatic Disposal" in the Programming Topics documentation for general information on using the autorelease mechanism.<p>
+
+You create an NSAutoreleasePool with the usual <code>alloc</code> and <code>init</code> messages, and dispose of it with <code>release</code> (an exception will be raised if you send <code>autorelease</code><code> </code>or<code> </code><code>retain</code> to an autorelease pool).  An autorelease pool should always be released in the same context (invocation of a method or function, or body of a loop) that it was created. When a thread terminates, it automatically releases all of the autorelease pools associated with itself.<p>
+
+Autorelease pools can be nested, so you can include them in any function or method. For example,  a <code>main()</code> function may create an autorelease pool and call another function that creates another autorelease pool. Or a single method might have an autorelease pool for an outer loop, and another autorelease pool for an inner loop. Each thread in a program maintains autorelease pools on a stack; the most recently created (and unreleased) autorelease pool is the top pool on the stack. The ability to nest autorelease pools is a definite advantage, but there are side effects when exceptions occur (see <a href="#148">"Implications of Nested Autorelease Pools"</a>).<p>
+
+NSAutoreleasePools are automatically created and destroyed in applications based on the Application Kit, so your code normally doesn't have to worry about them.  (The Application Kit creates a pool at the beginning of the event loop and releases it at the end). There are two cases, though, where you might wish to create and destroy your own autorelease pools.  If you're writing a program that's not based on the Application Kit, such as a UNIX tool, there's no built-in support for autorelease pools; you must create and destroy them yourself.  Also, if you write a loop that creates many temporary objects, you might wish to create an NSAutoreleasePool inside the loop to dispose of those objects before the next iteration.<p>
+
+Enabling the autorelease mechanism in a program that's not based on the Application Kit is easy.  Many programs have a top-level loop where they do most of their work.  To enable the autorelease mechanism you create an NSAutoreleasePool at the beginning of this loop and release it at the end.  An <code>autorelease</code> message sent in the body of the loop automatically puts its receiver into this pool.  <p>
+
+Your <code>main()</code> function might look like this:<p>
+
+<blockquote><pre>void main()<br>{<br>    NSArray *args = [[NSProcessInfo processInfo] arguments];<br>    unsigned count, limit = [args count];<br>    <br>    for (count = 1; count &lt; limit; count++){<br>        NSAutoreleasePool *pool =[[NSAutoreleasePool alloc] init];<br>        NSString *fileContents;<br>        NSString *fileName;<br>    <br>        fileName = [args objectAtIndex:count];<br>        fileContents = [[NSString alloc] initWithContentsOfFile:fileName];<br>        [fileContents autorelease];<br>    <br>        /* Process the file, creating and autoreleasing more objects. */<br>    <br>        [pool release];<br>    }<br>    <br>    /* Do whatever cleanup is needed. */<br>    <br>    exit (EXIT_SUCCESS);<br>}
+
+</pre></blockquote><p>This program processes files passed in on the command line. The <code>for</code> loop processes one file at a time. An NSAutoreleasePool is created at the beginning of this loop and released at the end. Therefore, any object sent an <code>autorelease</code> message inside the <code>for</code> loop, such as <code>fileContents</code>, is added to <code>pool</code>, and when <code>pool</code> is released at the end of the loop those objects are also released.<p>
+
+Similarly, NSAutoreleasePools can be created inside any loop, even in a program based on the Application Kit, that creates and releases many objects during each iteration.<p>
+
+<h3>
+
+<a name="148">
+
+ Implications of Nested Autorelease Pools
+
+</a>
+
+</h3>
+
+It's common to speak of autorelease pools as being nested because of the enclosure evident in code;  for instance, you can have an autorelease pool in an outer loop that contains an inner loop with its own autorelease pool. But you can also think of nested autorelease pools as being on a stack, with the "inmost" autorelease pool being on top of the stack. As noted earlier, this is actually how nested autorelease pools are implemented: Each thread (NSThread) in a program maintains a stack of autorelease pools. When you create an autorelease pool, it is pushed onto the top of the current thread's stack. Autoreleased objects-that is, objects which have received an <code>autorelease</code> message or which are added through the <code>addObject:</code> class method-are always put in the autorelease pool at the top of the stack. <p>
+
+Released autorelease pools, if not on the top of the stack, will cause all (unreleased) autorelease pools above them on the stack to be released, along with all their objects. If you neglect to send <code>release</code> to an autorelease pool when you're finished with it (something <em>not</em> recommended), it will be released when one of the autorelease pools in which it nests is released.<p>
+
+This behavior has implications for exceptional conditions. If an exception occurs, and the thread suddenly transfers out of the current context, the pool associated with that context is released. However, if that pool is not the top pool on the thread's stack, all the pools above the released pool are also released (releasing all their objects in the process). The top autorelease pool on the thread's stack then becomes the pool previously underneath the released pool associated with the exceptional condition. Because of this behavior, exception handlers do not need to release objects that were sent <code>autorelease</code>. Neither is it necessary or even desireable for an exception handler to send <code>release</code> to its autorelease pool, unless the handler is re-raising the exception.<p>
+
+<h3>
+
+<a name="152">
+
+ Guaranteeing the Foundation Ownership Policy
+
+</a>
+
+</h3>
+
+By creating an NSAutoreleasePool instead of simply releasing objects, you extend the lifetime of temporary objects to the lifetime of that pool.  After an NSAutoreleasePool is deallocated, you should regard any object that was autoreleased while that pool was active as "disposed of", and not send a message to that object or return it to the invoker of your method. <p>
+
+If you must use a temporary object beyond an autorelease context, you can do so by sending a <code>retain</code> message to the object within the context and then send it <code>autorelease</code> after the pool has been released as in:<p>
+
+<blockquote><pre>- findMatchingObject:anObject<br>{<br>    id match = nil;<br>    <br>    while (match == nil) {<br>        NSAutoreleasePool *subpool = [[NSAutoreleasePool alloc] init];<br>    <br>        /* Do a search that creates a lot of temporary objects. */<br>        match = [self expensiveSearchForObject:anObject];<br>    <br>        if (match != nil) <br>            [match retain]; /* Keep match around. */<br>    <br>        [subpool release];<br>    }<br>    <br>    return [match autorelease];   /* Let match go and return it. */<br>}
+
+</pre></blockquote><p>By sending <code>retain</code> to <code>match</code> while <code>subpool</code> is in effect and sending <code>autorelease</code> to it after <code>subpool</code> has been released, <code>match</code> is effectively moved from <code>subpool</code> to the pool that was previously active.  This extends the lifetime of <code>match</code> and allows it to receive messages outside the loop and be returned to the invoker of <code>findMatchingObject:</code>.<p>
+
+<HR WIDTH="50%" ALIGN="LEFT">
+
+<a name="157"></a>
+
+<a name="clm"></a>
+
+<h2>Class Methods</h2>  
+
+ 
+
+
+
+<a name="158"></a>
+
+<h3>
+
+ <a name="//apple_ref/occ/clm/NSAutoreleasePool/addObject:">addObject:</a>
+
+</h3>
+
++ (void)<code>addObject:</code>(id)<em>anObject</em> 
+
+<P>Adds <em>anObject</em> to the active autorelease pool in the current thread, so that it will be sent a <code>release</code> message when the pool itself is deallocated.  The same object may be added several times to the active pool and will receive a <code>release</code> message for each time it was added. Normally you don't invoke this method directly-send <code>autorelease</code> to <em>anObject</em> instead.<p>
+
+<B>See also: </B>  
+
+<code><a href="#//apple_ref/occ/instm/NSAutoreleasePool/addObject:">- addObject:</a>
+
+</code><p><HR WIDTH="50%" ALIGN="LEFT">
+
+<a name="instm"></a>
+
+<h2>Instance Methods</h2>  
+
+
+
+
+
+<a name="163"></a>
+
+<h3>
+
+ <a name="//apple_ref/occ/instm/NSAutoreleasePool/addObject:">addObject:</a>
+
+</h3>
+
+- (void)<code>addObject:</code>(id)<em>anObject</em> 
+
+<P>Adds <em>anObject</em> to the receiver, so that it will be sent a <code>release</code> message when the receiver is deallocated. The same object may be added several times to the same pool and will receive a <code>release</code> message for each time it was added. Normally you don't invoke this method directly-send <code>autorelease</code> to <em>anObject</em> instead.<p>
+
+<B>See also: </B>  
+
+ <a href="#//apple_ref/occ/clm/NSAutoreleasePool/addObject:"><code>+ addObject:</a>
+
+</code><p>
+
+ 
+
+ 
+
+
+
+
+
+<i>Copyright &#169; 1997, Apple Computer, Inc.   All rights
+
+reserved.</i>
+
+
+
+<!-- Last updated: 06/17/97 16:46:03 -->
+
+
+
+</body>
+
+</html>
+

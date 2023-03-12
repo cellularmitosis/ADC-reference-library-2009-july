@@ -1,0 +1,1194 @@
+<html><head><title></title></head>
+
+<body bgcolor="#ffffff">
+
+ 
+
+ 
+
+<h2><a name="//apple_ref/occ/cl/EOAttribute">EOAttribute</a>
+
+ <BR>
+
+</h2>
+
+<p><B>Inherits From:</B><BR>  
+
+NSObject
+
+
+
+<p><B>Conforms To:</B>
+
+NSObject (NSObject)
+
+
+
+<p><B>Declared in:</B>
+
+EOAccess/EOAttribute.h
+
+
+
+<p><a name="640">
+
+<a name="description"></a>
+
+<h3>Class Description </h3>
+
+</a>An EOAttribute represents a column, field or property in a database, and associates an internal name with an external name or expression by which the property is known to the database. The property an EOAttribute represents may be a meaningful value, such as a salary or a name, or it may be an arbitrary value used for identification but with no real-world applicability (ID numbers and foreign keys for relationships fall into this category). An EOAttribute also maintains type information for binding values to the instance variables of objects.<p>
+
+EOAttributes are also used to represent arguments for EOStoredProcedures.<p>
+
+You usually define attributes in your EOModel with the EOModeler application, which is documented in the <em>Enterprise Objects Framework Developer's Guide</em>. Your code probably won't need to programmatically interact with EOAttribute unless you're working at the adaptor level.<p>
+
+An attribute may be simple, derived, or flattened. A simple attribute typically corresponds to a single column in the database, and may be read or updated directly from or to the database. A simple EOAttribute may also be set as read-only with its <B>setReadOnly: </B> method. Read-only attributes of enterprise objects are never updated.<p>
+
+A derived attribute doesn't correspond to a single database column in its entity's database table, and is usually based on some other attribute, which is modified in some way. For example, if an Employee entity has a simple monthly salary attribute, you can define a derived <B>annualSalary </B> attribute as "salary * 12". Derived attributes, since they don't correspond to actual values in the database, are effectively read-only; it makes no sense to write a derived value.<p>
+
+A flattened attribute of an entity is actually an attribute of some other entity reached through a relationship. A flattened attribute's external definition is a data path ending in an attribute name. For example, if the Employee entity has the relationship <B>toAddress </B> and the Address entity has the attribute <code>street</code>, you can define <B>streetName </B> as an attribute of your Employee EOEntity by creating an EOAttribute for it with a definition of "toAddress.street".<p>
+
+Like the other major modeling classes, EOAttribute provides a user dictionary for the application to store any auxiliary information it needs.<p>
+
+<a name="647">
+
+<h3> Mapping from Database to Objects</h3>
+
+</a>Every EOAttribute has an external type, which is the type used by the database to store its associated data, and an Objective-C class used as the type for that data in the client application. The type used by the database is accessed with the <B>setExternalType: </B> and <B>externalType </B> methods. The class type used by the application is accessed with the <B>setValueClassName: </B> and <B>valueClassName </B> methods. You can map database types to a set of standard value classes, which includes:<p>
+
+<ul><li>NSString<br><li>NSNumber<br><li>NSDecimalNumber<br><li>NSData<br><li>NSDate<br></ul><p>Database-specific adaptors automatically handle value conversions for these classes. You can also create your own custom value class, so long as you define a format that it uses to interpret data. Your value class must also implement the EOCustomClassArchiving protocol to work as a custom value; see that protocol specification for more information. For more information on using EOAttribute methods to work with custom data types, see the next section, "<a href="#1048">Working with Custom Data Types</a>."<p>
+
+The handling of dates assumes by default that both the database server and the client application are running in the same, local, time zone. You can alter the server time zone with the <B>setServerTimeZone: </B> method. If you alter the server time zone, the adaptor automatically converts dates as they pass into and out of the server.<p>
+
+<a name="1048">
+
+<h3> Working with Custom Data Types</h3>
+
+</a>When you create a new model, EOModeler maps each attribute in your model to one of the primitive data types the adaptor knows how to manipulate: NSString, NSData, NSNumber, NSDecimalNumber, and NSDate. For example, suppose you have a <code>photo</code> attribute that's stored in the database as a LONG RAW. When you create a new model, this attribute is mapped to NSData. However, NSData is just an object wrapper for binary data-for instance, it doesn't have any methods for operating on images, which would limit what you'd be able to do with the image in your application. This is a case in which you'd probably choose to use a custom data type, such as NSImage.<p>
+
+For a custom data type to be usable in Enterprise Objects Framework, it must supply methods for importing and exporting itself as one of the primitive types so that it can be read from and written to the database. Specifically, to implement a custom data type you need to do the following:<p>
+
+<ul><li>Set the attributes's value class (using the EOAttribute method <code>setValueClassName:</code>). <p><li>Set the factory method that will be used to create instances of your class from raw data (using the EOAttribute method <code>setValueFactoryMethodName:</code>).<p><li>Set the type of the argument that should be passed to the factory method (using the EOAttribute method <code>setFactoryMethodArgumentType:</code>).<p><li>Set the conversion method that will be used to convert your data back into one of the primitive data types the adaptor can work with; this enables the data to be stored in the database (using the EOAttribute method <code>setAdaptorValueConversionMethodName:</code>).<p></ul>If an EOAttribute represents a binary column in the database, the factory method argument type can be either EOFactoryMethodArgumentIsNSData or EOFactoryMethodArgumentIsBytes, indicating that the method takes an NSData object or raw bytes as an argument. If the EOAttribute represents a string or character column, the factory method argument type can be either EOFactoryMethodArgumentIsNSString or EOFactoryMethodArgumentIsBytes, indicating that the method takes an NSString object or raw bytes as an argument. These types apply when fetching custom values, as described below.<p>
+
+The following code excerpt demonstrates how these methods work together. The example shows two custom data types: an image that's initialized with an NSData, and a custom zip code that's initialized with a string.<p>
+
+<blockquote><pre>    [imageAttribute setValueClassName:@"NSImage"];
+
+</pre></blockquote><p>
+
+<blockquote><pre>    [imageAttribute setFactoryMethodArgumentType:EOFactoryMethodArgumentIsNSData];
+
+</pre></blockquote><p>
+
+<blockquote><pre>    [imageAttribute setValueFactoryMethodName:@"imageWithData:"];
+
+</pre></blockquote><p>
+
+<blockquote><pre>    [imageAttribute setAdaptorValueConversionMethodName:@"TIFFRepresentation"];
+
+</pre></blockquote><p>
+
+<blockquote><pre>    [zipCodeAttribute setValueClassName:@"MyZipCodeClass"];
+
+</pre></blockquote><p>
+
+<blockquote><pre>    [zipCodeAttribute setFactoryMethodArgumentType:EOFactoryMethodArgumentIsBytes];
+
+</pre></blockquote><p>
+
+<blockquote><pre>    [zipCodeAttribute setValueFactoryMethodName:@"zipCodeWithBytes:length:"];
+
+</pre></blockquote><p>
+
+<blockquote><pre>    [zipCodeAttribute setAdaptorValueConversionMethodName:@"zipCodeString"];
+
+</pre></blockquote><p>
+
+You can also define a custom data type using the Attributes Inspector in EOModeler. For more information, see the chapter "Advanced Modeling Techniques" in the <em>Enterprise Objects Framework Developer's Guide</em>.<p>
+
+<a name="1041">
+
+<h4> Fetching Custom Values</h4>
+
+</a>Custom values are created during fetching in EOAdaptorChannel's <B>fetchRowWithZone: </B> method. This method fetches data in the external (server) type and converts it to a value object. For scalar database types such as numbers and dates, the EOAdaptorChannel converts the value itself. For binary and string database types, it calls upon the EOAttribute being fetched to perform the conversion, into either a standard or custom value class. EOAttribute's methods for performing this conversion are <B>newValueForBytes:length: </B> for binary data and <B>newValueForBytes:length:encoding: </B> for strings. These methods either convert the raw data directly into an NSData or NSString, or apply the custom value factory method to convert it into the custom class. Once the value is converted, the EOAdaptorChannel puts it into the NSDictionary for the row being fetched.<p>
+
+<B>newValueForBytes:length: </B> can handle NSData and raw bytes (<B>void * </B>). It converts the raw bytes into an NSData if the custom value argument type is EOFactoryMethodArgumentIsNSData, then invokes the custom value factory method with the NSData or bytes. If the EOAttribute has no custom value factory method, this method simply returns an NSData object containing the bytes.<p>
+
+<B>newValueForBytes:length:encoding: </B> can handle NSString and raw bytes. It converts the raw bytes into an NSString if the custom value argument type is EOFactoryMethodArgumentIsNSString, then invokes the custom value factory method with the string or bytes. If the EOAttribute has no custom value factory method, this method simply returns an NSString object created from the bytes.<p>
+
+<a name="1045">
+
+<h4> Converting Custom Values</h4>
+
+</a>Custom values are converted back to binary or character data in EOAdaptorChannel's <B>evaluateExpression: </B> method. For each value in the EOSQLExpression to be evaluated, the EOAdaptorChannel sends the appropriate EOAttribute an <B>adaptorValueByConvertingAttributeValue: </B> message to convert it. If the value is any of the standard value classes, it's returned unchanged. If the value is of a custom class, though, it's converted by applying the conversion method specified in the EOAttribute.<p>
+
+<a name="657">
+
+<h3> SQL Statement Formats</h3>
+
+</a>In addition to mapping database values to object values, an EOAttribute can alter the way values are selected, inserted, and updated in the database by defining special format strings. These format strings allow a client application to extend its reach right down to the server for certain operations. For example, you might want to view an employee's salary on a yearly basis, without defining a derived attribute as in a previous example. In this case, you could set the salary attribute's SELECT statement format to "salary * 12" (with <B>setReadFormat: </B>) and the INSERT and UPDATE statement formats to "salary / 12" (<B>setWriteFormat: </B>). Thus, whenever your application retrieves values for the salary attribute they're multiplied by 12, and when it writes values back to the database they're divided by 12.<p>
+
+Your application can use any legal SQL value expression in a format string, and can even access server-specific features such as stored procedures (see EOEntity's <B>setStoredProcedure: </B> method description for more information). Accessing server-specific features can offer your application great flexibility in dealing with its server, but does limit its portability. You're responsible for ensuring that your SQL is well-formed and will be understood by the database server.<p>
+
+Format strings for the <code>setReadFormat:</code> and <code>setwriteFormat:</code> methods should use "%P" as the substitution character for the value that is being formatted. "%@" will not work. For example:<p>
+
+<blockquote><pre>    [myAttribute setReadFormat:@"TO_UPPER(%P)"];
+
+</pre></blockquote><p>
+
+<blockquote><pre>    [myAttribute setWriteFormat:@"TO_LOWER(%P)"];
+
+</pre></blockquote><p>
+
+<a name="663">
+
+<h3> Creating a Simple Attribute</h3>
+
+</a>A simple attribute needs at least the following characteristics:<p>
+
+<ul><li>A name unique within its EOEntity<p><li>The name of a column in the database table for its entity (the external name)<p><li>A declaration of the type of that column as defined by the database and adaptor (the external type)<p><li>A declaration of the Objective-C class used to represent values in the application<p><li>For Objective-C value classes that require it, a subtype for such distinctions as between numeric types<p></ul>You also have to set whether the attribute is part of its entity's primary key, is a class property, or is used for locking. See the EOEntity class description for more information on these three groups of attributes. This code excerpt gives an example of creating a simple EOAttribute and adding it to an EOEntity:<p>
+
+<blockquote><pre>EOEntity *employeeEntity;    /* Assume this exists. */
+
+</pre></blockquote><p>
+
+<blockquote><pre>EOAttribute *salaryAttribute;
+
+</pre></blockquote><p>
+
+<blockquote><pre>NSArray *empClassProps;
+
+</pre></blockquote><p>
+
+<blockquote><pre>NSArray *empLockAttributes;
+
+</pre></blockquote><p>
+
+<blockquote><pre>BOOL result;
+
+</pre></blockquote><p>
+
+<blockquote><pre>salaryAttribute = [[EOAttribute alloc] init];
+
+</pre></blockquote><p>
+
+<blockquote><pre>[salaryAttribute setName:@"salary"];
+
+</pre></blockquote><p>
+
+<blockquote><pre>[salaryAttribute setColumnName:@"SALARY"];
+
+</pre></blockquote><p>
+
+<blockquote><pre>[salaryAttribute setExternalType:@"money"];
+
+</pre></blockquote><p>
+
+<blockquote><pre>[salaryAttribute setValueClassName:"NSDecimalNumber"];
+
+</pre></blockquote><p>
+
+<blockquote><pre>[employeeEntity addAttribute:salaryAttribute];
+
+</pre></blockquote><p>
+
+<blockquote><pre>[salaryAttribute release];
+
+</pre></blockquote><p>
+
+<blockquote><pre>empClassProps = [[employeeEntity classProperties] mutableCopy];
+
+</pre></blockquote><p>
+
+<blockquote><pre>[empClassProps addObject:salaryAttribute];
+
+</pre></blockquote><p>
+
+<blockquote><pre>[employeeEntity setClassProperties:empClassProps];
+
+</pre></blockquote><p>
+
+<blockquote><pre>[empClassProps release];
+
+</pre></blockquote><p>
+
+<blockquote><pre>empLockAttributes = [[employeeEntity attributesUsedForLocking]
+
+</pre></blockquote><p>
+
+<blockquote><pre>mutableCopy];
+
+</pre></blockquote><p>
+
+<blockquote><pre>[empLockAttributes addObject:salaryAttribute];
+
+</pre></blockquote><p>
+
+<blockquote><pre>result = [employeeEntity setAttributesUsedForLocking:empLockAttributes];
+
+</pre></blockquote><p>
+
+<blockquote><pre>[empLockAttributes release];
+
+</pre></blockquote><p>
+
+<a name="695">
+
+<h3> Creating a Derived Attribute</h3>
+
+</a>A derived attribute depends on another attribute, so you base it on a definition including that attribute's name rather than on an external name. Because a derived attribute isn't mapped directly to anything in the database, you shouldn't include it in the entity's set of primary key attributes or attributes used for locking:<p>
+
+<blockquote><pre>EOEntity *employeeEntity;    /* Assume this exists. */
+
+</pre></blockquote><p>
+
+<blockquote><pre>EOAttribute *bonusAttribute;
+
+</pre></blockquote><p>
+
+<blockquote><pre>NSArray *empClassProps;
+
+</pre></blockquote><p>
+
+<blockquote><pre>BOOL result;
+
+</pre></blockquote><p>
+
+<blockquote><pre>bonusAttribute = [[EOAttribute alloc] init];
+
+</pre></blockquote><p>
+
+<blockquote><pre>[bonusAttribute setName:@"bonus"];
+
+</pre></blockquote><p>
+
+<blockquote><pre>[bonusAttribute setDefinition:@"salary * 0.5"];
+
+</pre></blockquote><p>
+
+<blockquote><pre>[bonusAttribute setValueClassName:@"NSDecimalNumber"];
+
+</pre></blockquote><p>
+
+<blockquote><pre>[employeeEntity addAttribute:bonusAttribute];
+
+</pre></blockquote><p>
+
+<blockquote><pre>[bonusAttribute release];
+
+</pre></blockquote><p>
+
+<blockquote><pre>empClassProps = [[employeeEntity classProperties] mutableCopy];
+
+</pre></blockquote><p>
+
+<blockquote><pre>[empClassProps addObject:bonusAttribute];
+
+</pre></blockquote><p>
+
+<blockquote><pre>result = [employeeEntity setClassProperties:empClassProps];
+
+</pre></blockquote><p>
+
+<blockquote><pre>[empClassProps release];
+
+</pre></blockquote><p>
+
+<a name="713">
+
+<h3> Creating a Flattened Attribute</h3>
+
+</a>A flattened attribute depends on a relationship, so you base it on a definition including that relationship's name rather than on an external name. Because a flattened attribute doesn't correspond directly to anything in its entity's table, you don't have to specify an external name, and shouldn't include it in the entity's set of primary key attributes or attributes used for locking:<p>
+
+<blockquote><pre>EOEntity *employeeEntity;    /* Assume this exists. */
+
+</pre></blockquote><p>
+
+<blockquote><pre>EOAttribute *deptNameAttribute;
+
+</pre></blockquote><p>
+
+<blockquote><pre>NSArray *empClassProps;
+
+</pre></blockquote><p>
+
+<blockquote><pre>BOOL result;
+
+</pre></blockquote><p>
+
+<blockquote><pre>deptNameAttribute = [[EOAttribute alloc] init];
+
+</pre></blockquote><p>
+
+<blockquote><pre>[deptNameAttribute setName:@"departmentName"];
+
+</pre></blockquote><p>
+
+<blockquote><pre>[deptNameAttribute setValueClassName:"NSString"];
+
+</pre></blockquote><p>
+
+<blockquote><pre>[deptNameAttribute setExternalType:@"varchar"];
+
+</pre></blockquote><p>
+
+<blockquote><pre>[employeeEntity addAttribute:deptNameAttribute];
+
+</pre></blockquote><p>
+
+<blockquote><pre>[deptNameAttribute setDefinition:@"toDepartment.name"];
+
+</pre></blockquote><p>
+
+<blockquote><pre>[deptNameAttribute release];
+
+</pre></blockquote><p>
+
+<blockquote><pre>empClassProps = [[employeeEntity classProperties] mutableCopy];
+
+</pre></blockquote><p>
+
+<blockquote><pre>[empClassProps addObject:deptNameAttribute];
+
+</pre></blockquote><p>
+
+<blockquote><pre>result = [employeeEntity setClassProperties:empClassProps];
+
+</pre></blockquote><p>
+
+<blockquote><pre>[empClassProps release]; 
+
+</pre></blockquote><p>
+
+Instead of flattening attributes in your model, a better approach is often to directly traverse the object graph through relationships. See the chapter "Using EOModeler" in the <em>Enterprise Objects Framework Developer's Guide</em> for a discussion on when to use flattened attributes.<p>
+
+<dl><dt>Getting the entity
+
+<dl><dt><a href="#//apple_ref/occ/instm/EOAttribute/entity">- entity</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOAttribute/parent">- parent</a>
+
+</dl><dt>Setting the name
+
+<dl><dt><a href="#//apple_ref/occ/instm/EOAttribute/beautifyName">- beautifyName</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOAttribute/name">- name</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOAttribute/setName:">- setName:</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOAttribute/validateName:">- validateName:</a>
+
+</dl><dt>Setting date information
+
+<dl><dt><a href="#//apple_ref/occ/instm/EOAttribute/serverTimeZone">- serverTimeZone</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOAttribute/setServerTimeZone:">- setServerTimeZone:</a>
+
+</dl><dt>Setting external definitions
+
+<dl><dt><a href="#//apple_ref/occ/instm/EOAttribute/columnName">- columnName</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOAttribute/definition">- definition</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOAttribute/externalType">- externalType</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOAttribute/setColumnName:">- setColumnName:</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOAttribute/setDefinition:">- setDefinition:</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOAttribute/setExternalType:">- setExternalType:</a>
+
+</dl><dt>Setting value type information
+
+<dl><dt><a href="#//apple_ref/occ/instm/EOAttribute/allowsNull">- allowsNull</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOAttribute/precision">- precision</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOAttribute/scale">- scale</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOAttribute/setAdaptorValueConversionMethodName:">- setAdaptorValueConversionMethodName:</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOAttribute/setAllowsNull:">- setAllowsNull:</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOAttribute/setFactoryMethodArgumentType:">- setFactoryMethodArgumentType:</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOAttribute/setPrecision:">- setPrecision:</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOAttribute/setScale:">- setScale:</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOAttribute/setValueClassName:">- setValueClassName:</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOAttribute/setValueFactoryMethodName:">- setValueFactoryMethodName:</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOAttribute/setValueType:"><a href="#961">- setValueType:</a>:</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOAttribute/setWidth:">- setWidth:</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOAttribute/validateValue:">- validateValue:</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOAttribute/valueClassName">- valueClassName</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOAttribute/valueType">- valueType</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOAttribute/width">- width</a>
+
+</dl><dt>Checking type information
+
+<dl><dt><a href="#//apple_ref/occ/instm/EOAttribute/isDerived">- isDerived</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOAttribute/isFlattened">- isFlattened</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOAttribute/isReadOnly">- isReadOnly</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOAttribute/setReadOnly:">- setReadOnly:</a>
+
+</dl><dt>Setting SQL statement formats
+
+<dl><dt><a href="#//apple_ref/occ/instm/EOAttribute/setWriteFormat:">- setWriteFormat:</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOAttribute/setReadFormat:">- setReadFormat:</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOAttribute/readFormat">- readFormat</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOAttribute/writeFormat">- writeFormat</a>
+
+</dl><dt>Setting the user dictionary
+
+<dl><dt><a href="#//apple_ref/occ/instm/EOAttribute/setUserInfo:">- setUserInfo:</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOAttribute/userInfo">- userInfo</a>
+
+</dl><dt>Methods used by the adaptor
+
+<dl><dt><a href="#//apple_ref/occ/instm/EOAttribute/adaptorValueByConvertingAttributeValue:">- adaptorValueByConvertingAttributeValue:</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOAttribute/adaptorValueConversionMethod">- adaptorValueConversionMethod</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOAttribute/adaptorValueConversionMethodName">- adaptorValueConversionMethodName</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOAttribute/adaptorValueType">- adaptorValueType</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOAttribute/factoryMethodArgumentType">- factoryMethodArgumentType</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOAttribute/newDateForYear:month:day:hour:minute:second:millisecond:timezone:zone:"><a href="#857">- newDateForYear:month:day:hour:minute:second:millisecond:time
+
+zone:zone:</a></a>
+
+<dt><a href="#//apple_ref/occ/instm/EOAttribute/newValueForBytes:length:">- newValueForBytes:length:</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOAttribute/newValueForBytes:length:encoding:">- newValueForBytes:length:encoding:</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOAttribute/valueFactoryMethod">- valueFactoryMethod</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOAttribute/valueFactoryMethodName">- valueFactoryMethodName</a>
+
+</dl><dt>Working with stored procedures
+
+<dl><dt><a href="#//apple_ref/occ/instm/EOAttribute/parameterDirection">- parameterDirection</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOAttribute/storedProcedure">- storedProcedure</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOAttribute/setParameterDirection:">- setParameterDirection:</a>
+
+</dl></dl><a name="791">
+
+<a name="instm"></a>
+
+<h3>Instance Methods </h3>
+
+</a><a name="792">
+
+<h4> <a name="//apple_ref/occ/instm/EOAttribute/adaptorValueByConvertingAttributeValue:">adaptorValueByConvertingAttributeValue:</a></h4>
+
+</a>- (id)<code>adaptorValueByConvertingAttributeValue:</code>(id)<em>value</em> <p>
+
+Ensures that <em>value</em> is either an NSString, NSData, NSNumber, or NSDate, converting it if necessary. If <em>value</em> needs to be converted, <B>adaptorValueByConvertingAttributeValue: </B> uses the adaptor conversion method to convert <em>value</em> to one of these four primitive types. If the attribute hasn't a specific adaptor conversion method, and the type to be fetched from the database is EOAdaptorBytesType, "archiveData" will be invoked to convert the attribute value.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOAttribute/adaptorValueConversionMethod">- adaptorValueConversionMethod</a> </B>, <a href="#//apple_ref/occ/instm/EOAttribute/adaptorValueType"><B>- adaptorValueType</a>
+
+ </B><p><a name="796">
+
+<h4> <a name="//apple_ref/occ/instm/EOAttribute/adaptorValueConversionMethod">adaptorValueConversionMethod</a></h4>
+
+</a>- (SEL)<code>adaptorValueConversionMethod</code> <p>
+
+Returns the method used to convert a custom class into one of the primitive types that the adaptor knows how to manipulate: NSString, NSData, NSNumber, or NSDate. The return value of this method is derived from the attribute's adaptor value conversion method name. If that name doesn't map to a valid selector in the Objective-C run-time, <B>nil </B> is returned.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOAttribute/adaptorValueByConvertingAttributeValue:">- adaptorValueByConvertingAttributeValue:</a> </B>, <a href="#//apple_ref/occ/instm/EOAttribute/adaptorValueConversionMethodName"><B>- adaptorValueConversionMethodName</a>
+
+ </B><p><a name="800">
+
+<h4> <a name="//apple_ref/occ/instm/EOAttribute/adaptorValueConversionMethodName">adaptorValueConversionMethodName</a></h4>
+
+</a>- (NSString *)<code>adaptorValueConversionMethodName</code> <p>
+
+Returns the name of the method used to convert a custom class into one of the primitive types that the adaptor knows how to manipulate: NSString, NSData, NSNumber, or NSDate.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOAttribute/adaptorValueByConvertingAttributeValue:">- adaptorValueByConvertingAttributeValue:</a>
+
+ </B><p><a name="804">
+
+<h4> <a name="//apple_ref/occ/instm/EOAttribute/adaptorValueType">adaptorValueType</a></h4>
+
+</a>- (EOAdaptorValueType)<code>adaptorValueType</code> <p>
+
+Returns an EOAdaptorValueType that indicates the data type that will be fetched from the database. Currently, this method returns one of the following values:<p>
+
+EOAdaptorNumberType<br>EOAdaptorCharactersType<br>EOAdaptorBytesType<br>EOAdaptorDateType<p><B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOAttribute/factoryMethodArgumentType">- factoryMethodArgumentType</a>
+
+ </B><p><a name="809">
+
+<h4> <a name="//apple_ref/occ/instm/EOAttribute/allowsNull">allowsNull</a></h4>
+
+</a>- (BOOL)<code>allowsNull</code> <p>
+
+Returns YES to indicate that the attribute can have a <B>nil </B> value, NO otherwise. If the attribute maps directly to a column in the database, it also is used to determine whether the database column can have a NULL value.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOAttribute/setAllowsNull:">- setAllowsNull:</a>
+
+ </B><p><a name="812">
+
+<h4> <a name="//apple_ref/occ/instm/EOAttribute/beautifyName">beautifyName</a></h4>
+
+</a>- (void)<code>beautifyName</code> <p>
+
+Makes the attribute name conform to a standard convention. Names that conform to this style are all lower-case except for the initial letter of each embedded word other than the first, which is upper case. Thus, "NAME" becomes "name", and "FIRST_NAME" becomes "firstName". This method is used in reverse-engineering an EOModel.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOAttribute/validateName:">- validateName:</a>
+
+ </B><p><a name="816">
+
+<h4> <a name="//apple_ref/occ/instm/EOAttribute/columnName">columnName</a></h4>
+
+</a>- (NSString *)<code>columnName</code> <p>
+
+Returns the name of the column in the database that corresponds to this attribute, or <B>nil </B> if the attribute isn't simple (that is, if it's derived or flattened). An adaptor uses this name to identify the column corresponding to the attribute. Your application should never need to use this name. Note that <B>columnName </B> and <B>definition </B> are mutually exclusive; if one returns a value, the other returns <B>nil </B>.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOAttribute/definition">- definition</a> </B>, <a href="#//apple_ref/occ/instm/EOAttribute/externalType"><B>- externalType</a>
+
+ </B><p><a name="820">
+
+<h4> <a name="//apple_ref/occ/instm/EOAttribute/definition">definition</a></h4>
+
+</a>- (NSString *)<code>definition</code> <p>
+
+Returns a derived or flattened attribute's definition, or <B>nil </B> if the attribute is simple. An attribute's definition is either a value expression defining a derived attribute, such as "salary * 12", or a data path for a flattened attribute, such as "toAuthor.name". Note that <B>columnName </B> and <B>definition </B> are mutually exclusive; if one returns a value, the other returns <B>nil </B>.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOAttribute/columnName">- columnName</a> </B>, <a href="#//apple_ref/occ/instm/EOAttribute/externalType"><B>- externalType</a>, <a href="#//apple_ref/occ/instm/EOAttribute/setDefinition:">- setDefinition:</a>
+
+ </B><p><a name="824">
+
+<h4> <a name="//apple_ref/occ/instm/EOAttribute/entity">entity</a></h4>
+
+</a>- (EOEntity *)<code>entity</code> <p>
+
+Returns the entity that owns the attribute, or <B>nil </B> if this attribute is acting as an argument for a stored procedure.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOAttribute/storedProcedure">- storedProcedure</a>
+
+ </B><p><a name="828">
+
+<h4> <a name="//apple_ref/occ/instm/EOAttribute/externalType">externalType</a></h4>
+
+</a>- (NSString *)<code>externalType</code> <p>
+
+Returns the attribute's type as understood by the database; for example, a Sybase "varchar" or an Oracle "NUMBER".<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOAttribute/columnName">- columnName</a>, <a href="#//apple_ref/occ/instm/EOAttribute/setExternalType:">- setExternalType:</a>
+
+ </B><p><a name="832">
+
+<h4> <a name="//apple_ref/occ/instm/EOAttribute/factoryMethodArgumentType">factoryMethodArgumentType</a></h4>
+
+</a>- (EOFactoryMethodArgumentType)<code>factoryMethodArgumentType</code> <p>
+
+Returns the type of argument that should be passed to the "factory method"-which is invoked by the attribute to create an attribute value for a custom class. This method returns one of the following values:<p>
+
+<b>Return Value		Argument Type
+
+</b>EOFactoryMethodArgumentIsNSData		an NSData
+
+EOFactoryMethodArgumentIsNSString		an NSString
+
+EOFactoryMethodArgumentIsBytes		raw bytes
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOAttribute/valueFactoryMethod">- valueFactoryMethod</a> </B>, <a href="#//apple_ref/occ/instm/EOAttribute/setFactoryMethodArgumentType:"><B>- setFactoryMethodArgumentType:</a>
+
+ </B><p><a name="840">
+
+<h4> <a name="//apple_ref/occ/instm/EOAttribute/isDerived">isDerived</a></h4>
+
+</a>- (BOOL)<code>isDerived</code> <p>
+
+Returns NO if the attribute corresponds exactly to one column in the table associated with its entity, and YES if it doesn't. For example, an attribute with a definition of "otherAttributeName + 1" is derived.<p>
+
+Note that flattened attributes are also considered as derived attributes.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOAttribute/isFlattened">- isFlattened</a> </B>, <a href="#//apple_ref/occ/instm/EOAttribute/definition"><B>- definition</a>
+
+ </B><p><a name="845">
+
+<h4> <a name="//apple_ref/occ/instm/EOAttribute/isFlattened">isFlattened</a></h4>
+
+</a>- (BOOL)<code>isFlattened</code> <p>
+
+Returns YES if the attribute is flattened, NO otherwise. A flattened attribute is one that's accessed through an entity's relationships but belongs to another entity.<p>
+
+Note that flattened attributes are also considered to be derived attributes.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOAttribute/isDerived">- isDerived</a> </B>, <a href="#//apple_ref/occ/instm/EOAttribute/definition"><B>- definition</a>
+
+ </B><p><a name="850">
+
+<h4> <a name="//apple_ref/occ/instm/EOAttribute/isReadOnly">isReadOnly</a></h4>
+
+</a>- (BOOL)<code>isReadOnly</code> <p>
+
+Returns YES if the value of the attribute can't be modified, NO if it can.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOAttribute/setReadOnly:">- setReadOnly:</a>
+
+ </B><p><a name="853">
+
+<h4> <a name="//apple_ref/occ/instm/EOAttribute/name">name</a></h4>
+
+</a>- (NSString *)<code>name</code> <p>
+
+Returns the attribute's name.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOAttribute/columnName">- columnName</a> </B>, <a href="#//apple_ref/occ/instm/EOAttribute/definition"><B>- definition</a>, <a href="#//apple_ref/occ/instm/EOAttribute/setName:">- setName:</a>
+
+ </B><p><a name="857">
+
+<h4> <a name="//apple_ref/occ/instm/EOAttribute/newDateForYear:month:day:hour:minute:second:millisecond:timezone:zone:">newDateForYear:month:day:hour:minute:second:millisecond:timezone:zone:</a></h4>
+
+</a>- (NSCalendarDate *)<code>newDateForYear:</code>(int)<em>year </em><code>month:</code>(unsigned)<em>month </em><code>day:</code>(unsigned)<em>day </em><code>hour:</code>(unsigned)<em>hour </em><code>minute:</code>(unsigned)<em>minute </em><code>second:</code>(unsigned)<em>second </em><code>millisecond:</code>(unsigned)<em>millisecond </em><code>timezone:</code>(NSTimeZone *)<em>timezone </em><code>zone:</code>(NSZone *)<em>zone</em> <p>
+
+Returns an NSCalendarDate given discrete values for year, month, day, and so on. This method is used by EOAdaptorChannel subclasses to create a calendar date object to return in an adaptor row. For efficiency reasons, the caller is responsible for releasing the return value.<p>
+
+<a name="860">
+
+<h4> <a name="//apple_ref/occ/instm/EOAttribute/newValueForBytes:length:">newValueForBytes:length:</a></h4>
+
+</a>- (id)<code>newValueForBytes:</code>(const void *)<em>bytes </em><code>length:</code>(int)<em>length</em> <p>
+
+Generates an NSString or custom class value object from a supplied set of bytes. This method is called by the adaptor during value creation while fetching from the database. For efficiency reasons, the caller is responsible for releasing the return value.<p>
+
+<a name="863">
+
+<h4> <a name="//apple_ref/occ/instm/EOAttribute/newValueForBytes:length:encoding:">newValueForBytes:length:encoding:</a></h4>
+
+</a>- (id)<code>newValueForBytes:</code>(const void *)<em>bytes </em><code>length:</code>(int)<em>length </em><code>encoding:</code>(NSStringEncoding)<em>encoding</em><p>
+
+Generates an NSData or custom class value object from a supplied set of bytes with a given NSStringEncoding. This method is called by the adaptor during value creation while fetching from the database. For efficiency reasons, the caller is responsible for releasing the return value.<p>
+
+<a name="866">
+
+<h4> <a name="//apple_ref/occ/instm/EOAttribute/parameterDirection">parameterDirection</a></h4>
+
+</a>- (EOParameterDirection)<code>parameterDirection</code> <p>
+
+Returns the parameter direction for attributes that are arguments to a stored procedure. This method returns one of the following values:<p>
+
+EOVoid<br>EOInParameter<br>EOOutParameter<br>EOInOutParameter<p><B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOAttribute/storedProcedure">- storedProcedure</a> </B>, <B><a href="../EOEntity/EOEntity.html#//apple_ref/occ/instm/EOEntity/storedProcedureForOperation:" target="_top">- storedProcedureForOperation: </B> (EOEntity)</a>, <a href="#//apple_ref/occ/instm/EOAttribute/setParameterDirection:"><B>- setParameterDirection:</a>
+
+ </B><p><a name="871">
+
+<h4> <a name="//apple_ref/occ/instm/EOAttribute/parent">parent</a></h4>
+
+</a>- (id)<code>parent</code><p>
+
+Returns the attribute's parent, which is either an EOEntity or an EOStoredProcedure. Use this method when you need to find the model for an attribute:<p>
+
+<blockquote><pre>EOModel *myModel = [[anAttribute parent] model];
+
+</pre></blockquote><p>
+
+<a name="875">
+
+<h4> <a name="//apple_ref/occ/instm/EOAttribute/precision">precision</a></h4>
+
+</a>- (unsigned)<code>precision</code><p>
+
+Returns the precision of the database representation for attributes with a value class of NSNumber or NSDecimalNumber.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOAttribute/scale">- scale</a>
+
+ </B><p><a name="879">
+
+<h4> <a name="//apple_ref/occ/instm/EOAttribute/readFormat">readFormat</a></h4>
+
+</a>- (NSString *)<code>readFormat</code><p>
+
+Returns a format string of the appropriate type that can be used when building an expression that contains the value of the attribute.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOAttribute/setReadFormat:">- setReadFormat:</a> </B>, <a href="#//apple_ref/occ/instm/EOAttribute/writeFormat"><B>- writeFormat</a>
+
+ </B><p><a name="883">
+
+<h4> <a name="//apple_ref/occ/instm/EOAttribute/scale">scale</a></h4>
+
+</a>- (int)<code>scale</code> <p>
+
+Returns the scale of the database representation for attributes with a value class of NSNumber or NSDecimalNumber. The returned value can be negative.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOAttribute/precision">- precision</a>, <a href="#//apple_ref/occ/instm/EOAttribute/setScale:">- setScale:</a>
+
+ </B><p><a name="887">
+
+<h4> <a name="//apple_ref/occ/instm/EOAttribute/serverTimeZone">serverTimeZone</a></h4>
+
+</a>- (NSTimeZone *)<code>serverTimeZone</code> <p>
+
+Returns the time zone assumed for NSDates in the database server, or the local time zone if one hasn't been set. An EOAdaptorChannel automatically converts dates between the time zones used by the server and the client when fetching and saving values. Applies only to attributes that represent dates.<p>
+
+<B>See also: </B>  
+
+<B>+ localTimeZone </B><code></code> (NSTimeZone), <a href="#//apple_ref/occ/instm/EOAttribute/setServerTimeZone:"><B>- setServerTimeZone:</a>
+
+ </B><p><a name="891">
+
+<h4> <a name="//apple_ref/occ/instm/EOAttribute/setAdaptorValueConversionMethodName:">setAdaptorValueConversionMethodName:</a></h4>
+
+</a>- (void)<code>setAdaptorValueConversionMethodName:</code>(NSString *)<em>conversionMethodName</em> <p>
+
+Sets the name of the method used to convert a custom class into one of the primitive types that the adaptor knows how to manipulate: NSString, NSData, NSNumber, or NSDate. Note that your adaptor value conversion method should return a an autoreleased object.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOAttribute/adaptorValueConversionMethodName">- adaptorValueConversionMethodName</a>
+
+ </B><p><a name="894">
+
+<h4> <a name="//apple_ref/occ/instm/EOAttribute/setAllowsNull:">setAllowsNull:</a></h4>
+
+</a>- (void)<code>setAllowsNull:</code>(BOOL)<em>allowsNull</em> <p>
+
+Sets whether or not the attribute can have a <B>nil </B> value. If the attribute maps directly to a column in the database, it also controls whether the database column can have a NULL value.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOAttribute/allowsNull">- allowsNull</a>
+
+ </B><p><a name="897">
+
+<h4> <a name="//apple_ref/occ/instm/EOAttribute/setColumnName:">setColumnName:</a></h4>
+
+</a>- (void)<code>setColumnName:</code>(NSString *)<em>columnName</em> <p>
+
+Sets to <em>columnName</em> the name of the attribute used in communication with the database server. An adaptor uses this name to identify the column corresponding to the attribute; this name must match the name of a column in the database table corresponding to the attribute's entity.<p>
+
+This method makes a derived or flattened attribute simple; the definition is released and the column name takes its place for use with the server.<p>
+
+<B>Note:	</B>
+
+<B>setColumnName </B> and <B>setDefinition </B> are closely related. Only one can be set at any given time. 
+
+Invoking either of these methods causes the other value to be set to <B>nil </B>.
+
+<p><B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOAttribute/setDefinition:">- setDefinition:</a>, <a href="#//apple_ref/occ/instm/EOAttribute/columnName">- columnName</a>
+
+ </B><p><a name="903">
+
+<h4> <a name="//apple_ref/occ/instm/EOAttribute/setDefinition:">setDefinition:</a></h4>
+
+</a>- (void)<code>setDefinition:</code>(NSString *)<em>definition</em> <p>
+
+Sets to <em>definition</em> the attribute's definition as recognized by the database server. <em>definition</em> should be either a value expression defining a derived attribute, such as "salary * 12", or a data path for a flattened attribute, such as "toAuthor.name".<p>
+
+Prior to invoking this method, the attribute's entity must have been set by adding the attribute to an entity. This method will not function correctly if the attribute's entity has not been set.<p>
+
+This method converts a simple attribute into a derived or flattened attribute; the column name is released and the definition takes its place for use with the server.<p>
+
+<B>Note:	</B>
+
+<B>setColumnName </B> and <B>setDefinition </B> are closely related. Only one can be set at any given time. 
+
+Invoking either of these methods causes the other value to be set to <B>nil </B>.
+
+<p><B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOAttribute/setColumnName:">- setColumnName:</a>, <a href="#//apple_ref/occ/instm/EOAttribute/definition">- definition</a>
+
+ </B><p><a name="910">
+
+<h4> <a name="//apple_ref/occ/instm/EOAttribute/setExternalType:">setExternalType:</a></h4>
+
+</a>- (void)<code>setExternalType:</code>(NSString *)<em>typeName</em> <p>
+
+Sets to <em>typeName</em> the type used for the attribute in the database adaptor; for example, a Sybase "varchar" or an Oracle7 "NUMBER". Each adaptor defines the set of types that can be supplied to <B>setExternalType: </B>. The external type you specify for a given attribute must correspond to the type used in the database server.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOAttribute/setDefinition:">- setDefinition:</a>, <a href="#//apple_ref/occ/instm/EOAttribute/externalType">- externalType</a>
+
+ </B><p><a name="914">
+
+<h4> <a name="//apple_ref/occ/instm/EOAttribute/setFactoryMethodArgumentType:">setFactoryMethodArgumentType:</a></h4>
+
+</a>- (void)<code>setFactoryMethodArgumentType:</code>(EOFactoryMethodArgumentType)<em>argumentType</em> <p>
+
+Sets the type of argument that should be passed to the "factory method"-which is invoked by the attribute to create an attribute value for a custom class. The factory method accepts NSStrings, NSDatas, and raw bytes; specify an <em>argumentType</em> of EOFactoryMethodArgumentIsNSString, EOFactoryMethodArgumentIsNSData, or EOFactoryMethodArgumentIsBytes as appropriate.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOAttribute/setValueFactoryMethodName:">- setValueFactoryMethodName:</a>, <a href="#//apple_ref/occ/instm/EOAttribute/factoryMethodArgumentType">- factoryMethodArgumentType</a>
+
+ </B><p><a name="918">
+
+<h4> <a name="//apple_ref/occ/instm/EOAttribute/setName:">setName:</a></h4>
+
+</a>- (void)<code>setName:</code>(NSString *)<em>name</em> <p>
+
+Sets the attribute's name to <em>name</em>. Raises an NSInvalidArgumentException if <em>name</em> is already in use by another attribute or relationship of the same entity, or if <em>name</em> is not a valid attribute name.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOAttribute/validateName:">- validateName:</a>, <a href="#//apple_ref/occ/instm/EOAttribute/name">- name</a>
+
+ </B><p><a name="922">
+
+<h4> <a name="//apple_ref/occ/instm/EOAttribute/setParameterDirection:">setParameterDirection:</a></h4>
+
+</a>- (void)<code>setParameterDirection:</code>(EOParameterDirection)<em>parameterDirection</em> <p>
+
+Sets the parameter direction for attributes that are arguments to a stored procedure. <em>parameterDirection</em> should be one of the following values:<p>
+
+EOVoid<br>EOInParameter<br>EOOutParameter<br>EOInOutParameter<p><B>See also: </B>  
+
+<B><a href="../EOEntity/EOEntity.html#//apple_ref/occ/instm/EOEntity/setStoredProcedure:forOperation:" target="_top">- setStoredProcedure:forOperation:  </B>(EOEntity)</a>, <a href="#//apple_ref/occ/instm/EOAttribute/parameterDirection"><B>- parameterDirection</a>
+
+ </B><p><a name="927">
+
+<h4> <a name="//apple_ref/occ/instm/EOAttribute/setPrecision:">setPrecision:</a></h4>
+
+</a>- (void)<code>setPrecision:</code>(unsigned)<em>precision</em> <p>
+
+Sets the precision of the database representation for attributes with a value class of NSNumber or NSDecimalNumber.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOAttribute/setScale:">- setScale:</a>, <a href="#//apple_ref/occ/instm/EOAttribute/precision">- precision</a>
+
+ </B><p><a name="931">
+
+<h4> <a name="//apple_ref/occ/instm/EOAttribute/setReadFormat:">setReadFormat:</a></h4>
+
+</a>- (void)<code>setReadFormat:</code>(NSString *)<em>string</em> <p>
+
+Sets the format string that's used to format the attribute's value for SELECT statements. In <em>string</em>, %P is replaced by the attribute's external name. For example:<p>
+
+<blockquote><pre>[myAttribute setReadFormat:@"TO_UPPER(%P)"];
+
+</pre></blockquote><p>
+
+The read format string is used whenever the attribute is referenced in a select list or qualifier.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOAttribute/setWriteFormat:">- setWriteFormat:</a>, <a href="#//apple_ref/occ/instm/EOAttribute/readFormat">- readFormat</a>
+
+ </B><p><a name="937">
+
+<h4> <a name="//apple_ref/occ/instm/EOAttribute/setReadOnly:">setReadOnly:</a></h4>
+
+</a>- (void)<code>setReadOnly:</code>(BOOL)<em>flag</em> <p>
+
+Sets whether the value of the attribute can be modified according to <em>flag</em>. Raises an NSInvalidArgumentException if <em>flag</em> is NO and the argument is derived but not flattened.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOAttribute/isDerived">- isDerived</a> </B>, <a href="#//apple_ref/occ/instm/EOAttribute/isFlattened"><B>- isFlattened</a>, <a href="#//apple_ref/occ/instm/EOAttribute/isReadOnly">- isReadOnly</a>
+
+ </B><p><a name="941">
+
+<h4> <a name="//apple_ref/occ/instm/EOAttribute/setScale:">setScale:</a></h4>
+
+</a>- (void)<code>setScale:</code>(int)<em>scale</em> <p>
+
+Sets the scale of the database representation for attributes with a value class of NSNumber or NSDecimalNumber. <em>scale</em> can be negative.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOAttribute/setPrecision:">- setPrecision:</a>, <a href="#//apple_ref/occ/instm/EOAttribute/scale">- scale</a>
+
+ </B><p><a name="945">
+
+<h4> <a name="//apple_ref/occ/instm/EOAttribute/setServerTimeZone:">setServerTimeZone:</a></h4>
+
+</a>- (void)<code>setServerTimeZone:</code>(NSTimeZone *)<em>aTimeZone</em> <p>
+
+Sets to <em>aTimeZone</em> the time zone used for NSDates in the database server. If <em>aTimeZone</em> is <B>nil </B> then the local time zone is used. An EOAdaptorChannel automatically converts dates between the time zones used by the server and the client when fetching and saving values. Applies only to attributes that represent dates.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOAttribute/serverTimeZone">- serverTimeZone</a>
+
+ </B><p><a name="948">
+
+<h4> <a name="//apple_ref/occ/instm/EOAttribute/setUserInfo:">setUserInfo:</a></h4>
+
+</a>- (void)<code>setUserInfo:</code>(NSDictionary *)<em>dictionary</em> <p>
+
+Sets the <em>dictionary</em> of auxiliary data, which your application can use for whatever it needs. <em>dictionary</em> can only contain property list data types (that is, NSDictionaries, NSStrings, NSArrays, and NSDatas).<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOAttribute/userInfo">- userInfo</a>
+
+ </B><p><a name="951">
+
+<h4> <a name="//apple_ref/occ/instm/EOAttribute/setValueClassName:">setValueClassName:</a></h4>
+
+</a>- (void)<code>setValueClassName:</code>(NSString *)<em>name</em> <p>
+
+Sets the class name for values of this attribute to <em>name</em>. When an EOAdaptorChannel fetches data for the attribute, it's presented to the application as an instance of this class.<p>
+
+The class need not exist in the run-time system when this message is sent, but it must exist when an adaptor channel performs a fetch; if the class isn't present the result depends on the adaptor. See your adaptor's documentation for information on how absent value classes are handled.<p>
+
+ As an example, if your attribute's values are instances of NSImage, send the following:<p>
+
+<blockquote><pre>[myAttribute setValueClassName:@"NSImage"];
+
+</pre></blockquote><p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOAttribute/setValueType:">- setValueType:</a>, <a href="#//apple_ref/occ/instm/EOAttribute/valueClassName">- valueClassName</a>
+
+ </B><p><a name="958">
+
+<h4> <a name="//apple_ref/occ/instm/EOAttribute/setValueFactoryMethodName:">setValueFactoryMethodName:</a></h4>
+
+</a>- (void)<code>setValueFactoryMethodName:</code>(NSString *)<em>factoryMethodName</em> <p>
+
+Sets the "factory method"-which is invoked by the attribute to create an attribute value for a custom class-to <em>factoryMethodName</em>. The factory method should be a class method that returns an autoreleased object. Use <B>setFactoryMethodArgumentType: </B> to specify the type of argument that is to be passed to your factory method.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOAttribute/valueFactoryMethodName">- valueFactoryMethodName</a>
+
+ </B><p><a name="961">
+
+<h4> <a name="//apple_ref/occ/instm/EOAttribute/setValueType:">setValueType:</a></h4>
+
+</a>- (void)<code>setValueType:</code>(NSString *)<em>typeName</em> <p>
+
+Sets to <em>typeName</em> the conversion character (such as "i" or "d") for the data type an NSNumber attribute is converted to and from in your application. Value types are scalars such as <code>int</code>, <code>float</code>, and <code>double</code>. Each adaptor supports a different set of conversion characters for numeric types. However, in most (if not all) cases it's safe to supply a value of "i" (int) or "d" (double).<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOAttribute/setValueClassName:">- setValueClassName:</a>, <a href="#//apple_ref/occ/instm/EOAttribute/valueType">- valueType</a>
+
+ </B><p><a name="965">
+
+<h4> <a name="//apple_ref/occ/instm/EOAttribute/setWidth:">setWidth:</a></h4>
+
+</a>- (void)<code>setWidth:</code>(unsigned)<em>length</em> <p>
+
+Sets to <em>length</em> the maximum amount of bytes the attribute's value may contain. Adaptors may use this information to allocate space for fetch buffers.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOAttribute/width">- width</a>
+
+ </B><p><a name="969">
+
+<h4> <a name="//apple_ref/occ/instm/EOAttribute/setWriteFormat:">setWriteFormat:</a></h4>
+
+</a>- (void)<code>setWriteFormat:</code>(NSString *)<em>string</em> <p>
+
+Sets the format string that's used to format the attribute's value for INSERT or UPDATE expressions. In <em>string</em>, %P is replaced by the attribute's value. For example:<p>
+
+<blockquote><pre>[myAttribute setWriteFormat:@"TO_LOWER(%P)"];
+
+</pre></blockquote><p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOAttribute/setReadFormat:">- setReadFormat:</a>, <a href="#//apple_ref/occ/instm/EOAttribute/writeFormat">- writeFormat</a>
+
+ </B><p><a name="974">
+
+<h4> <a name="//apple_ref/occ/instm/EOAttribute/storedProcedure">storedProcedure</a></h4>
+
+</a>- (EOStoredProcedure *)<code>storedProcedure</code> <p>
+
+Returns the stored procedure for which this attribute is an argument. If this attribute isn't an argument to a stored procedure but instead is owned by an entity, this method returns <B>nil </B>.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOAttribute/entity">- entity</a>
+
+ </B><p><a name="978">
+
+<h4> <a name="//apple_ref/occ/instm/EOAttribute/userInfo">userInfo</a></h4>
+
+</a>- (NSDictionary *)<code>userInfo</code> <p>
+
+Returns a dictionary of user data. Your application can use this to store any auxiliary information it needs.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOAttribute/setUserInfo:">- setUserInfo:</a>
+
+ </B><p><a name="982">
+
+<h4> <a name="//apple_ref/occ/instm/EOAttribute/validateName:">validateName:</a></h4>
+
+</a>- (NSException *)<code>validateName:</code>(NSString *)<em>name</em> <p>
+
+Validates <em>name</em> and returns <B>nil </B> if it is a valid name, or an exception if it isn't. A name is invalid if it has zero length; starts with a character other than a letter, a number, or "@", "#", or "_"; or contains a character other than a letter, a number, "@", "#", "_", or "$". A name is also invalid if the receiver's EOEntity already has an EOAttribute with the same name, or if the model has a stored procedure that has an argument with the same name.<p>
+
+<B>setName: </B> uses this method to validate its argument.<p>
+
+<a name="986">
+
+<h4> <a name="//apple_ref/occ/instm/EOAttribute/validateValue:">validateValue:</a></h4>
+
+</a>- (NSException *)<code>validateValue:</code>(id *)<em>valueP</em><p>
+
+Validates the argument by converting it to the attribute's value type and by testing other attribute validation constraints (such as <B>allowsNull </B>, <B>width </B>, and so on). Returns <B>nil </B> if <em>*valueP</em> is deemed to be a legal value for this attribute. Returns a validation exception otherwise. If, during the validation process, any coercion was performed, the converted value is assigned to <em>*valueP</em>.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOAttribute/adaptorValueByConvertingAttributeValue:">- adaptorValueByConvertingAttributeValue:</a> </B>, <a href="#//apple_ref/occ/instm/EOAttribute/allowsNull"><B>- allowsNull</a> </B>, <a href="#//apple_ref/occ/instm/EOAttribute/valueType"><B>- valueType</a> </B>, <a href="#//apple_ref/occ/instm/EOAttribute/valueClassName"><B>- valueClassName</a> </B>, 
+
+<B><a href="#//apple_ref/occ/instm/EOAttribute/width">- width</a>
+
+ </B><p><a name="990">
+
+<h4> <a name="//apple_ref/occ/instm/EOAttribute/valueClassName">valueClassName</a></h4>
+
+</a>- (NSString *)<code>valueClassName</code> <p>
+
+Returns the name of the class for custom value types. When data is fetched for the attribute, it's presented to the application as an instance of this class. For example, if a column from the database is represented by instances of NSImage, this method returns "NSImage".<p>
+
+This class must be present in the run-time system when an EOAdaptorChannel fetches data for the attribute; if the class isn't present the result depends on the adaptor. See your adaptor's documentation for information on how absent value classes are handled.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOAttribute/valueType">- valueType</a>, <a href="#//apple_ref/occ/instm/EOAttribute/setValueClassName:">- setValueClassName:</a>
+
+ </B><p><a name="995">
+
+<h4> <a name="//apple_ref/occ/instm/EOAttribute/valueFactoryMethod">valueFactoryMethod</a></h4>
+
+</a>- (SEL)<code>valueFactoryMethod</code> <p>
+
+Returns the factory method that's invoked by the attribute when creating an attribute value that's of a custom class. The value returned from this method is derived from the attribute's <B>valueFactoryMethodName </B>. If that name doesn't map to a valid selector in the Objective-C run-time, this method returns <B>nil </B>.<p>
+
+<a name="998">
+
+<h4> <a name="//apple_ref/occ/instm/EOAttribute/valueFactoryMethodName">valueFactoryMethodName</a></h4>
+
+</a>- (NSString *)<code>valueFactoryMethodName</code> <p>
+
+Returns the name of the factory method that's used for creating a custom class value.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOAttribute/valueFactoryMethod">- valueFactoryMethod</a>, <a href="#//apple_ref/occ/instm/EOAttribute/setValueFactoryMethodName:">- setValueFactoryMethodName:</a>
+
+ </B><p><a name="1002">
+
+<h4> <a name="//apple_ref/occ/instm/EOAttribute/valueType">valueType</a></h4>
+
+</a>- (NSString *)<code>valueType</code> <p>
+
+Returns the conversion character (such as "i" or "d") for the data type an NSNumber attribute is converted to and from in your application. Value types are scalars such as <code>int</code>, <code>float</code>, and <code>double</code>. <p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOAttribute/valueClassName">- valueClassName</a>, <a href="#//apple_ref/occ/instm/EOAttribute/setValueType:">- setValueType:</a>
+
+ </B><p><a name="1006">
+
+<h4> <a name="//apple_ref/occ/instm/EOAttribute/width">width</a></h4>
+
+</a>- (unsigned)<code>width</code> <p>
+
+Returns he maximum length (in bytes) for values that are mapped to this attribute. Returns zero for numeric and date types.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOAttribute/setWidth:">- setWidth:</a>
+
+ </B><p><a name="1010">
+
+<h4> <a name="//apple_ref/occ/instm/EOAttribute/writeFormat">writeFormat</a></h4>
+
+</a>- (NSString *)<code>writeFormat</code> <p>
+
+Returns the format string that's used to format the attribute's value for INSERT or UPDATE expressions. In the returned string, %P is replaced by the attribute's value.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOAttribute/readFormat">- readFormat</a>, <a href="#//apple_ref/occ/instm/EOAttribute/setWriteFormat:">- setWriteFormat:</a>
+
+ </B><p><dl><dt>
+
+</dl>
+
+ 
+
+ 
+
+
+
+
+
+<i>Copyright &#169; 1997, Apple Computer, Inc.   All rights
+
+reserved.</i>
+
+
+
+<!-- Last updated: 10/16/97 11:21:03 -->
+
+
+
+</body>
+
+</html>
+

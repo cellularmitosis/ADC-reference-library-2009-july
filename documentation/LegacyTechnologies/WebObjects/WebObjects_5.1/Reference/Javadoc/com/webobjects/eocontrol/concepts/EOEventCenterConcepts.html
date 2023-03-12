@@ -1,0 +1,149 @@
+  <h2>WOEventSetup page</h2><hr>
+  The page used to set up the logging properties is accessed through a
+  direct action named "WOEventSetup". So for example, WOEventSetup page
+  can be accessed for an application named "MyApp" with a URL such as the
+  following:<p>
+  http://myhost:aPort/cgi-bin/WebObjects/MyApp.woa/wa/WOEventSetup<P>
+  On the WOEventSetup page, you can see all families of events that are
+  registered for the application. Since the event classes are registered
+  dynamically as the program executes, it is a good idea to "warm up" an
+  application before accessing WOEventSetup.<P>
+  The page lists the registered event classes, their subcategories, and a
+  description of the kinds of events that can be logged. For instance, the
+  EOEditingContext event class logs events for the <b>saveChanges</b> and
+  <b>objectsWithFetchSpecification</b> methods. Logging for each class can
+  be enabled and disabled with the corresponding check box; it isn't
+  possible to disable individual subcategories of an event class.<P>
+  The logging mechanism is extremely fast and memory efficient. A standard
+  300MHz G3 can log more than 300,000 events per second, so event logging
+  overhead is negligible compared to the time required to generate dynamic
+  web pages.<P>
+  <B>User Defaults</B><hr>
+  In addition to the configuration you can do on the WOEventSetup page, the
+  event logging system uses user defaults to additionally configure event
+  logging behavior. The user defaults are:<P>
+  <ul>
+  <li><b>EOEventLoggingEnabled</b>,a boolean value that specifies whether
+  or not to log registered event classes by default.</li>
+  <li><b>EOEventLoggingLimit</b>,an integer value that specifies the number
+  of events to log before suspending logging.</li>
+  </ul><p>
+  <b>WOEventDisplay page</b><hr>
+  The page that displays collected events, WOEventDisplay, is also accessed
+  through a direct action. For example, WOEventSetup page can be  accessed
+  for an application named "MyApp" with a URL such as the following:<P>
+  http://myhost:aPort/cgi bin/WebObjects/MyApp.woa/wa/WOEventDisplay<P>
+  On this page, events can be viewed in four different ways:<P>
+  <ul>
+  <li><b>Raw root events</B>. In this view, all events at the root level
+  (events without an encompassing event) are displayed. WOEventDisplay shows
+  each event individually, which means that it's possible for an event to
+  appear multiple times if the thread of execution crossed its point more
+  than once.</li>
+  <li><b>Aggregated root events</b>. This view is similar to the raw root
+  event view, except that multiple identical events are aggregated, and
+  their combined time is displayed. In addition, the "Calls" column shows
+  how many times an event was executed (in other words, how many events
+  contributed to the displayed aggregate event).</li>
+  <li><b>Events grouped by page and component</b>. In this view, the first
+  level of display shows only page names. By expanding a page, you can get a
+  list of components in that page. Expanding a component shows all the
+  events within that component. This means that even events which were
+  collected "deep" within a component are shown immediately below the
+  component name. All identical events are aggregated as in the aggregated
+  root event view for easier reading. It's possible to traverse the
+  component event hierarchy by expanding the hyperlinks within a component.
+  <P>
+  Note that since a page is also a component, a page with no dynamic
+  subcomponents seems as if it's nested one level too deep. This is the
+  correct behavior.</li>
+  <li><b>Events grouped by page only</b>. This display is similar to the
+  grouped by page and component view, except the events do not have a
+  by component subgrouping.</li>
+  </ul><P>
+  In any of these displays, if an event or event group has subevents, it can
+  be expanded by clicking the hyperlink or triangle image.<P>
+  Each view orders events by duration (in milliseconds) from the longest to
+  the shortest. Aggregation induces rounding errors, which are a maximum of
+  1ms per event. In other words, an aggregate event consisting of ten events
+  has at most 1 ms deviation from the actual run time; however, manually
+  adding ten individual events as displayed in the table might have up to a
+  10 ms deviation. Therefore, any displayed sum is always more accurate than
+  adding up the durations of individual events. Also note that the sub
+  events of an event branch doesn't necessarily add up to the duration of
+  the branch event the branch event's duration might be larger. This because
+  the parent event generally consists of more than just calling the methods
+  causing the sub events.<P>
+  <b>Custom Event Logging</B><hr>
+  To define and log custom events, an event class can be created, event's
+  categories and subcategories can be defined, the event class can be
+  registered with the WOEvent center, and you can instrument the portions
+  of code you wants to log. This section describes these steps.<P>
+  To create a custom event:<P>
+  <ol>
+  <li>Create a subclass of EOEvent or an appropriate subclass.<p>
+  For example, to log events for a custom adaptor , say
+  MyAdaptor, create an EOEvent subclass named MyAdaptorEvent.  subclass
+  doesn't usually have to override any of the inherited methods, but you can
+  customize the default behavior.</li>
+  <li>Create a description file for the event and add it to project's
+  Resources folder.<P>
+  An event's description file defines the event categories and subcategories
+  used in the WOEventDisplay page. The file's contents is a dictionary in
+  plist format. For the MyAdaptorEvent class, the file's name is
+  <code>MyAdaptorEvent.description</code> , and it might look like the following:<P>
+  <code>
+  <blockquote><pre>
+  {
+  EOEventGroupName ="MyAdaptor Event ";
+  connect ="Connect ";
+  openChannel ="Open Channel ";
+  evaluateExpression ="Evaluate Expression ";
+  fetchRow ="Fetch Row ";
+  commitTransaction ="Commit Transaction ";
+  }
+  </pre></blockquote>
+  </code></li>
+  <li>Register the event class with the EOEventCenter.<p>
+  Typically you can register an event class in the <em>initialize</em> method
+  of the class whose code you are instrumenting MyAdaptor in this example.<p>
+  <code>
+  <blockquote><pre>
+  static Class MyAdaptorEventLoggingClass =Nil;
+  static NSString connectEvent =@"connect ";
+  static NSString openChannelEvent =@"openChannel ";
+  static NSString evaluateExpressionEvent =@"evaluateExpression ";
+  static NSString fetchRowEvent =@"fetchRow ";
+  static NSString commitTransactionEvent =@"commitTransaction ";
+  +(void)initialize {
+  [EOEventCenter registerEventClass:[MyAdaptorEvent class ]
+  classPointer:&MyAdaptorEventLoggingClass ];
+  }
+  </pre></blockquote>
+  </code><p>
+  As in this example, you might want to define string constants for the keys
+  in the event's description dictionary.</li><p>
+  <li>Instrument the methods.<p>
+  In any method you want to instrument, following code to be added,
+  substituting the appropriate event key. This code instruments the
+  "connect" event of MyAdaptorEvent.<p>
+  <code>
+  <blockquote><pre>
+  MyAdaptorEvent event =nil;
+  //Setup and start logging
+  if (MyAdaptorEventLoggingClass){
+  event =EONewEventOfClass(MyAdaptorEventLoggingClass,connectEvent);
+  EOMarkStartOfEvent(event,nil);
+  }
+  //Code to be timed goes here.
+  //Finish logging.
+  if(event){
+  EOMarkEndOfEvent(event);
+  </pre></blockquote>
+  </code><p>
+  The second argument to <b>EONewEventOfClass</b> is an event key
+  corresponding with an entry in the <code>.description</code> file. The
+  corresponding value is used in the Title column of the WOEventDisplay page.
+  If the argument isn't a key in the description dictionary,
+  <b>EONewEventOfClass</b> uses the argument instead.<p></li>
+  </ol>

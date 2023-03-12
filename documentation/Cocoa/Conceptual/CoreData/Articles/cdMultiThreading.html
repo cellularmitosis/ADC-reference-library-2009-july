@@ -1,0 +1,148 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+<head>
+	<title>Core Data Programming Guide: Multi-Threading with Core Data</title>
+	<meta id="Generator" name="Generator" content="Gutenberg"/>
+	<meta id="GeneratorVersion" name="GeneratorVersion" content="v132"/>
+	<meta http-equiv="content-type" content="text/html;charset=utf-8"/>
+	<meta id="Copyright" name="Copyright" content="Copyright 2009 Apple Inc. All Rights Reserved."/>
+	<meta id="IndexTitle" name="IndexTitle" content="Multi-Threading with Core Data"/>
+	<meta id="xcode-display" name="xcode-display" content="render"/>
+	<meta id="toc-file" name="toc-file" content="../toc.html"/>
+	<meta id="RESOURCES" content="../../../../Resources" />
+	
+	<link rel="stylesheet" type="text/css" href="../../../../Resources/CSS/frameset_styles.css"/>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/lib/prototype.js"></script>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/lib/scriptaculous.js"></script>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/page.js"></script>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/pedia.js"></script>
+	<!--[if lte IE 6]>
+		<style type="text/css">
+			/*<![CDATA[*/ 
+			html {overflow-x:auto; overflow-y:hidden;  }
+			/*]]>*/
+		</style>
+	<![endif]-->
+</head>
+<body bgcolor="#ffffff" onload="initialize_page();"><a name="//apple_ref/doc/uid/TP40003385" title="Multi-Threading with Core Data"></a>
+    <noscript>
+    <div id="tocMenu">
+        <iframe id="toc_content" name="toc_content" SRC="../toc.html" width="210" height="100%" align="left" frameborder="0">This document set is best viewed in a browser that supports iFrames.</iframe>
+    </div>
+    </noscript>
+    <div id="bodyText">
+        <a name="top"></a>
+        <div class="hideOnPrint hideInXcode">
+        <!-- start of header -->
+        <!--#include virtual="/includes/framesetheader" -->
+        <!-- end of header -->
+        </div>
+        
+        <!-- start of path -->
+<div class="breadcrumb hideOnPrint hideInXcode"><a href="http://developer.apple.com/" target="_top">ADC Home</a> &gt; <a href="../../../../../referencelibrary/index.html#//apple_ref/doc/uid/TP30000943" target="_top">Reference Library</a> &gt; <a href="../../../../index.html#//apple_ref/doc/uid/TP30000440" target="_top">Guides</a> &gt; <a href="../../../index.html#//apple_ref/doc/uid/TP30000440-TP30000416" target="_top">Cocoa</a> &gt; <a href="../../../DesignGuidelines-date.html#//apple_ref/doc/uid/TP30000440-TP30000416-TP30000556" target="_top">Design Guidelines</a> &gt; <a href="../index.html" target="_top">Core Data Programming Guide</a> &gt; </div><br class="hideInXcode"/><!-- end of path -->
+        
+        <div class="mini_nav_text" align="left">
+        <span class="navButtons">
+        <a href="cdPersistentStores.html">&lt; Previous Page</a><span style="margin-left: 8px"><a href="cdPerformance.html">Next Page &gt;</a></span>
+        </span>
+        <span id="showHideTOCUpperSpan">
+        <a href="#" onclick="showHideTOC();"><img src="../../../../Resources/Images/show_toc_icon.gif" width="15" height="14" border="0" style="margin-bottom: -2px;" alt="" hideText="Hide TOC" showText="Show TOC" /></a> <a href="#" onclick="showHideTOC();">Hide TOC</a>
+        </span>
+        </div>
+        
+        
+        <a name="//apple_ref/doc/uid/TP40003385-SW1" title="Multi-Threading with Core Data"></a><hr /><H1>Multi-Threading with Core Data</H1><p>There may be perceived performance advantages that accrue from using multiple threads with Core Data. In particular, if you execute a large or complex fetch that takes some time, you might execute the full fetch on a background thread. It is important to consider, however, that most of the Application Kit is not thread safe and that you need to take considerable care that object graphs do not get into an inconsistent state. </p>
+<!-- This template is being used for both PDF and HTML. -->
+
+    
+    <!-- TopicBook.pm uses this template for its miniTOCs, but needs a different title. -->
+    <h4>Contents:</h4>
+    
+    
+    <p class="blockquote">
+    
+        
+			
+			
+				<a href="cdMultiThreading.html#//apple_ref/doc/uid/TP40003385-SW3">Thread Safety Fundamentals</a>
+				
+			<br/>
+			
+        
+			
+			
+				<a href="cdMultiThreading.html#//apple_ref/doc/uid/TP40003385-SW2">General Guidelines</a>
+				
+			<br/>
+			
+        
+			
+			
+				<a href="cdMultiThreading.html#//apple_ref/doc/uid/TP40003385-SW4">Locking</a>
+				
+			<br/>
+			
+        
+			
+			
+				<a href="cdMultiThreading.html#//apple_ref/doc/uid/TP40003385-SW5">Fetching in a Background Thread</a>
+				
+			<br/>
+			
+        
+			
+			
+				<a href="cdMultiThreading.html#//apple_ref/doc/uid/TP40003385-SW6">Saving</a>
+				
+			<br/>
+			
+        
+
+    </p><br/>
+
+<a name="//apple_ref/doc/uid/TP40003385-SW3" title="Thread Safety Fundamentals"></a><h2>Thread Safety Fundamentals</h2><p>There are several issues to bear in mind when using multi-threading in a Core Data application:</p><ul class="ul"><li class="li"><p>Any time you manipulate or access your object graph, you may be using the associated managed object context.</p><p>Core Data does not present a situation where reads are "safe" but changes are "dangerous"—<em>every</em> operation is "dangerous" because every operation can trigger faulting.</p></li><li class="li"><p>Managed objects themselves are not thread safe.</p><p>If you want to work with a managed object across different threads, you must lock its context (see <code><a href="../../../Reference/Foundation/Protocols/NSLocking_Protocol/Reference/Reference.html#//apple_ref/occ/intf/NSLocking" target="_top">NSLocking</a></code>). If you try to pass actual objects, share contexts between threads, and so on, you must be <em>extremely</em> careful about locking (and as a consequence you are likely to negate any benefit you may otherwise derive from multi-threading). Working with a managed object across different threads is therefore strongly discouraged, as described in <span class="content_text"><a href="cdMultiThreading.html#//apple_ref/doc/uid/TP40003385-SW2">“General Guidelines.”</a></span> </p></li><li class="li"><p>Passing object IDs (which are immutable) across thread boundaries makes dealing with threading much easier. </p><p>To make a managed object from one context visible in another, you pass its managed object ID and use <code><a href="../../../Reference/CoreDataFramework/Classes/NSManagedObjectContext_Class/Reference/Reference.html#//apple_ref/occ/instm/NSManagedObjectContext/objectWithID:" target="_top">objectWithID:</a></code> on the receiving thread's managed object context to get a local version of the managed object. Note that the corresponding managed objects must have been saved—you cannot pass the ID of a newly-inserted managed object to another context. </p><p>On Mac OS X v10.5, you can use the API provided by <code><a href="../../../Reference/CoreDataFramework/Classes/NSFetchRequest_Class/Reference/Reference.html#//apple_ref/occ/cl/NSFetchRequest" target="_top">NSFetchRequest</a></code> to facilitate working with data across threads. For example, you can configure a fetch request to return objectIDs but include the row data (and update the row cache)—this can be useful if you're just going to pass those object IDs from a background thread to another thread.</p></li><li class="li"><p>A persistent store coordinator provides to its managed object contexts the façade of one virtual store.</p><p>For completely concurrent operations you need a different coordinator for each thread.</p></li><li class="li"><p>On Mac OS X v10.5, <code><a href="../../../Reference/CoreDataFramework/Classes/NSManagedObjectContext_Class/Reference/Reference.html#//apple_ref/occ/instm/NSManagedObjectContext/executeFetchRequest:error:" target="_top">executeFetchRequest:error:</a></code> intrinsically scales its behavior appropriately for the hardware and work load. </p><p>If necessary, the Core Data will create additional private threads to optimize fetching performance. You will not improve absolute fetching speed by creating background threads for the purpose (although it may still be appropriate to fetch in a background thread for enhanced responsiveness—that is, to prevent your application from blocking).</p></li><li class="li"><p>It is important to consider the application environment.</p><p>For the most part, the Application Kit is not thread safe; in particular, Cocoa bindings and controllers are not thread safe—if you are using these technologies, multi-threading may be complex.</p></li></ul><a name="//apple_ref/doc/uid/TP40003385-SW2" title="General Guidelines"></a><h2>General Guidelines</h2><p>In general, you should not use any given managed object or managed object context in more than one thread. Instead, you should give each thread its own entirely private managed object context and keep their associated object graphs separated on a per-thread basis. If you do this, there is no need to lock contexts during access. You can use one persistent store coordinator per group of cooperating threads (for example, for your application or for each document).</p><p>There are three patterns you can adopt to support multi-threading in a Core Data application; in order of preference they are:</p><ol class="ol"><li class="li"><p>Create a separate managed object context for each thread and share a single persistent store coordinator.</p><p>If you need to “pass” managed objects between threads, you just pass their object IDs.</p><p>If you want to aggregate a number of operations in one context together as if a virtual single transaction, you can lock the persistent store coordinator to prevent other managed object contexts using the persistent store coordinator over the scope of several operations.</p></li><li class="li"><p>Create a separate managed object context and persistent store coordinator for each thread.</p><p>If you need to “pass” managed objects between threads, you just pass their object IDs.</p><p>Using a separate persistent store coordinator for each thread allows for completely concurrent operations.</p></li><li class="li"><p>Pass managed objects or managed object contexts between threads.</p><p>This approach is strongly discouraged. You must ensure that you apply locks as appropriate and necessary.</p></li></ol><a name="//apple_ref/doc/uid/TP40003385-SW4" title="Locking"></a><h2>Locking</h2><p> Generally, you only need to lock a managed object context (and not even then if you ensure that each thread has its own private context, as described in <span class="content_text"><a href="cdMultiThreading.html#//apple_ref/doc/uid/TP40003385-SW2">“General Guidelines”</a></span>). If you do choose to share a managed object context or a persistent store coordinator between threads, you must ensure that  any method invocations are made from a thread-safe scope. For locking, you should use the <code><a href="../../../Reference/Foundation/Protocols/NSLocking_Protocol/Reference/Reference.html#//apple_ref/occ/intf/NSLocking" target="_top">NSLocking</a></code> methods on managed object context and persistent store coordinator instead of implementing your own mutexes. These methods help provide contextual information to the framework about the application's intent—that is, in addition to providing a mutex, they help scope clusters of operations.</p><p>Typically you lock the context or coordinator using <code>tryLock</code> or <code>lock</code>. If you do this, the framework will ensure that what it does behind the scenes is also thread-safe. For example, if you create one context per thread, but all pointing to the same persistent store coordinator, Core Data takes care of accessing the coordinator in a thread-safe way (<code>NSManagedObjectContext</code>'s <code><a href="../../../Reference/CoreDataFramework/Classes/NSManagedObjectContext_Class/Reference/Reference.html#//apple_ref/occ/instm/NSManagedObjectContext/lock" target="_top">lock</a></code> and <code><a href="../../../Reference/CoreDataFramework/Classes/NSManagedObjectContext_Class/Reference/Reference.html#//apple_ref/occ/instm/NSManagedObjectContext/unlock" target="_top">unlock</a></code> methods handle recursivity).</p><p>If you lock (or successfully <code><a href="../../../Reference/CoreDataFramework/Classes/NSManagedObjectContext_Class/Reference/Reference.html#//apple_ref/occ/instm/NSManagedObjectContext/tryLock" target="_top">tryLock</a></code>) a context, that context must be retained until you invoke <code><a href="../../../Reference/CoreDataFramework/Classes/NSManagedObjectContext_Class/Reference/Reference.html#//apple_ref/occ/instm/NSManagedObjectContext/unlock" target="_top">unlock</a></code>. If you don’t properly retain a context in a multi-threaded environment, you may cause a deadlock.</p><a name="//apple_ref/doc/uid/TP40003385-SW5" title="Fetching in a Background Thread"></a><h2>Fetching in a Background Thread</h2><p>One of the simplest multi-threading techniques you can use with Core Data to improve application responsiveness is to execute a fetch request on a background thread. (Note that this technique is only useful if you are using an SQLite store, since data from binary and XML stores is read into memory immediately on open.) This means that if a fetch is complicated or returns a large amount of data, you can return control to the user and display results as they arrive. For an example of how to do this, see the <code>BackgroundFetching</code> example in <code>/Developer/Examples/CoreData/</code>. </p><p>You use two managed object contexts associated with a single persistent store coordinator. You fetch in one managed object context on a background thread, and pass the <em>object IDs</em> of the fetched objects to another thread. In the second thread (typically the application's main thread, so that you can then display the results), you use the second context to fault in objects with those object IDs (you use <code><a href="../../../Reference/CoreDataFramework/Classes/NSManagedObjectContext_Class/Reference/Reference.html#//apple_ref/occ/instm/NSManagedObjectContext/objectWithID:" target="_top">objectWithID:</a></code> to instantiate the object).</p><a name="//apple_ref/doc/uid/TP40003385-SW6" title="Saving"></a><h2>Saving</h2><p>Performing a save operation in a detached thread is error-prone unless you take additional steps to prevent the application from quitting before the save is completed. Specifically, all <code>NSThread</code>-based threads are "detached" (see the documentation for <code>pthread</code> for complete details) and a process runs only until all not-detached threads have exited. The work a detached thread is performing is therefore considered optional, and the process may terminate at any time. (Most users do not consider saving to be optional work!) In Cocoa, only the main thread is not-detached. If you need to save on other threads, you must write additional code such that the main thread prevents the application from quitting until all the save operation is complete.</p>
+
+        <br/><br/> 
+
+        <div class="mini_nav_text" align="left">
+        <span class="navButtons">
+        <a href="cdPersistentStores.html">&lt; Previous Page</a><span style="margin-left: 8px"><a href="cdPerformance.html">Next Page &gt;</a></span>
+        </span>
+        <span id="showHideTOCLowerSpan">
+        <a href="#" onclick="showHideTOC();"><img src="../../../../Resources/Images/show_toc_icon.gif" width="15" height="14" border="0" style="margin-bottom: -2px;" alt="" /></a> <a href="#" onclick="showHideTOC();">Hide TOC</a>
+        </span>
+        </div>
+
+        <br/><hr /><div align="center"><p class="content_text" lang="en" dir="ltr"> <!--#if expr="0=1" -->&#x00a9; 2004, 2009 Apple Inc. All Rights Reserved. &#40;<!--#endif -->Last updated: 2009-03-04<!--#if expr="0=1" -->&#041;<!--#endif --></p></div>
+
+        
+        <div class="hideOnPrint hideInXcode">
+        <!-- start of footer -->
+        	<table width="100%" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/documentation/Cocoa/Conceptual/CoreData/Articles/cdMultiThreading.html%3Fid%3DTP40001075-5.6&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/documentation/Cocoa/Conceptual/CoreData/Articles/cdMultiThreading.html%3Fid%3DTP40001075-5.6&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/documentation/Cocoa/Conceptual/CoreData/Articles/cdMultiThreading.html%3Fid%3DTP40001075-5.6&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+
+        <!--#include virtual="/includes/framesetfooter" -->
+        <!-- end of footer -->
+        </div>
+    </div>
+</body>
+</html>

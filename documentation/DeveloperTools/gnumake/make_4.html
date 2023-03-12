@@ -1,0 +1,2038 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html401/loose.dtd">
+<html>
+<!--This file documents the GNU make utility, which determines
+automatically which pieces of a large program need to be recompiled,
+and issues the commands to recompile them.
+
+This is Edition 0.70, last updated 1 April 2006,
+of The GNU Make Manual, for GNU make version 3.81.
+
+Copyright C 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995,
+1996, 1997, 1998, 1999, 2000, 2002, 2003, 2004, 2005, 2006
+Free Software Foundation, Inc.
+
+
+Permission is granted to copy, distribute and/or modify this document
+under the terms of the GNU Free Documentation License, Version 1.2 or
+any later version published by the Free Software Foundation; with no
+Invariant Sections, with the Front-Cover Texts being "A GNU Manual,"
+and with the Back-Cover Texts as in (a) below.  A copy of the
+license is included in the section entitled "GNU Free Documentation
+License."
+
+(a) The FSF's Back-Cover Text is: "You have freedom to copy and modify
+this GNU Manual, like GNU software.  Copies published by the Free
+Software Foundation raise funds for GNU development."
+
+-->
+<!-- Created on February, 19 2008 by texi2html 1.70 -->
+<!--
+Written by: Lionel Cons <Lionel.Cons@cern.ch> (original author)
+            Karl Berry  <karl@freefriends.org>
+            Olaf Bachmann <obachman@mathematik.uni-kl.de>
+            and many others.
+Maintained by: Many creative people <dev@texi2html.cvshome.org>
+Send bugs and suggestions to <users@texi2html.cvshome.org>
+
+-->
+<head>
+<title>GNU Make: 4. Writing Rules</title>
+
+<meta name="description" content="GNU Make: 4. Writing Rules">
+<meta name="keywords" content="GNU Make: 4. Writing Rules">
+<meta name="resource-type" content="document">
+<meta name="distribution" content="global">
+<meta name="Generator" content="texi2html 1.70">
+<meta http-equiv="Content-Type" content="text/html; charset=us-ascii">
+<style type="text/css">
+<!--
+a.summary-letter {text-decoration: none}
+pre.display {font-family: serif}
+pre.format {font-family: serif}
+pre.menu-comment {font-family: serif}
+pre.menu-preformatted {font-family: serif}
+pre.smalldisplay {font-family: serif; font-size: smaller}
+pre.smallexample {font-size: smaller}
+pre.smallformat {font-family: serif; font-size: smaller}
+pre.smalllisp {font-size: smaller}
+ul.toc {list-style: none}
+-->
+</style>
+
+
+</head>
+
+<body lang="en" bgcolor="#FFFFFF" text="#000000" link="#0000FF" vlink="#800080" alink="#FF0000">
+
+<a name="NOD25"></a>
+<a name="SEC30"></a>
+<table cellpadding="1" cellspacing="1" border="0">
+<tr><td valign="middle" align="left" scope="row">[<a href="make_3.html#SEC26" title="Previous section in reading order"> &lt; </a>]</td>
+<td valign="middle" align="left">[<a href="#SEC31" title="Next section in reading order"> &gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="make_3.html#SEC13" title="Beginning of this chapter or previous chapter"> &lt;&lt; </a>]</td>
+<td valign="middle" align="left">[<a href="make.html#SEC_Top" title="Up section"> Up </a>]</td>
+<td valign="middle" align="left">[<a href="make_5.html#SEC56" title="Next chapter"> &gt;&gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="make.html#SEC_Top" title="Cover (top) of document">Top</a>]</td>
+<td valign="middle" align="left">[<a href="make_toc.html#SEC_Contents" title="Table of contents">Contents</a>]</td>
+<td valign="middle" align="left">[<a href="make_19.html#SEC148" title="Index">Index</a>]</td>
+<td valign="middle" align="left">[<a href="make_abt.html#SEC_About" title="About (help)"> ? </a>]</td>
+</tr></table>
+<h1 class="chapter"> 4. Writing Rules </h1>
+
+<p>A <em>rule</em> appears in the makefile and says when and how to remake
+certain files, called the rule's <em>targets</em> (most often only one per rule).
+It lists the other files that are the <em>prerequisites</em> of the target, and
+<em>commands</em> to use to create or update the target.
+
+</p><a name="IDX69"></a>
+<a name="IDX70"></a>
+<p>The order of rules is not significant, except for determining the
+<em>default goal</em>: the target for <code>make</code> to consider, if you do
+not otherwise specify one.  The default goal is the target of the first
+rule in the first makefile.  If the first rule has multiple targets,
+only the first target is taken as the default.  There are two
+exceptions: a target starting with a period is not a default unless it
+contains one or more slashes, `<samp>/</samp>', as well; and, a target that
+defines a pattern rule has no effect on the default goal.
+(See section <a href="make_10.html#SEC118">Defining and Redefining Pattern Rules</a>.)
+
+</p><p>Therefore, we usually write the makefile so that the first rule is the
+one for compiling the entire program or all the programs described by
+the makefile (often with a target called `<samp>all</samp>').
+See section <a href="make_9.html#SEC107">Arguments to Specify the Goals</a>.
+
+</p><table class="menu" border="0" cellspacing="0">
+<tr><td align="left" valign="top" scope="row"><a href="#SEC31">4.1 Rule Example</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">                An example explained.
+</td></tr>
+<tr><td align="left" valign="top" scope="row"><a href="#SEC32">4.2 Rule Syntax</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">                 General syntax explained.
+</td></tr>
+<tr><td align="left" valign="top" scope="row"><a href="#SEC33">4.3 Types of Prerequisites</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">          There are two types of prerequisites.
+</td></tr>
+<tr><td align="left" valign="top" scope="row"><a href="#SEC34">4.4 Using Wildcard Characters in File Names</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">                   Using wildcard characters such as `*'.
+</td></tr>
+<tr><td align="left" valign="top" scope="row"><a href="#SEC38">4.5 Searching Directories for Prerequisites</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">            Searching other directories for source files.
+</td></tr>
+<tr><td align="left" valign="top" scope="row"><a href="#SEC45">4.6 Phony Targets</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">               Using a target that is not a real file's name.
+</td></tr>
+<tr><td align="left" valign="top" scope="row"><a href="#SEC46">4.7 Rules without Commands or Prerequisites</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">               You can use a target without commands
+                                  or prerequisites to mark other targets
+                                  as phony.
+</td></tr>
+<tr><td align="left" valign="top" scope="row"><a href="#SEC47">4.8 Empty Target Files to Record Events</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">               When only the date matters and the
+                                  files are empty.
+</td></tr>
+<tr><td align="left" valign="top" scope="row"><a href="#SEC48">4.9 Special Built-in Target Names</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">             Targets with special built-in meanings.
+</td></tr>
+<tr><td align="left" valign="top" scope="row"><a href="#SEC49">4.10 Multiple Targets in a Rule</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">            When to make use of several targets in a rule.
+</td></tr>
+<tr><td align="left" valign="top" scope="row"><a href="#SEC50">4.11 Multiple Rules for One Target</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">              How to use several rules with the same target.
+</td></tr>
+<tr><td align="left" valign="top" scope="row"><a href="#SEC51">4.12 Static Pattern Rules</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">              Static pattern rules apply to multiple targets
+                                  and can vary the prerequisites according to
+                                  the target name.
+</td></tr>
+<tr><td align="left" valign="top" scope="row"><a href="#SEC54">4.13 Double-Colon Rules</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">                How to use a special kind of rule to allow
+                                  several independent rules for one target.
+</td></tr>
+<tr><td align="left" valign="top" scope="row"><a href="#SEC55">4.14 Generating Prerequisites Automatically</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">     How to automatically generate rules giving
+                                  prerequisites from source files themselves.
+</td></tr>
+</table>
+
+<hr size="6">
+<a name="NOD26"></a>
+<a name="SEC31"></a>
+<table cellpadding="1" cellspacing="1" border="0">
+<tr><td valign="middle" align="left" scope="row">[<a href="#SEC30" title="Previous section in reading order"> &lt; </a>]</td>
+<td valign="middle" align="left">[<a href="#SEC32" title="Next section in reading order"> &gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="#SEC30" title="Beginning of this chapter or previous chapter"> &lt;&lt; </a>]</td>
+<td valign="middle" align="left">[<a href="#SEC30" title="Up section"> Up </a>]</td>
+<td valign="middle" align="left">[<a href="make_5.html#SEC56" title="Next chapter"> &gt;&gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="make.html#SEC_Top" title="Cover (top) of document">Top</a>]</td>
+<td valign="middle" align="left">[<a href="make_toc.html#SEC_Contents" title="Table of contents">Contents</a>]</td>
+<td valign="middle" align="left">[<a href="make_19.html#SEC148" title="Index">Index</a>]</td>
+<td valign="middle" align="left">[<a href="make_abt.html#SEC_About" title="About (help)"> ? </a>]</td>
+</tr></table>
+<h2 class="section"> 4.1 Rule Example </h2>
+
+<p>Here is an example of a rule:
+
+</p><table><tr><td scope="row">&nbsp;</td><td><pre class="example">foo.o : foo.c defs.h       # module for twiddling the frobs
+        cc -c -g foo.c
+</pre></td></tr></table>
+<p>Its target is `<tt>foo.o</tt>' and its prerequisites are `<tt>foo.c</tt>' and
+`<tt>defs.h</tt>'.  It has one command, which is `<samp>cc -c -g foo.c</samp>'.
+The command line starts with a tab to identify it as a command.
+
+</p><p>This rule says two things:
+
+</p><ul>
+<li>
+<p>How to decide whether `<tt>foo.o</tt>' is out of date: it is out of date
+if it does not exist, or if either `<tt>foo.c</tt>' or `<tt>defs.h</tt>' is
+more recent than it.
+
+</p></li><li>
+<p>How to update the file `<tt>foo.o</tt>': by running <code>cc</code> as stated.
+The command does not explicitly mention `<tt>defs.h</tt>', but we presume
+that `<tt>foo.c</tt>' includes it, and that that is why `<tt>defs.h</tt>' was
+added to the prerequisites.
+</p></li></ul>
+
+<hr size="6">
+<a name="NOD27"></a>
+<a name="SEC32"></a>
+<table cellpadding="1" cellspacing="1" border="0">
+<tr><td valign="middle" align="left" scope="row">[<a href="#SEC31" title="Previous section in reading order"> &lt; </a>]</td>
+<td valign="middle" align="left">[<a href="#SEC33" title="Next section in reading order"> &gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="#SEC30" title="Beginning of this chapter or previous chapter"> &lt;&lt; </a>]</td>
+<td valign="middle" align="left">[<a href="#SEC30" title="Up section"> Up </a>]</td>
+<td valign="middle" align="left">[<a href="make_5.html#SEC56" title="Next chapter"> &gt;&gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="make.html#SEC_Top" title="Cover (top) of document">Top</a>]</td>
+<td valign="middle" align="left">[<a href="make_toc.html#SEC_Contents" title="Table of contents">Contents</a>]</td>
+<td valign="middle" align="left">[<a href="make_19.html#SEC148" title="Index">Index</a>]</td>
+<td valign="middle" align="left">[<a href="make_abt.html#SEC_About" title="About (help)"> ? </a>]</td>
+</tr></table>
+<h2 class="section"> 4.2 Rule Syntax </h2>
+
+<p>In general, a rule looks like this:
+
+</p><table><tr><td scope="row">&nbsp;</td><td><pre class="example"><var>targets</var> : <var>prerequisites</var>
+        <var>command</var>
+        &hellip;
+</pre></td></tr></table>
+
+<p>or like this:
+
+</p><table><tr><td scope="row">&nbsp;</td><td><pre class="example"><var>targets</var> : <var>prerequisites</var> ; <var>command</var>
+        <var>command</var>
+        &hellip;
+</pre></td></tr></table>
+<a name="IDX71"></a>
+<a name="IDX72"></a>
+<p>The <var>targets</var> are file names, separated by spaces.  Wildcard
+characters may be used (see section <a href="#SEC34">Using Wildcard Characters in File Names</a>) and a name of the form `<tt><var>a</var>(<var>m</var>)</tt>'
+represents member <var>m</var> in archive file <var>a</var>
+(see section <a href="make_11.html#SEC129">Archive Members as Targets</a>).
+Usually there is only one
+target per rule, but occasionally there is a reason to have more
+(see section <a href="#SEC49">Multiple Targets in a Rule</a>).
+
+</p><a name="IDX73"></a>
+<a name="IDX74"></a>
+<p>The <var>command</var> lines start with a tab character.  The first command may
+appear on the line after the prerequisites, with a tab character, or may
+appear on the same line, with a semicolon.  Either way, the effect is the
+same.  There are other differences in the syntax of command lines.
+See section <a href="make_5.html#SEC56">Writing the Commands in Rules</a>.
+
+</p><a name="IDX75"></a>
+<a name="IDX76"></a>
+<a name="IDX77"></a>
+<p>Because dollar signs are used to start <code>make</code> variable
+references, if you really want a dollar sign in a target or
+prerequisite you must write two of them, `<samp>$$</samp>' (see section <a href="make_6.html#SEC74">How to Use Variables</a>).  If you have enabled secondary
+expansion (see section <a href="make_3.html#SEC26">Secondary Expansion</a>) and you want a literal dollar
+sign in the prerequisites lise, you must actually write <em>four</em>
+dollar signs (`<samp>$$$$</samp>').
+
+</p><p>You may split a long line by inserting a backslash followed by a
+newline, but this is not required, as <code>make</code> places no limit on
+the length of a line in a makefile.
+
+</p><p>A rule tells <code>make</code> two things: when the targets are out of date,
+and how to update them when necessary.
+
+</p><a name="IDX78"></a>
+<a name="IDX79"></a>
+<p>The criterion for being out of date is specified in terms of the
+<var>prerequisites</var>, which consist of file names separated by spaces.
+(Wildcards and archive members (see section <a href="make_11.html#SEC128">Using <code>make</code> to Update Archive Files</a>) are allowed here too.)
+A target is out of date if it does not exist or if it is older than any
+of the prerequisites (by comparison of last-modification times).  The
+idea is that the contents of the target file are computed based on
+information in the prerequisites, so if any of the prerequisites changes,
+the contents of the existing target file are no longer necessarily
+valid.
+
+</p><p>How to update is specified by <var>commands</var>.  These are lines to be
+executed by the shell (normally `<samp>sh</samp>'), but with some extra features
+(see section <a href="make_5.html#SEC56">Writing the Commands in Rules</a>).
+
+</p><hr size="6">
+<a name="NOD28"></a>
+<a name="SEC33"></a>
+<table cellpadding="1" cellspacing="1" border="0">
+<tr><td valign="middle" align="left" scope="row">[<a href="#SEC32" title="Previous section in reading order"> &lt; </a>]</td>
+<td valign="middle" align="left">[<a href="#SEC34" title="Next section in reading order"> &gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="#SEC30" title="Beginning of this chapter or previous chapter"> &lt;&lt; </a>]</td>
+<td valign="middle" align="left">[<a href="#SEC30" title="Up section"> Up </a>]</td>
+<td valign="middle" align="left">[<a href="make_5.html#SEC56" title="Next chapter"> &gt;&gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="make.html#SEC_Top" title="Cover (top) of document">Top</a>]</td>
+<td valign="middle" align="left">[<a href="make_toc.html#SEC_Contents" title="Table of contents">Contents</a>]</td>
+<td valign="middle" align="left">[<a href="make_19.html#SEC148" title="Index">Index</a>]</td>
+<td valign="middle" align="left">[<a href="make_abt.html#SEC_About" title="About (help)"> ? </a>]</td>
+</tr></table>
+<h2 class="section"> 4.3 Types of Prerequisites </h2>
+
+<p>There are actually two different types of prerequisites understood by
+GNU <code>make</code>: normal prerequisites such as described in the
+previous section, and <em>order-only</em> prerequisites.  A normal
+prerequisite makes two statements: first, it imposes an order of
+execution of build commands: any commands necessary to build any of a
+target's prerequisites will be fully executed before any commands
+necessary to build the target.  Second, it imposes a dependency
+relationship: if any prerequisite is newer than the target, then the
+target is considered out-of-date and must be rebuilt.
+
+</p><p>Normally, this is exactly what you want: if a target's prerequisite is
+updated, then the target should also be updated.
+
+</p><p>Occasionally, however, you have a situation where you want to impose a
+specific ordering on the rules to be invoked <em>without</em> forcing
+the target to be updated if one of those rules is executed.  In that
+case, you want to define <em>order-only</em> prerequisites.  Order-only
+prerequisites can be specified by placing a pipe symbol (<code>|</code>)
+in the prerequisites list: any prerequisites to the left of the pipe
+symbol are normal; any prerequisites to the right are order-only:
+
+</p><table><tr><td scope="row">&nbsp;</td><td><pre class="example"><var>targets</var> : <var>normal-prerequisites</var> | <var>order-only-prerequisites</var>
+</pre></td></tr></table>
+<p>The normal prerequisites section may of course be empty.  Also, you
+may still declare multiple lines of prerequisites for the same target:
+they are appended appropriately.  Note that if you declare the same
+file to be both a normal and an order-only prerequisite, the normal
+prerequisite takes precedence (since they are a strict superset of the
+behavior of an order-only prerequisite).
+
+</p><hr size="6">
+<a name="NOD29"></a>
+<a name="SEC34"></a>
+<table cellpadding="1" cellspacing="1" border="0">
+<tr><td valign="middle" align="left" scope="row">[<a href="#SEC33" title="Previous section in reading order"> &lt; </a>]</td>
+<td valign="middle" align="left">[<a href="#SEC35" title="Next section in reading order"> &gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="#SEC30" title="Beginning of this chapter or previous chapter"> &lt;&lt; </a>]</td>
+<td valign="middle" align="left">[<a href="#SEC30" title="Up section"> Up </a>]</td>
+<td valign="middle" align="left">[<a href="make_5.html#SEC56" title="Next chapter"> &gt;&gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="make.html#SEC_Top" title="Cover (top) of document">Top</a>]</td>
+<td valign="middle" align="left">[<a href="make_toc.html#SEC_Contents" title="Table of contents">Contents</a>]</td>
+<td valign="middle" align="left">[<a href="make_19.html#SEC148" title="Index">Index</a>]</td>
+<td valign="middle" align="left">[<a href="make_abt.html#SEC_About" title="About (help)"> ? </a>]</td>
+</tr></table>
+<h2 class="section"> 4.4 Using Wildcard Characters in File Names </h2>
+
+<p>A single file name can specify many files using <em>wildcard characters</em>.
+The wildcard characters in <code>make</code> are `<samp>*</samp>', `<samp>?</samp>' and
+`<samp>[&hellip;]</samp>', the same as in the Bourne shell.  For example, `<tt>*.c</tt>'
+specifies a list of all the files (in the working directory) whose names
+end in `<samp>.c</samp>'.
+
+</p><a name="IDX80"></a>
+<a name="IDX81"></a>
+<a name="IDX82"></a>
+<p>The character `<samp>~</samp>' at the beginning of a file name also has special
+significance.  If alone, or followed by a slash, it represents your home
+directory.  For example `<tt>~/bin</tt>' expands to `<tt>/home/you/bin</tt>'.
+If the `<samp>~</samp>' is followed by a word, the string represents the home
+directory of the user named by that word.  For example `<tt>~john/bin</tt>'
+expands to `<tt>/home/john/bin</tt>'.  On systems which don't have a home
+directory for each user (such as MS-DOS or MS-Windows), this
+functionality can be simulated by setting the environment variable
+<var>HOME</var>.
+
+</p><p>Wildcard expansion is performed by <code>make</code> automatically in
+targets and in prerequisites.  In commands the shell is responsible
+for wildcard expansion.  In other contexts, wildcard expansion happens
+only if you request it explicitly with the <code>wildcard</code> function.
+
+</p><p>The special significance of a wildcard character can be turned off by
+preceding it with a backslash.  Thus, `<tt>foo\*bar</tt>' would refer to a
+specific file whose name consists of `<samp>foo</samp>', an asterisk, and
+`<samp>bar</samp>'.
+
+</p><table class="menu" border="0" cellspacing="0">
+<tr><td align="left" valign="top" scope="row"><a href="#SEC35">4.4.1 Wildcard Examples</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">           Several examples
+</td></tr>
+<tr><td align="left" valign="top" scope="row"><a href="#SEC36">4.4.2 Pitfalls of Using Wildcards</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">            Problems to avoid.
+</td></tr>
+<tr><td align="left" valign="top" scope="row"><a href="#SEC37">4.4.3 The Function <code>wildcard</code></a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">           How to cause wildcard expansion where
+                                  it does not normally take place.
+</td></tr>
+</table>
+
+<hr size="6">
+<a name="NOD30"></a>
+<a name="SEC35"></a>
+<table cellpadding="1" cellspacing="1" border="0">
+<tr><td valign="middle" align="left" scope="row">[<a href="#SEC34" title="Previous section in reading order"> &lt; </a>]</td>
+<td valign="middle" align="left">[<a href="#SEC36" title="Next section in reading order"> &gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="#SEC30" title="Beginning of this chapter or previous chapter"> &lt;&lt; </a>]</td>
+<td valign="middle" align="left">[<a href="#SEC34" title="Up section"> Up </a>]</td>
+<td valign="middle" align="left">[<a href="make_5.html#SEC56" title="Next chapter"> &gt;&gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="make.html#SEC_Top" title="Cover (top) of document">Top</a>]</td>
+<td valign="middle" align="left">[<a href="make_toc.html#SEC_Contents" title="Table of contents">Contents</a>]</td>
+<td valign="middle" align="left">[<a href="make_19.html#SEC148" title="Index">Index</a>]</td>
+<td valign="middle" align="left">[<a href="make_abt.html#SEC_About" title="About (help)"> ? </a>]</td>
+</tr></table>
+<h3 class="subsection"> 4.4.1 Wildcard Examples </h3>
+
+<p>Wildcards can be used in the commands of a rule, where they are expanded
+by the shell.  For example, here is a rule to delete all the object files:
+
+</p><table><tr><td scope="row">&nbsp;</td><td><pre class="example">clean:
+        rm -f *.o
+</pre></td></tr></table><a name="IDX83"></a>
+
+<p>Wildcards are also useful in the prerequisites of a rule.  With the
+following rule in the makefile, `<samp>make print</samp>' will print all the
+`<samp>.c</samp>' files that have changed since the last time you printed them:
+
+</p><table><tr><td scope="row">&nbsp;</td><td><pre class="example">print: *.c
+        lpr -p $?
+        touch print
+</pre></td></tr></table>
+<a name="IDX84"></a>
+<a name="IDX85"></a>
+<a name="IDX86"></a>
+
+<p>This rule uses `<tt>print</tt>' as an empty target file; see <a href="#SEC47">Empty Target Files to Record Events</a>.  (The automatic variable
+`<samp>$?</samp>' is used to print only those files that have changed; see
+<a href="make_10.html#SEC121">Automatic Variables</a>.)
+
+</p><p>Wildcard expansion does not happen when you define a variable.  Thus, if
+you write this:
+
+</p><table><tr><td scope="row">&nbsp;</td><td><pre class="example">objects = *.o
+</pre></td></tr></table>
+
+<p>then the value of the variable <code>objects</code> is the actual string
+`<samp>*.o</samp>'.  However, if you use the value of <code>objects</code> in a target,
+prerequisite or command, wildcard expansion will take place at that time.
+To set <code>objects</code> to the expansion, instead use:
+
+</p><table><tr><td scope="row">&nbsp;</td><td><pre class="example">objects := $(wildcard *.o)
+</pre></td></tr></table>
+
+<p>See section <a href="#SEC37">The Function <code>wildcard</code></a>.
+
+</p><hr size="6">
+<a name="NOD31"></a>
+<a name="SEC36"></a>
+<table cellpadding="1" cellspacing="1" border="0">
+<tr><td valign="middle" align="left" scope="row">[<a href="#SEC35" title="Previous section in reading order"> &lt; </a>]</td>
+<td valign="middle" align="left">[<a href="#SEC37" title="Next section in reading order"> &gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="#SEC30" title="Beginning of this chapter or previous chapter"> &lt;&lt; </a>]</td>
+<td valign="middle" align="left">[<a href="#SEC34" title="Up section"> Up </a>]</td>
+<td valign="middle" align="left">[<a href="make_5.html#SEC56" title="Next chapter"> &gt;&gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="make.html#SEC_Top" title="Cover (top) of document">Top</a>]</td>
+<td valign="middle" align="left">[<a href="make_toc.html#SEC_Contents" title="Table of contents">Contents</a>]</td>
+<td valign="middle" align="left">[<a href="make_19.html#SEC148" title="Index">Index</a>]</td>
+<td valign="middle" align="left">[<a href="make_abt.html#SEC_About" title="About (help)"> ? </a>]</td>
+</tr></table>
+<h3 class="subsection"> 4.4.2 Pitfalls of Using Wildcards </h3>
+
+<p>Now here is an example of a naive way of using wildcard expansion, that
+does not do what you would intend.  Suppose you would like to say that the
+executable file `<tt>foo</tt>' is made from all the object files in the
+directory, and you write this:
+
+</p><table><tr><td scope="row">&nbsp;</td><td><pre class="example">objects = *.o
+
+foo : $(objects)
+        cc -o foo $(CFLAGS) $(objects)
+</pre></td></tr></table>
+
+<p>The value of <code>objects</code> is the actual string `<samp>*.o</samp>'.  Wildcard
+expansion happens in the rule for `<tt>foo</tt>', so that each <em>existing</em>
+`<samp>.o</samp>' file becomes a prerequisite of `<tt>foo</tt>' and will be recompiled if
+necessary.
+
+</p><p>But what if you delete all the `<samp>.o</samp>' files?  When a wildcard matches
+no files, it is left as it is, so then `<tt>foo</tt>' will depend on the
+oddly-named file `<tt>*.o</tt>'.  Since no such file is likely to exist,
+<code>make</code> will give you an error saying it cannot figure out how to
+make `<tt>*.o</tt>'.  This is not what you want!
+
+</p><p>Actually it is possible to obtain the desired result with wildcard
+expansion, but you need more sophisticated techniques, including the
+<code>wildcard</code> function and string substitution.
+See section <a href="#SEC37">The Function <code>wildcard</code></a>.
+
+</p><a name="IDX87"></a>
+<a name="IDX88"></a>
+
+<p>Microsoft operating systems (MS-DOS and MS-Windows) use backslashes to
+separate directories in pathnames, like so:
+
+</p><table><tr><td scope="row">&nbsp;</td><td><pre class="example">  c:\foo\bar\baz.c
+</pre></td></tr></table>
+<p>This is equivalent to the Unix-style `<tt>c:/foo/bar/baz.c</tt>' (the
+`<tt>c:</tt>' part is the so-called drive letter).  When <code>make</code> runs on
+these systems, it supports backslashes as well as the Unix-style forward
+slashes in pathnames.  However, this support does <em>not</em> include the
+wildcard expansion, where backslash is a quote character.  Therefore,
+you <em>must</em> use Unix-style slashes in these cases.
+
+</p>
+<hr size="6">
+<a name="NOD32"></a>
+<a name="SEC37"></a>
+<table cellpadding="1" cellspacing="1" border="0">
+<tr><td valign="middle" align="left" scope="row">[<a href="#SEC36" title="Previous section in reading order"> &lt; </a>]</td>
+<td valign="middle" align="left">[<a href="#SEC38" title="Next section in reading order"> &gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="#SEC30" title="Beginning of this chapter or previous chapter"> &lt;&lt; </a>]</td>
+<td valign="middle" align="left">[<a href="#SEC34" title="Up section"> Up </a>]</td>
+<td valign="middle" align="left">[<a href="make_5.html#SEC56" title="Next chapter"> &gt;&gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="make.html#SEC_Top" title="Cover (top) of document">Top</a>]</td>
+<td valign="middle" align="left">[<a href="make_toc.html#SEC_Contents" title="Table of contents">Contents</a>]</td>
+<td valign="middle" align="left">[<a href="make_19.html#SEC148" title="Index">Index</a>]</td>
+<td valign="middle" align="left">[<a href="make_abt.html#SEC_About" title="About (help)"> ? </a>]</td>
+</tr></table>
+<h3 class="subsection"> 4.4.3 The Function <code>wildcard</code> </h3>
+
+<p>Wildcard expansion happens automatically in rules.  But wildcard expansion
+does not normally take place when a variable is set, or inside the
+arguments of a function.  If you want to do wildcard expansion in such
+places, you need to use the <code>wildcard</code> function, like this:
+
+</p><table><tr><td scope="row">&nbsp;</td><td><pre class="example">$(wildcard <var>pattern</var>&hellip;)
+</pre></td></tr></table>
+
+<p>This string, used anywhere in a makefile, is replaced by a
+space-separated list of names of existing files that match one of the
+given file name patterns.  If no existing file name matches a pattern,
+then that pattern is omitted from the output of the <code>wildcard</code>
+function.  Note that this is different from how unmatched wildcards
+behave in rules, where they are used verbatim rather than ignored
+(see section <a href="#SEC36">Pitfalls of Using Wildcards</a>).
+
+</p><p>One use of the <code>wildcard</code> function is to get a list of all the C source
+files in a directory, like this:
+
+</p><table><tr><td scope="row">&nbsp;</td><td><pre class="example">$(wildcard *.c)
+</pre></td></tr></table>
+<p>We can change the list of C source files into a list of object files by
+replacing the `<samp>.c</samp>' suffix with `<samp>.o</samp>' in the result, like this:
+
+</p><table><tr><td scope="row">&nbsp;</td><td><pre class="example">$(patsubst %.c,%.o,$(wildcard *.c))
+</pre></td></tr></table>
+
+<p>(Here we have used another function, <code>patsubst</code>.
+See section <a href="make_8.html#SEC94">Functions for String Substitution and Analysis</a>.)
+
+</p><p>Thus, a makefile to compile all C source files in the directory and then
+link them together could be written as follows:
+
+</p><table><tr><td scope="row">&nbsp;</td><td><pre class="example">objects := $(patsubst %.c,%.o,$(wildcard *.c))
+
+foo : $(objects)
+        cc -o foo $(objects)
+</pre></td></tr></table>
+
+<p>(This takes advantage of the implicit rule for compiling C programs, so
+there is no need to write explicit rules for compiling the files.
+See section <a href="make_6.html#SEC76">The Two Flavors of Variables</a>, for an explanation of
+`<samp>:=</samp>', which is a variant of `<samp>=</samp>'.)
+
+</p><hr size="6">
+<a name="NOD33"></a>
+<a name="SEC38"></a>
+<table cellpadding="1" cellspacing="1" border="0">
+<tr><td valign="middle" align="left" scope="row">[<a href="#SEC37" title="Previous section in reading order"> &lt; </a>]</td>
+<td valign="middle" align="left">[<a href="#SEC39" title="Next section in reading order"> &gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="#SEC30" title="Beginning of this chapter or previous chapter"> &lt;&lt; </a>]</td>
+<td valign="middle" align="left">[<a href="#SEC30" title="Up section"> Up </a>]</td>
+<td valign="middle" align="left">[<a href="make_5.html#SEC56" title="Next chapter"> &gt;&gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="make.html#SEC_Top" title="Cover (top) of document">Top</a>]</td>
+<td valign="middle" align="left">[<a href="make_toc.html#SEC_Contents" title="Table of contents">Contents</a>]</td>
+<td valign="middle" align="left">[<a href="make_19.html#SEC148" title="Index">Index</a>]</td>
+<td valign="middle" align="left">[<a href="make_abt.html#SEC_About" title="About (help)"> ? </a>]</td>
+</tr></table>
+<h2 class="section"> 4.5 Searching Directories for Prerequisites </h2>
+
+<p>For large systems, it is often desirable to put sources in a separate
+directory from the binaries.  The <em>directory search</em> features of
+<code>make</code> facilitate this by searching several directories
+automatically to find a prerequisite.  When you redistribute the files
+among directories, you do not need to change the individual rules,
+just the search paths.
+
+</p><table class="menu" border="0" cellspacing="0">
+<tr><td align="left" valign="top" scope="row"><a href="#SEC39">4.5.1 <code>VPATH</code>: Search Path for All Prerequisites</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">              Specifying a search path that applies
+                                  to every prerequisite.
+</td></tr>
+<tr><td align="left" valign="top" scope="row"><a href="#SEC40">4.5.2 The <code>vpath</code> Directive</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">            Specifying a search path
+                                  for a specified class of names.
+</td></tr>
+<tr><td align="left" valign="top" scope="row"><a href="#SEC41">4.5.3 How Directory Searches are Performed</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">            When and how search paths are applied.
+</td></tr>
+<tr><td align="left" valign="top" scope="row"><a href="#SEC42">4.5.4 Writing Shell Commands with Directory Search</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">             How to write shell commands that work together
+                                  with search paths.
+</td></tr>
+<tr><td align="left" valign="top" scope="row"><a href="#SEC43">4.5.5 Directory Search and Implicit Rules</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">             How search paths affect implicit rules.
+</td></tr>
+<tr><td align="left" valign="top" scope="row"><a href="#SEC44">4.5.6 Directory Search for Link Libraries</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">            Directory search for link libraries.
+</td></tr>
+</table>
+
+<hr size="6">
+<a name="NOD34"></a>
+<a name="SEC39"></a>
+<table cellpadding="1" cellspacing="1" border="0">
+<tr><td valign="middle" align="left" scope="row">[<a href="#SEC38" title="Previous section in reading order"> &lt; </a>]</td>
+<td valign="middle" align="left">[<a href="#SEC40" title="Next section in reading order"> &gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="#SEC30" title="Beginning of this chapter or previous chapter"> &lt;&lt; </a>]</td>
+<td valign="middle" align="left">[<a href="#SEC38" title="Up section"> Up </a>]</td>
+<td valign="middle" align="left">[<a href="make_5.html#SEC56" title="Next chapter"> &gt;&gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="make.html#SEC_Top" title="Cover (top) of document">Top</a>]</td>
+<td valign="middle" align="left">[<a href="make_toc.html#SEC_Contents" title="Table of contents">Contents</a>]</td>
+<td valign="middle" align="left">[<a href="make_19.html#SEC148" title="Index">Index</a>]</td>
+<td valign="middle" align="left">[<a href="make_abt.html#SEC_About" title="About (help)"> ? </a>]</td>
+</tr></table>
+<h3 class="subsection"> 4.5.1 <code>VPATH</code>: Search Path for All Prerequisites </h3>
+
+<p>The value of the <code>make</code> variable <code>VPATH</code> specifies a list of
+directories that <code>make</code> should search.  Most often, the
+directories are expected to contain prerequisite files that are not in the
+current directory; however, <code>make</code> uses <code>VPATH</code> as a search
+list for both prerequisites and targets of rules.
+
+</p><p>Thus, if a file that is listed as a target or prerequisite does not exist
+in the current directory, <code>make</code> searches the directories listed in
+<code>VPATH</code> for a file with that name.  If a file is found in one of
+them, that file may become the prerequisite (see below).  Rules may then
+specify the names of files in the prerequisite list as if they all
+existed in the current directory.  See section <a href="#SEC42">Writing Shell Commands with Directory Search</a>.
+
+</p><p>In the <code>VPATH</code> variable, directory names are separated by colons or
+blanks.  The order in which directories are listed is the order followed
+by <code>make</code> in its search.  (On MS-DOS and MS-Windows, semi-colons
+are used as separators of directory names in <code>VPATH</code>, since the
+colon can be used in the pathname itself, after the drive letter.)
+
+</p><p>For example,
+
+</p><table><tr><td scope="row">&nbsp;</td><td><pre class="example">VPATH = src:../headers
+</pre></td></tr></table>
+
+<p>specifies a path containing two directories, `<tt>src</tt>' and
+`<tt>../headers</tt>', which <code>make</code> searches in that order.
+
+</p><p>With this value of <code>VPATH</code>, the following rule,
+
+</p><table><tr><td scope="row">&nbsp;</td><td><pre class="example">foo.o : foo.c
+</pre></td></tr></table>
+
+<p>is interpreted as if it were written like this:
+
+</p><table><tr><td scope="row">&nbsp;</td><td><pre class="example">foo.o : src/foo.c
+</pre></td></tr></table>
+
+<p>assuming the file `<tt>foo.c</tt>' does not exist in the current directory but
+is found in the directory `<tt>src</tt>'.
+
+</p><hr size="6">
+<a name="NOD35"></a>
+<a name="SEC40"></a>
+<table cellpadding="1" cellspacing="1" border="0">
+<tr><td valign="middle" align="left" scope="row">[<a href="#SEC39" title="Previous section in reading order"> &lt; </a>]</td>
+<td valign="middle" align="left">[<a href="#SEC41" title="Next section in reading order"> &gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="#SEC30" title="Beginning of this chapter or previous chapter"> &lt;&lt; </a>]</td>
+<td valign="middle" align="left">[<a href="#SEC38" title="Up section"> Up </a>]</td>
+<td valign="middle" align="left">[<a href="make_5.html#SEC56" title="Next chapter"> &gt;&gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="make.html#SEC_Top" title="Cover (top) of document">Top</a>]</td>
+<td valign="middle" align="left">[<a href="make_toc.html#SEC_Contents" title="Table of contents">Contents</a>]</td>
+<td valign="middle" align="left">[<a href="make_19.html#SEC148" title="Index">Index</a>]</td>
+<td valign="middle" align="left">[<a href="make_abt.html#SEC_About" title="About (help)"> ? </a>]</td>
+</tr></table>
+<h3 class="subsection"> 4.5.2 The <code>vpath</code> Directive </h3>
+
+<p>Similar to the <code>VPATH</code> variable, but more selective, is the
+<code>vpath</code> directive (note lower case), which allows you to specify a
+search path for a particular class of file names: those that match a
+particular pattern.  Thus you can supply certain search directories for
+one class of file names and other directories (or none) for other file
+names.
+
+</p><p>There are three forms of the <code>vpath</code> directive:
+
+</p><dl compact="compact">
+<dt><code> vpath <var>pattern</var> <var>directories</var></code></dt>
+<dd><p>Specify the search path <var>directories</var> for file names that match
+<var>pattern</var>.
+
+</p><p>The search path, <var>directories</var>, is a list of directories to be
+searched, separated by colons (semi-colons on MS-DOS and MS-Windows) or
+blanks, just like the search path used in the <code>VPATH</code> variable.
+
+</p></dd>
+<dt><code> vpath <var>pattern</var></code></dt>
+<dd><p>Clear out the search path associated with <var>pattern</var>.
+
+</p></dd>
+<dt><code> vpath</code></dt>
+<dd>
+<p>Clear all search paths previously specified with <code>vpath</code> directives.
+</p></dd>
+</dl>
+
+<p>A <code>vpath</code> pattern is a string containing a `<samp>%</samp>' character.  The
+string must match the file name of a prerequisite that is being searched
+for, the `<samp>%</samp>' character matching any sequence of zero or more
+characters (as in pattern rules; see section <a href="make_10.html#SEC118">Defining and Redefining Pattern Rules</a>).  For example, <code>%.h</code> matches files that
+end in <code>.h</code>.  (If there is no `<samp>%</samp>', the pattern must match the
+prerequisite exactly, which is not useful very often.)
+
+</p><a name="IDX89"></a>
+<a name="IDX90"></a>
+<a name="IDX91"></a>
+<a name="IDX92"></a>
+<a name="IDX93"></a>
+<p>`<samp>%</samp>' characters in a <code>vpath</code> directive's pattern can be quoted
+with preceding backslashes (`<samp>\</samp>').  Backslashes that would otherwise
+quote `<samp>%</samp>' characters can be quoted with more backslashes.
+Backslashes that quote `<samp>%</samp>' characters or other backslashes are
+removed from the pattern before it is compared to file names.  Backslashes
+that are not in danger of quoting `<samp>%</samp>' characters go unmolested.
+
+</p><p>When a prerequisite fails to exist in the current directory, if the
+<var>pattern</var> in a <code>vpath</code> directive matches the name of the
+prerequisite file, then the <var>directories</var> in that directive are searched
+just like (and before) the directories in the <code>VPATH</code> variable.
+
+</p><p>For example,
+
+</p><table><tr><td scope="row">&nbsp;</td><td><pre class="example">vpath %.h ../headers
+</pre></td></tr></table>
+
+<p>tells <code>make</code> to look for any prerequisite whose name ends in `<tt>.h</tt>'
+in the directory `<tt>../headers</tt>' if the file is not found in the current
+directory.
+
+</p><p>If several <code>vpath</code> patterns match the prerequisite file's name, then
+<code>make</code> processes each matching <code>vpath</code> directive one by one,
+searching all the directories mentioned in each directive.  <code>make</code>
+handles multiple <code>vpath</code> directives in the order in which they
+appear in the makefile; multiple directives with the same pattern are
+independent of each other.
+
+</p><p>Thus,
+
+</p><table><tr><td scope="row">&nbsp;</td><td><pre class="example">vpath %.c foo
+vpath %   blish
+vpath %.c bar
+</pre></td></tr></table>
+
+<p>will look for a file ending in `<samp>.c</samp>' in `<tt>foo</tt>', then
+`<tt>blish</tt>', then `<tt>bar</tt>', while
+
+</p><table><tr><td scope="row">&nbsp;</td><td><pre class="example">vpath %.c foo:bar
+vpath %   blish
+</pre></td></tr></table>
+
+<p>will look for a file ending in `<samp>.c</samp>' in `<tt>foo</tt>', then
+`<tt>bar</tt>', then `<tt>blish</tt>'.
+
+</p><hr size="6">
+<a name="NOD36"></a>
+<a name="SEC41"></a>
+<table cellpadding="1" cellspacing="1" border="0">
+<tr><td valign="middle" align="left" scope="row">[<a href="#SEC40" title="Previous section in reading order"> &lt; </a>]</td>
+<td valign="middle" align="left">[<a href="#SEC42" title="Next section in reading order"> &gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="#SEC30" title="Beginning of this chapter or previous chapter"> &lt;&lt; </a>]</td>
+<td valign="middle" align="left">[<a href="#SEC38" title="Up section"> Up </a>]</td>
+<td valign="middle" align="left">[<a href="make_5.html#SEC56" title="Next chapter"> &gt;&gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="make.html#SEC_Top" title="Cover (top) of document">Top</a>]</td>
+<td valign="middle" align="left">[<a href="make_toc.html#SEC_Contents" title="Table of contents">Contents</a>]</td>
+<td valign="middle" align="left">[<a href="make_19.html#SEC148" title="Index">Index</a>]</td>
+<td valign="middle" align="left">[<a href="make_abt.html#SEC_About" title="About (help)"> ? </a>]</td>
+</tr></table>
+<h3 class="subsection"> 4.5.3 How Directory Searches are Performed </h3>
+
+<p>When a prerequisite is found through directory search, regardless of type
+(general or selective), the pathname located may not be the one that
+<code>make</code> actually provides you in the prerequisite list.  Sometimes
+the path discovered through directory search is thrown away.
+
+</p><p>The algorithm <code>make</code> uses to decide whether to keep or abandon a
+path found via directory search is as follows:
+
+</p><ol>
+<li>
+<p>If a target file does not exist at the path specified in the makefile,
+directory search is performed.
+
+</p></li><li>
+<p>If the directory search is successful, that path is kept and this file
+is tentatively stored as the target.
+
+</p></li><li>
+<p>All prerequisites of this target are examined using this same method.
+
+</p></li><li>
+<p>After processing the prerequisites, the target may or may not need to be
+rebuilt:
+
+</p><ol>
+<li>
+<p>If the target does <em>not</em> need to be rebuilt, the path to the file
+found during directory search is used for any prerequisite lists which
+contain this target.  In short, if <code>make</code> doesn't need to rebuild
+the target then you use the path found via directory search.
+
+</p></li><li>
+<p>If the target <em>does</em> need to be rebuilt (is out-of-date), the
+pathname found during directory search is <em>thrown away</em>, and the
+target is rebuilt using the file name specified in the makefile.  In
+short, if <code>make</code> must rebuild, then the target is rebuilt locally,
+not in the directory found via directory search.
+</p></li></ol></li></ol>
+
+<p>This algorithm may seem complex, but in practice it is quite often
+exactly what you want.
+
+</p><a name="IDX94"></a>
+<a name="IDX95"></a>
+<p>Other versions of <code>make</code> use a simpler algorithm: if the file does
+not exist, and it is found via directory search, then that pathname is
+always used whether or not the target needs to be built.  Thus, if the
+target is rebuilt it is created at the pathname discovered during
+directory search.
+
+</p><a name="IDX96"></a>
+<p>If, in fact, this is the behavior you want for some or all of your
+directories, you can use the <code>GPATH</code> variable to indicate this to
+<code>make</code>.
+
+</p><p><code>GPATH</code> has the same syntax and format as <code>VPATH</code> (that is, a
+space- or colon-delimited list of pathnames).  If an out-of-date target
+is found by directory search in a directory that also appears in
+<code>GPATH</code>, then that pathname is not thrown away.  The target is
+rebuilt using the expanded path.
+
+</p><hr size="6">
+<a name="NOD37"></a>
+<a name="SEC42"></a>
+<table cellpadding="1" cellspacing="1" border="0">
+<tr><td valign="middle" align="left" scope="row">[<a href="#SEC41" title="Previous section in reading order"> &lt; </a>]</td>
+<td valign="middle" align="left">[<a href="#SEC43" title="Next section in reading order"> &gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="#SEC30" title="Beginning of this chapter or previous chapter"> &lt;&lt; </a>]</td>
+<td valign="middle" align="left">[<a href="#SEC38" title="Up section"> Up </a>]</td>
+<td valign="middle" align="left">[<a href="make_5.html#SEC56" title="Next chapter"> &gt;&gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="make.html#SEC_Top" title="Cover (top) of document">Top</a>]</td>
+<td valign="middle" align="left">[<a href="make_toc.html#SEC_Contents" title="Table of contents">Contents</a>]</td>
+<td valign="middle" align="left">[<a href="make_19.html#SEC148" title="Index">Index</a>]</td>
+<td valign="middle" align="left">[<a href="make_abt.html#SEC_About" title="About (help)"> ? </a>]</td>
+</tr></table>
+<h3 class="subsection"> 4.5.4 Writing Shell Commands with Directory Search </h3>
+
+<p>When a prerequisite is found in another directory through directory search,
+this cannot change the commands of the rule; they will execute as written.
+Therefore, you must write the commands with care so that they will look for
+the prerequisite in the directory where <code>make</code> finds it.
+
+</p><p>This is done with the <em>automatic variables</em> such as `<samp>$^</samp>'
+(see section <a href="make_10.html#SEC121">Automatic Variables</a>).
+For instance, the value of `<samp>$^</samp>' is a
+list of all the prerequisites of the rule, including the names of
+the directories in which they were found, and the value of
+`<samp>$@</samp>' is the target.  Thus:
+
+</p><table><tr><td scope="row">&nbsp;</td><td><pre class="example">foo.o : foo.c
+        cc -c $(CFLAGS) $^ -o $@
+</pre></td></tr></table>
+
+<p>(The variable <code>CFLAGS</code> exists so you can specify flags for C
+compilation by implicit rules; we use it here for consistency so it will
+affect all C compilations uniformly;
+see section <a href="make_10.html#SEC116">Variables Used by Implicit Rules</a>.)
+
+</p><p>Often the prerequisites include header files as well, which you do not
+want to mention in the commands.  The automatic variable `<samp>$&lt;</samp>' is
+just the first prerequisite:
+
+</p><table><tr><td scope="row">&nbsp;</td><td><pre class="example">VPATH = src:../headers
+foo.o : foo.c defs.h hack.h
+        cc -c $(CFLAGS) $&lt; -o $@
+</pre></td></tr></table>
+<hr size="6">
+<a name="NOD38"></a>
+<a name="SEC43"></a>
+<table cellpadding="1" cellspacing="1" border="0">
+<tr><td valign="middle" align="left" scope="row">[<a href="#SEC42" title="Previous section in reading order"> &lt; </a>]</td>
+<td valign="middle" align="left">[<a href="#SEC44" title="Next section in reading order"> &gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="#SEC30" title="Beginning of this chapter or previous chapter"> &lt;&lt; </a>]</td>
+<td valign="middle" align="left">[<a href="#SEC38" title="Up section"> Up </a>]</td>
+<td valign="middle" align="left">[<a href="make_5.html#SEC56" title="Next chapter"> &gt;&gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="make.html#SEC_Top" title="Cover (top) of document">Top</a>]</td>
+<td valign="middle" align="left">[<a href="make_toc.html#SEC_Contents" title="Table of contents">Contents</a>]</td>
+<td valign="middle" align="left">[<a href="make_19.html#SEC148" title="Index">Index</a>]</td>
+<td valign="middle" align="left">[<a href="make_abt.html#SEC_About" title="About (help)"> ? </a>]</td>
+</tr></table>
+<h3 class="subsection"> 4.5.5 Directory Search and Implicit Rules </h3>
+
+<p>The search through the directories specified in <code>VPATH</code> or with
+<code>vpath</code> also happens during consideration of implicit rules
+(see section <a href="make_10.html#SEC113">Using Implicit Rules</a>).
+
+</p><p>For example, when a file `<tt>foo.o</tt>' has no explicit rule, <code>make</code>
+considers implicit rules, such as the built-in rule to compile
+`<tt>foo.c</tt>' if that file exists.  If such a file is lacking in the
+current directory, the appropriate directories are searched for it.  If
+`<tt>foo.c</tt>' exists (or is mentioned in the makefile) in any of the
+directories, the implicit rule for C compilation is applied.
+
+</p><p>The commands of implicit rules normally use automatic variables as a
+matter of necessity; consequently they will use the file names found by
+directory search with no extra effort.
+
+</p><hr size="6">
+<a name="NOD39"></a>
+<a name="SEC44"></a>
+<table cellpadding="1" cellspacing="1" border="0">
+<tr><td valign="middle" align="left" scope="row">[<a href="#SEC43" title="Previous section in reading order"> &lt; </a>]</td>
+<td valign="middle" align="left">[<a href="#SEC45" title="Next section in reading order"> &gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="#SEC30" title="Beginning of this chapter or previous chapter"> &lt;&lt; </a>]</td>
+<td valign="middle" align="left">[<a href="#SEC38" title="Up section"> Up </a>]</td>
+<td valign="middle" align="left">[<a href="make_5.html#SEC56" title="Next chapter"> &gt;&gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="make.html#SEC_Top" title="Cover (top) of document">Top</a>]</td>
+<td valign="middle" align="left">[<a href="make_toc.html#SEC_Contents" title="Table of contents">Contents</a>]</td>
+<td valign="middle" align="left">[<a href="make_19.html#SEC148" title="Index">Index</a>]</td>
+<td valign="middle" align="left">[<a href="make_abt.html#SEC_About" title="About (help)"> ? </a>]</td>
+</tr></table>
+<h3 class="subsection"> 4.5.6 Directory Search for Link Libraries </h3>
+
+<p>Directory search applies in a special way to libraries used with the
+linker.  This special feature comes into play when you write a prerequisite
+whose name is of the form `<samp>-l<var>name</var></samp>'.  (You can tell something
+strange is going on here because the prerequisite is normally the name of a
+file, and the <em>file name</em> of a library generally looks like
+`<tt>lib<var>name</var>.a</tt>', not like `<samp>-l<var>name</var></samp>'.)
+
+</p><p>When a prerequisite's name has the form `<samp>-l<var>name</var></samp>', <code>make</code>
+handles it specially by searching for the file `<tt>lib<var>name</var>.so</tt>' in
+the current directory, in directories specified by matching <code>vpath</code>
+search paths and the <code>VPATH</code> search path, and then in the
+directories `<tt>/lib</tt>', `<tt>/usr/lib</tt>', and `<tt><var>prefix</var>/lib</tt>'
+(normally `<tt>/usr/local/lib</tt>', but MS-DOS/MS-Windows versions of
+<code>make</code> behave as if <var>prefix</var> is defined to be the root of the
+DJGPP installation tree).
+
+</p><p>If that file is not found, then the file `<tt>lib<var>name</var>.a</tt>' is
+searched for, in the same directories as above.
+
+</p><p>For example, if there is a `<tt>/usr/lib/libcurses.a</tt>' library on your
+system (and no `<tt>/usr/lib/libcurses.so</tt>' file), then
+
+</p><table><tr><td scope="row">&nbsp;</td><td><pre class="example">foo : foo.c -lcurses
+        cc $^ -o $@
+</pre></td></tr></table>
+
+<p>would cause the command `<samp>cc foo.c /usr/lib/libcurses.a -o foo</samp>' to
+be executed when `<tt>foo</tt>' is older than `<tt>foo.c</tt>' or than
+`<tt>/usr/lib/libcurses.a</tt>'.
+
+</p><p>Although the default set of files to be searched for is
+`<tt>lib<var>name</var>.so</tt>' and `<tt>lib<var>name</var>.a</tt>', this is customizable
+via the <code>.LIBPATTERNS</code> variable.  Each word in the value of this
+variable is a pattern string.  When a prerequisite like
+`<samp>-l<var>name</var></samp>' is seen, <code>make</code> will replace the percent in
+each pattern in the list with <var>name</var> and perform the above directory
+searches using that library filename.  If no library is found, the next
+word in the list will be used.
+
+</p><p>The default value for <code>.LIBPATTERNS</code> is `<samp>lib%.so lib%.a</samp>',
+which provides the default behavior described above.
+
+</p><p>You can turn off link library expansion completely by setting this
+variable to an empty value.
+
+</p><hr size="6">
+<a name="NOD40"></a>
+<a name="SEC45"></a>
+<table cellpadding="1" cellspacing="1" border="0">
+<tr><td valign="middle" align="left" scope="row">[<a href="#SEC44" title="Previous section in reading order"> &lt; </a>]</td>
+<td valign="middle" align="left">[<a href="#SEC46" title="Next section in reading order"> &gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="#SEC30" title="Beginning of this chapter or previous chapter"> &lt;&lt; </a>]</td>
+<td valign="middle" align="left">[<a href="#SEC30" title="Up section"> Up </a>]</td>
+<td valign="middle" align="left">[<a href="make_5.html#SEC56" title="Next chapter"> &gt;&gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="make.html#SEC_Top" title="Cover (top) of document">Top</a>]</td>
+<td valign="middle" align="left">[<a href="make_toc.html#SEC_Contents" title="Table of contents">Contents</a>]</td>
+<td valign="middle" align="left">[<a href="make_19.html#SEC148" title="Index">Index</a>]</td>
+<td valign="middle" align="left">[<a href="make_abt.html#SEC_About" title="About (help)"> ? </a>]</td>
+</tr></table>
+<h2 class="section"> 4.6 Phony Targets </h2>
+
+<p>A phony target is one that is not really the name of a file.  It is just a
+name for some commands to be executed when you make an explicit request.
+There are two reasons to use a phony target: to avoid a conflict with
+a file of the same name, and to improve performance.
+
+</p><p>If you write a rule whose commands will not create the target file, the
+commands will be executed every time the target comes up for remaking.
+Here is an example:
+
+</p><table><tr><td scope="row">&nbsp;</td><td><pre class="example">clean:
+        rm *.o temp
+</pre></td></tr></table>
+
+<p>Because the <code>rm</code> command does not create a file named `<tt>clean</tt>',
+probably no such file will ever exist.  Therefore, the <code>rm</code> command
+will be executed every time you say `<samp>make clean</samp>'.
+<a name="IDX97"></a>
+
+</p><a name="IDX98"></a>
+<p>The phony target will cease to work if anything ever does create a file
+named `<tt>clean</tt>' in this directory.  Since it has no prerequisites, the
+file `<tt>clean</tt>' would inevitably be considered up to date, and its
+commands would not be executed.  To avoid this problem, you can explicitly
+declare the target to be phony, using the special target <code>.PHONY</code>
+(see section <a href="#SEC48">Special Built-in Target Names</a>) as follows:
+
+</p><table><tr><td scope="row">&nbsp;</td><td><pre class="example">.PHONY : clean
+</pre></td></tr></table>
+
+<p>Once this is done, `<samp>make clean</samp>' will run the commands regardless of
+whether there is a file named `<tt>clean</tt>'.
+
+</p><p>Since it knows that phony targets do not name actual files that could be
+remade from other files, <code>make</code> skips the implicit rule search for
+phony targets (see section <a href="make_10.html#SEC113">Using Implicit Rules</a>).  This is why declaring a target
+phony is good for performance, even if you are not worried about the
+actual file existing.
+
+</p><p>Thus, you first write the line that states that <code>clean</code> is a
+phony target, then you write the rule, like this:
+
+</p><table><tr><td scope="row">&nbsp;</td><td><pre class="example">.PHONY: clean
+clean:
+        rm *.o temp
+</pre></td></tr></table>
+<p>Another example of the usefulness of phony targets is in conjunction
+with recursive invocations of <code>make</code> (for more information, see
+<a href="make_5.html#SEC67">Recursive Use of <code>make</code></a>).  In this case the
+makefile will often contain a variable which lists a number of
+subdirectories to be built.  One way to handle this is with one rule
+whose command is a shell loop over the subdirectories, like this:
+
+</p><table><tr><td scope="row">&nbsp;</td><td><pre class="example">SUBDIRS = foo bar baz
+
+subdirs:
+        for dir in $(SUBDIRS); do \
+          $(MAKE) -C $$dir; \
+        done
+</pre></td></tr></table>
+<p>There are a few problems with this method, however.  First, any error
+detected in a submake is not noted by this rule, so it will continue to
+build the rest of the directories even when one fails.  This can be
+overcome by adding shell commands to note the error and exit, but then
+it will do so even if <code>make</code> is invoked with the <code>-k</code> option,
+which is unfortunate.  Second, and perhaps more importantly, you cannot
+take advantage of <code>make</code>'s ability to build targets in parallel
+(see section <a href="make_5.html#SEC64">Parallel Execution</a>), since there is only one rule.
+
+</p><p>By declaring the subdirectories as phony targets (you must do this as
+the subdirectory obviously always exists; otherwise it won't be built)
+you can remove these problems:
+
+</p><table><tr><td scope="row">&nbsp;</td><td><pre class="example">SUBDIRS = foo bar baz
+
+.PHONY: subdirs $(SUBDIRS)
+
+subdirs: $(SUBDIRS)
+
+$(SUBDIRS):
+        $(MAKE) -C $@
+
+foo: baz
+</pre></td></tr></table>
+<p>Here we've also declared that the `<tt>foo</tt>' subdirectory cannot be
+built until after the `<tt>baz</tt>' subdirectory is complete; this kind of
+relationship declaration is particularly important when attempting
+parallel builds.
+
+</p><p>A phony target should not be a prerequisite of a real target file; if it
+is, its commands are run every time <code>make</code> goes to update that
+file.  As long as a phony target is never a prerequisite of a real
+target, the phony target commands will be executed only when the phony
+target is a specified goal (see section <a href="make_9.html#SEC107">Arguments to Specify the Goals</a>).
+
+</p><p>Phony targets can have prerequisites.  When one directory contains multiple
+programs, it is most convenient to describe all of the programs in one
+makefile `<tt>./Makefile</tt>'.  Since the target remade by default will be the
+first one in the makefile, it is common to make this a phony target named
+`<samp>all</samp>' and give it, as prerequisites, all the individual programs.  For
+example:
+
+</p><table><tr><td scope="row">&nbsp;</td><td><pre class="example">all : prog1 prog2 prog3
+.PHONY : all
+
+prog1 : prog1.o utils.o
+        cc -o prog1 prog1.o utils.o
+
+prog2 : prog2.o
+        cc -o prog2 prog2.o
+
+prog3 : prog3.o sort.o utils.o
+        cc -o prog3 prog3.o sort.o utils.o
+</pre></td></tr></table>
+
+<p>Now you can say just `<samp>make</samp>' to remake all three programs, or
+specify as arguments the ones to remake (as in `<samp>make prog1
+prog3</samp>').  Phoniness is not inherited: the prerequisites of a phony
+target are not themselves phony, unless explicitly declared to be so.
+
+</p><p>When one phony target is a prerequisite of another, it serves as a subroutine
+of the other.  For example, here `<samp>make cleanall</samp>' will delete the
+object files, the difference files, and the file `<tt>program</tt>':
+
+</p><table><tr><td scope="row">&nbsp;</td><td><pre class="example">.PHONY: cleanall cleanobj cleandiff
+
+cleanall : cleanobj cleandiff
+        rm program
+
+cleanobj :
+        rm *.o
+
+cleandiff :
+        rm *.diff
+</pre></td></tr></table>
+<hr size="6">
+<a name="NOD41"></a>
+<a name="SEC46"></a>
+<table cellpadding="1" cellspacing="1" border="0">
+<tr><td valign="middle" align="left" scope="row">[<a href="#SEC45" title="Previous section in reading order"> &lt; </a>]</td>
+<td valign="middle" align="left">[<a href="#SEC47" title="Next section in reading order"> &gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="#SEC30" title="Beginning of this chapter or previous chapter"> &lt;&lt; </a>]</td>
+<td valign="middle" align="left">[<a href="#SEC30" title="Up section"> Up </a>]</td>
+<td valign="middle" align="left">[<a href="make_5.html#SEC56" title="Next chapter"> &gt;&gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="make.html#SEC_Top" title="Cover (top) of document">Top</a>]</td>
+<td valign="middle" align="left">[<a href="make_toc.html#SEC_Contents" title="Table of contents">Contents</a>]</td>
+<td valign="middle" align="left">[<a href="make_19.html#SEC148" title="Index">Index</a>]</td>
+<td valign="middle" align="left">[<a href="make_abt.html#SEC_About" title="About (help)"> ? </a>]</td>
+</tr></table>
+<h2 class="section"> 4.7 Rules without Commands or Prerequisites </h2>
+
+<p>If a rule has no prerequisites or commands, and the target of the rule
+is a nonexistent file, then <code>make</code> imagines this target to have
+been updated whenever its rule is run.  This implies that all targets
+depending on this one will always have their commands run.
+
+</p><p>An example will illustrate this:
+
+</p><table><tr><td scope="row">&nbsp;</td><td><pre class="example">clean: FORCE
+        rm $(objects)
+FORCE:
+</pre></td></tr></table>
+<p>Here the target `<samp>FORCE</samp>' satisfies the special conditions, so the
+target `<tt>clean</tt>' that depends on it is forced to run its commands.
+There is nothing special about the name `<samp>FORCE</samp>', but that is one name
+commonly used this way.
+
+</p><p>As you can see, using `<samp>FORCE</samp>' this way has the same results as using
+`<samp>.PHONY: clean</samp>'.
+
+</p><p>Using `<samp>.PHONY</samp>' is more explicit and more efficient.  However,
+other versions of <code>make</code> do not support `<samp>.PHONY</samp>'; thus
+`<samp>FORCE</samp>' appears in many makefiles.  See section <a href="#SEC45">Phony Targets</a>.
+
+</p><hr size="6">
+<a name="NOD42"></a>
+<a name="SEC47"></a>
+<table cellpadding="1" cellspacing="1" border="0">
+<tr><td valign="middle" align="left" scope="row">[<a href="#SEC46" title="Previous section in reading order"> &lt; </a>]</td>
+<td valign="middle" align="left">[<a href="#SEC48" title="Next section in reading order"> &gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="#SEC30" title="Beginning of this chapter or previous chapter"> &lt;&lt; </a>]</td>
+<td valign="middle" align="left">[<a href="#SEC30" title="Up section"> Up </a>]</td>
+<td valign="middle" align="left">[<a href="make_5.html#SEC56" title="Next chapter"> &gt;&gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="make.html#SEC_Top" title="Cover (top) of document">Top</a>]</td>
+<td valign="middle" align="left">[<a href="make_toc.html#SEC_Contents" title="Table of contents">Contents</a>]</td>
+<td valign="middle" align="left">[<a href="make_19.html#SEC148" title="Index">Index</a>]</td>
+<td valign="middle" align="left">[<a href="make_abt.html#SEC_About" title="About (help)"> ? </a>]</td>
+</tr></table>
+<h2 class="section"> 4.8 Empty Target Files to Record Events </h2>
+
+<p>The <em>empty target</em> is a variant of the phony target; it is used to hold
+commands for an action that you request explicitly from time to time.
+Unlike a phony target, this target file can really exist; but the file's
+contents do not matter, and usually are empty.
+
+</p><p>The purpose of the empty target file is to record, with its
+last-modification time, when the rule's commands were last executed.  It
+does so because one of the commands is a <code>touch</code> command to update the
+target file.
+
+</p><p>The empty target file should have some prerequisites (otherwise it
+doesn't make sense).  When you ask to remake the empty target, the
+commands are executed if any prerequisite is more recent than the target;
+in other words, if a prerequisite has changed since the last time you
+remade the target.  Here is an example:
+
+</p><table><tr><td scope="row">&nbsp;</td><td><pre class="example">print: foo.c bar.c
+        lpr -p $?
+        touch print
+</pre></td></tr></table><a name="IDX99"></a>
+<a name="IDX100"></a>
+<a name="IDX101"></a>
+
+
+<p>With this rule, `<samp>make print</samp>' will execute the <code>lpr</code> command if
+either source file has changed since the last `<samp>make print</samp>'.  The
+automatic variable `<samp>$?</samp>' is used to print only those files that have
+changed (see section <a href="make_10.html#SEC121">Automatic Variables</a>).
+
+</p><hr size="6">
+<a name="NOD43"></a>
+<a name="SEC48"></a>
+<table cellpadding="1" cellspacing="1" border="0">
+<tr><td valign="middle" align="left" scope="row">[<a href="#SEC47" title="Previous section in reading order"> &lt; </a>]</td>
+<td valign="middle" align="left">[<a href="#SEC49" title="Next section in reading order"> &gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="#SEC30" title="Beginning of this chapter or previous chapter"> &lt;&lt; </a>]</td>
+<td valign="middle" align="left">[<a href="#SEC30" title="Up section"> Up </a>]</td>
+<td valign="middle" align="left">[<a href="make_5.html#SEC56" title="Next chapter"> &gt;&gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="make.html#SEC_Top" title="Cover (top) of document">Top</a>]</td>
+<td valign="middle" align="left">[<a href="make_toc.html#SEC_Contents" title="Table of contents">Contents</a>]</td>
+<td valign="middle" align="left">[<a href="make_19.html#SEC148" title="Index">Index</a>]</td>
+<td valign="middle" align="left">[<a href="make_abt.html#SEC_About" title="About (help)"> ? </a>]</td>
+</tr></table>
+<h2 class="section"> 4.9 Special Built-in Target Names </h2>
+
+<p>Certain names have special meanings if they appear as targets.
+
+</p><dl compact="compact">
+<dd><a name="IDX102"></a>
+</dd>
+<dt><code> .PHONY</code></dt>
+<dd>
+<p>The prerequisites of the special target <code>.PHONY</code> are considered to
+be phony targets.  When it is time to consider such a target,
+<code>make</code> will run its commands unconditionally, regardless of
+whether a file with that name exists or what its last-modification
+time is.  See section <a href="#SEC45">Phony Targets</a>.
+
+</p><a name="IDX103"></a>
+</dd>
+<dt><code> .SUFFIXES</code></dt>
+<dd>
+<p>The prerequisites of the special target <code>.SUFFIXES</code> are the list
+of suffixes to be used in checking for suffix rules.
+See section <a href="make_10.html#SEC126">Old-Fashioned Suffix Rules</a>.
+
+</p><a name="IDX104"></a>
+</dd>
+<dt><code> .DEFAULT</code></dt>
+<dd>
+<p>The commands specified for <code>.DEFAULT</code> are used for any target for
+which no rules are found (either explicit rules or implicit rules).
+See section <a href="make_10.html#SEC125">Defining Last-Resort Default Rules</a>.  If <code>.DEFAULT</code> commands are specified, every
+file mentioned as a prerequisite, but not as a target in a rule, will have
+these commands executed on its behalf.  See section <a href="make_10.html#SEC127">Implicit Rule Search Algorithm</a>.
+
+</p><a name="IDX105"></a>
+</dd>
+<dt><code> .PRECIOUS</code></dt>
+<dd><a name="IDX106"></a>
+<a name="IDX107"></a>
+
+<p>The targets which <code>.PRECIOUS</code> depends on are given the following
+special treatment: if <code>make</code> is killed or interrupted during the
+execution of their commands, the target is not deleted.
+See section <a href="make_5.html#SEC66">Interrupting or Killing <code>make</code></a>.  Also, if the
+target is an intermediate file, it will not be deleted after it is no
+longer needed, as is normally done.  See section <a href="make_10.html#SEC117">Chains of Implicit Rules</a>.  In this latter respect it overlaps with the
+<code>.SECONDARY</code> special target.
+
+</p><p>You can also list the target pattern of an implicit rule (such as
+`<samp>%.o</samp>') as a prerequisite file of the special target <code>.PRECIOUS</code>
+to preserve intermediate files created by rules whose target patterns
+match that file's name.
+
+</p><a name="IDX108"></a>
+</dd>
+<dt><code> .INTERMEDIATE</code></dt>
+<dd><a name="IDX109"></a>
+
+<p>The targets which <code>.INTERMEDIATE</code> depends on are treated as
+intermediate files.  See section <a href="make_10.html#SEC117">Chains of Implicit Rules</a>.
+<code>.INTERMEDIATE</code> with no prerequisites has no effect.
+
+</p><a name="IDX110"></a>
+</dd>
+<dt><code> .SECONDARY</code></dt>
+<dd><a name="IDX111"></a>
+<a name="IDX112"></a>
+
+<p>The targets which <code>.SECONDARY</code> depends on are treated as
+intermediate files, except that they are never automatically deleted.
+See section <a href="make_10.html#SEC117">Chains of Implicit Rules</a>.
+
+</p><p><code>.SECONDARY</code> with no prerequisites causes all targets to be treated
+as secondary (i.e., no target is removed because it is considered
+intermediate).
+
+</p><a name="IDX113"></a>
+</dd>
+<dt><code> .SECONDEXPANSION</code></dt>
+<dd>
+<p>If <code>.SECONDEXPANSION</code> is mentioned as a target anywhere in the
+makefile, then all prerequisite lists defined <em>after</em> it appears
+will be expanded a second time after all makefiles have been read in.
+See section <a href="make_3.html#SEC26">Secondary Expansion</a>.
+
+</p><p>The prerequisites of the special target <code>.SUFFIXES</code> are the list
+of suffixes to be used in checking for suffix rules.
+See section <a href="make_10.html#SEC126">Old-Fashioned Suffix Rules</a>.
+
+</p><a name="IDX114"></a>
+</dd>
+<dt><code> .DELETE_ON_ERROR</code></dt>
+<dd><a name="IDX115"></a>
+
+<p>If <code>.DELETE_ON_ERROR</code> is mentioned as a target anywhere in the
+makefile, then <code>make</code> will delete the target of a rule if it has
+changed and its commands exit with a nonzero exit status, just as it
+does when it receives a signal.  See section <a href="make_5.html#SEC65">Errors in Commands</a>.
+
+</p><a name="IDX116"></a>
+</dd>
+<dt><code> .IGNORE</code></dt>
+<dd>
+<p>If you specify prerequisites for <code>.IGNORE</code>, then <code>make</code> will
+ignore errors in execution of the commands run for those particular
+files.  The commands for <code>.IGNORE</code> are not meaningful.
+
+</p><p>If mentioned as a target with no prerequisites, <code>.IGNORE</code> says to
+ignore errors in execution of commands for all files.  This usage of
+`<samp>.IGNORE</samp>' is supported only for historical compatibility.  Since
+this affects every command in the makefile, it is not very useful; we
+recommend you use the more selective ways to ignore errors in specific
+commands.  See section <a href="make_5.html#SEC65">Errors in Commands</a>.
+
+</p><a name="IDX117"></a>
+</dd>
+<dt><code> .LOW_RESOLUTION_TIME</code></dt>
+<dd>
+<p>If you specify prerequisites for <code>.LOW_RESOLUTION_TIME</code>,
+<code>make</code> assumes that these files are created by commands that
+generate low resolution time stamps.  The commands for
+<code>.LOW_RESOLUTION_TIME</code> are not meaningful.
+
+</p><p>The high resolution file time stamps of many modern hosts lessen the
+chance of <code>make</code> incorrectly concluding that a file is up to
+date.  Unfortunately, these hosts provide no way to set a high
+resolution file time stamp, so commands like `<samp>cp -p</samp>' that
+explicitly set a file's time stamp must discard its subsecond part.  If
+a file is created by such a command, you should list it as a
+prerequisite of <code>.LOW_RESOLUTION_TIME</code> so that <code>make</code> does
+not mistakenly conclude that the file is out of date.  For example:
+
+</p><table><tr><td scope="row">&nbsp;</td><td><pre class="example">.LOW_RESOLUTION_TIME: dst
+dst: src
+        cp -p src dst
+</pre></td></tr></table>
+<p>Since `<samp>cp -p</samp>' discards the subsecond part of `<tt>src</tt>''s time
+stamp, `<tt>dst</tt>' is typically slightly older than `<tt>src</tt>' even when
+it is up to date.  The <code>.LOW_RESOLUTION_TIME</code> line causes
+<code>make</code> to consider `<tt>dst</tt>' to be up to date if its time stamp
+is at the start of the same second that `<tt>src</tt>''s time stamp is in.
+
+</p><p>Due to a limitation of the archive format, archive member time stamps
+are always low resolution.  You need not list archive members as
+prerequisites of <code>.LOW_RESOLUTION_TIME</code>, as <code>make</code> does this
+automatically.
+
+</p><a name="IDX118"></a>
+</dd>
+<dt><code> .SILENT</code></dt>
+<dd>
+<p>If you specify prerequisites for <code>.SILENT</code>, then <code>make</code> will
+not print the commands to remake those particular files before executing
+them.  The commands for <code>.SILENT</code> are not meaningful.
+
+</p><p>If mentioned as a target with no prerequisites, <code>.SILENT</code> says not
+to print any commands before executing them.  This usage of
+`<samp>.SILENT</samp>' is supported only for historical compatibility.  We
+recommend you use the more selective ways to silence specific commands.
+See section <a href="make_5.html#SEC60">Command Echoing</a>.  If you want to silence all commands
+for a particular run of <code>make</code>, use the `<samp>-s</samp>' or
+`<samp>--silent</samp>' option (see section <a href="make_9.html#SEC112">Summary of Options</a>).
+
+</p><a name="IDX119"></a>
+</dd>
+<dt><code> .EXPORT_ALL_VARIABLES</code></dt>
+<dd>
+<p>Simply by being mentioned as a target, this tells <code>make</code> to
+export all variables to child processes by default.
+See section <a href="make_5.html#SEC69">Communicating Variables to a Sub-<code>make</code></a>.
+
+</p><a name="IDX120"></a>
+</dd>
+<dt><code> .NOTPARALLEL</code></dt>
+<dd><a name="IDX121"></a>
+
+<p>If <code>.NOTPARALLEL</code> is mentioned as a target, then this invocation of
+<code>make</code> will be run serially, even if the `<samp>-j</samp>' option is
+given.  Any recursively invoked <code>make</code> command will still be run in
+parallel (unless its makefile contains this target).  Any prerequisites
+on this target are ignored.
+</p></dd>
+</dl>
+
+<p>Any defined implicit rule suffix also counts as a special target if it
+appears as a target, and so does the concatenation of two suffixes, such
+as `<samp>.c.o</samp>'.  These targets are suffix rules, an obsolete way of
+defining implicit rules (but a way still widely used).  In principle, any
+target name could be special in this way if you break it in two and add
+both pieces to the suffix list.  In practice, suffixes normally begin with
+`<samp>.</samp>', so these special target names also begin with `<samp>.</samp>'.
+See section <a href="make_10.html#SEC126">Old-Fashioned Suffix Rules</a>.
+
+</p><hr size="6">
+<a name="NOD44"></a>
+<a name="SEC49"></a>
+<table cellpadding="1" cellspacing="1" border="0">
+<tr><td valign="middle" align="left" scope="row">[<a href="#SEC48" title="Previous section in reading order"> &lt; </a>]</td>
+<td valign="middle" align="left">[<a href="#SEC50" title="Next section in reading order"> &gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="#SEC30" title="Beginning of this chapter or previous chapter"> &lt;&lt; </a>]</td>
+<td valign="middle" align="left">[<a href="#SEC30" title="Up section"> Up </a>]</td>
+<td valign="middle" align="left">[<a href="make_5.html#SEC56" title="Next chapter"> &gt;&gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="make.html#SEC_Top" title="Cover (top) of document">Top</a>]</td>
+<td valign="middle" align="left">[<a href="make_toc.html#SEC_Contents" title="Table of contents">Contents</a>]</td>
+<td valign="middle" align="left">[<a href="make_19.html#SEC148" title="Index">Index</a>]</td>
+<td valign="middle" align="left">[<a href="make_abt.html#SEC_About" title="About (help)"> ? </a>]</td>
+</tr></table>
+<h2 class="section"> 4.10 Multiple Targets in a Rule </h2>
+
+<p>A rule with multiple targets is equivalent to writing many rules, each with
+one target, and all identical aside from that.  The same commands apply to
+all the targets, but their effects may vary because you can substitute the
+actual target name into the command using `<samp>$@</samp>'.  The rule contributes
+the same prerequisites to all the targets also.
+
+</p><p>This is useful in two cases.
+
+</p><ul>
+<li>
+<p>You want just prerequisites, no commands.  For example:
+
+</p><table><tr><td scope="row">&nbsp;</td><td><pre class="example">kbd.o command.o files.o: command.h
+</pre></td></tr></table>
+
+<p>gives an additional prerequisite to each of the three object files
+mentioned.
+
+</p></li><li>
+<p>Similar commands work for all the targets.  The commands do not need
+to be absolutely identical, since the automatic variable `<samp>$@</samp>'
+can be used to substitute the particular target to be remade into the
+commands (see section <a href="make_10.html#SEC121">Automatic Variables</a>).  For example:
+
+</p><table><tr><td scope="row">&nbsp;</td><td><pre class="example">bigoutput littleoutput : text.g
+        generate text.g -$(subst output,,$@) &gt; $@
+</pre></td></tr></table><a name="IDX122"></a>
+
+
+<p>is equivalent to
+
+</p><table><tr><td scope="row">&nbsp;</td><td><pre class="example">bigoutput : text.g
+        generate text.g -big &gt; bigoutput
+littleoutput : text.g
+        generate text.g -little &gt; littleoutput
+</pre></td></tr></table>
+
+<p>Here we assume the hypothetical program <code>generate</code> makes two
+types of output, one if given `<samp>-big</samp>' and one if given
+`<samp>-little</samp>'.
+See section <a href="make_8.html#SEC94">Functions for String Substitution and Analysis</a>,
+for an explanation of the <code>subst</code> function.
+</p></li></ul>
+
+<p>Suppose you would like to vary the prerequisites according to the target,
+much as the variable `<samp>$@</samp>' allows you to vary the commands.
+You cannot do this with multiple targets in an ordinary rule, but you can
+do it with a <em>static pattern rule</em>.
+See section <a href="#SEC51">Static Pattern Rules</a>.
+
+</p><hr size="6">
+<a name="NOD45"></a>
+<a name="SEC50"></a>
+<table cellpadding="1" cellspacing="1" border="0">
+<tr><td valign="middle" align="left" scope="row">[<a href="#SEC49" title="Previous section in reading order"> &lt; </a>]</td>
+<td valign="middle" align="left">[<a href="#SEC51" title="Next section in reading order"> &gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="#SEC30" title="Beginning of this chapter or previous chapter"> &lt;&lt; </a>]</td>
+<td valign="middle" align="left">[<a href="#SEC30" title="Up section"> Up </a>]</td>
+<td valign="middle" align="left">[<a href="make_5.html#SEC56" title="Next chapter"> &gt;&gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="make.html#SEC_Top" title="Cover (top) of document">Top</a>]</td>
+<td valign="middle" align="left">[<a href="make_toc.html#SEC_Contents" title="Table of contents">Contents</a>]</td>
+<td valign="middle" align="left">[<a href="make_19.html#SEC148" title="Index">Index</a>]</td>
+<td valign="middle" align="left">[<a href="make_abt.html#SEC_About" title="About (help)"> ? </a>]</td>
+</tr></table>
+<h2 class="section"> 4.11 Multiple Rules for One Target </h2>
+
+<p>One file can be the target of several rules.  All the prerequisites
+mentioned in all the rules are merged into one list of prerequisites for
+the target.  If the target is older than any prerequisite from any rule,
+the commands are executed.
+
+</p><p>There can only be one set of commands to be executed for a file.  If
+more than one rule gives commands for the same file, <code>make</code> uses
+the last set given and prints an error message.  (As a special case,
+if the file's name begins with a dot, no error message is printed.
+This odd behavior is only for compatibility with other implementations
+of <code>make</code>... you should avoid using it).  Occasionally it is
+useful to have the same target invoke multiple commands which are
+defined in different parts of your makefile; you can use
+<em>double-colon rules</em> (see section <a href="#SEC54">Double-Colon Rules</a>) for this.
+
+</p><p>An extra rule with just prerequisites can be used to give a few extra
+prerequisites to many files at once.  For example, makefiles often
+have a variable, such as <code>objects</code>, containing a list of all the
+compiler output files in the system being made.  An easy way to say
+that all of them must be recompiled if `<tt>config.h</tt>' changes is to
+write the following:
+
+</p><table><tr><td scope="row">&nbsp;</td><td><pre class="example">objects = foo.o bar.o
+foo.o : defs.h
+bar.o : defs.h test.h
+$(objects) : config.h
+</pre></td></tr></table>
+<p>This could be inserted or taken out without changing the rules that really
+specify how to make the object files, making it a convenient form to use if
+you wish to add the additional prerequisite intermittently.
+
+</p><p>Another wrinkle is that the additional prerequisites could be specified with
+a variable that you set with a command argument to <code>make</code>
+(see section <a href="make_9.html#SEC110">Overriding Variables</a>).  For example,
+
+</p><table><tr><td scope="row">&nbsp;</td><td><pre class="example">extradeps=
+$(objects) : $(extradeps)
+</pre></td></tr></table>
+
+<p>means that the command `<samp>make extradeps=foo.h</samp>' will consider
+`<tt>foo.h</tt>' as a prerequisite of each object file, but plain `<samp>make</samp>'
+will not.
+
+</p><p>If none of the explicit rules for a target has commands, then <code>make</code>
+searches for an applicable implicit rule to find some commands
+see section <a href="make_10.html#SEC113">Using Implicit Rules</a>).
+
+</p><hr size="6">
+<a name="NOD46"></a>
+<a name="SEC51"></a>
+<table cellpadding="1" cellspacing="1" border="0">
+<tr><td valign="middle" align="left" scope="row">[<a href="#SEC50" title="Previous section in reading order"> &lt; </a>]</td>
+<td valign="middle" align="left">[<a href="#SEC52" title="Next section in reading order"> &gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="#SEC30" title="Beginning of this chapter or previous chapter"> &lt;&lt; </a>]</td>
+<td valign="middle" align="left">[<a href="#SEC30" title="Up section"> Up </a>]</td>
+<td valign="middle" align="left">[<a href="make_5.html#SEC56" title="Next chapter"> &gt;&gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="make.html#SEC_Top" title="Cover (top) of document">Top</a>]</td>
+<td valign="middle" align="left">[<a href="make_toc.html#SEC_Contents" title="Table of contents">Contents</a>]</td>
+<td valign="middle" align="left">[<a href="make_19.html#SEC148" title="Index">Index</a>]</td>
+<td valign="middle" align="left">[<a href="make_abt.html#SEC_About" title="About (help)"> ? </a>]</td>
+</tr></table>
+<h2 class="section"> 4.12 Static Pattern Rules </h2>
+
+<p><em>Static pattern rules</em> are rules which specify multiple targets and
+construct the prerequisite names for each target based on the target name.
+They are more general than ordinary rules with multiple targets because the
+targets do not have to have identical prerequisites.  Their prerequisites must
+be <em>analogous</em>, but not necessarily <em>identical</em>.
+
+</p><table class="menu" border="0" cellspacing="0">
+<tr><td align="left" valign="top" scope="row"><a href="#SEC52">4.12.1 Syntax of Static Pattern Rules</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">                The syntax of static pattern rules.
+</td></tr>
+<tr><td align="left" valign="top" scope="row"><a href="#SEC53">4.12.2 Static Pattern Rules versus Implicit Rules</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">      When are they better than implicit rules?
+</td></tr>
+</table>
+
+<hr size="6">
+<a name="NOD47"></a>
+<a name="SEC52"></a>
+<table cellpadding="1" cellspacing="1" border="0">
+<tr><td valign="middle" align="left" scope="row">[<a href="#SEC51" title="Previous section in reading order"> &lt; </a>]</td>
+<td valign="middle" align="left">[<a href="#SEC53" title="Next section in reading order"> &gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="#SEC30" title="Beginning of this chapter or previous chapter"> &lt;&lt; </a>]</td>
+<td valign="middle" align="left">[<a href="#SEC51" title="Up section"> Up </a>]</td>
+<td valign="middle" align="left">[<a href="make_5.html#SEC56" title="Next chapter"> &gt;&gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="make.html#SEC_Top" title="Cover (top) of document">Top</a>]</td>
+<td valign="middle" align="left">[<a href="make_toc.html#SEC_Contents" title="Table of contents">Contents</a>]</td>
+<td valign="middle" align="left">[<a href="make_19.html#SEC148" title="Index">Index</a>]</td>
+<td valign="middle" align="left">[<a href="make_abt.html#SEC_About" title="About (help)"> ? </a>]</td>
+</tr></table>
+<h3 class="subsection"> 4.12.1 Syntax of Static Pattern Rules </h3>
+
+<p>Here is the syntax of a static pattern rule:
+
+</p><table><tr><td scope="row">&nbsp;</td><td><pre class="example"><var>targets</var> &hellip;: <var>target-pattern</var>: <var>prereq-patterns</var> &hellip;
+        <var>commands</var>
+        &hellip;
+</pre></td></tr></table>
+
+<p>The <var>targets</var> list specifies the targets that the rule applies to.
+The targets can contain wildcard characters, just like the targets of
+ordinary rules (see section <a href="#SEC34">Using Wildcard Characters in File Names</a>).
+
+</p><a name="IDX123"></a>
+<a name="IDX124"></a>
+<p>The <var>target-pattern</var> and <var>prereq-patterns</var> say how to compute the
+prerequisites of each target.  Each target is matched against the
+<var>target-pattern</var> to extract a part of the target name, called the
+<em>stem</em>.  This stem is substituted into each of the <var>prereq-patterns</var>
+to make the prerequisite names (one from each <var>prereq-pattern</var>).
+
+</p><p>Each pattern normally contains the character `<samp>%</samp>' just once.  When the
+<var>target-pattern</var> matches a target, the `<samp>%</samp>' can match any part of
+the target name; this part is called the <em>stem</em>.  The rest of the
+pattern must match exactly.  For example, the target `<tt>foo.o</tt>' matches
+the pattern `<samp>%.o</samp>', with `<samp>foo</samp>' as the stem.  The targets
+`<tt>foo.c</tt>' and `<tt>foo.out</tt>' do not match that pattern.
+
+</p><a name="IDX125"></a>
+<p>The prerequisite names for each target are made by substituting the stem
+for the `<samp>%</samp>' in each prerequisite pattern.  For example, if one
+prerequisite pattern is `<tt>%.c</tt>', then substitution of the stem
+`<samp>foo</samp>' gives the prerequisite name `<tt>foo.c</tt>'.  It is legitimate
+to write a prerequisite pattern that does not contain `<samp>%</samp>'; then this
+prerequisite is the same for all targets.
+
+</p><a name="IDX126"></a>
+<a name="IDX127"></a>
+<a name="IDX128"></a>
+<a name="IDX129"></a>
+<a name="IDX130"></a>
+<p>`<samp>%</samp>' characters in pattern rules can be quoted with preceding
+backslashes (`<samp>\</samp>').  Backslashes that would otherwise quote `<samp>%</samp>'
+characters can be quoted with more backslashes.  Backslashes that quote
+`<samp>%</samp>' characters or other backslashes are removed from the pattern
+before it is compared to file names or has a stem substituted into it.
+Backslashes that are not in danger of quoting `<samp>%</samp>' characters go
+unmolested.  For example, the pattern `<tt>the\%weird\\%pattern\\</tt>' has
+`<samp>the%weird\</samp>' preceding the operative `<samp>%</samp>' character, and
+`<samp>pattern\\</samp>' following it.  The final two backslashes are left alone
+because they cannot affect any `<samp>%</samp>' character.
+
+</p><p>Here is an example, which compiles each of `<tt>foo.o</tt>' and `<tt>bar.o</tt>'
+from the corresponding `<tt>.c</tt>' file:
+
+</p><table><tr><td scope="row">&nbsp;</td><td><pre class="example">objects = foo.o bar.o
+
+all: $(objects)
+
+$(objects): %.o: %.c
+        $(CC) -c $(CFLAGS) $&lt; -o $@
+</pre></td></tr></table>
+
+<p>Here `<samp>$&lt;</samp>' is the automatic variable that holds the name of the
+prerequisite and `<samp>$@</samp>' is the automatic variable that holds the name
+of the target; see <a href="make_10.html#SEC121">Automatic Variables</a>.
+
+</p><p>Each target specified must match the target pattern; a warning is issued
+for each target that does not.  If you have a list of files, only some of
+which will match the pattern, you can use the <code>filter</code> function to
+remove nonmatching file names (see section <a href="make_8.html#SEC94">Functions for String Substitution and Analysis</a>):
+
+</p><table><tr><td scope="row">&nbsp;</td><td><pre class="example">files = foo.elc bar.o lose.o
+
+$(filter %.o,$(files)): %.o: %.c
+        $(CC) -c $(CFLAGS) $&lt; -o $@
+$(filter %.elc,$(files)): %.elc: %.el
+        emacs -f batch-byte-compile $&lt;
+</pre></td></tr></table>
+
+<p>In this example the result of `<samp>$(filter %.o,$(files))</samp>' is
+`<tt>bar.o lose.o</tt>', and the first static pattern rule causes each of
+these object files to be updated by compiling the corresponding C source
+file.  The result of `<samp>$(filter %.elc,$(files))</samp>' is
+`<tt>foo.elc</tt>', so that file is made from `<tt>foo.el</tt>'.
+
+</p><p>Another example shows how to use <code>$*</code> in static pattern rules:
+<a name="IDX131"></a>
+
+</p><table><tr><td scope="row">&nbsp;</td><td><pre class="example">bigoutput littleoutput : %output : text.g
+        generate text.g -$* &gt; $@
+</pre></td></tr></table>
+
+<p>When the <code>generate</code> command is run, <code>$*</code> will expand to the
+stem, either `<samp>big</samp>' or `<samp>little</samp>'.
+
+</p><hr size="6">
+<a name="NOD48"></a>
+<a name="SEC53"></a>
+<table cellpadding="1" cellspacing="1" border="0">
+<tr><td valign="middle" align="left" scope="row">[<a href="#SEC52" title="Previous section in reading order"> &lt; </a>]</td>
+<td valign="middle" align="left">[<a href="#SEC54" title="Next section in reading order"> &gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="#SEC30" title="Beginning of this chapter or previous chapter"> &lt;&lt; </a>]</td>
+<td valign="middle" align="left">[<a href="#SEC51" title="Up section"> Up </a>]</td>
+<td valign="middle" align="left">[<a href="make_5.html#SEC56" title="Next chapter"> &gt;&gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="make.html#SEC_Top" title="Cover (top) of document">Top</a>]</td>
+<td valign="middle" align="left">[<a href="make_toc.html#SEC_Contents" title="Table of contents">Contents</a>]</td>
+<td valign="middle" align="left">[<a href="make_19.html#SEC148" title="Index">Index</a>]</td>
+<td valign="middle" align="left">[<a href="make_abt.html#SEC_About" title="About (help)"> ? </a>]</td>
+</tr></table>
+<h3 class="subsection"> 4.12.2 Static Pattern Rules versus Implicit Rules </h3>
+
+<p>A static pattern rule has much in common with an implicit rule defined as a
+pattern rule (see section <a href="make_10.html#SEC118">Defining and Redefining Pattern Rules</a>).
+Both have a pattern for the target and patterns for constructing the
+names of prerequisites.  The difference is in how <code>make</code> decides
+<em>when</em> the rule applies.
+
+</p><p>An implicit rule <em>can</em> apply to any target that matches its pattern,
+but it <em>does</em> apply only when the target has no commands otherwise
+specified, and only when the prerequisites can be found.  If more than one
+implicit rule appears applicable, only one applies; the choice depends on
+the order of rules.
+
+</p><p>By contrast, a static pattern rule applies to the precise list of targets
+that you specify in the rule.  It cannot apply to any other target and it
+invariably does apply to each of the targets specified.  If two conflicting
+rules apply, and both have commands, that's an error.
+
+</p><p>The static pattern rule can be better than an implicit rule for these
+reasons:
+
+</p><ul>
+<li>
+<p>You may wish to override the usual implicit rule for a few
+files whose names cannot be categorized syntactically but
+can be given in an explicit list.
+
+</p></li><li>
+<p>If you cannot be sure of the precise contents of the directories
+you are using, you may not be sure which other irrelevant files
+might lead <code>make</code> to use the wrong implicit rule.  The choice
+might depend on the order in which the implicit rule search is done.
+With static pattern rules, there is no uncertainty: each rule applies
+to precisely the targets specified.
+</p></li></ul>
+
+<hr size="6">
+<a name="NOD49"></a>
+<a name="SEC54"></a>
+<table cellpadding="1" cellspacing="1" border="0">
+<tr><td valign="middle" align="left" scope="row">[<a href="#SEC53" title="Previous section in reading order"> &lt; </a>]</td>
+<td valign="middle" align="left">[<a href="#SEC55" title="Next section in reading order"> &gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="#SEC30" title="Beginning of this chapter or previous chapter"> &lt;&lt; </a>]</td>
+<td valign="middle" align="left">[<a href="#SEC30" title="Up section"> Up </a>]</td>
+<td valign="middle" align="left">[<a href="make_5.html#SEC56" title="Next chapter"> &gt;&gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="make.html#SEC_Top" title="Cover (top) of document">Top</a>]</td>
+<td valign="middle" align="left">[<a href="make_toc.html#SEC_Contents" title="Table of contents">Contents</a>]</td>
+<td valign="middle" align="left">[<a href="make_19.html#SEC148" title="Index">Index</a>]</td>
+<td valign="middle" align="left">[<a href="make_abt.html#SEC_About" title="About (help)"> ? </a>]</td>
+</tr></table>
+<h2 class="section"> 4.13 Double-Colon Rules </h2>
+
+<p><em>Double-colon</em> rules are rules written with `<samp>::</samp>' instead of
+`<samp>:</samp>' after the target names.  They are handled differently from
+ordinary rules when the same target appears in more than one rule.
+
+</p><p>When a target appears in multiple rules, all the rules must be the same
+type: all ordinary, or all double-colon.  If they are double-colon, each
+of them is independent of the others.  Each double-colon rule's commands
+are executed if the target is older than any prerequisites of that rule.
+If there are no prerequisites for that rule, its commands are always
+executed (even if the target already exists).  This can result in
+executing none, any, or all of the double-colon rules.
+
+</p><p>Double-colon rules with the same target are in fact completely separate
+from one another.  Each double-colon rule is processed individually, just
+as rules with different targets are processed.
+
+</p><p>The double-colon rules for a target are executed in the order they appear
+in the makefile.  However, the cases where double-colon rules really make
+sense are those where the order of executing the commands would not matter.
+
+</p><p>Double-colon rules are somewhat obscure and not often very useful; they
+provide a mechanism for cases in which the method used to update a target
+differs depending on which prerequisite files caused the update, and such
+cases are rare.
+
+</p><p>Each double-colon rule should specify commands; if it does not, an
+implicit rule will be used if one applies.
+See section <a href="make_10.html#SEC113">Using Implicit Rules</a>.
+
+</p><hr size="6">
+<a name="NOD50"></a>
+<a name="SEC55"></a>
+<table cellpadding="1" cellspacing="1" border="0">
+<tr><td valign="middle" align="left" scope="row">[<a href="#SEC54" title="Previous section in reading order"> &lt; </a>]</td>
+<td valign="middle" align="left">[<a href="make_5.html#SEC56" title="Next section in reading order"> &gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="#SEC30" title="Beginning of this chapter or previous chapter"> &lt;&lt; </a>]</td>
+<td valign="middle" align="left">[<a href="#SEC30" title="Up section"> Up </a>]</td>
+<td valign="middle" align="left">[<a href="make_5.html#SEC56" title="Next chapter"> &gt;&gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="make.html#SEC_Top" title="Cover (top) of document">Top</a>]</td>
+<td valign="middle" align="left">[<a href="make_toc.html#SEC_Contents" title="Table of contents">Contents</a>]</td>
+<td valign="middle" align="left">[<a href="make_19.html#SEC148" title="Index">Index</a>]</td>
+<td valign="middle" align="left">[<a href="make_abt.html#SEC_About" title="About (help)"> ? </a>]</td>
+</tr></table>
+<h2 class="section"> 4.14 Generating Prerequisites Automatically </h2>
+
+<p>In the makefile for a program, many of the rules you need to write often
+say only that some object file depends on some header
+file.  For example, if `<tt>main.c</tt>' uses `<tt>defs.h</tt>' via an
+<code>#include</code>, you would write:
+
+</p><table><tr><td scope="row">&nbsp;</td><td><pre class="example">main.o: defs.h
+</pre></td></tr></table>
+
+<p>You need this rule so that <code>make</code> knows that it must remake
+`<tt>main.o</tt>' whenever `<tt>defs.h</tt>' changes.  You can see that for a
+large program you would have to write dozens of such rules in your
+makefile.  And, you must always be very careful to update the makefile
+every time you add or remove an <code>#include</code>.
+<a name="IDX132"></a>
+
+</p><a name="IDX133"></a>
+<p>To avoid this hassle, most modern C compilers can write these rules for
+you, by looking at the <code>#include</code> lines in the source files.
+Usually this is done with the `<samp>-M</samp>' option to the compiler.
+For example, the command:
+
+</p><table><tr><td scope="row">&nbsp;</td><td><pre class="example">cc -M main.c
+</pre></td></tr></table>
+
+<p>generates the output:
+
+</p><table><tr><td scope="row">&nbsp;</td><td><pre class="example">main.o : main.c defs.h
+</pre></td></tr></table>
+
+<p>Thus you no longer have to write all those rules yourself.
+The compiler will do it for you.
+
+</p><p>Note that such a prerequisite constitutes mentioning `<tt>main.o</tt>' in a
+makefile, so it can never be considered an intermediate file by implicit
+rule search.  This means that <code>make</code> won't ever remove the file
+after using it; see section <a href="make_10.html#SEC117">Chains of Implicit Rules</a>.
+
+</p><a name="IDX134"></a>
+<p>With old <code>make</code> programs, it was traditional practice to use this
+compiler feature to generate prerequisites on demand with a command like
+`<samp>make depend</samp>'.  That command would create a file `<tt>depend</tt>'
+containing all the automatically-generated prerequisites; then the
+makefile could use <code>include</code> to read them in (see section <a href="make_3.html#SEC16">Including Other Makefiles</a>).
+
+</p><p>In GNU <code>make</code>, the feature of remaking makefiles makes this
+practice obsolete--you need never tell <code>make</code> explicitly to
+regenerate the prerequisites, because it always regenerates any makefile
+that is out of date.  See section <a href="make_3.html#SEC20">How Makefiles Are Remade</a>.
+
+</p><p>The practice we recommend for automatic prerequisite generation is to have
+one makefile corresponding to each source file.  For each source file
+`<tt><var>name</var>.c</tt>' there is a makefile `<tt><var>name</var>.d</tt>' which lists
+what files the object file `<tt><var>name</var>.o</tt>' depends on.  That way
+only the source files that have changed need to be rescanned to produce
+the new prerequisites.
+
+</p><p>Here is the pattern rule to generate a file of prerequisites (i.e., a makefile)
+called `<tt><var>name</var>.d</tt>' from a C source file called `<tt><var>name</var>.c</tt>':
+
+</p><table><tr><td scope="row">&nbsp;</td><td><pre class="smallexample">%.d: %.c
+        @set -e; rm -f $@; \
+         $(CC) -M $(CPPFLAGS) $&lt; &gt; $@.$$$$; \
+         sed 's,\($*\)\.o[ :]*,\1.o $@ : ,g' &lt; $@.$$$$ &gt; $@; \
+         rm -f $@.$$$$
+</pre></td></tr></table>
+
+<p>See section <a href="make_10.html#SEC118">Defining and Redefining Pattern Rules</a>, for information on defining pattern rules.  The
+`<samp>-e</samp>' flag to the shell causes it to exit immediately if the
+<code>$(CC)</code> command (or any other command) fails (exits with a
+nonzero status).
+<a name="IDX135"></a>
+
+</p><a name="IDX136"></a>
+<p>With the GNU C compiler, you may wish to use the `<samp>-MM</samp>' flag instead
+of `<samp>-M</samp>'.  This omits prerequisites on system header files.
+See <a href="../gcc.info/Preprocessor-Options.html">(gcc.info)Preprocessor Options</a> section `Options Controlling the Preprocessor' in <cite>Using GNU CC</cite>, for details.
+
+</p><a name="IDX137"></a>
+<p>The purpose of the <code>sed</code> command is to translate (for example):
+
+</p><table><tr><td scope="row">&nbsp;</td><td><pre class="example">main.o : main.c defs.h
+</pre></td></tr></table>
+
+<p>into:
+
+</p><table><tr><td scope="row">&nbsp;</td><td><pre class="example">main.o main.d : main.c defs.h
+</pre></td></tr></table>
+
+<a name="IDX138"></a>
+<p>This makes each `<samp>.d</samp>' file depend on all the source and header files
+that the corresponding `<samp>.o</samp>' file depends on.  <code>make</code> then
+knows it must regenerate the prerequisites whenever any of the source or
+header files changes.
+
+</p><p>Once you've defined the rule to remake the `<samp>.d</samp>' files,
+you then use the <code>include</code> directive to read them all in.
+See section <a href="make_3.html#SEC16">Including Other Makefiles</a>.  For example:
+
+</p><table><tr><td scope="row">&nbsp;</td><td><pre class="example">sources = foo.c bar.c
+
+include $(sources:.c=.d)
+</pre></td></tr></table>
+
+<p>(This example uses a substitution variable reference to translate the
+list of source files `<samp>foo.c bar.c</samp>' into a list of prerequisite
+makefiles, `<samp>foo.d bar.d</samp>'.  See section <a href="make_6.html#SEC78">Substitution References</a>, for full
+information on substitution references.)  Since the `<samp>.d</samp>' files are
+makefiles like any others, <code>make</code> will remake them as necessary
+with no further work from you.  See section <a href="make_3.html#SEC20">How Makefiles Are Remade</a>.
+
+</p><p>Note that the `<samp>.d</samp>' files contain target definitions; you should
+be sure to place the <code>include</code> directive <em>after</em> the first,
+default goal in your makefiles or run the risk of having a random
+object file become the default goal.
+See section <a href="make_2.html#SEC8">How <code>make</code> Processes a Makefile</a>.
+
+</p><hr size="6">
+<table cellpadding="1" cellspacing="1" border="0">
+<tr><td valign="middle" align="left" scope="row">[<a href="#SEC30" title="Beginning of this chapter or previous chapter"> &lt;&lt; </a>]</td>
+<td valign="middle" align="left">[<a href="make_5.html#SEC56" title="Next chapter"> &gt;&gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="make.html#SEC_Top" title="Cover (top) of document">Top</a>]</td>
+<td valign="middle" align="left">[<a href="make_toc.html#SEC_Contents" title="Table of contents">Contents</a>]</td>
+<td valign="middle" align="left">[<a href="make_19.html#SEC148" title="Index">Index</a>]</td>
+<td valign="middle" align="left">[<a href="make_abt.html#SEC_About" title="About (help)"> ? </a>]</td>
+</tr></table>
+<p>
+ <font size="-1">
+  This document was generated by <em>System Administrator</em> on <em>February, 19 2008</em> using <a href="http://texi2html.cvshome.org/"><em>texi2html 1.70</em></a>.
+ </font>
+ <br>
+
+</p>
+</body>
+</html>

@@ -1,0 +1,294 @@
+<html><head><title>Mac OS X
+ Manual Page For SVK::Log::Filter(3pm)</title>
+<style type="text/css"><!-- @import "../../../../adcstyle.css"; .char {background: #ffffff; color:#0000ff;}.comment {background:#ffffff; color:#236e25}.function {background:#ffffff; color:#000000;}.keyword {background:#ffffff; color:#761550;}.number {background: #ffffff; color:#0000ff;}.param {background:#ffffff; color:#000000;}.preprocessor {background:#ffffff; color:#236e25}.string {background: #ffffff; color:#891315;}.template {background:#ffffff; color:#761550;}.type {background:#ffffff; color:#761550;}.var {background:#ffffff; color:#000000;} pre.manpages {font-size: 10pt;} .graybox { border-top: 1px solid #919699; border-left: 1px solid #919699; margin-bottom: 10px; } .graybox th { padding: 4px 8px 4px 8px; background: #E2E2E2; font-size: 12px; font-weight: bold; border-bottom: 1px solid #919699; border-right: 1px solid #919699; } .graybox td { padding: 8px; font-size: 12px; text-align: left; vertical-align: top; border-bottom: 1px solid #919699; border-right: 1px solid #919699; } .whiteout { font-size: 1px; background: #ffffff; color: #ffffff; } --></style>
+<style type="text/css" media="print, aural, braille, embossed, projection, tty"><!-- @import "../../../../adcstyle.css"; .char {background: #ffffff; color:#0000ff;}.comment {background:#ffffff; color:#236e25}.function {background:#ffffff; color:#000000;}.keyword {background:#ffffff; color:#761550;}.number {background: #ffffff; color:#0000ff;}.param {background:#ffffff; color:#000000;}.preprocessor {background:#ffffff; color:#236e25}.string {background: #ffffff; color:#891315;}.template {background:#ffffff; color:#761550;}.type {background:#ffffff; color:#761550;}.var {background:#ffffff; color:#000000;} pre.manpages {font-size: 10pt;} .graybox { border-top: 1px solid #919699; border-left: 1px solid #919699; margin-bottom: 10px; } .graybox th { padding: 4px 8px 4px 8px; background: #E2E2E2; font-size: 12px; font-weight: bold; border-bottom: 1px solid #919699; border-right: 1px solid #919699; } .graybox td { padding: 8px; font-size: 12px; text-align: left; vertical-align: top; border-bottom: 1px solid #919699; border-right: 1px solid #919699; } .whiteout { display: none; } --></style>
+</head><body bgcolor="white">
+<a name="//apple_ref/doc/man/3pm/SVK::Log::Filter" title="Mac OS X
+ Manual Page for SVK::Log::Filter(3pm)"><a name="//apple_ref/doc/man/3/SVK::Log::Filter" title="Mac OS X
+ Manual Page for SVK::Log::Filter(3pm)"><!-- headerDoc=man; indexgroup=Section 3pm; uid="//apple_ref/doc/man/3pm/SVK::Log::Filter"; name=SVK::Log::Filter(3pm) --></a>
+<!--#include virtual="/includes/framesetheader"-->
+<table width=600><tr><td scope="row">
+<!-- begin breadcrumb insert request --><font face="Geneva,Helvetica,Arial" size="1">
+ <a target="_top" href="http://developer.apple.com">ADC Home</a> <b>&gt;</b> <a href="../../../../../referencelibrary/index.html#//apple_ref/doc/uid/TP30000943" target="_top">Reference Library</a> <b>&gt;</b> <a href="../../../../../reference/index.html#//apple_ref/doc/uid/TP30001281" target="_top">Reference</a> <b>&gt;</b> <!-- a href="" target="_top" -->Mac OS X<!-- /a --> <b>&gt;</b> <a href="../index.html#//apple_ref/doc/framework/manpages" target="_top">Mac OS X Man Pages</a></font>
+<!-- end breadcrumb insert request -->
+<p>&nbsp;</p>
+</td></tr></table>
+<!-- end of header -->
+<table border="0"  cellpadding="2" cellspacing="2" width="630pt"><tr><td valign="top" height="12" colspan="5" scope="row">
+<p style='text-align:justify;'>This document is a Mac OS X manual page.  Manual pages are a command-line technology
+for providing documentation.  You can view these manual pages locally using the
+<a href="../man1/man.1.html#//apple_ref/doc/man/1/man">man(1)</a> command.
+These manual pages come from many different sources, and thus, have a variety of writing
+styles.</p>
+<p style='text-align:justify;'>For more information about the manual page format, see the manual page for 
+<a href="../man5/manpages.5.html#//apple_ref/doc/man/5/manpages">manpages(5)</a>.</p>
+</td></tr></table>
+<hr />
+<table border="0"  cellpadding="2" cellspacing="2" width="300"><tr><td valign="top" height="12" colspan="5" scope="row"><pre class="manpages"><tt>
+SVK::Log::Filter(3)                  User Contributed Perl Documentation                 SVK::Log::Filter(3)
+
+
+
+<b>NAME</b>
+       SVK::Log::Filter - base class for all log filters
+
+<b>DESCRIPTION</b>
+       SVK::Log::Filter is a class for displaying or otherwise processing revision properties.  The SVK
+       "log" command uses filter classes to handle the details of processing the revision properties.  The
+       bulk of this document explains how to write those filter classes.
+
+       A log filter is just a Perl class with special methods.  At specific points while processing log
+       information, SVK calls these methods on the filter object.  SVK::Log::Filter provides sensible
+       defaults for each of the methods it calls.  The methods (in order of invocation) are "setup",
+       "header", "revision", "footer", "teardown". Each is fully documented in the section "METHOD
+       REFERENCE".
+
+<b>TUTORIAL</b>
+       Although log filters which output and log filters which select are exactly the same kind of objects,
+       they are generally conceptualized separately.  The following tutorial provides a simple example for
+       each type of filter.
+
+       <b>OUTPUT</b>
+
+       For our simple output filter example, we want to display something like the following
+
+           1. r3200 by john
+           2. r3194 by tom
+           3. r3193 by larry
+
+       Namely, the number the revisions we've seen, then show the actual revision number from the repository
+       and indicate the author of that revision.   We want this log filter to be accessible by a command
+       like "svk log --output list" The code to accomplish that is
+
+          1   package SVK::Log::Filter::List;
+          2   use base qw( SVK::Log::Filter );
+
+          3   sub setup {
+          4       my ($self) = @_;
+          5       $self-&gt;{count} = 1;
+          6   }
+
+          7   sub revision {
+          8       my ($self, $args) = @_;
+
+          9       printf "%d. r%d by %s\n",
+         10           $self-&gt;{count}++,
+         11           $args-&gt;{rev},
+         12           $args-&gt;{props}{'svn:author'}
+         13       ;
+         14   }
+
+       First, we must establish the name of this filter.  SVK looks for filters with the namespace prefix
+       "SVK::Log::Filter".  The final portion of the name can either have the first letter capitalized or
+       all the letters capitalized.  On line 2, we use SVK::Log::Filter as the base class so that we can get
+       the default method implementations.
+
+       On lines 3-6, we get to the first meat.  Since we want to count the revisions that we see, we have to
+       store the information somewhere that will persist between method calls.  We just store it in the log
+       filter object itself.  Finally, on line 6, our "setup" method is finished.  The return value of the
+       method is irrelevant.
+
+       The "revision" method on lines 7-14 does the real work of the filter.  First (line 8) we extract
+       arguments into a hashref $args.  Then it simply prints what we want it to display.  SVK takes care of
+       directing output to the appropriate place.  You'll notice that the revision properties are provided
+       as a hash.  The key of the hash is the name of the property and the value of the hash is the value of
+       the property.
+
+       That's it.  Put SVK::Log::Filter::List somewhere in @INC and SVK will find it.
+
+       <b>SELECTION</b>
+
+       Our simple selection filter example will pass revisions based on whether the revision number is even
+       or odd.  The filter accepts a single argument 'odd' or 'even' indicating which revisions should be
+       passed down the pipeline.  Additionally, if the filter ever encounters the revision number "42" it
+       will stop the entire pipeline and process no more revisions.  The invocation is something like "svk
+       log --filter 'parity even'" to display all even revisions up to r42.
+
+          1   package SVK::Log::Filter::Parity;
+          2   use base qw( SVK::Log::Filter );
+
+          3   sub setup {
+          4       my ($self) = @_;
+
+          5       my $argument = lc $self-&gt;{argument};
+          6       $self-&gt;{bit} = $argument eq 'even' ? 0
+          7                    : $argument eq 'odd'  ? 1
+          8                    : die "Parity argument not 'even' or 'odd'\n"
+          9                    ;
+         10   }
+
+         11   sub revision {
+         12       my ($self, $args) = @_;
+
+         13       my $rev = $args-&gt;{rev};
+         14       $self-&gt;pipeline('last') if $rev == 42;
+         15       $self-&gt;pipeline('next') if $rev % 2 != $self-&gt;{bit};
+         16   }
+
+       There are only a few differences between this implementation and the output filter implementation.
+       The first difference is in line 5.  When a log filter object is created, the default "new" method
+       creates the 'argument' key which contains the command-line argument provided to your filter.  In this
+       case, the argument should be either 'even' or 'odd'.  Based on the argument, we update the object to
+       remind us what parity we're looking for.
+
+       The unique characteristics of "revision" are the calls to the "pipeline" method in lines 14 and 15.
+       If we want to stop the pipeline entirely, call "pipeline" with the argument 'last' (think "this is
+       the last revision").  The current revision and all subsequent revisions will not be processed by the
+       filter pipelin.  If the argument to "pipeline" is 'next' (think "go to the next revision"), the
+       current revision will not be displayed and the pipeline will proceed with the next revision in
+       sequence.  If you don't call "pipeline", the current revision is passed down the remainder of the
+       pipeline so that it can be processed and displayed.
+
+<b>METHODS</b>
+       This is a list of all the methods that SVK::Log::Filter implements and a description of how they
+       should be called.  When defining a subclass, one need only override those methods that are necessary
+       for implementing the filter.  All methods have sensible defaults (namely, do nothing).  The methods
+       are listed here in the order in which they are called by the pipeline.
+
+       All methods except "new" and "pipeline" receive a single hash reference as their first argument
+       (after the invocant, of course).  The 'Receives' section in the documentation below indicates which
+       named arguments are present in that hash.
+
+       <b>new</b>
+
+       Builds a new object from a hash reference.  The value of any arguments provided to the log filter on
+       the command line are placed in the 'argument' attribute of the object.  Generally, there is no need
+       to override the "new" method because the "setup" method can be overriden instead.
+
+       <b>setup</b>
+
+       Receives: "stash"
+
+       This method is called once just before the filter is used for the first time.  It's conceptually
+       similar to "new", but allows the filter developer to ignore the creation of the filter object.  This
+       is the place to do filter initialization, process command-line arguments, read configuration files,
+       connect to a database, etc.
+
+       <b>header</b>
+
+       Receives: "stash"
+
+       This method is called once just before the first revision is processed but after "setup" has
+       completed.  This is an ideal place to display information which should appear at the top of the log
+       display.
+
+       <b>revision</b>
+
+       Receives: "paths", "rev", "props", "stash", "get_remoterev"
+
+       This method is called for each revision that SVK wants to process.  The bulk of a log filter's code
+       implements this method.  Output filters may simply print the information that they want displayed.
+       Other filters should either modify the revision properties (see "props") or use pipeline commands
+       (see "pipeline") to skip irrelevant revisions.
+
+       <b>footer</b>
+
+       Receives: "stash"
+
+       This method is similar to the "header" method, but it's called once after all the revisions have been
+       displayed.  This is the place to do any final output.
+
+       <b>teardown</b>
+
+       Receives: "stash"
+
+       This method is called once just before the log filter is discarded.  This is the place to disconnect
+       from databases, close file handles, etc.
+
+       <b>pipeline</b>
+
+       This method is not called by the filter pipeline.  Rather, it's used by log filters to control the
+       pipeline's behavior.  It accepts a single scalar as the argument.  If the argument is 'next', the
+       pipeline stops processing the current revision (including any output filter) and starts processing
+       the next revision starting over at the beginning of the pipeline.  If the argument to "pipeline" is
+       'last', the pipeline is stopped entirely (including any output filters).  Once the pipeline has
+       stopped, the SVK log command finishes any final details and stops.
+
+<b>ARGUMENTS</b>
+       This section describes the possible keys and values of the hashref that's provided to method calls.
+
+<b>get_remoterev</b>
+       If the value of this argument is true, the value is a coderef.  When the coderef is invoked with a
+       single revision number as the argument, it returns the number of the equivalent revision in the
+       upstream repository.  The value of this key may be undefined if the logs are being processed for
+       something other than a mirror.  The following code may be useful when working with "get_remoterev"
+
+           my           ( $stash, $rev, $get_remoterev)
+           = @{$args}{qw(  stash   rev   get_remoterev )};
+           my $remote_rev = $get_remoterev ? $get_remoterev-&gt;($rev) : 'unknown';
+           print "The remote revision for r$rev is $remote_rev.\n";
+
+       <b>paths</b>
+
+       The value of the 'paths' argument is an SVK::Log::ChangedPaths object.  The object provides methods
+       for indicating which paths were changed by this revision and approximately how they were changed
+       (modified file contents, modified file properties, etc.)
+
+       See the documentation for SVK::Log::ChangedPaths for more details.
+
+       <b>rev</b>
+
+       The value of the 'rev' argument is the Subversion revision number for the current revision.
+
+       <b>props</b>
+
+       The value of the 'props' argument is a hash reference containing all the revision properties for the
+       current revision.  The keys of the hash are the property names and the values of the hash are the
+       property values.  For example, the author of a revision is available with "$args-&gt;{'svn:author'}".
+
+       If you change values in the 'props' hashref, those changes are visible to all subsequent filters in
+       the pipeline.  This can be useful and dangerous.  Dangerous if you accidentally modify a property,
+       useful if you intentionally modify a property.  For instance, it's possible to make a "selection"
+       filter which uses Babelfish to translate log messages from one language to another (see
+       SVK::Log::Filter::Babelfish on CPAN).  By modifying the 'svn:log' property, other log filters can
+       operate on the translated log message without knowing that it's translated.
+
+       <b>stash</b>
+
+       The value of the 'stash' argument is a reference to a hash.  The stash persists throughout the entire
+       log filtering process and is provided to every method that the filter pipeline calls.  The stash may
+       be used to pass information from one filter to another filter in the pipeline.
+
+       When creating new keys in the stash, it's important to avoid unintentional name collisions with other
+       filters in the pipeline.  A good practice is to preface the name of each stash key with the name of
+       your filter ("myfilter_key") or to create your own hash reference inside the stash
+       ("$stash-&gt;{myfilter}{key}").  If your filter puts information into the stash that other filters may
+       want to access, please document the location and format of that information for other filter authors.
+
+<b>STASH</b> <b>REFERENCE</b>
+<b>quiet</b>
+       If the user included the "--quiet" flag when invoking "svk log" the value of this key will be a true
+       value.  Otherwise, the value will be false.
+
+<b>verbose</b>
+       If the user included the "--verbose" flag when invoking "svk log" the value of this key will be a
+       true value.  Otherwise, the value will be false.
+
+
+
+perl v5.8.8                                      2006-12-28                              SVK::Log::Filter(3)
+</tt></pre>
+</td></tr></table>
+	<table width="100%" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/documentation/Darwin/Reference/ManPages/man3/SVK__Log__Filter.3pm.html%3Fid%3DTP40000894-7.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/documentation/Darwin/Reference/ManPages/man3/SVK__Log__Filter.3pm.html%3Fid%3DTP40000894-7.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/documentation/Darwin/Reference/ManPages/man3/SVK__Log__Filter.3pm.html%3Fid%3DTP40000894-7.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+
+</body></html>

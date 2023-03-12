@@ -1,0 +1,361 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+<head>
+	<title>Kernel Programming Guide: Performance Considerations</title>
+	<meta id="Generator" name="Generator" content="Gutenberg"/>
+	<meta id="GeneratorVersion" name="GeneratorVersion" content="v132"/>
+	<meta http-equiv="content-type" content="text/html;charset=utf-8"/>
+	<meta id="Copyright" name="Copyright" content="Copyright 2009 Apple Inc. All Rights Reserved."/>
+	<meta id="IndexTitle" name="IndexTitle" content="Performance Considerations"/>
+	<meta id="xcode-display" name="xcode-display" content="render"/>
+	<meta id="toc-file" name="toc-file" content="../toc.html"/>
+	<meta id="RESOURCES" content="../../../../Resources" />
+	
+	<link rel="stylesheet" type="text/css" href="../../../../Resources/CSS/frameset_styles.css"/>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/lib/prototype.js"></script>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/lib/scriptaculous.js"></script>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/page.js"></script>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/pedia.js"></script>
+	<!--[if lte IE 6]>
+		<style type="text/css">
+			/*<![CDATA[*/ 
+			html {overflow-x:auto; overflow-y:hidden;  }
+			/*]]>*/
+		</style>
+	<![endif]-->
+</head>    
+<body bgcolor="#ffffff" onload="initialize_page();"><a name="//apple_ref/doc/uid/TP30000905-CH207" title="Performance Considerations"></a>
+    <noscript>
+    <div id="tocMenu">
+        <iframe id="toc_content" name="toc_content" SRC="../toc.html" width="210" height="100%" align="left" frameborder="0">This document set is best viewed in a browser that supports iFrames.</iframe>
+    </div>
+    </noscript>
+    <div id="bodyText">
+        <a name="top"></a>
+        <div class="hideOnPrint hideInXcode">
+        <!-- start of header -->
+        <!--#include virtual="/includes/framesetheader" -->
+        <!-- end of header -->
+        </div>
+        
+        <!-- start of path -->
+<div class="breadcrumb hideOnPrint hideInXcode"><a href="http://developer.apple.com/" target="_top">ADC Home</a> &gt; <a href="../../../../../referencelibrary/index.html#//apple_ref/doc/uid/TP30000943" target="_top">Reference Library</a> &gt; <a href="../../../../index.html#//apple_ref/doc/uid/TP30000440" target="_top">Guides</a> &gt; <a href="../../../index.html#//apple_ref/doc/uid/TP30000440-TP30000422" target="_top">Darwin</a> &gt; <a href="../../../Kernel-date.html#//apple_ref/doc/uid/TP30000440-TP30000422-TP30000532" target="_top">Kernel</a> &gt; <a href="../About/About.html#//apple_ref/doc/uid/TP30000905-CH204-TPXREF101">Kernel Programming Guide</a> &gt; </div><br class="hideInXcode"/><!-- end of path -->
+        
+        <div class="mini_nav_text" align="left">
+        <span class="navButtons">
+        <a href="../security/security.html">&lt; Previous Page</a><span style="margin-left: 8px"><a href="../style/style.html">Next Page &gt;</a></span>
+        </span>
+        <span id="showHideTOCUpperSpan">
+        <a href="#" onclick="showHideTOC();"><img src="../../../../Resources/Images/show_toc_icon.gif" width="15" height="14" border="0" style="margin-bottom: -2px;" alt="" hideText="Hide TOC" showText="Show TOC" /></a> <a href="#" onclick="showHideTOC();">Hide TOC</a>
+        </span>
+        </div>
+
+        <hr />
+        
+        
+        <a name="//apple_ref/doc/uid/TP30000905-CH207-BEHJDFCA" title="Performance Considerations"></a><h1>Performance Considerations</h1><p>Performance is a key aspect of any software
+system. Nowhere is this more true than in the kernel, where small
+performance problems tend to be magnified by repeated execution. For
+this reason, it is extremely important that your code be as efficient
+as possible.</p>
+<p>This chapter discusses the importance of low interrupt latency
+and fine-grained locking and tells you how to determine what portions
+of your code would benefit most from more efficient design.</p>
+
+
+<!-- This template is being used for both PDF and HTML. -->
+
+    
+    <h4>In this section:</h4>
+    
+    
+    <p class="blockquote">
+    
+        
+			
+			
+				<a href="performance.html#//apple_ref/doc/uid/TP30000905-CH207-TPXREF108">Interrupt Latency</a>
+				
+			<br/>
+			
+        
+			
+			
+				<a href="performance.html#//apple_ref/doc/uid/TP30000905-CH207-TPXREF109">Locking Bottlenecks</a>
+				
+			<br/>
+			
+        
+			
+			
+				<a href="performance.html#//apple_ref/doc/uid/TP30000905-CH207-TPXREF112">Code Profiling</a>
+				
+			<br/>
+			
+        
+
+    </p><br/>
+
+<a name="//apple_ref/doc/uid/TP30000905-CH207-TPXREF108" title="Interrupt Latency"></a><h2>Interrupt Latency</h2>
+<p>In Mac OS X, you will probably never need to write code that
+runs in an interrupt context. In general, only motherboard hardware
+requires this. However, in the unlikely event that you do need to
+write code in an interrupt context, interrupt latency should be
+a primary concern.</p>
+<p><strong>Interrupt latency</strong><a name="//apple_ref/doc/uid/TP30000905-CH207-DontLinkElementID_461"></a> refers to the delay between an
+interrupt being generated and an interrupt handler actually beginning
+to service that interrupt. In practice, the worst case interrupt
+latency is closely tied to the amount of time spent in <strong>supervisor
+mode</strong><a name="//apple_ref/doc/uid/TP30000905-CH207-DontLinkElementID_462"></a> (also
+called kernel mode) with interrupts off while handling some other
+interrupt. Low interrupt latency is necessary for reasonable overall
+performance, particularly when working with audio and video. In
+order to have reasonable soft real-time performance (for example, performance
+of multimedia applications), the interrupt latency caused by every
+device driver must be both small and bounded.</p>
+<p>Mac OS X takes great care to bound and minimize interrupt
+latency for built-in drivers. It does this primarily through the
+use of <strong>interrupt service threads</strong><a name="//apple_ref/doc/uid/TP30000905-CH207-DontLinkElementID_463"></a> (also known as I/O service threads).</p>
+<p>When Mac OS X takes an interrupt, the low-level trap handlers
+call up to a generic interrupt handling routine that clears the
+pending interrupt bit in the interrupt controller and calls a device-specific
+interrupt handler<a name="//apple_ref/doc/uid/TP30000905-CH207-DontLinkElementID_464"></a>.
+That device-specific handler, in turn, sends a message to an interrupt
+service thread to notify it that an interrupt has occurred, and
+then the handler returns. When no further interrupts are pending,
+control returns to the currently executing thread.</p>
+<p>The next time the interrupt service thread is scheduled, it
+checks to see if an interrupt has occurred, then services the interrupt.
+As the name suggests, this actually is happening in a thread context,
+not an interrupt context. This design causes two major differences
+from traditional operating system design:</p>
+<ul class="ul"><li class="li"><p>Interrupt
+latency is near zero, since the code executing in an interrupt context
+is very small.</p></li>
+<li class="li"><p>It is possible for an interrupt to occur while a device driver
+is executing. This means that traditional (threaded) device drivers
+can be preempted and must use locking or other similar methods to
+protect any shared data (although they need to do so anyway to work
+on computers with multiple processors).</p></li></ul>
+<p>This model is crucial to the performance of Mac OS X. You
+should not attempt to circumvent this design by doing large amounts
+of work in an interrupt context. Doing so will be detrimental to
+the overall performance of the system.</p>
+<a name="//apple_ref/doc/uid/TP30000905-CH207-TPXREF109" title="Locking Bottlenecks"></a><h2>Locking Bottlenecks</h2><a name="//apple_ref/doc/uid/TP30000905-CH207-DontLinkElementID_465"></a>
+<p>It is difficult to communicate data between multiple threads
+or between thread and interrupt contexts without using locking or
+other synchronization. This locking protects your data from getting
+clobbered by another thread. However, it also has the unfortunate side
+effect of being a potential bottleneck.</p>
+<p>In some types of communication (particularly n-way), locking
+can dramatically hinder performance by allowing only one thing to
+happen at a time. Read-write locks, discussed in <span class="content_text"><a href="../synchronization/synchronization.html#//apple_ref/doc/uid/TP30000905-CH218-BEHJDFCA">“Synchronization Primitives,”</a></span>
+can help alleviate this problem in the most common situation where
+multiple clients need to be able to read information but only rarely
+need to modify that data.</p>
+<p>However, there are many cases where read-write locks<a name="//apple_ref/doc/uid/TP30000905-CH207-DontLinkElementID_466"></a><a name="//apple_ref/doc/uid/TP30000905-CH207-DontLinkElementID_467"></a> are
+not helpful. This section discusses some possible problems and ways
+of improving performance within those constraints.</p>
+<a name="//apple_ref/doc/uid/TP30000905-CH207-TPXREF110" title="Working With Highly Contended Locks"></a><h3>Working With Highly Contended
+Locks</h3><a name="//apple_ref/doc/uid/TP30000905-CH207-DontLinkElementID_468"></a><a name="//apple_ref/doc/uid/TP30000905-CH207-DontLinkElementID_469"></a>
+<p>When many threads need to obtain a lock (or a small number
+of threads need to obtain a lock frequently), this lock is considered
+highly contended. Highly contended locks frequently represent faulty
+code design, but they are sometimes unavoidable. In those cases,
+the lock tends to become a major performance bottleneck.</p>
+<p>Take, for example, the issue of many-to-many communication
+that must be synchronized through a common buffer. While some improvement
+can be gained by using read-write locks instead of an ordinary mutex,
+the issue of multiple writers means that read-write locks still
+perform badly.</p>
+<p>One possible solution for this many-to-many communication
+problem is to break the lock up into multiple locks. Instead of
+sharing a single buffer for the communication itself, make a shared
+buffer that contains accounting information for the communication
+(for example, a list of buffers available for reading). Then assign
+each individual buffer its own lock. The readers might then need
+to check several locations to find the right data, but this still
+frequently yields better performance, since writers must only contend
+for a write lock while modifying the accounting information.</p>
+<p>Another solution for many-to-many communications is to eliminate
+the buffer entirely and communicate using message passing, sockets,
+IPC, RPC, or other methods.</p>
+<p>Yet another solution is to restructure your code in a way
+that the locking is unnecessary. This is often much more difficult.
+One method that is often helpful is to take advantage of flags and
+atomic increments, as outlined in the next paragraph. For simplicity,
+a single-writer, single-reader example is presented, but it is possible
+to extend this idea to more complicated designs.</p>
+<p>Take a buffer with some number of slots. Keep a read index
+and a write index into that buffer. When the write index and read
+index are the same, there is no data in the buffer. When writing,
+clear the next location. Then do an atomic increment on the pointer.
+Write the data. End by setting a flag at that new location that
+says that the data is valid.</p>
+<p>Note that this solution becomes much more difficult when dealing
+with multiple readers and multiple writers, and as such, is beyond
+the scope of this section.</p>
+<a name="//apple_ref/doc/uid/TP30000905-CH207-TPXREF111" title="Reducing Contention by Decreasing Granularity"></a><h3>Reducing Contention by Decreasing
+Granularity</h3>
+<p>One of the fundamental properties of locks is granularity<a name="//apple_ref/doc/uid/TP30000905-CH207-DontLinkElementID_470"></a><a name="//apple_ref/doc/uid/TP30000905-CH207-DontLinkElementID_471"></a><a name="//apple_ref/doc/uid/TP30000905-CH207-DontLinkElementID_472"></a>. The granularity
+of a lock refers to the amount of code or data that it protects.
+A lock that protects a large block of code or a large amount of
+data is referred to as a coarse-grained lock, while a lock that
+protects only a small amount of code or data is referred to as a
+fine-grained lock<a name="//apple_ref/doc/uid/TP30000905-CH207-DontLinkElementID_473"></a>.
+A coarse-grained lock<a name="//apple_ref/doc/uid/TP30000905-CH207-DontLinkElementID_474"></a> is much more likely to be
+contended (needed by one thread while being held by another) than
+a more finely grained lock.</p>
+<p>There are two basic ways of decreasing granularity. The first
+is to minimize the amount of code executed while a lock is held.
+For example, if you have code that calculates a value and stores
+it into a table, don’t take the lock before calling the function
+and release it after the function returns. Instead, take the lock
+in that piece of code right before you write the data, and release
+it as soon as you no longer need it.</p>
+<p>Of course, reducing the amount of protected code is not always
+possible or practical if the code needs to guarantee consistency
+where the value it is writing depends on other values in the table,
+since those values could change before you obtain the lock, requiring
+you to go back and redo the work.</p>
+<p>It is also possible to reduce granularity by locking the data
+in smaller units. In the above example, you could have a lock on
+each cell of the table. When updating cells in the table, you would
+start by determining the cells on which the destination cell depends,
+then lock those cells and the destination cell in some fixed order.
+(To avoid deadlock, you must always either lock cells in the same
+order or use an appropriate <code><!--a-->try<!--/a--></code> function
+and release all locks on failure.)</p>
+<p>Once you have locked all the cells involved, you can then
+perform your calculation and release the locks, confident that no
+other thread has corrupted your calculations. However, by locking
+on a smaller unit of data, you have also reduced the likelihood
+of two threads needing to access the same cell.</p>
+<p>A slightly more radical version of this is to use read-write
+locks on a per-cell basis and always upgrade in a particular order.
+This is, however, rather extreme, and difficult to do correctly.</p>
+<a name="//apple_ref/doc/uid/TP30000905-CH207-TPXREF112" title="Code Profiling"></a><h2>Code Profiling</h2>
+<p>Code profiling<a name="//apple_ref/doc/uid/TP30000905-CH207-DontLinkElementID_475"></a><a name="//apple_ref/doc/uid/TP30000905-CH207-DontLinkElementID_476"></a> means determining how often certain
+pieces of code are executed. By knowing how frequently a piece of
+code is used, you can more accurately gauge the importance of optimizing
+that piece of code. There are a number of good tools for profiling user
+space applications. However, code profiling in the kernel is a very
+different beast, since it isn’t reasonable to attach to it like
+you would a running process. (It is possible by using a second computer,
+but even then, it is not a trivial task.)</p>
+<p>This section describes two useful ways of profiling your kernel
+code: counters and lock profiling. Any changes you make to allow
+code profiling should be done only during development. These are
+not the sort of changes that you want to release to end users.</p>
+<a name="//apple_ref/doc/uid/TP30000905-CH207-TPXREF113" title="Using Counters for Code Profiling"></a><h3>Using Counters for Code Profiling</h3>
+<p>The first method of code profiling is with counters. To profile
+a section of code with a counter, you must first create a global
+variable whose name describes that piece of code and initialize
+it to zero. You then add something like</p>
+<div class="codesample"><table><tr><td scope="row"><pre>#ifdef PROFILING<span></span></pre></td></tr><tr><td scope="row"><pre>            foo_counter++; #endif<span></span></pre></td></tr></table></div>
+<p>in the appropriate piece of code. If you then define <code>PROFILING</code>,
+that counter is created and initialized to zero, then incremented
+each time the code in question is executed.</p>
+<p>One small snag with this sort of profiling is the problem
+of obtaining the data. This can be done in several ways. The simplest
+is probably to install a <code>sysctl</code>,
+using the address of <code>foo_counter</code> as
+an argument. Then, you could simply issue the <code>sysctl</code><a name="//apple_ref/doc/uid/TP30000905-CH207-DontLinkElementID_477"></a><a name="//apple_ref/doc/uid/TP30000905-CH207-DontLinkElementID_478"></a> command
+from the command line and read or clear the variable. Adding a <code>sysctl</code> is
+described in more detail in <span class="content_text"><a href="../boundaries/boundaries.html#//apple_ref/doc/uid/TP30000905-CH217-BABJJBHG">“BSD sysctl API .”</a></span></p>
+<p>In addition to using <code>sysctl</code>,
+you could also obtain the data by printing its value when unloading
+the module (in the case of a KEXT) or by using a remote debugger
+to attach to the kernel and directly inspecting the variable. However,
+a <code>sysctl</code> provides the
+most flexibility. With a <code>sysctl</code>,
+you can sample the value at any time, not just when the module is
+unloaded. The ability to arbitrarily sample the value makes it easier
+to determine the importance of a piece of code to one particular
+action.</p>
+<p>If you are developing code for use in the I/O Kit, you should
+probably use your driver’s <code><!--a-->setProperties<!--/a--></code> call
+instead of a <code><a href="../../../Reference/ManPages/man3/sysctl.3.html#//apple_ref/doc/man/3/sysctl" target="_top">sysctl</a></code>.</p>
+<a name="//apple_ref/doc/uid/TP30000905-CH207-TPXREF114" title="Lock Profiling"></a><h3>Lock Profiling</h3>
+<p>Lock profiling<a name="//apple_ref/doc/uid/TP30000905-CH207-DontLinkElementID_479"></a><a name="//apple_ref/doc/uid/TP30000905-CH207-DontLinkElementID_480"></a> is another useful
+way to find the cause of code inefficiency. Lock profiling can give
+you the following information:</p>
+<ul class="spaceabove"><li class="li"><p>how many
+times a lock was taken</p></li>
+<li class="li"><p>how long the lock was held on average</p></li>
+<li class="li"><p>how often the lock was unavailable</p></li></ul>
+<p>Put another way, this allows you to determine the contention
+of a lock, and in so doing, can help you to minimize contention
+by code restructuring.</p>
+<p>There are many different ways to do lock profiling. The most
+common way is to create your own lock calls that increment a counter
+and then call the real locking functions. When you move from debugging
+into a testing cycle before release, you can then replace the functions
+with defines to cause the actual functions to be called directly.
+For example, you might write something like this:</p>
+<div class="codesample"><table><tr><td scope="row"><pre>extern struct timeval time;<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>boolean_t   mymutex_try(mymutex_t *lock) {<span></span></pre></td></tr><tr><td scope="row"><pre>    int ret;<span></span></pre></td></tr><tr><td scope="row"><pre>    ret=mutex_try(lock->mutex);<span></span></pre></td></tr><tr><td scope="row"><pre>    if (ret) {<span></span></pre></td></tr><tr><td scope="row"><pre>        lock->tryfailcount++;<span></span></pre></td></tr><tr><td scope="row"><pre>    }<span></span></pre></td></tr><tr><td scope="row"><pre>    return ret;<span></span></pre></td></tr><tr><td scope="row"><pre>}<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>void    mymutex_lock(mymutex_t *lock) {<span></span></pre></td></tr><tr><td scope="row"><pre>    if (!(mymutex_try(lock))) {<span></span></pre></td></tr><tr><td scope="row"><pre>        mutex_lock(lock->mutex);<span></span></pre></td></tr><tr><td scope="row"><pre>    }<span></span></pre></td></tr><tr><td scope="row"><pre>    lock->starttime = time.tv_sec;<span></span></pre></td></tr><tr><td scope="row"><pre>}<span></span></pre></td></tr><tr><td scope="row"><pre>void    mymutex_unlock(mymutex_t *lock) {<span></span></pre></td></tr><tr><td scope="row"><pre>    lock->lockheldtime += (time.tv_sec - lock->starttime);<span></span></pre></td></tr><tr><td scope="row"><pre>    lock->heldcount++;<span></span></pre></td></tr><tr><td scope="row"><pre>    mutex_unlock(lock->mutex);<span></span></pre></td></tr><tr><td scope="row"><pre>}<span></span></pre></td></tr></table></div>
+<p>This routine has accuracy only to the nearest second, which
+is not particularly accurate. Ideally, you want to keep track of
+both <code>time.tv_sec</code> and <code>time.tv_usec</code> and
+roll the microseconds into seconds as the number gets large.</p>
+<p>From this information, you can obtain the average time the
+lock was held by dividing the total time held by the number of times
+it was held. It also tells you the number of times a lock was taken
+immediately instead of waiting, which is a valuable piece of data
+when analyzing contention.</p>
+<p>As with counter-based profiling, after you have written code
+to record lock use and contention, you must find a way to obtain
+that information. A <code>sysctl</code> is
+a good way of doing this, since it is relatively easy to implement
+and can provide a “snapshot” view of the data structure at any
+point in time. For more information on adding a <code>sysctl</code>,
+see <span class="content_text"><a href="../boundaries/boundaries.html#//apple_ref/doc/uid/TP30000905-CH217-BABJJBHG">“BSD sysctl API .”</a></span></p>
+<p>Another way to do lock profiling is to use the built-in ETAP
+(Event Trace Analysis Package). This package consists of additional
+code designed for lock profiling. However, since this requires a
+kernel recompile, it is generally not recommended.</p>
+
+        <br /><br /> 
+        
+        <div class="mini_nav_text" align="left">
+        <span class="navButtons">
+        <a href="../security/security.html">&lt; Previous Page</a><span style="margin-left: 8px"><a href="../style/style.html">Next Page &gt;</a></span>
+        </span>
+        <span id="showHideTOCLowerSpan">
+        <a href="#" onclick="showHideTOC();"><img src="../../../../Resources/Images/show_toc_icon.gif" width="15" height="14" border="0" style="margin-bottom: -2px;" alt="" /></a> <a href="#" onclick="showHideTOC();">Hide TOC</a>
+        </span>
+        </div>
+
+        <br/><hr /><div align="center"><p class="content_text" lang="en" dir="ltr"> <!--#if expr="0=1" -->&#x00a9; 2002, 2006 Apple Computer, Inc. All Rights Reserved. &#40;<!--#endif -->Last updated: 2006-11-07<!--#if expr="0=1" -->&#041;<!--#endif --></p></div>
+
+        
+        <div class="hideOnPrint hideInXcode">
+        <!-- start of footer -->
+        	<table width="100%" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/documentation/Darwin/Conceptual/KernelProgramming/performance/performance.html%3Fid%3DTP30000905-5.7&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/documentation/Darwin/Conceptual/KernelProgramming/performance/performance.html%3Fid%3DTP30000905-5.7&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/documentation/Darwin/Conceptual/KernelProgramming/performance/performance.html%3Fid%3DTP30000905-5.7&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+
+        <!--#include virtual="/includes/framesetfooter" -->
+        <!-- end of footer -->
+        </div>
+    </div>
+</body>
+</html>

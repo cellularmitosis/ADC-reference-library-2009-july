@@ -1,0 +1,99 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+<head>
+	<title>Mach-O Programming Topics: x86-64 Code Model</title>
+	<meta id="Generator" name="Generator" content="Gutenberg"/>
+	<meta id="GeneratorVersion" name="GeneratorVersion" content="v132"/>
+	<meta http-equiv="content-type" content="text/html;charset=utf-8"/>
+	<meta id="Copyright" name="Copyright" content="Copyright 2009 Apple Inc. All Rights Reserved."/>
+	<meta id="IndexTitle" name="IndexTitle" content="x86-64 Code Model"/>
+	<meta id="xcode-display" name="xcode-display" content="render"/>
+	<meta id="toc-file" name="toc-file" content="../toc.html"/>
+	<meta id="RESOURCES" content="../../../../Resources" />
+	
+	<link rel="stylesheet" type="text/css" href="../../../../Resources/CSS/frameset_styles.css"/>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/lib/prototype.js"></script>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/lib/scriptaculous.js"></script>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/page.js"></script>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/pedia.js"></script>
+	<!--[if lte IE 6]>
+		<style type="text/css">
+			/*<![CDATA[*/ 
+			html {overflow-x:auto; overflow-y:hidden;  }
+			/*]]>*/
+		</style>
+	<![endif]-->
+</head>
+<body bgcolor="#ffffff" onload="initialize_page();"><a name="//apple_ref/doc/uid/TP40005044" title="x86-64 Code Model"></a>
+    <noscript>
+    <div id="tocMenu">
+        <iframe id="toc_content" name="toc_content" SRC="../toc.html" width="210" height="100%" align="left" frameborder="0">This document set is best viewed in a browser that supports iFrames.</iframe>
+    </div>
+    </noscript>
+    <div id="bodyText">
+        <a name="top"></a>
+        <div class="hideOnPrint hideInXcode">
+        <!-- start of header -->
+        <!--#include virtual="/includes/framesetheader" -->
+        <!-- end of header -->
+        </div>
+        
+        <!-- start of path -->
+<div class="breadcrumb hideOnPrint hideInXcode"><a href="http://developer.apple.com/" target="_top">ADC Home</a> &gt; <a href="../../../../../referencelibrary/index.html#//apple_ref/doc/uid/TP30000943" target="_top">Reference Library</a> &gt; <a href="../../../../index.html#//apple_ref/doc/uid/TP30000440" target="_top">Guides</a> &gt; <a href="../../../index.html#//apple_ref/doc/uid/TP30000440-TP30000436" target="_top">Tools</a> &gt; <a href="../../../CompilersDebuggers-date.html#//apple_ref/doc/uid/TP30000440-TP30000436-TP30001025" target="_top">Compiling &amp; Debugging</a> &gt; <a href="../index.html" target="_top">Mach-O Programming Topics</a> &gt; </div><br class="hideInXcode"/><!-- end of path -->
+        
+        <div class="mini_nav_text" align="left">
+        <span class="navButtons">
+        <a href="dynamic_code.html">&lt; Previous Page</a><span style="margin-left: 8px"><a href="../9-Revision-3.1/history.html">Next Page &gt;</a></span>
+        </span>
+        <span id="showHideTOCUpperSpan">
+        <a href="#" onclick="showHideTOC();"><img src="../../../../Resources/Images/show_toc_icon.gif" width="15" height="14" border="0" style="margin-bottom: -2px;" alt="" hideText="Hide TOC" showText="Show TOC" /></a> <a href="#" onclick="showHideTOC();">Hide TOC</a>
+        </span>
+        </div>
+        
+        
+        <a name="//apple_ref/doc/uid/TP40005044-SW1" title="x86-64 Code Model"></a><hr /><H1>x86-64 Code Model</H1><p>This article describes differences in the Mac OS X x86-64 user-space code model from the code model described in <em>System V Application Binary Interface AMD64 Architecture Processor Supplement</em>, at <span class="content_text"><a href="http://www.x86-64.org/documentation" target="_blank">http://www.x86-64.org/documentation</a></span>.</p><p>The x86-64 environment in Mac OS X has only one code model for user-space code. It’s most similar to the small PIC model defined by the x86-64 System V ABI. Under Mach-O, all static initialized storage (both code and data) must fit within a 4GB Mach-O file. Uninitialized (zero-fill) data may be any size, although there is a practical limit imposed by Mac OS X.</p><p>All local and small data is accessed directly using addressing that’s relative to the instruction pointer (RIP-relative addressing). All large or possibly nonlocal data is accessed indirectly through a global offset table (GOT) entry. The GOT entry is accessed directly using RIP-relative addressing.</p><p><span class="content_text">Listing 1</span> shows sample C code and corresponding assemble code.</p><a name="//apple_ref/doc/uid/TP40005044-SW2" title="Listing 1C code and the corresponding assembly code"></a><p class="codesample"><strong>Listing 1&nbsp;&nbsp;</strong>C code and the corresponding assembly code</p><div class="codesample"><table><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>extern int src[];<span></span></pre></td></tr><tr><td scope="row"><pre>extern int dst[];<span></span></pre></td></tr><tr><td scope="row"><pre>extern int* ptr;<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>static int lsrc[500];<span></span></pre></td></tr><tr><td scope="row"><pre>static int ldst[500];<span></span></pre></td></tr><tr><td scope="row"><pre>static int bsrc[500000];<span></span></pre></td></tr><tr><td scope="row"><pre>static int bdst[500000];<span></span></pre></td></tr><tr><td scope="row"><pre>static int* lptr;<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>dst[0] = src[0];        movq _src@GOTPCREL(%rip), %rax<span></span></pre></td></tr><tr><td scope="row"><pre>                        movl (%rax), %edx<span></span></pre></td></tr><tr><td scope="row"><pre>                        movq _dst@GOTPCREL(%rip), %rax<span></span></pre></td></tr><tr><td scope="row"><pre>                        movl %edx, (%rax)<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>ptr = dst;              movq _dst@GOTPCREL(%rip), %rdx<span></span></pre></td></tr><tr><td scope="row"><pre>                        movq _ptr@GOTPCREL(%rip), %rax<span></span></pre></td></tr><tr><td scope="row"><pre>                        movq %rdx, (%rax)<span></span></pre></td></tr><tr><td scope="row"><pre>                        ret<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>*ptr = src[0];          movq  _ptr@GOTPCREL(%rip), %rax<span></span></pre></td></tr><tr><td scope="row"><pre>                        movq   (%rax), %rdx<span></span></pre></td></tr><tr><td scope="row"><pre>                        movq   _src@GOTPCREL(%rip), %rax<span></span></pre></td></tr><tr><td scope="row"><pre>                        movl   (%rax), %eax<span></span></pre></td></tr><tr><td scope="row"><pre>                        movl   %eax, (%rdx)<span></span></pre></td></tr><tr><td scope="row"><pre>                        ret<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>ldst[0] = lsrc[0];      movl _lsrc(%rip), %eax<span></span></pre></td></tr><tr><td scope="row"><pre>                        movl %eax, _ldst(%rip)<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>lptr = ldst;            lea  _ldst(%rip), %rax<span></span></pre></td></tr><tr><td scope="row"><pre>                        movq %rax, _lptr(%rip)<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>*lptr = lsrc[0];        movl _lsrc(%rip), %edx<span></span></pre></td></tr><tr><td scope="row"><pre>                        movq _lptr(%rip), %rax<span></span></pre></td></tr><tr><td scope="row"><pre>                        movl %edx, (%rax)<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>bdst[0] = bsrc[0];      movq _bsrc@GOTPCREL(%rip), %rax<span></span></pre></td></tr><tr><td scope="row"><pre>                        movl (%rax), %edx<span></span></pre></td></tr><tr><td scope="row"><pre>                        movq _bdst@GOTPCREL(%rip), %rax<span></span></pre></td></tr><tr><td scope="row"><pre>                        movl %edx, (%rax)<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>lptr = bdst;            movq _bdst@GOTPCREL(%rip), %rax<span></span></pre></td></tr><tr><td scope="row"><pre>                        movq %rax, _lptr(%rip)<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>*lptr = bsrc[0];        movq _bsrc@GOTPCREL(%rip), %rdx<span></span></pre></td></tr><tr><td scope="row"><pre>                        movq _lptr(%rip), %rax<span></span></pre></td></tr><tr><td scope="row"><pre>                        movl (%rdx), %edx<span></span></pre></td></tr></table></div><p>The Mac OS X x86-64 code-generation model accesses large local data through the GOT, which is different from the way the small PIC model works in the System V x86-64 environment. Indirection through the GOT obviates the need for a medium code model. This behavior stems from the fact that, when the linker lays out data, it places data that is accessed directly (small local data and the GOT itself) within 2 GB of the code. Other data can be placed farther away because these data are accessed only through the GOT. This behavior enables large (greater than 4 GB) and small executables to be built using the same code model.</p><div class="notebox"><a name="//apple_ref/doc/uid/TP40005044-SW4" title="Note"></a><p><strong>Note:</strong>&nbsp;It is acceptable for the compiler to access static data through a GOT entry. The linker preserves the static semantics of the symbol.</p></div><p>The code model for function calls is very simple, as shown in <span class="content_text">Listing 2</span>.</p><a name="//apple_ref/doc/uid/TP40005044-SW3" title="Listing 2The code model for function calls"></a><p class="codesample"><strong>Listing 2&nbsp;&nbsp;</strong>The code model for function calls</p><div class="codesample"><table><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>extern int foo();<span></span></pre></td></tr><tr><td scope="row"><pre>static int bar();<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>foo();                    call _foo<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>bar();                    call _bar<span></span></pre></td></tr></table></div><p>All direct function calls are made using the <code>CALL rel32</code> instruction.</p><p>The linker is responsible for creating GOT entries (also known as nonlazy pointers) as well as stub functions and lazy pointers (also known as program load table entries, or PLT entries) for calls to another linkage unit. Since the linker must create these entries, it can also choose not to create them when it sees the opportunity. The linker has a complicated set of rules that dictate which symbols must be accessed indirectly (depending on flat versus two-level namespace, weak versus nonweak definitions, symbol visibility, distance from code, and so on). But ultimately there are many symbols that can be accessed directly (not through GOT or PLT entries). For these symbols the linker makes the following optimization:</p><ol class="ol"><li class="li"><p>A <code>CALL</code> or <code>JMP</code> instruction performs a direct, PC-relative branch to the target.</p></li><li class="li"><p>A load instruction performed on a GOT entry (for example, <code>movq _foo@GOTPCREL(%rip), %rxx</code>) is transformed into a <code>LEA</code> calculation (for example, <code>leaq _foo(%rip), %rxx</code>). This transformation removes one GOT entry and saves one memory load.</p></li></ol><p>In both cases special relocations are used that allow the linker to perform this optimization.</p>
+
+        <br/><br/> 
+
+        <div class="mini_nav_text" align="left">
+        <span class="navButtons">
+        <a href="dynamic_code.html">&lt; Previous Page</a><span style="margin-left: 8px"><a href="../9-Revision-3.1/history.html">Next Page &gt;</a></span>
+        </span>
+        <span id="showHideTOCLowerSpan">
+        <a href="#" onclick="showHideTOC();"><img src="../../../../Resources/Images/show_toc_icon.gif" width="15" height="14" border="0" style="margin-bottom: -2px;" alt="" /></a> <a href="#" onclick="showHideTOC();">Hide TOC</a>
+        </span>
+        </div>
+
+        <br/><hr /><div align="center"><p class="content_text" lang="en" dir="ltr"> <!--#if expr="0=1" -->&#x00a9; 2003, 2009 Apple Inc. All Rights Reserved. &#40;<!--#endif -->Last updated: 2009-02-04<!--#if expr="0=1" -->&#041;<!--#endif --></p></div>
+
+        
+        <div class="hideOnPrint hideInXcode">
+        <!-- start of footer -->
+        	<table width="100%" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/documentation/DeveloperTools/Conceptual/MachOTopics/1-Articles/x86_64_code.html%3Fid%3DTP40001519-3.1&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/documentation/DeveloperTools/Conceptual/MachOTopics/1-Articles/x86_64_code.html%3Fid%3DTP40001519-3.1&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/documentation/DeveloperTools/Conceptual/MachOTopics/1-Articles/x86_64_code.html%3Fid%3DTP40001519-3.1&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+
+        <!--#include virtual="/includes/framesetfooter" -->
+        <!-- end of footer -->
+        </div>
+    </div>
+</body>
+</html>

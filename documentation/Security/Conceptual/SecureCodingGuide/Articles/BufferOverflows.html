@@ -1,0 +1,148 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+<head>
+	<title>Secure Coding Guide: Avoiding Buffer Overflows</title>
+	<meta id="Generator" name="Generator" content="Gutenberg"/>
+	<meta id="GeneratorVersion" name="GeneratorVersion" content="v132"/>
+	<meta http-equiv="content-type" content="text/html;charset=utf-8"/>
+	<meta id="Copyright" name="Copyright" content="Copyright 2009 Apple Inc. All Rights Reserved."/>
+	<meta id="IndexTitle" name="IndexTitle" content="Avoiding Buffer Overflows"/>
+	<meta id="xcode-display" name="xcode-display" content="render"/>
+	<meta id="toc-file" name="toc-file" content="../toc.html"/>
+	<meta id="RESOURCES" content="../../../../Resources" />
+	
+	<link rel="stylesheet" type="text/css" href="../../../../Resources/CSS/frameset_styles.css"/>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/lib/prototype.js"></script>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/lib/scriptaculous.js"></script>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/page.js"></script>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/pedia.js"></script>
+	<!--[if lte IE 6]>
+		<style type="text/css">
+			/*<![CDATA[*/ 
+			html {overflow-x:auto; overflow-y:hidden;  }
+			/*]]>*/
+		</style>
+	<![endif]-->
+</head>
+<body bgcolor="#ffffff" onload="initialize_page();"><a name="//apple_ref/doc/uid/TP40002577" title="Avoiding Buffer Overflows"></a>
+    <noscript>
+    <div id="tocMenu">
+        <iframe id="toc_content" name="toc_content" SRC="../toc.html" width="210" height="100%" align="left" frameborder="0">This document set is best viewed in a browser that supports iFrames.</iframe>
+    </div>
+    </noscript>
+    <div id="bodyText">
+        <a name="top"></a>
+        <div class="hideOnPrint hideInXcode">
+        <!-- start of header -->
+        <!--#include virtual="/includes/framesetheader" -->
+        <!-- end of header -->
+        </div>
+        
+        <!-- start of path -->
+<div class="breadcrumb hideOnPrint hideInXcode"><a href="http://developer.apple.com/" target="_top">ADC Home</a> &gt; <a href="../../../../../referencelibrary/index.html#//apple_ref/doc/uid/TP30000943" target="_top">Reference Library</a> &gt; <a href="../../../../index.html#//apple_ref/doc/uid/TP30000440" target="_top">Guides</a> &gt; <a href="../../../index.html#//apple_ref/doc/uid/TP30000440-TP30000434" target="_top">Security</a> &gt; <a href="../index.html" target="_top">Secure Coding Guide</a> &gt; </div><br class="hideInXcode"/><!-- end of path -->
+        
+        <div class="mini_nav_text" align="left">
+        <span class="navButtons">
+        <a href="SecuritySvcs.html">&lt; Previous Page</a><span style="margin-left: 8px"><a href="ValidatingInput.html">Next Page &gt;</a></span>
+        </span>
+        <span id="showHideTOCUpperSpan">
+        <a href="#" onclick="showHideTOC();"><img src="../../../../Resources/Images/show_toc_icon.gif" width="15" height="14" border="0" style="margin-bottom: -2px;" alt="" hideText="Hide TOC" showText="Show TOC" /></a> <a href="#" onclick="showHideTOC();">Hide TOC</a>
+        </span>
+        </div>
+        
+        
+        <a name="//apple_ref/doc/uid/TP40002577-SW1" title="Avoiding Buffer Overflows"></a><hr /><H1>Avoiding Buffer Overflows</H1><p><a name="//apple_ref/doc/uid/TP40002577-DontLinkElementID_62"></a><a name="//apple_ref/doc/uid/TP40002577-DontLinkElementID_63"></a>Buffer overflows, both on the stack and on the heap, are a major source of security vulnerabilities in C, Objective-C, and C++ code. This article discusses coding practices that will avoid buffer overflow problems, lists tools you can use to detect buffer overflows, and provides samples illustrating safe code. This article assumes familiarity with the concepts of memory allocation and the program's heap and stack. For a higher-level discussion of the problem, see <span class="content_text"><a href="TypesSecVuln.html#//apple_ref/doc/uid/TP40002529-SW5">“Buffer Overflows.”</a></span></p>
+<!-- This template is being used for both PDF and HTML. -->
+
+    
+    <!-- TopicBook.pm uses this template for its miniTOCs, but needs a different title. -->
+    <h4>Contents:</h4>
+    
+    
+    <p class="blockquote">
+    
+        
+			
+			
+				<a href="BufferOverflows.html#//apple_ref/doc/uid/TP40002577-SW11">The Source Of the Problem</a>
+				
+			<br/>
+			
+        
+			
+			
+				<a href="BufferOverflows.html#//apple_ref/doc/uid/TP40002577-SW10">String Handling</a>
+				
+			<br/>
+			
+        
+			
+			
+				<a href="BufferOverflows.html#//apple_ref/doc/uid/TP40002577-SW9">Calculating Buffer Sizes</a>
+				
+			<br/>
+			
+        
+			
+			
+				<a href="BufferOverflows.html#//apple_ref/doc/uid/TP40002577-SW7">Integer Overflow</a>
+				
+			<br/>
+			
+        
+			
+			
+				<a href="BufferOverflows.html#//apple_ref/doc/uid/TP40002577-SW12">Detecting Buffer Overflows</a>
+				
+			<br/>
+			
+        
+
+    </p><br/>
+
+<a name="//apple_ref/doc/uid/TP40002577-SW11" title="The Source Of the Problem"></a><h2>The Source Of the Problem</h2><p>Local variables are allocated on the stack, along with parameters and linkage information (that is, where to resume execution after a function returns.) The exact content and order of data on the stack depends on the operating system and CPU architecture. When you use <code>malloc</code>, <code>new</code>, or equivalent functions to allocate a block of memory or instantiate an object, the memory is allocated on the heap. </p><p>Every time your program solicits <a name="//apple_ref/doc/uid/TP40002577-DontLinkElementID_64"></a>input from a user, there is a potential for the user to enter inappropriate data. For example, they might enter more data than you have reserved room for in memory. If the user enters more data than will fit in the reserved space, and you do not truncate it, then that data will overwrite other data in memory. If the memory overwritten contained data essential to the operation of the program, this overflow will cause a bug that, being intermittent, might be very hard to find. If the overwritten data includes the address of other code to be executed and the user has done this deliberately, the user can point to malicious code that your program will then execute.</p><p>In the case of data saved on the stack, such as a local variable, it is relatively easy for an attacker to overwrite the linkage information in order to execute malicious code. An attacker can also modify local data and function parameters on the stack. <a name="//apple_ref/doc/uid/TP40002577-DontLinkElementID_65"></a><span class="content_text">Figure 1</span> illustrates a stack overflow in Mac OS X running on a PowerPC processor. For other processors, the details are different, but the effect is the same.</p><br/><div><a name="//apple_ref/doc/uid/TP40002577-SW2" title="Figure 1Mac OS X PPC stack overflow"></a><p><strong>Figure 1&nbsp;&nbsp;</strong>Mac OS X PPC stack overflow</p><img src = "../Art/ppc_stack_overflow.jpg" alt = "Mac OS X PPC stack overflow" ></div><br/><p>Because the data on the heap changes in a nonobvious way as a program runs, exploiting a buffer overflow on the heap is more challenging. However, many successful exploits have involved heap overflows. Attacks on the heap might involve overwriting critical data, either to cause the program to crash, or to change a value that can be exploited later (such as when a program temporarily stores a user name and password on the heap and an attacker manages to change them). In some cases, the heap contains pointers to executable code, so that by overwriting such a pointer an attacker can execute malicious code.  <a name="//apple_ref/doc/uid/TP40002577-DontLinkElementID_66"></a><span class="content_text">Figure 2</span> illustrates a heap overflow overwriting a pointer.</p><br/><div><a name="//apple_ref/doc/uid/TP40002577-SW3" title="Figure 2Heap overflow"></a><p><strong>Figure 2&nbsp;&nbsp;</strong>Heap overflow</p><img src = "../Art/heap_overflow.gif" alt = "Heap overflow" width="232" height="408"></div><br/><p>Although most programming languages check input against storage to prevent buffer overflows, C, Objective-C, and C++ do not. Because many programs link to C libraries, vulnerabilities in standard libraries can cause vulnerabilities even in programs written in "safe" languages. For this reason, even if you are confident that your code is free of buffer overflow problems, you should limit exposure by running with the least privileges possible. See <span class="content_text"><a href="AccessControl.html#//apple_ref/doc/uid/TP40002589-SW1">“Elevating Privileges Safely”</a></span> for more information on this topic.</p><p>Keep in mind that obvious forms of <a name="//apple_ref/doc/uid/TP40002577-DontLinkElementID_67"></a>input, such as strings entered through dialog boxes, are not the only potential source of malicious input. For example:</p><ol class="ol"><li class="li"><p>Buffer overflows in one operating system’s help system could be caused by maliciously prepared embedded images.</p></li><li class="li"><p>A commonly-used media player failed to validate a specific type of audio files, allowing an attacker to execute arbitrary code by causing a buffer overflow with a carefully crafted audio file.</p><p>[<sup>1</sup>CVE-2006-1591 <sup>2</sup>CVE-2006-1370]</p></li></ol><a name="//apple_ref/doc/uid/TP40002577-SW10" title="String Handling"></a><h2>String Handling</h2><p>Strings are a common form of input and because many <a name="//apple_ref/doc/uid/TP40002577-DontLinkElementID_68"></a><a name="//apple_ref/doc/uid/TP40002577-DontLinkElementID_69"></a>string-handling functions have no built-in checks for string length, strings are frequently the source of exploitable buffer overflows. <span class="content_text">Figure 3</span> illustrates the different ways three string copy functions handle the same over-length string. The <code>strcpy</code> function merely writes the entire string into memory, overwriting whatever came after it. The <code>strncpy</code> function truncates the string to the correct length, but without the terminating null character. When this string is read, then, all of the bytes in memory following it, up to the next null character, might be read as part of the string. Only the <code>strlcpy</code> function is fully safe, truncating the string and adding the terminating null character.</p><br/><div><a name="//apple_ref/doc/uid/TP40002577-SW4" title="Figure 3String handling functions and buffer overflows"></a><p><strong>Figure 3&nbsp;&nbsp;</strong>String handling functions and buffer overflows</p><img src = "../Art/stringcopy.gif" alt = "String handling functions and buffer overflows" width="361" height="250"></div><br/><p><span class="content_text">Table 1</span> summarizes the common C string-handling routines to avoid and which to use instead. </p><a name="//apple_ref/doc/uid/TP40002577-SW5" title="Table 1String functions to use and avoid"></a><div class="tableholder"><table class="graybox" border = "0" cellspacing="0" cellpadding="5"><caption class="tablecaption"><strong>Table 1&nbsp;&nbsp;</strong>String functions to use and avoid</caption><tr><th scope="col" align="left" style="font-weight: bold" bgcolor="#CCCCCC"><p>Don't use these functions</p></th><th scope="col" align="left" style="font-weight: bold" bgcolor="#CCCCCC"><p>Use these instead</p></th></tr><tr><td  scope="row"><p><code>strcat</code></p></td><td ><p><code>strlcat</code></p></td></tr><tr><td  scope="row"><p><code>strcpy</code></p></td><td ><p><code>strlcpy</code></p></td></tr><tr><td  scope="row"><p><code>strncat</code></p></td><td ><p><code>strlcat</code></p></td></tr><tr><td  scope="row"><p><code>strncpy</code></p></td><td ><p><code>strlcpy</code></p></td></tr><tr><td  scope="row"><p><code>sprintf</code></p></td><td ><p><code>snprintf</code></p></td></tr><tr><td  scope="row"><p><code>vsprintf</code></p></td><td ><p><code>vsnprintf</code></p></td></tr><tr><td  scope="row"><p><code>gets</code></p></td><td ><p><code>fgets</code></p></td></tr></table></div><p>You can avoid string handling buffer overflows by using higher-level interfaces. If you are using C++, the ANSI C++ <code>string</code> class avoids buffer overflows, though it doesn't handle non-ASCII encodings (such as UNICODE).  For Objective-C, use the <code>NSString</code> class. Note that an <code>NSString</code> object has to be converted to a C string in order to be passed to a C routine, such as a POSIX function. If you are writing code in C, you can use the Core Foundation representation of a string, referred to as a CFString, and the string-manipulation functions in the CFString API. </p><p>The Core Foundation CFString is “toll-free bridged” with its Cocoa Foundation counterpart, <code>NSString</code>. This means that the Core Foundation type is interchangeable in function or method calls with its equivalent Foundation object. Therefore, in a method where you see an <code>NSString *</code> parameter, you can pass in a value of type <code>CFStringRef</code>, and in a function where you see a <code>CFStringRef</code> parameter, you can pass in an <code>NSString</code> instance. This also applies to concrete subclasses of <code>NSString</code>. See <em><a href="../../../../CoreFoundation/Reference/CFStringRef/index.html#//apple_ref/doc/uid/20001211" target="_top">CFString Reference</a></em>, <em><a href="../../../../Cocoa/Reference/Foundation/ObjC_classic/index.html#//apple_ref/doc/uid/20001091" target="_top">Foundation Framework Reference</a></em>, and <em><a href="../../../../Cocoa/Conceptual/CarbonCocoaDoc/index.html#//apple_ref/doc/uid/TP30000893" target="_top">Carbon-Cocoa Integration Guide</a></em> for more details on using these representations of strings and on converting between CFString strings and <code>NSString</code> objects.</p><a name="//apple_ref/doc/uid/TP40002577-SW9" title="Calculating Buffer Sizes"></a><h2>Calculating Buffer Sizes</h2><p>You should always calculate the size of a buffer and then make sure you don't put more data into the buffer than it can hold. The reason you should not assume a static size for a buffer is because, even if you originally assigned a static size to the buffer, either you or someone else maintaining your code in the future might change the buffer size but fail to change every case where the buffer is written to. The left column of <a name="//apple_ref/doc/uid/TP40002577-DontLinkElementID_70"></a><span class="content_text">Table 2</span> shows some code samples that assume a set buffer size. The right column shows a safer approach to achieving the same results. </p><p>In the first set of samples, a character buffer is set to 1024 bytes and, later in the program, the size of a block of data is checked before it is written to the buffer. This code is safe as long as the original declaration of the buffer size is never changed. However, if in a later version of the program a smaller size is assigned to the buffer, but the test is not changed, then a buffer overflow will result. The right column shows two safer versions of this code. In the first version, the buffer size is set using a constant that is set elsewhere and the check uses the same constant. In the second version, the buffer is set to 1024 bytes, but the check calculates the actual size of the buffer.  In these cases, changing the original size of the buffer would not invalidate the check.</p><p>The second set of examples show a function that adds an <code>.ext</code> suffix to a filename. Both versions use the maximum path length for a file as the buffer size. The unsafe version in the left column assumes that the filename does not exceed this limit, and appends the suffix without checking the length of the string. The safer version in the right column uses the <code>strlcat</code> function, which truncates the string if it exceeds the size of the buffer.</p><a name="//apple_ref/doc/uid/TP40002577-SW6" title="Table 2C coding styles to use and avoid"></a><div class="tableholder"><table class="graybox" border = "0" cellspacing="0" cellpadding="5"><caption class="tablecaption"><strong>Table 2&nbsp;&nbsp;</strong>C coding styles to use and avoid</caption><tr><th scope="col" align="left" style="font-weight: bold" bgcolor="#CCCCCC"><p>Don't use this style</p></th><th scope="col" align="left" style="font-weight: bold" bgcolor="#CCCCCC"><p>Use this style instead</p></th></tr><tr><td  scope="row"><p><code>char buf[1024];</code></p><p><code>...</code></p><p><code>if (size &lt;= 1023) {</code></p><p><code>...</code></p><p><code>}</code></p><p><strong>or</strong></p><p><code>char buf[1024];</code></p><p><code>...</code></p><p><code>if (size &lt; 1024) {</code></p><p><code>...</code></p><p><code>}</code></p></td><td ><p><code>char buf[BUF_SIZE];</code></p><p><code>...</code></p><p><code>if (size &lt; BUF_SIZE) {</code></p><p><code>...</code></p><p><code>}</code></p><p><strong>or</strong></p><p><code>char buf[1024];</code></p><p><code>...</code></p><p><code>if (size &lt; sizeof(buf)) {</code></p><p><code>...</code></p><p><code>}</code></p></td></tr><tr><td  scope="row"><p><code>{</code></p><p><code> char file[MAX_PATH];</code></p><p><code>...</code></p><p><code> addsfx(file);</code></p><p><code>...</code></p><p><code>}</code></p><p><code>static *suffix = ".ext";</code></p><p><code>char *addsfx(char *buf)</code></p><p><code>{</code></p><p><code> return strcat(buf, suffix);</code></p><p><code>}</code></p></td><td ><p><code>{</code></p><p><code> char file[MAX_PATH];</code></p><p><code>...</code></p><p><code> addsfx(file, sizeof(file));</code></p><p><code>...</code></p><p><code>}</code></p><p><code>static *suffix = ".ext";</code></p><p><code>char *addsfx(char *buf, uint size)</code></p><p><code>{</code></p><p><code> return strlcat(buf, suffix, size);</code></p><p><code>}</code></p></td></tr></table></div><p>You should always use unsigned variables for calculating sizes of buffers and of data going into buffers. Because negative numbers are stored as large positive numbers, if you use signed variables an attacker might be able to cause a miscalculation in the size of the buffer or data by writing a large number to your program. See <span class="content_text"><a href="BufferOverflows.html#//apple_ref/doc/uid/TP40002577-SW7">“Integer Overflow”</a></span> for more information on potential problems with integer arithmetic.</p><p>For a further discussion of this issue and a list of more functions that can cause problems, see Wheeler, <em>Secure Programming for Linux and Unix HOWTO</em> (<span class="content_text"><a href="http://www.dwheeler.com/secure-programs/" target="_blank">http://www.dwheeler.com/secure-programs/</a></span>).</p><a name="//apple_ref/doc/uid/TP40002577-SW7" title="Integer Overflow"></a><h2>Integer Overflow</h2><p>If the size of a buffer is calculated using data supplied by the user, there is a potential for a malicious user to enter a number that is too large for the integer data type, which can cause program crashes and other problems. <a name="//apple_ref/doc/uid/TP40002577-DontLinkElementID_71"></a><a name="//apple_ref/doc/uid/TP40002577-DontLinkElementID_72"></a></p><p>In <a name="//apple_ref/doc/uid/TP40002577-DontLinkElementID_73"></a>twos-complement arithmetic, used by most compilers, a <a name="//apple_ref/doc/uid/TP40002577-DontLinkElementID_74"></a>negative number is represented by inverting all the bits of the binary number and adding 1. A <code>1</code> in the most-significant bit indicates a negative number. Thus, for 4-byte signed integers, <code>0x7fffffff =  2147483647</code>, but <code>0x80000000 = -2147483648</code></p><p>Therefore,</p><div class="codesample"><table><tr><td scope="row"><pre>int 2147483647 + 1 = - 2147483648<span></span></pre></td></tr></table></div><p>If a malicious user specifies a negative number where your program is expecting only unsigned numbers, your program might interpret it as a very large number. Depending on what that number is used for, your program might attempt to allocate a buffer of that size, causing the memory allocation to fail or causing a heap overflow if the allocation succeeds. In an early version of a popular web browser, for example, storing objects into a JavaScript array allocated with negative size could overwrite memory. [CVE-2004-0361]</p><p>In other cases, if you use signed values to calculate buffer sizes and test to make sure the data is not too large for the buffer, a sufficiently large block of data will appear to have a negative size, and will therefore pass the size test while overflowing the buffer.</p><p>Depending on how the buffer size is calculated, specifying a negative number could result in a buffer too small for its intended use. For example, if your program wants a minimum buffer size of 1024 bytes and adds to that a number specified by the user, an attacker might cause you to allocate a buffer smaller than the minimum size by specifying a large positive number, as follows:</p><div class="codesample"><table><tr><td scope="row"><pre>1024 + 4294966784 = 512<span></span></pre></td></tr><tr><td scope="row"><pre>0x400 + 0xFFFFFE00 = 0x200<span></span></pre></td></tr></table></div><p>For some compilers, any bits that overflow past bit 31 are dropped; that is,  <code>2**32 == 0</code>.  Because it is not illegal to have a buffer with a size of 0, and because <code>malloc(0)</code> returns a pointer to a small block, your code might run without errors if an attacker specifies a value that causes your buffer size calculation to equal <code>0 mod 2**32</code>. In other words, for any values of <code>n</code> and <code>m</code> where <code>n * m = 0 mod 2**32</code>, allocating a buffer of size <code>n*m</code> results in a valid pointer to a buffer of size <code>0</code>. In that case, a buffer overflow is assured.</p><p>To avoid such problems, you should put limits on any values the user can specify. When checking the validity of the values used to calculate a buffer size, you should include checks to make sure no integer overflow occurred. For example: </p><div class="codesample"><table><tr><td scope="row"><pre>size_t bytes = n * m;<span></span></pre></td></tr><tr><td scope="row"><pre>if (n > 0 &amp;&amp; m > 0 &amp;&amp; int_max/n >= m) {<span></span></pre></td></tr><tr><td scope="row"><pre>    ... /* allocate “bytes” space */<span></span></pre></td></tr><tr><td scope="row"><pre>}<span></span></pre></td></tr></table></div><a name="//apple_ref/doc/uid/TP40002577-SW12" title="Detecting Buffer Overflows"></a><h2>Detecting Buffer Overflows</h2><p>To test for <a name="//apple_ref/doc/uid/TP40002577-DontLinkElementID_75"></a>buffer overflows, you should attempt to enter more data than is asked for wherever your program accepts <a name="//apple_ref/doc/uid/TP40002577-DontLinkElementID_76"></a>input. Also, if your program accepts data in a standard format, such as graphics or audio data, you should attempt to use malformed data. For example, if your program asks for a filename, you should attempt to enter a string longer than the maximum legal filename. Or, If there is a field that specifies the size of a block of data, attempt to use a data block larger than the one you indicated in the size field. If there are buffer overflows in your program, it will eventually crash. (Unfortunately, it might not crash until some time later, when it attempts to use the data that was overwritten.) Note that, although you can test for buffer overflows, you cannot test for the <em>absence</em> of buffer overflows; it is necessary, therefore, to check every input and every buffer size calculation in your code, as described in this article.</p><p>The crash log might provide some clues that the cause of the crash was a buffer overflow. If you enter a string of uppercase letters "A," for example, you might find a block of data in the crash log that repeats the number "41," the ASCII code for A (see <span class="content_text">Figure 4</span>). If the program is trying to jump to a location that is actually an ASCII string, that's a sure sign that a buffer overflow was responsible for the crash.</p><br/><div><a name="//apple_ref/doc/uid/TP40002577-SW8" title="Figure 4Buffer overflow crash log"></a><p><strong>Figure 4&nbsp;&nbsp;</strong>Buffer overflow crash log</p><img src = "../Art/crashlog.gif" alt = "Buffer overflow crash log" width="652" height="279"></div><br/><p>If there are any buffer overflows in your program, you should assume they are exploitable and fix them. It is much harder to prove that a buffer overflow is not exploitable than just to fix the bug.<a name="//apple_ref/doc/uid/TP40002577-DontLinkElementID_77"></a></p>
+
+        <br/><br/> 
+
+        <div class="mini_nav_text" align="left">
+        <span class="navButtons">
+        <a href="SecuritySvcs.html">&lt; Previous Page</a><span style="margin-left: 8px"><a href="ValidatingInput.html">Next Page &gt;</a></span>
+        </span>
+        <span id="showHideTOCLowerSpan">
+        <a href="#" onclick="showHideTOC();"><img src="../../../../Resources/Images/show_toc_icon.gif" width="15" height="14" border="0" style="margin-bottom: -2px;" alt="" /></a> <a href="#" onclick="showHideTOC();">Hide TOC</a>
+        </span>
+        </div>
+
+        <br/><hr /><div align="center"><p class="content_text" lang="en" dir="ltr"> <!--#if expr="0=1" -->&#x00a9; 2008 Apple Inc. All Rights Reserved. &#40;<!--#endif -->Last updated: 2008-05-23<!--#if expr="0=1" -->&#041;<!--#endif --></p></div>
+
+        
+        <div class="hideOnPrint hideInXcode">
+        <!-- start of footer -->
+        	<table width="100%" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/documentation/Security/Conceptual/SecureCodingGuide/Articles/BufferOverflows.html%3Fid%3DTP40002415-2.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/documentation/Security/Conceptual/SecureCodingGuide/Articles/BufferOverflows.html%3Fid%3DTP40002415-2.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/documentation/Security/Conceptual/SecureCodingGuide/Articles/BufferOverflows.html%3Fid%3DTP40002415-2.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+
+        <!--#include virtual="/includes/framesetfooter" -->
+        <!-- end of footer -->
+        </div>
+    </div>
+</body>
+</html>

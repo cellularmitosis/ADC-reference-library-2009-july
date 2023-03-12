@@ -1,0 +1,514 @@
+<html><head><title></title></head>
+
+<body bgcolor="#ffffff">
+
+ 
+
+ 
+
+<h2><a name="//apple_ref/occ/cl/SybaseAdaptor">SybaseAdaptor</a>
+
+ <BR>
+
+</h2>
+
+<p><B>Inherits From:</B><BR>  
+
+EOAdaptor : NSObject<em> 
+
+</em>
+
+<p><B>Declared in:</B>
+
+SybaseEOAdaptor/SybaseAdaptor.h<em> 
+
+</em>
+
+<p><a name="99">
+
+<a name="description"></a>
+
+<h3>Class Description  </h3>
+
+</a>A SybaseAdaptor represents a single connection to a Sybase database server, and is responsible for keeping login and model information, performing Sybase-specific formatting of SQL expressions, and reporting errors. <p>
+
+The features SybaseAdaptor adds to EOAdaptor are as follows:<p>
+
+<ul><li>The ability to specify a client character set and language<br><li>Sybase password encryption<br></ul><p>The SybaseAdaptor class has these restrictions: A context can only manage one channel at a time, and the adaptor doesn't support full outer joins because the Sybase server itself doesn't support them.<p>
+
+<a name="105">
+
+<h3> The Connection Dictionary</h3>
+
+</a>The connection dictionary contains items needed to connect to a Sybase server, such as the server name and database (it's common to omit the user name and password from the connection dictionary, and prompt users to enter those values in a login panel). The keys of this dictionary identify the information the server expects, and the values of those keys are the values that the adaptor uses when trying to connect to the server. For Sybase databases the required keys are as follows:<p>
+
+hostName<br>databaseName<br>userName<br>password<p>The connection dictionary can optionally include three other keys: sybasePasswordEncryption, LC_ALL, and primitiveTypeMap. sybasePasswordEncryption provides support for Sybase password encryption. LC_ALL declares to the Sybase server the character set being used by the client (such as eucjis, ascii7, or iso_1). For a complete list of types available for this field, see your Sybase documentation. primitiveTypeMap describes the mapping of user-defined data types to their base Sybase type (such as varchar or datetime). For more information on user-defined data types, see "<a href="#130">Data Type Mapping</a>."<p>
+
+To add any of these optional keys and appropriate values to your connection dictionary, you can manually edit your model file. For example:<p>
+
+<blockquote><pre>connectionDictionary = {databaseName = People; <br>    hostName = ""; 
+
+</pre></blockquote><p>
+
+<blockquote><pre>    LC_ALL = eucjis;
+
+</pre></blockquote><p>
+
+<blockquote><pre>    password = ""; 
+
+</pre></blockquote><p>
+
+<blockquote><pre>    primitiveTypeMap = {id = varchar; ssn = char(9); };
+
+</pre></blockquote><p>
+
+<blockquote><pre>    sybasePasswordEncryption = YES;
+
+</pre></blockquote><p>
+
+<blockquote><pre>    userName = "";
+
+</pre></blockquote><p>
+
+<blockquote><pre>}; 
+
+</pre></blockquote><p>
+
+Subsequently changing the connection dictionary in your model file using the Set Adaptor Info command in EOModeler has no effect on these keys and their values-they are preserved unless you edit the file to remove them. Alternatively you can add the optional keys to a model's connection dictionary programmatically.<p>
+
+The default character set for non-Japanese systems is iso_1 (that is, ISO Latin 1), while the default character set for Japanese systems is eucjis. You only need to add the LC_ALL key to your connection dictionary if you are using a character set other than your system's default.<p>
+
+<a name="116">
+
+<h3> Error Handling</h3>
+
+</a>SybaseAdaptor, SybaseContext, and SybaseChannel can raise exceptions due to programming errors that result in invalid argument values or internal inconsistencies. In addition, messages, errors, and failure status returned from the Sybase SQL Server and client libraries can also result in EOGeneralAdaptorExceptions. When an exception results from a callback to the CS_CLIENTMSG_CB (Sybase ClientMessage callback) or the CS_SERVERMSG_CB (Sybase ServerMessage callback), all of the information passed into this routine is available in the userInfo dictionary contained by the exception. When an exception is raised in response to a Sybase ClientMessage callback, you can get the information provided by the client library as follows:<p>
+
+<blockquote><pre>clientMsgDict = [[localException userInfo]<br>    objectForKey:@"sybaseClientMessageDictionary"];
+
+</pre></blockquote><p>
+
+The <code>clientMsgDict</code> contains the following keys which have values corresponding to those sent in the callback function that raised the exception: msgstring, osstring, sqlstate, severity, msgnumber, osnumber, status.<p>
+
+Similarly, when the exception is raised in response to a Sybase ServerMessage callback, you can get the information provided by the server as follows:<p>
+
+<blockquote><pre>svrMsgDict = [[localException userInfo]<br>    objectForKey:@"sybaseServerMessageDictionary"];
+
+</pre></blockquote><p>
+
+<p>
+
+The <code>svrMsgDict</code> contains the following keys which have values corresponding to those sent in the callback function that raised the exception: text, svrname, proc, sqlstate, msgnumber, state, severity, line, status.<p>
+
+<a name="124">
+
+<h3> Locking</h3>
+
+</a>All adaptors use the database server's native locking facilities to lock rows on the server. The Sybase adaptor locks a row by using the HOLDLOCK keyword in SELECT statements. This occurs when:<p>
+
+<ul><li>You send the adaptor channel a <code>selectAttributes:fetchSpecification:lock:entity:</code> message with YES specified as the value for the <code>lock:</code> keyword.<p><li>You explicitly lock an object's row with the EODatabaseContext's l<code>ockObjectWithGlobalID:editingContext:</code> message.<p><li>You set pessimistic locking at the database level and fetch objects.<p></ul>The semantics of the HOLDLOCK keyword are such that when you lock a row other users can't update it, but it doesn't guarantee that your update will succeed. This is because other users could be holding a lock on the same row. However, you can still read rows that are locked by other users.<p>
+
+<a name="130">
+
+<h3> Data Type Mapping</h3>
+
+</a>Every adaptor provides a mapping between each server data type and the Objective-C type to which a database value will be coerced when it's fetched from the database. The following table lists the mapping used by SybaseAdaptor.<p>
+
+<Table Border="3">
+
+<caption></caption>
+
+<tr><th>Sybase Data Type<p>
+
+</th><th>Objective-C Data Type<p>
+
+</th></tr>
+
+<tr><td scope="row"><a name="348">
+
+binary
+
+</a></td><td><a name="350">
+
+NSData
+
+</a></td></tr>
+
+<tr><td scope="row"><a name="352">
+
+bit
+
+</a></td><td><a name="354">
+
+NSNumber
+
+</a></td></tr>
+
+<tr><td scope="row"><a name="356">
+
+char
+
+</a></td><td><a name="358">
+
+NSString
+
+</a></td></tr>
+
+<tr><td scope="row"><a name="360">
+
+datetime
+
+</a></td><td><a name="362">
+
+NSCalendarDate
+
+</a></td></tr>
+
+<tr><td scope="row"><a name="364">
+
+datetimn
+
+</a></td><td><a name="366">
+
+NSCalendarDate
+
+</a></td></tr>
+
+<tr><td scope="row"><a name="368">
+
+decimal
+
+</a></td><td><a name="370">
+
+NSDecimalNumber
+
+</a></td></tr>
+
+<tr><td scope="row"><a name="372">
+
+decimaln
+
+</a></td><td><a name="374">
+
+NSDecimalNumber
+
+</a></td></tr>
+
+<tr><td scope="row"><a name="376">
+
+float
+
+</a></td><td><a name="378">
+
+NSNumber
+
+</a></td></tr>
+
+<tr><td scope="row"><a name="380">
+
+floatn
+
+</a></td><td><a name="382">
+
+NSNumber
+
+</a></td></tr>
+
+<tr><td scope="row"><a name="384">
+
+image
+
+</a></td><td><a name="386">
+
+NSData
+
+</a></td></tr>
+
+<tr><td scope="row"><a name="388">
+
+int
+
+</a></td><td><a name="390">
+
+NSNumber
+
+</a></td></tr>
+
+<tr><td scope="row"><a name="392">
+
+intn
+
+</a></td><td><a name="394">
+
+NSNumber
+
+</a></td></tr>
+
+<tr><td scope="row"><a name="396">
+
+money
+
+</a></td><td><a name="398">
+
+NSDecimalNumber
+
+</a></td></tr>
+
+<tr><td scope="row"><a name="400">
+
+moneyn
+
+</a></td><td><a name="402">
+
+NSDecimalNumber
+
+</a></td></tr>
+
+<tr><td scope="row"><a name="404">
+
+nchar
+
+</a></td><td><a name="406">
+
+NSString
+
+</a></td></tr>
+
+<tr><td scope="row"><a name="408">
+
+numeric
+
+</a></td><td><a name="410">
+
+NSDecimalNumber
+
+</a></td></tr>
+
+<tr><td scope="row"><a name="412">
+
+numericn
+
+</a></td><td><a name="414">
+
+NSDecimalNumber
+
+</a></td></tr>
+
+<tr><td scope="row"><a name="416">
+
+nvarchar
+
+</a></td><td><a name="418">
+
+NSString
+
+</a></td></tr>
+
+<tr><td scope="row"><a name="420">
+
+real
+
+</a></td><td><a name="422">
+
+NSNumber
+
+</a></td></tr>
+
+<tr><td scope="row"><a name="424">
+
+smalldatetime
+
+</a></td><td><a name="426">
+
+NSCalendarDate
+
+</a></td></tr>
+
+<tr><td scope="row"><a name="428">
+
+smallint
+
+</a></td><td><a name="430">
+
+NSNumber
+
+</a></td></tr>
+
+<tr><td scope="row"><a name="432">
+
+smallmoney
+
+</a></td><td><a name="434">
+
+NSDecimalNumber
+
+</a></td></tr>
+
+<tr><td scope="row"><a name="436">
+
+sysname
+
+</a></td><td><a name="438">
+
+NSString
+
+</a></td></tr>
+
+<tr><td scope="row"><a name="440">
+
+text
+
+</a></td><td><a name="442">
+
+NSString
+
+</a></td></tr>
+
+<tr><td scope="row"><a name="444">
+
+timestamp
+
+</a></td><td><a name="446">
+
+NSData
+
+</a></td></tr>
+
+<tr><td scope="row"><a name="448">
+
+tinyint
+
+</a></td><td><a name="450">
+
+NSNumber
+
+</a></td></tr>
+
+<tr><td scope="row"><a name="452">
+
+varbinary
+
+</a></td><td><a name="454">
+
+NSString
+
+</a></td></tr>
+
+<tr><td scope="row"><a name="456">
+
+varchar
+
+</a></td><td><a name="458">
+
+NSString
+
+</a></td></tr>
+
+
+
+</Table>
+
+
+
+<Table>
+
+<tr><td>
+
+</Table>
+
+<p>
+
+In addition, SybaseAdaptor provides a mapping for user-defined data types. For example, a custom data type <B>partnumber </B><em> </em>defined as char(10) is mapped to NSString-the Objective-C type to which <B>partnumber </B>'s base data type (char) is mapped. SybaseAdaptor's implementation of <B>describeModelWithTableNames: </B> automatically creates mappings for user-defined data types and saves them in the connection dictionary of the newly created model. Consequently, even models created with EOModeler automatically include information about custom data types.<p>
+
+Since information about custom types is stored in a model's connection dictionary, the type mapping methods-<B>externalTypesWithModel: </B>, <B>internalTypeForExternalType:model: </B>, and <B>isValidQualifierType:model: </B>-use the model argument if it is provided. If the model argument isn't provided, these methods don't have user-defined data type information available to them.<p>
+
+<a name="134">
+
+<h3> SQL and User-Defined Transactions</h3>
+
+</a>Certain data definition commands, such as CREATE TABLE, can't be executed in a user-defined transaction. However, the database channel and adaptor channel require you to start a transaction before evaluating any SQL. To work around this problem, you need to send the adaptor context or database context a <code>transactionDidBegin</code> message to make it think a transaction is in progress. Then you can send it the SQL statement, followed by a <code>transactionDidCommit</code> message.<p>
+
+<a name="136">
+
+<h3>Method Types  </h3>
+
+</a><dl><dt>Mapping external types to internal types
+
+<dl><dt><a href=""></a>
+
+<dt><a href="#//apple_ref/occ/clm/SybaseAdaptor/externalTypesWithModel:">+ externalTypesWithModel:</a>
+
+<dt><a href="#//apple_ref/occ/clm/SybaseAdaptor/internalTypeForExternalType:model:">+ internalTypeForExternalType:model:</a>
+
+</dl><dt>Getting information from the connection dictionary
+
+<dl><dt><a href="#//apple_ref/occ/instm/SybaseAdaptor/connectionKeys">- connectionKeys</a>
+
+</dl></dl><a name="142">
+
+<a name="clm"></a>
+
+<h3>Class Methods  </h3>
+
+</a><a name="143">
+
+<h4> <a name="//apple_ref/occ/clm/SybaseAdaptor/externalTypesWithModel:">externalTypesWithModel:</a></h4>
+
+</a>+ (NSArray *)<code>externalTypesWithModel:</code>(EOModel *)<em>model</em> <p>
+
+Overrides the EOAdaptor method <code>externalTypesWithModel:</code> to return the Sybase database types. <p>
+
+<B>See also: </B>  
+
+ <a href="#//apple_ref/occ/clm/SybaseAdaptor/internalTypeForExternalType:model:"><B>+ internalTypeForExternalType:model: </a>
+
+ </B><p><a name="147">
+
+<h4> <a name="//apple_ref/occ/clm/SybaseAdaptor/internalTypeForExternalType:model:">internalTypeForExternalType:model:</a></h4>
+
+</a>+ (NSString *)<code>internalTypeForExternalType:</code>(NSString *)<em>extType </em><code>model:</code>(EOModel *)<em>model</em> <p>
+
+Overrides the EOAdaptor method <code>internalTypeForExternalType:</code> to return the name of the Objective-C class used to represent values stored in the database as <em>extType</em>.<p>
+
+<B>See also: </B>  
+
+   <a href="#//apple_ref/occ/clm/SybaseAdaptor/externalTypesWithModel:"><B>+ externalTypesWithModel:</a>
+
+ </B><p><a name="151">
+
+<a name="instm"></a>
+
+<h3>Instance Methods </h3>
+
+</a><a name="152">
+
+<h4> <a name="//apple_ref/occ/instm/SybaseAdaptor/connectionKeys">connectionKeys</a></h4>
+
+</a>- (NSArray *)<code>connectionKeys</code> <p>
+
+Returns an NSArray containing the keys in the receiver's connection dictionary. You can use this method to prompt the user to supply values for the connection dictionary.<p>
+
+
+
+ 
+
+ 
+
+
+
+
+
+<i>Copyright &#169; 1997, Apple Computer, Inc.   All rights
+
+reserved.</i>
+
+
+
+<!-- Last updated: 10/16/97 16:23:21 -->
+
+
+
+</body>
+
+</html>
+

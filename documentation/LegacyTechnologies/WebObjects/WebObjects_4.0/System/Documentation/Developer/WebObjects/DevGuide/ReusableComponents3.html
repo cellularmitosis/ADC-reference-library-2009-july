@@ -1,0 +1,176 @@
+<html><head><title>Creating Reusable Components</title></head>
+<body bgcolor="#ffffff">
+
+<!--start of banner -->
+<!--#include virtual="/includes/framesetheader" -->
+<!-- end of banner -->
+
+<!--start of path -->
+<font face="Geneva,Helvetica,Arial" size="1">
+<b>PATH<spacer type="horizontal" size="5">&nbsp;</b>
+ <a href="../../../../../webobjects.html" target="_top">WebObjects 4.0 Documentation</a> <b>&gt;</b>
+ <a href="DevGuideTOC.html" target="_top">WebObjects Developer's Guide</a>
+</font>
+<br><br>
+<!--end of path -->
+
+ 
+<a href="ReuseTOC.html"><IMG SRC="ArrowUp.gif">Table of Contents</a> <a href="ReusableComponents2.html"><IMG SRC="ArrowLeft.gif">Previous Section</a>
+ 
+<a name="731">
+<h1> Intercomponent Communication</h1>
+</a><a name="732">
+Reusable components can vary widely in scope, from as extensive as an entire HTML page to as limited as a single character or graphic in a page. They can even serve as building blocks for other reusable components. When a reusable component is nested within another component, be it a page or something smaller, the containing component is known as the <em>parent component</em>, and the contained component is known as the <em>child component</em>. This section examines the interaction between parent and child components.<p>
+</a><a name="733">
+In the AlertPanel example shown in <a href="ReusableComponents2.html#993">Figure &#32;32</a>, you saw how the parent component, in its declarations file, sets the attributes of the child component:<p>
+</a><pre><a name="734">ALERT: AlertPanel {<br>
+		alertString = alertTitle;<br>
+		alertFontColor = "#A00000";<br>
+		alertFontSize = 6;<br>
+		infoString = alertDescription;<br>
+		infoFontSize = 4;<br>
+		infoFontColor = "#500000";<br>
+		tableWidth = "50%";<br>
+};
+</a></pre><a name="743">
+Each of the AlertPanel component's attributes is set either statically (to a constant value) or dynamically (by binding the attribute's value to a variable or method invocation in the parent's code). Communication from the parent to the child is quite straightforward.<p>
+</a><a name="744">
+For reusable components to be truly versatile, there must also be a mechanism for the child component to interact with the parent, either by setting the parent's variables or invoking its methods, or both. This mechanism must be flexible enough that a given child component can be reused by various parent components without having to be modified in any way. WebObjects provides just such a mechanism, as illustrated by the following example. <p>
+</a><a name="745">
+Consider an AlertPanel component like the one described above, but with the added ability to accept user input and relay that input to a parent component. The panel might look like the one in <a href="ReusableComponents3.html#748">Figure &#32;33</a>.<p>
+</a><a name="747">
+<p><img src="ReusableComponents2.gif"><p>
+</a><a name="748">
+<p>Figure 33.	  An Alert Panel That Allows User Input<p>
+</a><a name="746">
+As in the earlier example, you use this component by simply declaring its position within the HTML page:<p>
+</a><a name="749">
+<em>Parent's Template File</em><p>
+</a><pre><a name="751">&lt;HTML&gt;<br>
+&lt;HEAD&gt;<br>
+	&lt;TITLE&gt;Alert&lt;/TITLE&gt;<br>
+&lt;/HEAD&gt;<br>
+&lt;BODY&gt;<br>
+<br>
+&lt;WEBOBJECT NAME = "ALERT"&gt;&lt;/WEBOBJECT&gt;<br>
+<br>
+&lt;/BODY&gt;<br>
+&lt;/HTML&gt;
+</a></pre><a name="750">
+The corresponding declarations file reveals two new attributes (indicated in bold):<p>
+</a><a name="727">
+<em>Parent's Declarations File (excerpt)</em><p>
+</a><pre><a name="762">ALERT: AlertPanel {<br>
+		infoString = message;<br>
+		infoFontSize = 4;<br>
+		infoFontColor = "#500000";<br>
+		alertString = "New Release";<br>
+		alertFontColor = "#A00000";<br>
+		alertFontSize = 6;<br>
+		tableWidth = "50%";<br>
+<strong>		parentAction</strong> <strong>=</strong> <strong>"respondToAlert</strong><code>"</code>;<br>
+<strong>		exitStatus</strong> <strong>=</strong> <strong>usersChoice</strong>;<br>
+};
+</a></pre><a name="773">
+The <strong>parentAction</strong> attribute identifies a <em>callback method</em>, one that the child component invokes in the parent when the user clicks the Yes or No link. The <strong>exitStatus</strong> attribute identifies a variable that the parent can check to discover which of the two links was clicked. This attribute passes state information from the child to the parent. A reusable component can have any number of callback and state attributes, and they can have any name you choose.<p>
+</a><a name="774">
+Now let's look at the revised child component. The template file for the &#32;AlertPanel component has to declare the positions of the added Yes &#32;and No hyperlinks. (Only excerpts of the implementation files are shown &#32;here.)<p>
+</a><a name="775">
+<em>Child Component's Template File (excerpt)</em><p>
+</a><pre><a name="3360">&lt;TD&gt;<br>
+	&lt;WEBOBJECT name=NOCHOICE&gt;&lt;/WEBOBJECT&gt;<br>
+&lt;/TD&gt;<br>
+&lt;TD&gt;<br>
+	&lt;WEBOBJECT name=YESCHOICE&gt;&lt;/WEBOBJECT&gt;<br>
+&lt;/TD&gt;
+</a></pre><a name="3361">
+The corresponding declarations file binds these declarations to scripted methods:<p>
+</a><a name="776">
+<em>Child Component's Declarations File (excerpt)</em><p>
+</a><pre><a name="784">NOCHOICE: WOHyperlink {<br>
+		action = rejectChoice;<br>
+		string = "No";<br>
+};<br>
+<br>
+YESCHOICE: WOHyperlink {<br>
+		action = acceptChoice;<br>
+		string = "Yes";<br>
+};
+</a></pre><a name="794">
+And the script file contains the implementations of the <strong>rejectChoice</strong> and <strong>acceptChoice</strong> methods:<p>
+</a><a name="795">
+<em>Child Component's Script File (excerpt)</em><p>
+</a><pre><a name="796">id exitStatus;<br>
+id parentAction;<br>
+<br>
+- rejectChoice {<br>
+	exitStatus = NO;<br>
+	return [self performParentAction:parentAction];<br>
+}<br>
+<br>
+- acceptChoice {<br>
+	exitStatus = YES;<br>
+	return [self performParentAction:parentAction];<br>
+}
+</a></pre><a name="860">
+Note that<strong> exitStatus</strong> and <strong>parentAction</strong> are simply component variables. Depending on the method invoked, <strong>exitStatus</strong> can have the values YES or NO. The <strong>parentAction</strong> variable stores the name of the method in the parent component that will be invoked by the child. In this example <strong>parentAction</strong> identifies the parent method named <strong>"respondToAlert"</strong>, as &#32;specified in the parent's declarations file.<p>
+</a><a name="2285">
+<strong>Note:</strong> You must enclose the name of the parent's action method in quotes.<p>
+</a><a name="5258">
+Now, looking at the <strong>rejectChoice</strong> and <strong>acceptChoice</strong> method implementations, you can see that they are identical except for the assignment to <strong>exitStatus</strong>. Note that after a value is assigned to <strong>exitStatus</strong>, the child component sends a message to itself to invoke the parent's action method, causing the parent's <strong>respondToAlert</strong> method to be invoked. Since the parent's <strong>usersChoice</strong> variable is bound to the value of &#32;the child's <strong>exitStatus</strong> variable, the parent code can determine which of the two links was clicked and respond accordingly. <a href="ReusableComponents3.html#865">Figure &#32;34</a> illustrates the connections between the child and parent components.<p>
+</a><a name="863">
+<p><img src="ReusableComponents3.gif"><p>
+</a><a name="865">
+<p>Figure 34.	  Parent and Child Component Interconnections<p>
+</a><a name="861">
+The child component's <strong>parentAction</strong> attribute provides a separation between a user action (such as clicking a hyperlink) within a reusable component and the method it ultimately invokes in the parent. Because of this separation, the same child component can be used by multiple parents, invoking different methods in each of them:<p>
+</a><a name="866">
+<em>Parent1's Declarations File (excerpt)</em><p>
+</a><pre><a name="868">ALERT: AlertPanel {<br>
+		...<br>
+		parentAction = "respondToAlert";<br>
+		exitStatus = usersChoice;<br>
+};
+</a></pre><a name="875">
+<em>Parent2's Declarations File (excerpt)</em><p>
+</a><pre><a name="877">ALERT: AlertPanel {<br>
+		...<br>
+		parentAction = "okCancel";<br>
+		exitStatus = result;<br>
+};
+</a></pre><a name="884">
+<em>Parent3's Declarations File (excerpt)</em><p>
+</a><pre><a name="3439">ALERT: AlertPanel {<br>
+		...<br>
+		parentAction = "alertAction";<br>
+		exitStatus = choice;<br>
+};
+</a></pre><a name="3440">
+In summary, parent and child components communicate in these ways:<p>
+</a><a name="874">
+A parent component can, in its declarations file, set child component attributes by:<p>
+</a><ul><a name="876">
+<p><li>Assigning constant values
+</a><a name="882">
+<p><li>Binding an attribute to the value of a variable declared in the parent's code 
+</a><a name="883">
+<p><li>Binding an attribute to the return value of a method defined in the parent's code 
+</a></ul><a name="893">
+A child component can communicate actions and values to a parent component by:<p>
+</a><ul><a name="894">
+<p><li>Invoking the parent's callback method
+</a><a name="895">
+<p><li>Setting variables that are bound to variables in the parent, as &#32;specified in the parent's declarations file
+</a></ul>
+<P>
+ 
+<a href="ReuseTOC.html"><IMG SRC="ArrowUp.gif">Table of Contents</a> <a href="ReusableComponents4.html"><IMG SRC="ArrowRight.gif">Next Section</a>
+<P>
+
+
+<!--start of footer -->
+<!--#include virtual="/includes/framesetfooter" -->
+<!-- end of footer -->
+
+</body>
+</html>

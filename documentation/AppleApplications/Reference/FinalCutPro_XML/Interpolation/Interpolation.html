@@ -1,0 +1,101 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+<head>
+	<title>Final Cut Pro XML Interchange Format: Keyframe Interpolation</title>
+	<meta id="Generator" name="Generator" content="Gutenberg"/>
+	<meta id="GeneratorVersion" name="GeneratorVersion" content="v132"/>
+	<meta http-equiv="content-type" content="text/html;charset=utf-8"/>
+	<meta id="Copyright" name="Copyright" content="Copyright 2009 Apple Inc. All Rights Reserved."/>
+	<meta id="IndexTitle" name="IndexTitle" content="Keyframe Interpolation"/>
+	<meta id="xcode-display" name="xcode-display" content="render"/>
+	<meta id="toc-file" name="toc-file" content="../toc.html"/>
+	<meta id="RESOURCES" content="../../../../Resources" />
+	
+	<link rel="stylesheet" type="text/css" href="../../../../Resources/CSS/frameset_styles.css"/>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/lib/prototype.js"></script>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/lib/scriptaculous.js"></script>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/page.js"></script>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/pedia.js"></script>
+	<!--[if lte IE 6]>
+		<style type="text/css">
+			/*<![CDATA[*/ 
+			html {overflow-x:auto; overflow-y:hidden;  }
+			/*]]>*/
+		</style>
+	<![endif]-->
+</head>    
+<body bgcolor="#ffffff" onload="initialize_page();"><a name="//apple_ref/doc/uid/TP30001159" title="Keyframe Interpolation"></a>
+    <noscript>
+    <div id="tocMenu">
+        <iframe id="toc_content" name="toc_content" SRC="../toc.html" width="210" height="100%" align="left" frameborder="0">This document set is best viewed in a browser that supports iFrames.</iframe>
+    </div>
+    </noscript>
+    <div id="bodyText">
+        <a name="top"></a>
+        <div class="hideOnPrint hideInXcode">
+        <!-- start of header -->
+        <!--#include virtual="/includes/framesetheader" -->
+        <!-- end of header -->
+        </div>
+        
+        <!-- start of path -->
+<div class="breadcrumb hideOnPrint hideInXcode"><a href="http://developer.apple.com/" target="_top">ADC Home</a> &gt; <a href="../../../../../referencelibrary/index.html#//apple_ref/doc/uid/TP30000943" target="_top">Reference Library</a> &gt; <a href="../../../../index.html#//apple_ref/doc/uid/TP30000440" target="_top">Guides</a> &gt; <a href="../../../index.html#//apple_ref/doc/uid/TP30000440-TP30000418" target="_top">Apple Applications</a> &gt; <a href="../../../FinalCutProFinalCutExpress-date.html#//apple_ref/doc/uid/TP30000440-TP30000418-TP30000510" target="_top">Final Cut Pro/Final Cut Express</a> &gt; <a href="../AboutThisDoc/AboutThisDoc.html#//apple_ref/doc/uid/TP30001152-TPXREF101">Final Cut Pro XML Interchange Format</a> &gt; </div><br class="hideInXcode"/><!-- end of path -->
+        
+        <div class="mini_nav_text" align="left">
+        <span class="navButtons">
+        <a href="../FrameRate/FrameRate.html">&lt; Previous Page</a><span style="margin-left: 8px"><a href="../AppleEvents/AppleEvents.html">Next Page &gt;</a></span>
+        </span>
+        <span id="showHideTOCUpperSpan">
+        <a href="#" onclick="showHideTOC();"><img src="../../../../Resources/Images/show_toc_icon.gif" width="15" height="14" border="0" style="margin-bottom: -2px;" alt="" hideText="Hide TOC" showText="Show TOC" /></a> <a href="#" onclick="showHideTOC();">Hide TOC</a>
+        </span>
+        </div>
+
+        <hr />
+        
+        
+        <a name="//apple_ref/doc/uid/TP30001159-BAJGAAJG" title="Keyframe Interpolation"></a><h1>Keyframe Interpolation</h1><a name="//apple_ref/doc/uid/TP30001159-DontLinkElementID_315"></a><p>This appendix describes the algorithms that Final Cut Pro uses to interpolate keyframes with <a name="//apple_ref/doc/uid/TP30001159-DontLinkElementID_316"></a>Bezier curves.</p><a name="//apple_ref/doc/uid/TP30001159-TPXREF102" title="About Final Cut Pro Interpolation"></a><h2>About Final Cut Pro Interpolation</h2><p>Final Cut Pro uses both 1D and 2D Bezier curves to interpolate keyframes. The 2D Bezier algorithm is a simple extension of the 1D algorithm.</p><p>The heart of the math Final Cut Pro uses to find a given point on a Bezier curve is described in the article "Quick and Simple Bezier Curve Drawing" by Robert Miller, which appears in <em>Graphic Gems</em> Volume 5, page 206. Final Cut Pro modifies this algorithm to account for acceleration in a curve. As a result, Final Cut Pro users can change the velocity of motion into and out of a keyframe.</p><p>In Final Cut Pro, Bezier curves are represented by an approximation of a curve made up of 40 linear segments. The Bezier code itself is divided into two parts. The first part constructs a Bezier structure and calculates the location of all 40 constituent segments of the curve. The second part of the code finds the location of a given time on the curve. </p><p>To create the structure that represents a Bezier curve, Final Cut Pro first initializes a number of variables. This first set of variables—the acceleration coefficients— enables the user to ease the effect into the endpoints of the curve. This is done by biasing them either into or out of the endpoints using an exponential scaling factor to create a power curve.</p><a name="//apple_ref/doc/uid/TP30001159-TPXREF105" title="Listing C-1Acceleration coefficients"></a><p class="codesample"><strong>Listing C-1&nbsp;&nbsp;</strong>Acceleration coefficients</p><div class="codesample"><table><tr><td scope="row"><pre>    leftScale = curve[i].scale[1];<span></span></pre></td></tr><tr><td scope="row"><pre>    leftVal = pow(10, -leftScale)- 1.0;<span></span></pre></td></tr><tr><td scope="row"><pre>    rightScale = curve[i+1].scale[0];<span></span></pre></td></tr><tr><td scope="row"><pre>    rightVal = pow(10, -rightScale) - 1.0;<span></span></pre></td></tr></table></div><p>The scale values <code>leftScale</code> and <code>rightScale</code> are obtained from a UI widget. The values of this float scale factor range from <code>1</code> (biased away from the endpoint) to <code>-1</code> (biased toward the endpoint).</p><p>Next, Final Cut Pro initializes the Cartesian location of the control points of the Bezier curve segment by looking at the values passed in as an array of Bezier points,  <code>FloatPt *seg</code>. These values represent the location of the control points of the Bezier curve.</p><a name="//apple_ref/doc/uid/TP30001159-TPXREF106" title="Listing C-2Control points"></a><p class="codesample"><strong>Listing C-2&nbsp;&nbsp;</strong>Control points</p><div class="codesample"><table><tr><td scope="row"><pre>MakeBezSegment(Bezier curve, int32 index, FloatPt *seg) {<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>    FloatPt temp;<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>    seg[0] = curve[index].location;<span></span></pre></td></tr><tr><td scope="row"><pre>    seg[3] = curve[index+1].location;<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>    if (curve[index].vector[1].length == 0) {<span></span></pre></td></tr><tr><td scope="row"><pre>        seg[1].h = seg[0].h + (seg[3].h - seg[0].h) / 2.0 / SCALE_MULT_CONST;<span></span></pre></td></tr><tr><td scope="row"><pre>        seg[1].v = seg[0].v + (seg[3].v - seg[0].v) / 2.0 / SCALE_MULT_CONST;<span></span></pre></td></tr><tr><td scope="row"><pre>    }<span></span></pre></td></tr><tr><td scope="row"><pre>    else {<span></span></pre></td></tr><tr><td scope="row"><pre>        PolarToCart(&amp;curve[index].vector[1], &amp;temp);<span></span></pre></td></tr><tr><td scope="row"><pre>        seg[1].h = seg[0].h + temp.h * SCALE_MULT_CONST;<span></span></pre></td></tr><tr><td scope="row"><pre>        seg[1].v = seg[0].v + temp.v * SCALE_MULT_CONST;<span></span></pre></td></tr><tr><td scope="row"><pre>    }<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>    if (curve[index+1].vector[0].length == 0) {<span></span></pre></td></tr><tr><td scope="row"><pre>        seg[2].h = seg[3].h + (seg[0].h - seg[3].h) / 2.0 / SCALE_MULT_CONST;<span></span></pre></td></tr><tr><td scope="row"><pre>        seg[2].v = seg[3].v + (seg[0].v - seg[3].v) / 2.0 / SCALE_MULT_CONST;<span></span></pre></td></tr><tr><td scope="row"><pre>    }<span></span></pre></td></tr><tr><td scope="row"><pre>    else {<span></span></pre></td></tr><tr><td scope="row"><pre>        PolarToCart(&amp;curve[index+1].vector[0], &amp;temp);<span></span></pre></td></tr><tr><td scope="row"><pre>        seg[2].h = seg[3].h + temp.h * SCALE_MULT_CONST;<span></span></pre></td></tr><tr><td scope="row"><pre>        seg[2].v = seg[3].v + temp.v * SCALE_MULT_CONST;<span></span></pre></td></tr><tr><td scope="row"><pre>    }<span></span></pre></td></tr><tr><td scope="row"><pre>}<span></span></pre></td></tr></table></div><p>With this initialization work complete, Final Cut Pro now employs the algorithm found in the Robert Miller article to quickly and iteratively compute the location of points on the curve. First, Final Cut Pro initializes the values of the vertices of the control polygon of the Bezier curve:</p><a name="//apple_ref/doc/uid/TP30001159-CJBGJACB" title="Listing C-3Locations"></a><p class="codesample"><strong>Listing C-3&nbsp;&nbsp;</strong>Locations</p><div class="codesample"><table><tr><td scope="row"><pre>BezierForm(FloatPt *p, FloatPt *c, int numCtlPoints) {<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>    Int32 i, multiplier;<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>    for (i = 0; i &lt;= numCtlPoints - 1; i++) {<span></span></pre></td></tr><tr><td scope="row"><pre>        if (i == 0) multiplier = 1;<span></span></pre></td></tr><tr><td scope="row"><pre>        else if (i == 1) multiplier = numCtlPoints - 1;<span></span></pre></td></tr><tr><td scope="row"><pre>        else multiplier = multiplier * (numCtlPoints - i) / i;<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>        c[k].h = p[k].h * multiplier;<span></span></pre></td></tr><tr><td scope="row"><pre>        c[k].v = p[k].v * multiplier;<span></span></pre></td></tr><tr><td scope="row"><pre>    }<span></span></pre></td></tr><tr><td scope="row"><pre>}<span></span></pre></td></tr></table></div><p>Now Final Cut Pro is ready to calculate the final position of each linear segment that represents the Bezier curve. It makes this calculation using the final control points of the curve and the acceleration coefficients calculated earlier.</p><p>Final Cut Pro loops over the 40 segments that make up the curve. For each point, it calculates the distance along the curve as a fraction, for example 0, 1/40th, 2/40th, 3/40th, … 39/40th, 40/40th. Then it determines whether the point is on the left or right half of the curve and applies the appropriate acceleration value. It multiples the acceleration constant calculated at the outset by a contribution factor that yields a desired acceleration factor.</p><a name="//apple_ref/doc/uid/TP30001159-TPXREF107" title="Listing C-4Linear segments"></a><p class="codesample"><strong>Listing C-4&nbsp;&nbsp;</strong>Linear segments</p><div class="codesample"><table><tr><td scope="row"><pre>percent = (float)i / 40;<span></span></pre></td></tr><tr><td scope="row"><pre>if (percent &lt;= 0.5) {<span></span></pre></td></tr><tr><td scope="row"><pre>if (leftScale != 0.0) {<span></span></pre></td></tr><tr><td scope="row"><pre>        contribution = (1.0 - (percent * 2));<span></span></pre></td></tr><tr><td scope="row"><pre>        contribution *= contribution;           // ^2<span></span></pre></td></tr><tr><td scope="row"><pre>        contribution *= contribution;           // ^4<span></span></pre></td></tr><tr><td scope="row"><pre>        contribution *= contribution;           // ^8<span></span></pre></td></tr><tr><td scope="row"><pre>        scale = 1.0 + leftVal * contribution;<span></span></pre></td></tr><tr><td scope="row"><pre>}<span></span></pre></td></tr><tr><td scope="row"><pre>else scale = 1.0;<span></span></pre></td></tr><tr><td scope="row"><pre>}<span></span></pre></td></tr><tr><td scope="row"><pre>else {<span></span></pre></td></tr><tr><td scope="row"><pre>    if (rightScale != 0.0) {<span></span></pre></td></tr><tr><td scope="row"><pre>        contribution = ((percent * 2) - 1.0);<span></span></pre></td></tr><tr><td scope="row"><pre>        contribution *= contribution;           // ^2<span></span></pre></td></tr><tr><td scope="row"><pre>        contribution *= contribution;           // ^4<span></span></pre></td></tr><tr><td scope="row"><pre>        contribution *= contribution;           // ^8<span></span></pre></td></tr><tr><td scope="row"><pre>        scale = 1.0 + rightVal * contribution;<span></span></pre></td></tr><tr><td scope="row"><pre>    }<span></span></pre></td></tr><tr><td scope="row"><pre>    else scale = 1.0;<span></span></pre></td></tr><tr><td scope="row"><pre>}<span></span></pre></td></tr></table></div><p>In effect, these calculations push the segments of the curve in one direction or the other, either "squishing" the curve segments toward an endpoint, or "pulling" them away. </p><p>Now Final Cut Pro pulls these values together. First. it fixes the position of each control point which was calculated using Miller's algorithm BezierForm. See <span class="content_text"><a href="Interpolation.html#//apple_ref/doc/uid/TP30001159-CJBGJACB">Listing C-3</a></span> Using the final scaling factor calculated in <span class="content_text"><a href="Interpolation.html#//apple_ref/doc/uid/TP30001159-TPXREF107">Listing C-4</a></span> the program can stretch or shrink the magnitude of this linear segment of the curve. It can calculate the value of the curve at any point by interpolating between these control points.</p><a name="//apple_ref/doc/uid/TP30001159-TPXREF108" title="Listing C-5Bezier curve"></a><p class="codesample"><strong>Listing C-5&nbsp;&nbsp;</strong>Bezier curve</p><div class="codesample"><table><tr><td scope="row"><pre>BezierCurve(FloatPt *c, FloatPt *pt, float t) {<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>    int32               i, n;<span></span></pre></td></tr><tr><td scope="row"><pre>    float               t1, tt, u;<span></span></pre></td></tr><tr><td scope="row"><pre>    FloatPt         b[NUM_CONTL_POINTS];<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>    n = NUM_CONTL_POINTS - 1;<span></span></pre></td></tr><tr><td scope="row"><pre>    u = t;<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>    b[0].h = c[0].h;<span></span></pre></td></tr><tr><td scope="row"><pre>    b[0].v = c[0].v;<span></span></pre></td></tr><tr><td scope="row"><pre>    for (i =1; i &lt;=n; i++) {<span></span></pre></td></tr><tr><td scope="row"><pre>        b[i].h = c[i].h * u;<span></span></pre></td></tr><tr><td scope="row"><pre>        b[i].v = c[i].v * u;<span></span></pre></td></tr><tr><td scope="row"><pre>        u = u * t;<span></span></pre></td></tr><tr><td scope="row"><pre>    }<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>    (*pt).h = b[n].h;  (*pt).v = b[n].v;<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>    t1 = 1 - t;<span></span></pre></td></tr><tr><td scope="row"><pre>    tt = t1;<span></span></pre></td></tr><tr><td scope="row"><pre>    for (k = n - 1; i >= 0; i--) {<span></span></pre></td></tr><tr><td scope="row"><pre>        (*pt).h += b[i].h * tt;<span></span></pre></td></tr><tr><td scope="row"><pre>        (*pt).v += b[i].v * tt;<span></span></pre></td></tr><tr><td scope="row"><pre>        tt = tt * t1;<span></span></pre></td></tr><tr><td scope="row"><pre>    }<span></span></pre></td></tr><tr><td scope="row"><pre>}<span></span></pre></td></tr></table></div><p>Now that Final Cut Pro has all the information needed about the Cartesian position of the current line segment along the actual curve, it can update the Bezier structure representing the curve with this data. This process involves recording the start and end position of the segment and calculating the line connecting these points, while scaling the line segment by the calculated acceleration factor. Looping around from point to point, the application calculates the position of all 40 points of the curve.</p><p>Lastly, before finishing with this segment of the curve, Final Cut Pro calculates the time value for each segment point. Later, it uses these time values to look up and interpolate values between the segment points. This process is a simple matter of calculating the current position on the curve and then using this value to compute the total time along the curve this position represents.</p>
+
+        <br /><br /> 
+        
+        <div class="mini_nav_text" align="left">
+        <span class="navButtons">
+        <a href="../FrameRate/FrameRate.html">&lt; Previous Page</a><span style="margin-left: 8px"><a href="../AppleEvents/AppleEvents.html">Next Page &gt;</a></span>
+        </span>
+        <span id="showHideTOCLowerSpan">
+        <a href="#" onclick="showHideTOC();"><img src="../../../../Resources/Images/show_toc_icon.gif" width="15" height="14" border="0" style="margin-bottom: -2px;" alt="" /></a> <a href="#" onclick="showHideTOC();">Hide TOC</a>
+        </span>
+        </div>
+
+        <br/><hr /><div align="center"><p class="content_text" lang="en" dir="ltr"> <!--#if expr="0=1" -->&#x00a9; 2003, 2009 Apple Inc. All Rights Reserved. &#40;<!--#endif -->Last updated: 2009-02-04<!--#if expr="0=1" -->&#041;<!--#endif --></p></div>
+
+        
+        <div class="hideOnPrint hideInXcode">
+        <!-- start of footer -->
+        	<table width="100%" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/documentation/AppleApplications/Reference/FinalCutPro_XML/Interpolation/Interpolation.html%3Fid%3DTP30001149-4.3&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/documentation/AppleApplications/Reference/FinalCutPro_XML/Interpolation/Interpolation.html%3Fid%3DTP30001149-4.3&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/documentation/AppleApplications/Reference/FinalCutPro_XML/Interpolation/Interpolation.html%3Fid%3DTP30001149-4.3&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+
+        <!--#include virtual="/includes/framesetfooter" -->
+        <!-- end of footer -->
+        </div>
+    </div>
+</body>
+</html>

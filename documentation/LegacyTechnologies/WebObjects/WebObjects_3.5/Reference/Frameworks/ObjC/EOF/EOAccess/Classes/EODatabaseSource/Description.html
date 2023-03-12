@@ -1,0 +1,358 @@
+<html><head><title></title></head>
+
+<body bgcolor="#ffffff">
+
+ 
+
+ 
+
+<h2><a name="//apple_ref/occ/cl/EODatabaseDataSource">EODatabaseDataSource</a>
+
+ <BR>
+
+</h2>
+
+<p><B>Inherits From:</B><BR>  
+
+EODataSource : NSObject
+
+
+
+<p><B>Conforms To:</B>
+
+NSObject (NSObject)
+
+
+
+<p><B>Declared in:</B>
+
+EOAccess/EODatabaseDataSource.h
+
+
+
+<p><a name="214">
+
+<a name="description"></a>
+
+<h3>Class Description </h3>
+
+</a>EODatabaseDataSource is a concrete subclass of EODataSource that fetches objects based on an EOModel, using an EODatabaseContext that services the data source's EOEditingContext. An EODatabaseDataSource can be set up to fetch all objects for its root entity, to fetch objects matching a particular EOFetchSpecification, and to further filter its fetching with an auxiliary EOQualifier.<p>
+
+EODatabaseDataSource implements all the functionality defined by EODataSource: In addition to fetching objects, it can insert and delete them (provided the entity isn't read-only). See the EODataSource class specification for more information on these topics.<p>
+
+As with other data sources, EODatabaseDataSource can also provide a detail data source. The most significant consequence of using an master-detail configuration is that the detail operates directly on the master's object graph. The EODetailDataSource has a <em>master object</em> and a <em>detail key</em> through which the detail data source accesses the its objects. The master object is simply the object that's selected in the master display group, and the detail key is the name of a relationship property in the master object. When the detail display group asks its data source to fetch, the EODetailDataSource simply gets the value for the relationship property named <em>detail key</em> from its master object and returns it. When you add and remove objects from the detail, you're directly modifying the master's relationship array. In fact, you can think EODetailDataSource an interface to its master object's relationship property.<p>
+
+<a name="269">
+
+<h3> Master-Peer Configurations</h3>
+
+</a>EODatabaseDataSources can be used in <em>master-peer</em> configurations. In a master-peer configuration, instead of using an EODatabaseDataSource with the master display group and an EODetailDataSource with the detail display group, both display groups use EODatabaseDataSources.<p>
+
+The peer in a master-peer configuration-an EODatabaseDataSource-operates independently of its master. It goes to the database to fetch its objects and maintains those objects in its own array. Because the peer data source acts independently, if you add or remove objects from the peer, the changes aren't automatically reflected in the master. The database is updated correctly, but the master's relationship array (if it exists) isn't. Consequently, if you're using master-peer <em>and</em> the master has a to-many relationship as a class property, you're responsible for modifying the master's relationship array to keep it in sync with the peer.<p>
+
+<a name="272">
+
+<h4> When to Use Master-Peer</h4>
+
+</a>You might want to use a master-peer configuration instead of a master-detail if the master doesn't have a class property that represents a relationship to the peer. With master-detail, the master must have a class property that represents a relationship to the detail, but because a peer does its own fetching, the master in a master-detail doesn't have this restriction.<p>
+
+Another scenario in which you might want to use a master-peer configuration is when you need to further qualify the set of objects related to the master's selected object. For example, instead of displaying all of a studio's movies, you want to display only the movies whose revenues are greater than $5,000,000. You can accomplish this by assigning an in-memory qualifier to the detail display group, but if the number of records in the unfiltered set is prohibitively large, the filtering is better performed in the database. Using a master-peer configuration, you can further qualify the peer's set of objects <em>in the database</em> by assigning an auxiliary qualifier. You must also use this auxiliary qualifier approach if the qualifier can't be executed in memory (for example, because it uses custom SQL or accesses properties not in the object graph). For an example of applying an auxiliary qualifier, see "<a href="#275">Creating a Master-Peer Configuration</a>."<p>
+
+<a name="275">
+
+<h4> Creating a Master-Peer Configuration </h4>
+
+</a>To set up a master-peer configuration, follow these basic steps:<p>
+
+<ol>
+
+<a name="286">
+
+<li>Create the master display group and EODatabaseDataSource.
+
+</a><a name="267">
+
+<li>Create the peer display group and EODatabaseDataSource.
+
+</a><a name="289">
+
+<li>Connect the display groups.
+
+</a><a name="268">
+
+<li>Optionally, apply an auxiliary qualifier to the peer's data source.
+
+</a></ol>
+
+For an OpenStep application, the easiest way to create a display group and its data source is to drag a model file (or an entity from EOModeler) into a nib in Interface Builder. This action creates an EODisplayGroup and a corresponding EODatabaseDataSource. Using this approach, you can then connect your two display groups as you would for a master-detail configuration, but create an EOMasterPeerAssociation instead of an EOMasterDetailAssociation. For more information on this topic, see <em>Using Enterprise Objects Framework with OPENSTEP</em>.<p>
+
+For a WebObjects application, start out similarly by dragging a model file (or an entity from EOModeler) into a component in WebObjects Builder to create a WODisplayGroup and a corresponding EODatabaseDataSource. Do this twice, once to create a master display group and again to create the peer. Don't configure your peer display group to have a detail data source as you would for a master-peer configuration. Instead, you must establish the master-peer relationship in code, using the EODataSource method <B>qualifyWithRelationshipKey:ofObject: </B>. The following method demonstrates the procedure:<p>
+
+<blockquote><pre>- (void)selectObject {
+
+</pre></blockquote><p>
+
+<blockquote><pre>WODisplayGroup *studioDisplayGroup; // Assume this exists.
+
+</pre></blockquote><p>
+
+<blockquote><pre>WODisplayGroup *movieDisplayGroup;  // Assume this exists. 
+
+</pre></blockquote><p>
+
+<blockquote><pre>Studio *studio;                     // Assume this exists.
+
+</pre></blockquote><p>
+
+<blockquote><pre>EODatabaseDataSource *movieDataSource =
+
+</pre></blockquote><p>
+
+<blockquote><pre>(EODatabaseDataSource *)[movieDisplayGroup dataSource];
+
+</pre></blockquote><p>
+
+<blockquote><pre>[studioDisplayGroup selectObject:studio];
+
+</pre></blockquote><p>
+
+<blockquote><pre>[movieDataSource qualifyWithRelationshipKey:@"movies" ofObject:studio];
+
+</pre></blockquote><p>
+
+<blockquote><pre>[movieDisplayGroup fetch];
+
+</pre></blockquote><p>
+
+<blockquote><pre>}
+
+</pre></blockquote><p>
+
+In this example, the <B>selectObject </B> method is invoked when a user selects a new master object (<B>studio </B>). It updates the selection of the master display group (<B>studioDisplayGroup </B>) and requalifies the peer data source (<B>movieDataSource </B>) to match. The final step is to send a <B>fetch </B> message to the peer display group (<B>movieDisplayGroup </B>), causing <B>movieDataSource </B> to refetch its objects from the database using a newly formed qualifier.<p>
+
+For both OpenStep and WebObjects applications, to apply an auxiliary qualifier, use EODatabaseDataSource's <a href="#254"><B>setAuxiliaryQualifier: </B></a> method. The following method demonstrates the procedure:<p>
+
+<blockquote><pre>- (void)requalifyMovies {
+
+</pre></blockquote><p>
+
+<blockquote><pre>NSDecimalNumber *revenue;          // Assume this exists.
+
+</pre></blockquote><p>
+
+<blockquote><pre>id movieDisplayGroup;              // Assume this exists.
+
+</pre></blockquote><p>
+
+<blockquote><pre>EOQualifier *auxiliaryQualifier = nil;
+
+</pre></blockquote><p>
+
+<blockquote><pre>EODatabaseDataSource *movieDataSource;
+
+</pre></blockquote><p>
+
+<blockquote><pre>/* Construct qualifier. */
+
+</pre></blockquote><p>
+
+<blockquote><pre>auxiliaryQualifier = [EOQualifier
+
+</pre></blockquote><p>
+
+<blockquote><pre>qualifierWithQualifierFormat:@"%@ &gt; %@", @"revenue", revenue];
+
+</pre></blockquote><p>
+
+<blockquote><pre>/* Apply qualifier to peer data source. */
+
+</pre></blockquote><p>
+
+<blockquote><pre>movieDataSource = (EODatabaseDataSource *)[movieDisplayGroup dataSource];
+
+</pre></blockquote><p>
+
+<blockquote><pre>[movieDataSource setAuxiliaryQualifier:auxiliaryQualifier];
+
+</pre></blockquote><p>
+
+<blockquote><pre>/* Tell peer controller to fetch. */
+
+</pre></blockquote><p>
+
+<blockquote><pre>[movieDisplayGroup fetch];
+
+</pre></blockquote><p>
+
+<blockquote><pre>}
+
+</pre></blockquote><p>
+
+This method constructs a qualifier that selects movies whose revenues are greater than <B>revenue </B>, assigns that qualifier as the auxiliary qualifier for the peer data source (<B>movieDataSource </B>), and then directs the peer display group to fetch. Because the peer display group uses an EODatabaseDataSource instead of an EODetailDataSource, the refetch performs a fetch with the qualifier in the database.<p>
+
+<dl><dt>Creating instances
+
+<dl><dt><a href="#//apple_ref/occ/instm/EODatabaseDataSource/initWithEditingContext:entityName:"><a href="#247">- initWithEditingContext:entityName:</a></a>
+
+</dl><dt>Setting selection criteria
+
+<dl><dt><a href="#//apple_ref/occ/instm/EODatabaseDataSource/setFetchSpecification:"><a href="#262">- setFetchSpecification:</a></a>
+
+<dt><a href="#//apple_ref/occ/instm/EODatabaseDataSource/fetchSpecification"><a href="#239">- fetchSpecification</a></a>
+
+<dt><a href="#//apple_ref/occ/instm/EODatabaseDataSource/setAuxiliaryQualifier:"><a href="#254">- setAuxiliaryQualifier:</a></a>
+
+<dt><a href="#//apple_ref/occ/instm/EODatabaseDataSource/auxiliaryQualifier"><a href="#229">- auxiliaryQualifier</a></a>
+
+<dt><a href="#//apple_ref/occ/instm/EODatabaseDataSource/fetchSpecificationForFetch"><a href="#243">- fetchSpecificationForFetch</a></a>
+
+</dl><dt>Getting objects used for fetching
+
+<dl><dt><a href="#//apple_ref/occ/instm/EODatabaseDataSource/entity"><a href="#236">- entity</a></a>
+
+<dt><a href="#//apple_ref/occ/instm/EODatabaseDataSource/databaseContext"><a href="#233">- databaseContext</a></a>
+
+</dl><dt>Enabling fetching
+
+<dl><dt><a href="#//apple_ref/occ/instm/EODatabaseDataSource/setFetchEnabled:"><a href="#258">- setFetchEnabled:</a></a>
+
+<dt><a href="#//apple_ref/occ/instm/EODatabaseDataSource/isFetchEnabled"><a href="#250">- isFetchEnabled</a></a>
+
+</dl></dl><a name="228">
+
+<a name="instm"></a>
+
+<h3>Instance Methods </h3>
+
+</a><a name="229">
+
+<h4> <a name="//apple_ref/occ/instm/EODatabaseDataSource/auxiliaryQualifier">auxiliaryQualifier</a></h4>
+
+</a>- (EOQualifier *)<B>auxiliaryQualifier </B><p>
+
+Returns the EOQualifier used to further filter the objects fetched by the receiver's EOFetchSpecification. <p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EODatabaseDataSource/setAuxiliaryQualifier:">- setAuxiliaryQualifier:</a> </B>, <a href="#//apple_ref/occ/instm/EODatabaseDataSource/fetchSpecificationForFetch"><B>- fetchSpecificationForFetch</a> </B>, <a href="#//apple_ref/occ/instm/EODatabaseDataSource/fetchSpecification"><B>- fetchSpecification</a>
+
+ </B><p><a name="233">
+
+<h4> <a name="//apple_ref/occ/instm/EODatabaseDataSource/databaseContext">databaseContext</a></h4>
+
+</a>- (EODatabaseContext *)<B>databaseContext </B><p>
+
+Returns the EODatabaseContext that the receiver uses to access the external database. This is either the root EOObjectStore for the receiver's EOEditingContext, or if the root is an EOCooperatingObjectStore, it's the EODatabaseContext under that EOCooperatingObjectStore that services the EOModel containing the EOEntity for the receiver.<p>
+
+<a name="236">
+
+<h4> <a name="//apple_ref/occ/instm/EODatabaseDataSource/entity">entity</a></h4>
+
+</a>- (EOEntity *)<B>entity </B><p>
+
+Returns the EOEntity from which the receiver fetches objects.<p>
+
+<a name="239">
+
+<h4> <a name="//apple_ref/occ/instm/EODatabaseDataSource/fetchSpecification">fetchSpecification</a></h4>
+
+</a>- (EOFetchSpecification *)<B>fetchSpecification </B><p>
+
+Returns the receiver's basic EOFetchSpecification. Its EOQualifier is conjoined with the receiver's auxiliary EOQualifier when the receiver fetches objects. The sender of this message can alter the EOFetchSpecification directly, or replace it using <a href="#262"><B>setFetchSpecification: </B></a>.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EODatabaseDataSource/fetchSpecificationForFetch">- fetchSpecificationForFetch</a> </B>, <a href="#//apple_ref/occ/instm/EODatabaseDataSource/auxiliaryQualifier"><B>- auxiliaryQualifier</a>
+
+ </B><p><a name="243">
+
+<h4> <a name="//apple_ref/occ/instm/EODatabaseDataSource/fetchSpecificationForFetch">fetchSpecificationForFetch</a></h4>
+
+</a>- (EOFetchSpecification *)<B>fetchSpecificationForFetch </B><p>
+
+Returns a copy of the EOFetchSpecification that the receiver uses to fetch. This is constructed by conjoining the EOQualifier of the receiver's EOFetchSpecification with its auxiliary EOQualifier. Modifying the returned EOFetchSpecification doesn't affect the receiver's fetching behavior; use <a href="#262"><B>setFetchSpecification: </B></a> and <a href="#254"><B>setAuxiliaryQualifier: </B></a> for that purpose.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EODatabaseDataSource/fetchSpecification">- fetchSpecification</a> </B>, <a href="#//apple_ref/occ/instm/EODatabaseDataSource/auxiliaryQualifier"><B>- auxiliaryQualifier</a>
+
+ </B><p><a name="247">
+
+<h4> <a name="//apple_ref/occ/instm/EODatabaseDataSource/initWithEditingContext:entityName:">initWithEditingContext:entityName:</a></h4>
+
+</a>- (id)<B>initWithEditingContext: </B>(EOEditingContext *)<em>anEditingContext</em><em> </em><B>entityName: </B>(NSString *)<em>anEntityName</em><p>
+
+Initializes a newly allocated EODatabaseDataSource to fetch objects into <em>anEditingContext</em> for the EOEntity named by <em>anEntityName</em>. This method checks <em>anEditingContext</em>'s EOObjectStoreCoordinator for an EODatabaseChannel that services the EOModel containing the named EOEntity. If none exists, this method creates one. This is the designated initializer for the EODatabaseDataSource class. Returns <B>self </B>.<p>
+
+<a name="250">
+
+<h4> <a name="//apple_ref/occ/instm/EODatabaseDataSource/isFetchEnabled">isFetchEnabled</a></h4>
+
+</a>- (BOOL)<B>isFetchEnabled </B><p>
+
+Returns YES if the receiver's <B>fetchObjects </B> method actually fetches objects, NO if it returns an empty array without fetching. Fetching is typically disabled in a master-peer configuration when no object is selected in the master.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EODatabaseDataSource/setFetchEnabled:">- setFetchEnabled:</a>
+
+ </B><p><a name="254">
+
+<h4> <a name="//apple_ref/occ/instm/EODatabaseDataSource/setAuxiliaryQualifier:">setAuxiliaryQualifier:</a></h4>
+
+</a>- (void)<B>setAuxiliaryQualifier: </B>(EOQualifier *)<em>aQualifier</em><p>
+
+Sets the receiver's auxiliary qualifier to <em>aQualifier</em>. The auxiliary qualifier usually adds conditions to the primary qualifier and is useful for narrowing the scope of a data source without altering its primary qualifier. This is especially useful for setting a qualifier on a qualified peer data source, since a peer's primary qualifiers specifies the matching criteria for the relationship it fetches for. For more information on auxiliary qualifiers, see "<a href="#275">Creating a Master-Peer Configuration</a>" in the class description. <p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EODatabaseDataSource/fetchSpecificationForFetch">- fetchSpecificationForFetch</a> </B>, <a href="#//apple_ref/occ/instm/EODatabaseDataSource/fetchSpecification"><B>- fetchSpecification</a> </B>, <a href="#//apple_ref/occ/instm/EODatabaseDataSource/auxiliaryQualifier"><B>- auxiliaryQualifier</a>
+
+ </B><p><a name="258">
+
+<h4> <a name="//apple_ref/occ/instm/EODatabaseDataSource/setFetchEnabled:">setFetchEnabled:</a></h4>
+
+</a>- (void)<B>setFetchEnabled: </B>(BOOL)<em>flag</em><p>
+
+Controls whether the receiver can fetch. If <em>flag</em> is YES the receiver's <B>fetchObjects </B> method actually fetches objects, if NO it returns an empty array without fetching. Fetching is typically disabled in a master-peer configuration when no object is selected in the master. For example, EODatabaseDataSource's implementation of <B>qualifyWithRelationshipKey:ofObject: </B> invokes this method to enable or disable fetching based on whether a master object is provided.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EODatabaseDataSource/setFetchEnabled:">- setFetchEnabled:</a>
+
+ </B><p><a name="262">
+
+<h4> <a name="//apple_ref/occ/instm/EODatabaseDataSource/setFetchSpecification:">setFetchSpecification:</a></h4>
+
+</a>- (void)<B>setFetchSpecification: </B>(EOFetchSpecification *)<em>aFetchSpecification</em><p>
+
+Sets the receiver's basic EOFetchSpecification to <em>aFetchSpecification</em>. Its EOQualifier is conjoined with the receiver's auxiliary EOQualifier when the receiver fetches objects.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EODatabaseDataSource/setAuxiliaryQualifier:">- setAuxiliaryQualifier:</a> </B>, <a href="#//apple_ref/occ/instm/EODatabaseDataSource/fetchSpecificationForFetch"><B>- fetchSpecificationForFetch</a> </B>, <a href="#//apple_ref/occ/instm/EODatabaseDataSource/fetchSpecification"><B>- fetchSpecification</a>
+
+ </B><p>
+
+ 
+
+ 
+
+
+
+
+
+<i>Copyright &#169; 1997, Apple Computer, Inc.   All rights
+
+reserved.</i>
+
+
+
+<!-- Last updated: 10/16/97 11:23:54 -->
+
+
+
+</body>
+
+</html>
+

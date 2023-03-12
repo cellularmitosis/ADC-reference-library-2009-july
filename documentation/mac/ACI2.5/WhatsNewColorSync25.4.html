@@ -1,0 +1,312 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML EXPERIMENTAL 970324//EN">
+<HTML>
+<HEAD>
+<META NAME="GENERATOR" CONTENT="Adobe FrameMaker 5.5/HTML Export Filter">
+
+<TITLE> Optimized Profile Searching</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+<!-- start of header -->
+
+<!--#include virtual="/includes/framesetheader" -->
+
+<!-- end of header -->
+
+<!-- top image banner and para -->
+
+
+
+<CENTER>
+<P>   
+<A HREF="WhatsNewColorSync25.3.html"><IMG ALIGN = BOTTOM SRC = "prev.gif" border=none hspace=20 alt="Previous"></A> <A HREF="WhatsNewColorSync25-2.html"><IMG ALIGN = BOTTOM SRC = "content.gif" border=none hspace=20 alt="Book Contents"></A>  <A HREF="WhatsNewColorSync25.5.html"><IMG ALIGN = BOTTOM SRC = "next.gif" border=none hspace=20 alt="Next"></A> </CENTER><P>
+<FONT SIZE=-1><DL><DT><a href="../../macos8/mac8.html"><B>Inside Macintosh:</B></A> <A HREF="WhatsNewColorSync25-2.html"><B>What's New in ColorSync 2.5</B></A> / </DL></FONT><P>
+<HR>
+
+<H1 CLASS="H1.Heading1">
+<A NAME="pgfId=9180">
+ </A>
+<A NAME="28743">
+ </A>
+Optimized Profile Searching</H1>
+<P CLASS="T1.Text1">
+<A NAME="pgfId=9181">
+ </A>
+The following sections describe changes in the way ColorSync 2.5 stores and manages profile information.</P>
+<DIV>
+<H2 CLASS="H2.Heading2">
+<A NAME="pgfId=7970">
+ </A>
+The Profile Cache</H2>
+<P CLASS="T1.Text1">
+<A NAME="pgfId=8086">
+ </A>
+ColorSync 2.5 creates a cache file (containing private data) in the Preferences folder to keep track of all currently-installed profiles. The cache stores key information about each profile, using a smart algorithm that avoids rebuilding the cache unless the profile folder has changed.</P>
+<P CLASS="T1.Text1">
+<A NAME="pgfId=9215">
+ </A>
+ColorSync takes advantage of the profile cache to speed up profile searching. This optimized searching can help your application speed up some operations, such as displaying a pop-up menu of available profiles.</P>
+<P CLASS="T1.Text1">
+<A NAME="pgfId=8195">
+ </A>
+ColorSync's intelligent cache scheme provides the following advantages in profile management:</P>
+<UL>
+<LI CLASS="B1.Bullet1">
+<A NAME="pgfId=8198">
+ </A>
+The cache contains information including the name, header, script code, and location for each installed profile, so that once the cache has been built, ColorSync can supply the information your application needs for many tasks without having to reopen any profiles.</LI>
+<LI CLASS="B1.Bullet1">
+<A NAME="pgfId=8177">
+ </A>
+When you call a search routine, ColorSync can quickly determine if there has been any change to the currently-installed profiles. If not, ColorSync can supply information from the cache immediately, giving the user a pleasing performance experience.</LI>
+</UL>
+<P CLASS="T1.Text1">
+<A NAME="pgfId=8331">
+ </A>
+Note, however, that calls to the standard ColorSync search routines cannot take full advantage of the profile cache. For example, with the <CODE>CMNewProfileSearch</CODE>
+ routine, the caller passes in a search criteria and gets back a list of profiles that match that criteria. Before version 2.5, ColorSync had to open each profile to build the list, and the caller was likely to open each profile again after getting the list back. With version 2.5, ColorSync can at least use the profile cache to narrow down the list (unless the search criteria asks for all profiles!), but it cannot fully optimize the search process.</P>
+<P CLASS="T1.Text1">
+<A NAME="pgfId=8359">
+ </A>
+The next section describes a new routine added to the ColorSync API to take full advantage of the profile cache.</P>
+</DIV>
+<DIV>
+<H2 CLASS="H2.Heading2">
+<A NAME="pgfId=8068">
+ </A>
+<A NAME="41521">
+ </A>
+Optimized Profile Searching With CMIterateColorSyncFolder </H2>
+<P CLASS="T1.Text1">
+<A NAME="pgfId=8574">
+ </A>
+A flexible new routine, <CODE>CMIterateColorSyncFolder</CODE>
+, takes advantage of the profile cache to provide truly optimized searching and quick access to profile information.</P>
+<DIV>
+<H3 CLASS="H3.Heading3">
+<A NAME="pgfId=8575">
+ </A>
+CMIterateColorSyncFolder</H3>
+<P CLASS="T1.Text1">
+<A NAME="pgfId=8576">
+ </A>
+The <CODE>CMIterateColorSyncFolder</CODE>
+ routine iterates over the available profiles. It is defined as follows:</P>
+
+
+
+
+<PRE><A NAME="pgfId=8362"></A>pascal CMError CMIterateColorSyncFolder (
+                      CMProfileIterateUPP proc,
+                      unsigned long * seed,
+                      unsigned long * count,
+                      void * refCon);<P></PRE>
+
+<P CLASS="T1.Text1">
+<A NAME="pgfId=11873">
+ </A>
+<TABLE><TR><TD COLSPAN="1" ROWSPAN="1" ALIGN="LEFT" VALIGN="TOP"><CODE>proc</code>
+<TD COLSPAN="1" ROWSPAN="1" ALIGN="LEFT" VALIGN="TOP">
+A universal procedure pointer of type <CODE>CMProfileIterateUPP</CODE>, which is described in <A HREF="WhatsNewColorSync25.4.html#10580" CLASS="XRef"><CODE>CMProfileIterateProcPtr</CODE></A>
+. If you do not wish to receive callbacks, pass <CODE>nil</CODE>
+ for this parameter. Otherwise, pass a pointer to your callback routine.</P>
+
+<A NAME="pgfId=11879">
+ </A>
+<TR><TD COLSPAN="1" ROWSPAN="1" ALIGN="LEFT" VALIGN="TOP"><CODE>seed</code>
+<TD COLSPAN="1" ROWSPAN="1" ALIGN="LEFT" VALIGN="TOP">
+A pointer to a value of type <CODE>long</CODE>. The first time you call <CODE>CMIterateColorSyncFolder</CODE>, you typically set the value to 0. In subsequent calls, you set the value to the seed value obtained from the previous call. ColorSync uses the value in determining whether to call your callback routine, as described in the discussion for this function.<BR>
+On return, the value is the current seed for the profile cache (unless you pass <CODE>nil</CODE>, as described in the discussion).</P>
+
+<A NAME="pgfId=11883">
+ </A>
+<TR><TD COLSPAN="1" ROWSPAN="1" ALIGN="LEFT" VALIGN="TOP"><CODE>count</code>
+<TD COLSPAN="1" ROWSPAN="1" ALIGN="LEFT" VALIGN="TOP">
+A pointer to a value of type <CODE>long</CODE>. On return, the value is the number of available profiles. <CODE>CMIterateColorSyncFolder</CODE> provides the number of profiles even when no iteration occurs (unless you pass <CODE>nil</CODE>, as described in the discussion below). To determine the count alone, without iteration, call <CODE>CMIterateColorSyncFolder</CODE> and pass a value of <CODE>nil</CODE> for all parameters except <CODE>count</CODE>.</P>
+
+<A NAME="pgfId=11887">
+ </A>
+<TR><TD COLSPAN="1" ROWSPAN="1" ALIGN="LEFT" VALIGN="TOP"><CODE>refCon</code>
+<TD COLSPAN="1" ROWSPAN="1" ALIGN="LEFT" VALIGN="TOP">
+A pointer to arbitrary data, supplied by you, that ColorSync passes to your callback routine.	 If you pass <CODE>nil</CODE> for this parameter, ColorSync passes <CODE>nil</CODE> to your callback routine.</P>
+
+<A NAME="pgfId=11658">
+ </A>
+<TR><TD COLSPAN="1" ROWSPAN="1" ALIGN="LEFT" VALIGN="TOP"><EM CLASS="italics">
+function result	&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</EM>
+<TD COLSPAN="1" ROWSPAN="1" ALIGN="LEFT" VALIGN="TOP">
+A result code of type <CODE>CMError</CODE>. If your callback function returns an error, <CODE>CMIterateColorSyncFolder</CODE> stops iterating and returns the error value to its caller (presumably your code). See <A HREF="../ACI/ACI-2.html"><I>Advanced Color Imaging on the Mac OS</I></A> for a list of ColorSync-specific result code values.</P>
+</TABLE>
+
+<H4>
+<A NAME="pgfId=12251">
+ </A>
+DISCUSSION</H4>
+<P CLASS="T1.Text1">
+<A NAME="pgfId=12249">
+ </A>
+When your application needs information about the currently available profiles, it calls the <CODE>CMIterateColorSyncFolder</CODE>
+ routine, which in turn calls your callback routine once for each profile. Even though there may be many profiles available, ColorSync can use its profile cache to return profile information quickly, and (if the cache is valid) without having to open any profiles. For each profile, ColorSync returns the profile header, script code, name, and location. As a result, your routine may be able to perform its function, such as building a list of profiles to display in a pop-up menu, without further effort (such as opening a file-based profile).</P>
+<P CLASS="T1.Text1">
+<A NAME="pgfId=11828">
+ </A>
+Before calling <CODE>CMIterateColorSyncFolder</CODE>
+ for the first time, you typically set <CODE>seed</CODE>
+ to 0. ColorSync compares 0 to its current seed for the profile cache. It isn't likely they will match--the odds are roughly one in two billion against it. Therefore, the routine iterates through all the profiles in the cache, calling your callback routine once for each profile. <CODE>CMIterateColorSyncFolder</CODE>
+ then returns the actual seed value in <CODE>seed</CODE>
+ (unless you passed <CODE>nil</CODE>
+ for that parameter).</P>
+<P CLASS="T1.Text1">
+<A NAME="pgfId=11829">
+ </A>
+If you pass the returned seed value in a subsequent call, and if there has been no change in the available profiles, the passed seed will match the stored cache seed and no iteration will take place.</P>
+<P CLASS="T1.Text1">
+<A NAME="pgfId=11830">
+ </A>
+Note that you can pass a <CODE>nil</CODE>
+ pointer for the <CODE>seed</CODE>
+ parameter without harm. The result is the same as if you passed a pointer to 0, in that the function iterates through the available profiles, calling your callback routine once for each profile. However, the function doesn't return a seed value, since you haven't passed a valid pointer.</P>
+<P CLASS="T1.Text1">
+<A NAME="pgfId=11831">
+ </A>
+You can force ColorSync to call your callback routine (if any profiles are available) by passing a <CODE>nil</CODE>
+ pointer or by passing 0 for the seed value. But suppose you have an operation, such as building a pop-up menu, that you only want to perform if the available profiles have changed. In that case, you pass the seed value from a previous call to <CODE>CMIterateColorSyncFolder</CODE>
+. If the profile folder has not changed, ColorSync will not call your callback routine.</P>
+<P CLASS="T1.Text1">
+<A NAME="pgfId=11832">
+ </A>
+Note that if there are no profiles available, ColorSync does not call your callback routine.</P>
+
+
+<h4>Note</h4>
+<A NAME="pgfId=12238">
+ </A>
+You can safely pass <CODE>nil</CODE>
+ for any or all of the parameters to the <CODE>CMIterateColorSyncFolder</CODE>
+ function. If you pass <CODE>nil</CODE>
+ for all of the parameters, calling the function merely forces rebuilding of the profile cache, if necessary.
+
+<DIV>
+<H3 CLASS="H3.Heading3">
+<A NAME="pgfId=12244">
+ </A>
+<A NAME="10580">
+ </A>
+CMProfileIterateProcPtr</H3>
+<P CLASS="T1.Text1">
+<A NAME="pgfId=8581">
+ </A>
+The universal procedure pointer callback routine passed as a parameter to <CODE>CMIterateColorSyncFolder</CODE>
+ is defined as follows:</P>
+
+
+<PRE><A NAME="pgfId=8418"></A>pascal OSErr (*CMProfileIterateProcPtr )
+                     (CMProfileIterateData *iterateData,
+                     void *refCon);</P></PRE>
+
+
+<P CLASS="RP.RoutineParam">
+<A NAME="pgfId=8425">
+ </A>
+<TABLE><TR><TD COLSPAN="1" ROWSPAN="1" ALIGN="LEFT" VALIGN="TOP"><CODE>iterateData</code>
+<TD COLSPAN="1" ROWSPAN="1" ALIGN="LEFT" VALIGN="TOP">
+A pointer to a structure of type CMProfileIterateData (defined in the next section). On return, the structure contains profile information for the current profile (as the <CODE>CMIterateColorSyncFolder</CODE> routine iterates over all available profiles).</P>
+
+<P CLASS="RP.RoutineParam">
+<A NAME="pgfId=8426">
+ </A>
+<TR><TD COLSPAN="1" ROWSPAN="1" ALIGN="LEFT" VALIGN="TOP"><CODE>refCon</code>
+<TD COLSPAN="1" ROWSPAN="1" ALIGN="LEFT" VALIGN="TOP">
+A pointer to arbitrary data you pass to the<CODE>CMIterateColorSyncFolder</CODE> routine and it, in turn, passes to your callback routine.</P>
+
+<P CLASS="RP.RoutineParam">
+<A NAME="pgfId=11654">
+ </A>
+<TR><TD COLSPAN="1" ROWSPAN="1" ALIGN="LEFT" VALIGN="TOP"><EM CLASS="italics">
+callback return value&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</EM>
+<TD COLSPAN="1" ROWSPAN="1" ALIGN="LEFT" VALIGN="TOP">
+A result code of type <CODE>CMError</CODE>. If your callback function returns an error, <CODE>CMIterateColorSyncFolder</CODE> stops iterating and returns the error value to its caller (presumably your code). See <A HREF="../ACI/ACI-2.html"><I>Advanced Color Imaging on the Mac OS</I></A> for a list of ColorSync-specific result codes.</P></table>
+
+
+<H4>
+<A NAME="pgfId=13677">
+ </A>
+DISCUSSION</h4>
+<P CLASS="T1.Text1">
+<A NAME="pgfId=13682">
+ </A>
+When you call <CODE>CMIterateColorSyncFolder</CODE>, you pass a universal procedure pointer of type <CODE>CMProfileIterateProcPtr</CODE> that points to a function you provide. Your function definition is based on this definition of <CODE>CMProfileIterateProcPtr</CODE>.</P>
+</DIV>
+
+
+<DIV>
+<H3 CLASS="H3.Heading3">
+<A NAME="pgfId=8421">
+ </A>
+CMProfileIterateData</H3>
+<P CLASS="T1.Text1">
+<A NAME="pgfId=13686">
+ </A>
+The ColorSync Manager defines the <CODE>CMProfileIterateData</CODE> structure to provide your <A HREF="WhatsNewColorSync25.4.html#10580" CLASS="XRef"><CODE>CMProfileIterateProcPtr</CODE></A> callback routine with a description of a profile during an iteration through the available (or specified) profiles. The structure is defined as follows:</P>
+
+<PRE><CODE>
+<A NAME="pgfId=8441"></A>
+struct CMProfileIterateData {
+    unsigned long   dataVersion;    /* cmProfileIterateDataVersion1 */
+    CM2Header       header;
+    ScriptCode      code;
+    Str255          name;
+    CMProfileLocation  location;
+};
+typedef struct CMProfileIterateData CMProfileIterateData;</P></CODE></PRE>
+
+
+
+
+<P CLASS="RP.RoutineParam">
+<A NAME="pgfId=8466">
+ </A>
+<P><TABLE><TR><TD COLSPAN="1" ROWSPAN="1" ALIGN="LEFT" VALIGN="TOP"><CODE>dataVersion</code>
+<TD COLSPAN="1" ROWSPAN="1" ALIGN="LEFT" VALIGN="TOP">	A value identifying the version of the structure. Currently set to <CODE>
+cmProfileIterateDataVersion1</CODE>.</P>
+<P CLASS="RP.RoutineParam">
+<A NAME="pgfId=8468">
+ </A>
+<TR><TD COLSPAN="1" ROWSPAN="1" ALIGN="LEFT" VALIGN="TOP"><CODE>header</code>
+<TD COLSPAN="1" ROWSPAN="1" ALIGN="LEFT" VALIGN="TOP">
+A ColorSync version 2.x profile header structure, containing information such as the profile size, type, version, and so on.</P>
+<P CLASS="RP.RoutineParam">
+<A NAME="pgfId=8470">
+ </A>
+<TR><TD COLSPAN="1" ROWSPAN="1" ALIGN="LEFT" VALIGN="TOP"><CODE>code</code>
+<TD COLSPAN="1" ROWSPAN="1" ALIGN="LEFT" VALIGN="TOP">
+A script code identifying the script system used for the profile description.</P>
+<P CLASS="RP.RoutineParam">
+<A NAME="pgfId=8472">
+ </A>
+<TR><TD COLSPAN="1" ROWSPAN="1" ALIGN="LEFT" VALIGN="TOP"><CODE>name</code>
+<TD COLSPAN="1" ROWSPAN="1" ALIGN="LEFT" VALIGN="TOP">
+The profile name.</P>
+<P CLASS="RP.RoutineParam">
+<A NAME="pgfId=10151">
+ </A>
+<TR><TD COLSPAN="1" ROWSPAN="1" ALIGN="LEFT" VALIGN="TOP"><CODE>location</code>
+<TD COLSPAN="1" ROWSPAN="1" ALIGN="LEFT" VALIGN="TOP">
+A structure specifying the profile location. With ColorSync 2.5, the location is always file-based, but that may not be true for future versions. Your code should always verify that the location structure contains a file specification before attempting to use it.</P></table>
+</DIV>
+
+<HR>
+<CENTER>
+<P>   
+<A HREF="WhatsNewColorSync25.3.html"><IMG ALIGN = BOTTOM SRC = "prev.gif" border=none hspace=20 alt="Previous"></A> <A HREF="WhatsNewColorSync25-2.html"><IMG ALIGN = BOTTOM SRC = "content.gif" border=none hspace=20 alt="Book Contents"></A>  <A HREF="WhatsNewColorSync25.5.html"><IMG ALIGN = BOTTOM SRC = "next.gif" border=none hspace=20 alt="Next"></A> </CENTER><P>
+
+
+<!-- bottom image banner and para -->
+
+<!-- start of footer -->
+
+<!--#include virtual="/includes/framesetfooter" -->
+
+<!-- end of footer -->
+
+</BODY>
+</HTML>

@@ -1,0 +1,101 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+<head>
+	<title>64-Bit Transition Guide: Simulating a 64-Bit Address Space with mmap and munmap</title>
+	<meta id="Generator" name="Generator" content="Gutenberg"/>
+	<meta id="GeneratorVersion" name="GeneratorVersion" content="v132"/>
+	<meta http-equiv="content-type" content="text/html;charset=utf-8"/>
+	<meta id="Copyright" name="Copyright" content="Copyright 2009 Apple Inc. All Rights Reserved."/>
+	<meta id="IndexTitle" name="IndexTitle" content="Simulating a 64-Bit Address Space with mmap and munmap"/>
+	<meta id="xcode-display" name="xcode-display" content="render"/>
+	<meta id="toc-file" name="toc-file" content="../toc.html"/>
+	<meta id="RESOURCES" content="../../../../Resources" />
+	
+	<link rel="stylesheet" type="text/css" href="../../../../Resources/CSS/frameset_styles.css"/>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/lib/prototype.js"></script>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/lib/scriptaculous.js"></script>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/page.js"></script>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/pedia.js"></script>
+	<!--[if lte IE 6]>
+		<style type="text/css">
+			/*<![CDATA[*/ 
+			html {overflow-x:auto; overflow-y:hidden;  }
+			/*]]>*/
+		</style>
+	<![endif]-->
+</head>    
+<body bgcolor="#ffffff" onload="initialize_page();"><a name="//apple_ref/doc/uid/TP40001064-CH217" title="Simulating a 64-Bit Address Space with mmap and munmap"></a>
+    <noscript>
+    <div id="tocMenu">
+        <iframe id="toc_content" name="toc_content" SRC="../toc.html" width="210" height="100%" align="left" frameborder="0">This document set is best viewed in a browser that supports iFrames.</iframe>
+    </div>
+    </noscript>
+    <div id="bodyText">
+        <a name="top"></a>
+        <div class="hideOnPrint hideInXcode">
+        <!-- start of header -->
+        <!--#include virtual="/includes/framesetheader" -->
+        <!-- end of header -->
+        </div>
+        
+        <!-- start of path -->
+<div class="breadcrumb hideOnPrint hideInXcode"><a href="http://developer.apple.com/" target="_top">ADC Home</a> &gt; <a href="../../../../../referencelibrary/index.html#//apple_ref/doc/uid/TP30000943" target="_top">Reference Library</a> &gt; <a href="../../../../index.html#//apple_ref/doc/uid/TP30000440" target="_top">Guides</a> &gt; <a href="../../../index.html#//apple_ref/doc/uid/TP30000440-TP30000422" target="_top">Darwin</a> &gt; <a href="../../../Porting-date.html#//apple_ref/doc/uid/TP30000440-TP30000422-TP30000553" target="_top">Porting</a> &gt; <a href="../intro/intro.html#//apple_ref/doc/uid/TP40001064-CH205-TPXREF101">64-Bit Transition Guide</a> &gt; </div><br class="hideInXcode"/><!-- end of path -->
+        
+        <div class="mini_nav_text" align="left">
+        <span class="navButtons">
+        <a href="../Cross-ArchitecturePluginSupport/Cross-ArchitecturePluginSupport.html">&lt; Previous Page</a><span style="margin-left: 8px"><a href="../revision_history/revision_history.html">Next Page &gt;</a></span>
+        </span>
+        <span id="showHideTOCUpperSpan">
+        <a href="#" onclick="showHideTOC();"><img src="../../../../Resources/Images/show_toc_icon.gif" width="15" height="14" border="0" style="margin-bottom: -2px;" alt="" hideText="Hide TOC" showText="Show TOC" /></a> <a href="#" onclick="showHideTOC();">Hide TOC</a>
+        </span>
+        </div>
+
+        <hr />
+        
+        
+        <a name="//apple_ref/doc/uid/TP40001064-CH217-CHDHJGIF" title="Simulating a 64-Bit Address Space with mmap and munmap"></a><h1>Simulating a 64-Bit Address Space with mmap and munmap </h1><p>This appendix contains sample code (<span class="content_text">Listing A-1</span>) that demonstrates how to use <code><a href="../../../Reference/ManPages/man2/mmap.2.html#//apple_ref/doc/man/2/mmap" target="_top">mmap(2)</a></code> and <code><a href="../../../Reference/ManPages/man2/munmap.2.html#//apple_ref/doc/man/2/munmap" target="_top">munmap(2)</a></code> to simulate a large address space using offsets into a file.</p><a name="//apple_ref/doc/uid/TP40001064-CH217-DontLinkElementID_24" title="Code Example"></a><h2>Code Example</h2><a name="//apple_ref/doc/uid/TP40001064-CH217-TPXREF101" title="Listing A-1Using mmap and munmap"></a><p class="codesample"><strong>Listing A-1&nbsp;&nbsp;</strong>Using <code>mmap</code> and <code>munmap</code></p><div class="codesample"><table><tr><td scope="row"><pre>#include &lt;stdio.h><span></span></pre></td></tr><tr><td scope="row"><pre>#include &lt;stdlib.h><span></span></pre></td></tr><tr><td scope="row"><pre>#include &lt;string.h><span></span></pre></td></tr><tr><td scope="row"><pre>#include &lt;fcntl.h><span></span></pre></td></tr><tr><td scope="row"><pre>#include &lt;errno.h><span></span></pre></td></tr><tr><td scope="row"><pre>#include &lt;sys/stat.h><span></span></pre></td></tr><tr><td scope="row"><pre>#include &lt;sys/types.h><span></span></pre></td></tr><tr><td scope="row"><pre>#include &lt;sys/mman.h><span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>/*<span></span></pre></td></tr><tr><td scope="row"><pre>* max_mmap_size(filename)<span></span></pre></td></tr><tr><td scope="row"><pre>* A not-so-great attempt to determine at run time how much<span></span></pre></td></tr><tr><td scope="row"><pre>* of a given file can be mapped in.  Usually, the amount will<span></span></pre></td></tr><tr><td scope="row"><pre>* be the minimum of filesize or 0x7fffffff. The math is a<span></span></pre></td></tr><tr><td scope="row"><pre>* wee bit off on the binary search.<span></span></pre></td></tr><tr><td scope="row"><pre>*/<span></span></pre></td></tr><tr><td scope="row"><pre>size_t<span></span></pre></td></tr><tr><td scope="row"><pre>max_mmap_size(const char *file) {<span></span></pre></td></tr><tr><td scope="row"><pre>       int fd;<span></span></pre></td></tr><tr><td scope="row"><pre>       struct stat sbuf;<span></span></pre></td></tr><tr><td scope="row"><pre>       size_t retval;<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>       off_t min = 0, max = (size_t)(~0);<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>       fd = open(file, O_RDONLY);<span></span></pre></td></tr><tr><td scope="row"><pre>       if (fd == -1)<span></span></pre></td></tr><tr><td scope="row"><pre>               return 0;<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>       fstat(fd, &amp;sbuf);<span></span></pre></td></tr><tr><td scope="row"><pre>       if ((sbuf.st_mode &amp; S_IFMT) != S_IFREG) {<span></span></pre></td></tr><tr><td scope="row"><pre>               close(fd);<span></span></pre></td></tr><tr><td scope="row"><pre>               return 0;<span></span></pre></td></tr><tr><td scope="row"><pre>       } else if ((off_t)max > sbuf.st_size)<span></span></pre></td></tr><tr><td scope="row"><pre>               max = (sbuf.st_size);<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>       retval = (size_t)((max + min) / 2);<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>       while (min != max) {<span></span></pre></td></tr><tr><td scope="row"><pre>               caddr_t t;<span></span></pre></td></tr><tr><td scope="row"><pre>               errno = 0;<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>               t = mmap(0, retval, PROT_READ, MAP_SHARED, fd, 0);<span></span></pre></td></tr><tr><td scope="row"><pre>               if (t == (caddr_t)-1 &amp;&amp; errno != 0) {<span></span></pre></td></tr><tr><td scope="row"><pre>                       if (errno != EINVAL)<span></span></pre></td></tr><tr><td scope="row"><pre>                               return 0;<span></span></pre></td></tr><tr><td scope="row"><pre>                       /* too large */<span></span></pre></td></tr><tr><td scope="row"><pre>                       max = retval - 1;<span></span></pre></td></tr><tr><td scope="row"><pre>               } else {<span></span></pre></td></tr><tr><td scope="row"><pre>                       min = retval + 1;<span></span></pre></td></tr><tr><td scope="row"><pre>               }<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>               munmap(t, retval);<span></span></pre></td></tr><tr><td scope="row"><pre>               retval = (size_t)((min + max) / 2);<span></span></pre></td></tr><tr><td scope="row"><pre>       }<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>       close(fd);<span></span></pre></td></tr><tr><td scope="row"><pre>       return (size_t)min - 1;<span></span></pre></td></tr><tr><td scope="row"><pre>}<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>/*<span></span></pre></td></tr><tr><td scope="row"><pre>* sum(filename, starting_offset, size)<span></span></pre></td></tr><tr><td scope="row"><pre>* Sum the bytes in the file specified by the &lt;filename> parameter,<span></span></pre></td></tr><tr><td scope="row"><pre>* starting at the specified offset and continuing for &lt;size> bytes.<span></span></pre></td></tr><tr><td scope="row"><pre>* This is very slow, but this function will eventually touch<span></span></pre></td></tr><tr><td scope="row"><pre>* every byte of the file segment you have asked for.<span></span></pre></td></tr><tr><td scope="row"><pre>*/<span></span></pre></td></tr><tr><td scope="row"><pre>long long<span></span></pre></td></tr><tr><td scope="row"><pre>sum(const char *file, off_t offset, size_t count) {<span></span></pre></td></tr><tr><td scope="row"><pre>       long long retval = 0;<span></span></pre></td></tr><tr><td scope="row"><pre>       struct stat sbuf;<span></span></pre></td></tr><tr><td scope="row"><pre>       int fd;<span></span></pre></td></tr><tr><td scope="row"><pre>       caddr_t t;<span></span></pre></td></tr><tr><td scope="row"><pre>       char *cp;<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>       fd = open(file, O_RDONLY);<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>       if (fd == -1) {<span></span></pre></td></tr><tr><td scope="row"><pre>               return -1LL;<span></span></pre></td></tr><tr><td scope="row"><pre>       }<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>       fstat(fd, &amp;sbuf);<span></span></pre></td></tr><tr><td scope="row"><pre>       if (offset > sbuf.st_size)<span></span></pre></td></tr><tr><td scope="row"><pre>               return -1;<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>       sbuf.st_size -= offset;<span></span></pre></td></tr><tr><td scope="row"><pre>       if (sbuf.st_size &lt; count)<span></span></pre></td></tr><tr><td scope="row"><pre>               count = sbuf.st_size;<span></span></pre></td></tr><tr><td scope="row"><pre>       if (count == 0) {<span></span></pre></td></tr><tr><td scope="row"><pre>               retval = -1LL;<span></span></pre></td></tr><tr><td scope="row"><pre>               goto out;<span></span></pre></td></tr><tr><td scope="row"><pre>       }<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>       errno = 0;<span></span></pre></td></tr><tr><td scope="row"><pre>       fprintf(stderr, "mmap(NULL, %u, PROT_READ, MAP_FILE, %d, %qu)\n",<span></span></pre></td></tr><tr><td scope="row"><pre>               count, fd, offset);<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>       t = mmap(NULL, count, PROT_READ, MAP_FILE, fd, offset);<span></span></pre></td></tr><tr><td scope="row"><pre>       if (t == (caddr_t)-1 &amp;&amp; errno != 0) {<span></span></pre></td></tr><tr><td scope="row"><pre>               fprintf(stderr, "cannot mmap %s: %s\n", file, strerror(errno));<span></span></pre></td></tr><tr><td scope="row"><pre>               retval = -1LL;<span></span></pre></td></tr><tr><td scope="row"><pre>               goto out;<span></span></pre></td></tr><tr><td scope="row"><pre>       }<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>       for (cp = t; cp &lt; &amp;t[count]; cp++)<span></span></pre></td></tr><tr><td scope="row"><pre>               retval += *cp;<span></span></pre></td></tr><tr><td scope="row"><pre>       munmap(t, count);<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>out:<span></span></pre></td></tr><tr><td scope="row"><pre>       close(fd);<span></span></pre></td></tr><tr><td scope="row"><pre>       return retval;<span></span></pre></td></tr><tr><td scope="row"><pre>}<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>main(int ac, char **av) {<span></span></pre></td></tr><tr><td scope="row"><pre>       size_t max;<span></span></pre></td></tr><tr><td scope="row"><pre>       long long s = 0;<span></span></pre></td></tr><tr><td scope="row"><pre>       long long t, off = 0;<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>       if (ac != 2) {<span></span></pre></td></tr><tr><td scope="row"><pre>               fprintf(stderr, "usage: %s &lt;filename>\n", av[0]);<span></span></pre></td></tr><tr><td scope="row"><pre>               exit(1);<span></span></pre></td></tr><tr><td scope="row"><pre>       }<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>       max = max_mmap_size(av[1]);<span></span></pre></td></tr><tr><td scope="row"><pre>       printf("max = %u\n", max);<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>       /*<span></span></pre></td></tr><tr><td scope="row"><pre>        * Cycle through the given filename, in &lt;max>-byte<span></span></pre></td></tr><tr><td scope="row"><pre>        * segments.<span></span></pre></td></tr><tr><td scope="row"><pre>        */<span></span></pre></td></tr><tr><td scope="row"><pre>       while ((t = sum(av[1], off, max)) != -1) {<span></span></pre></td></tr><tr><td scope="row"><pre>               s += t;<span></span></pre></td></tr><tr><td scope="row"><pre>               off += max;<span></span></pre></td></tr><tr><td scope="row"><pre>       }<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>       printf("sum = %qd\n", s);<span></span></pre></td></tr><tr><td scope="row"><pre>       return 0;<span></span></pre></td></tr><tr><td scope="row"><pre>}<span></span></pre></td></tr></table></div>
+
+        <br /><br /> 
+        
+        <div class="mini_nav_text" align="left">
+        <span class="navButtons">
+        <a href="../Cross-ArchitecturePluginSupport/Cross-ArchitecturePluginSupport.html">&lt; Previous Page</a><span style="margin-left: 8px"><a href="../revision_history/revision_history.html">Next Page &gt;</a></span>
+        </span>
+        <span id="showHideTOCLowerSpan">
+        <a href="#" onclick="showHideTOC();"><img src="../../../../Resources/Images/show_toc_icon.gif" width="15" height="14" border="0" style="margin-bottom: -2px;" alt="" /></a> <a href="#" onclick="showHideTOC();">Hide TOC</a>
+        </span>
+        </div>
+
+        <br/><hr /><div align="center"><p class="content_text" lang="en" dir="ltr"> <!--#if expr="0=1" -->&#x00a9; 2004, 2008 Apple Inc. All Rights Reserved. &#40;<!--#endif -->Last updated: 2008-04-08<!--#if expr="0=1" -->&#041;<!--#endif --></p></div>
+
+        
+        <div class="hideOnPrint hideInXcode">
+        <!-- start of footer -->
+        	<table width="100%" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/documentation/Darwin/Conceptual/64bitPorting/pseudo_vm/pseudo_vm.html%3Fid%3DTP40001064-3.1&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/documentation/Darwin/Conceptual/64bitPorting/pseudo_vm/pseudo_vm.html%3Fid%3DTP40001064-3.1&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/documentation/Darwin/Conceptual/64bitPorting/pseudo_vm/pseudo_vm.html%3Fid%3DTP40001064-3.1&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+
+        <!--#include virtual="/includes/framesetfooter" -->
+        <!-- end of footer -->
+        </div>
+    </div>
+</body>
+</html>

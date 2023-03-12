@@ -1,0 +1,149 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+<head>
+	<title>Network Kernel Extensions Programming Guide: Network Interfaces and Protocol Plumbers</title>
+	<meta id="Generator" name="Generator" content="Gutenberg"/>
+	<meta id="GeneratorVersion" name="GeneratorVersion" content="v132"/>
+	<meta http-equiv="content-type" content="text/html;charset=utf-8"/>
+	<meta id="Copyright" name="Copyright" content="Copyright 2009 Apple Inc. All Rights Reserved."/>
+	<meta id="IndexTitle" name="IndexTitle" content="Network Interfaces and Protocol Plumbers"/>
+	<meta id="xcode-display" name="xcode-display" content="render"/>
+	<meta id="toc-file" name="toc-file" content="../toc.html"/>
+	<meta id="RESOURCES" content="../../../../Resources" />
+	
+	<link rel="stylesheet" type="text/css" href="../../../../Resources/CSS/frameset_styles.css"/>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/lib/prototype.js"></script>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/lib/scriptaculous.js"></script>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/page.js"></script>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/pedia.js"></script>
+	<!--[if lte IE 6]>
+		<style type="text/css">
+			/*<![CDATA[*/ 
+			html {overflow-x:auto; overflow-y:hidden;  }
+			/*]]>*/
+		</style>
+	<![endif]-->
+</head>    
+<body bgcolor="#ffffff" onload="initialize_page();"><a name="//apple_ref/doc/uid/TP40001858-CH231" title="Network Interfaces and Protocol Plumbers"></a>
+    <noscript>
+    <div id="tocMenu">
+        <iframe id="toc_content" name="toc_content" SRC="../toc.html" width="210" height="100%" align="left" frameborder="0">This document set is best viewed in a browser that supports iFrames.</iframe>
+    </div>
+    </noscript>
+    <div id="bodyText">
+        <a name="top"></a>
+        <div class="hideOnPrint hideInXcode">
+        <!-- start of header -->
+        <!--#include virtual="/includes/framesetheader" -->
+        <!-- end of header -->
+        </div>
+        
+        <!-- start of path -->
+<div class="breadcrumb hideOnPrint hideInXcode"><a href="http://developer.apple.com/" target="_top">ADC Home</a> &gt; <a href="../../../../../referencelibrary/index.html#//apple_ref/doc/uid/TP30000943" target="_top">Reference Library</a> &gt; <a href="../../../../index.html#//apple_ref/doc/uid/TP30000440" target="_top">Guides</a> &gt; <a href="../../../index.html#//apple_ref/doc/uid/TP30000440-TP30000422" target="_top">Darwin</a> &gt; <a href="../../../Kernel-date.html#//apple_ref/doc/uid/TP30000440-TP30000422-TP30000532" target="_top">Kernel</a> &gt; <a href="../intro/intro.html#//apple_ref/doc/uid/TP40001858-CH225-DontLinkElementID_68">Network Kernel Extensions Programming Guide</a> &gt; </div><br class="hideInXcode"/><!-- end of path -->
+        
+        <div class="mini_nav_text" align="left">
+        <span class="navButtons">
+        <a href="../interface_filter_nke/interface_filter_nke.html">&lt; Previous Page</a><span style="margin-left: 8px"><a href="../reference/reference.html">Next Page &gt;</a></span>
+        </span>
+        <span id="showHideTOCUpperSpan">
+        <a href="#" onclick="showHideTOC();"><img src="../../../../Resources/Images/show_toc_icon.gif" width="15" height="14" border="0" style="margin-bottom: -2px;" alt="" hideText="Hide TOC" showText="Show TOC" /></a> <a href="#" onclick="showHideTOC();">Hide TOC</a>
+        </span>
+        </div>
+
+        <hr />
+        
+        
+        <a name="//apple_ref/doc/uid/TP40001858-CH231-DontLinkElementID_63" title="Network Interfaces and Protocol Plumbers"></a><h1>Network Interfaces and Protocol Plumbers</h1><p>This chapter describes the network interface KPI. This programming interface allows a KEXT to attach new network interfaces, communicate with and manipulate network interfaces, and create new virtual interfaces.</p><p>The mechanism recommended for supporting new interfaces depends on the nature of the interface. The recommended mechanisms are:</p><ul class="ul"><li class="li"><p>Ethernet drivers—subclass the <code><a href="../../../Reference/IOKit/IOEthernetController_h/Classes/IOEthernetController/index.html#//apple_ref/cpp/cl/IOEthernetController" target="_top">IOEthernetController</a></code> and <code><a href="../../../Reference/IOKit/IOEthernetInterface_h/Classes/IOEthernetInterface/index.html#//apple_ref/cpp/cl/IOEthernetInterface" target="_top">IOEthernetInterface</a></code> classes from the I/O Kit’s I/O Networking Family.</p></li><li class="li"><p>Other hardware network controllers—subclass the <code><a href="../../../Reference/IOKit/IONetworkController_h/Classes/IONetworkController/index.html#//apple_ref/cpp/cl/IONetworkController" target="_top">IONetworkController</a></code> and <code><a href="../../../Reference/IOKit/IONetworkInterface_h/Classes/IONetworkInterface/index.html#//apple_ref/cpp/cl/IONetworkInterface" target="_top">IONetworkInterface</a></code> classes.</p></li><li class="li"><p>Virtual interfaces—the interface KPI described in this section is recommended.</p></li></ul><p>This chapter also describes protocol plumbers. Protocol plumbers are used to attach network protocols to interfaces.</p><p>If you are creating support for an interface type that the stack does not already support (such as ATM), regardless of whether your KEXT uses the I/O Kit, you must register protocol plumbers for attaching existing protocols to the new interface type.</p><div class="notebox"><a name="//apple_ref/doc/uid/TP40001858-CH231-DontLinkElementID_64" title="Note"></a><p><strong>Note:</strong>&nbsp;Since more than one developer might attempt to register plumbers for a given interface type, your KEXT should be prepared to handle such a situation. If the demux descriptors are standard, it should be possible for your KEXT to work with a third-party plumber.</p></div><p>The functionality in a network interface is utilized by both the interface driver and the protocol stacks, as shown in <span class="content_text"><a href="interface_nke.html#//apple_ref/doc/uid/TP40001858-CH231-BBAGICDF">Figure 7-1</a></span>.</p><br/><div><a name="//apple_ref/doc/uid/TP40001858-CH231-BBAGICDF" title="Figure 7-1Network Interfaces in the Networking Stack"></a><p><strong>Figure 7-1&nbsp;&nbsp;</strong>Network Interfaces in the Networking Stack</p><img src = "../art/nke_architecture.gif" alt = "Network Interfaces in the Networking Stack" width="457" height="265"></div><br/>
+<!-- This template is being used for both PDF and HTML. -->
+
+    
+    <h4>In this section:</h4>
+    
+    
+    <p class="blockquote">
+    
+        
+			
+			
+				<a href="interface_nke.html#//apple_ref/doc/uid/TP40001858-CH231-DontLinkElementID_18">Network Interface Callbacks</a>
+				
+			<br/>
+			
+        
+			
+			
+				<a href="interface_nke.html#//apple_ref/doc/uid/TP40001858-CH231-DontLinkElementID_19">Installing and Removing Network Interfaces</a>
+				
+			<br/>
+			
+        
+			
+			
+				<a href="interface_nke.html#//apple_ref/doc/uid/TP40001858-CH231-DontLinkElementID_20">Protocol Plumbers</a>
+				
+			<br/>
+			
+        
+			
+			
+				<a href="interface_nke.html#//apple_ref/doc/uid/TP40001858-CH231-DontLinkElementID_21">Sending Data</a>
+				
+			<br/>
+			
+        
+			
+			
+				<a href="interface_nke.html#//apple_ref/doc/uid/TP40001858-CH231-DontLinkElementID_22">Receiving Data</a>
+				
+			<br/>
+			
+        
+
+    </p><br/>
+
+<a name="//apple_ref/doc/uid/TP40001858-CH231-DontLinkElementID_18" title="Network Interface Callbacks"></a><h2>Network Interface Callbacks</h2><p>Your network interface should define the following callbacks, which are called by protocols and drivers:</p><ul class="ul"><li class="li"><p><code><a href="../../../Reference/KPI_Reference/kpi_interface/CompositePage.html#//apple_ref/c/tdef/ifnet_add_proto_func" target="_top">ifnet_add_proto_func</a></code>, which is called whenever a protocol is attached to the interface.</p></li><li class="li"><p><code><a href="../../../Reference/KPI_Reference/kpi_interface/CompositePage.html#//apple_ref/c/tdef/ifnet_check_multi" target="_top">ifnet_check_multi</a></code>, which is called when a multicast address is added to an interface. This allows the interface to reject invalid multicast addresses before they are added to the interface.</p></li><li class="li"><p><code><a href="../../../Reference/KPI_Reference/kpi_interface/CompositePage.html#//apple_ref/c/tdef/ifnet_del_proto_func" target="_top">ifnet_del_proto_func</a></code>, which is called when a protocol is detached from the interface.</p></li><li class="li"><p><code><a href="../../../Reference/KPI_Reference/kpi_interface/CompositePage.html#//apple_ref/c/tdef/ifnet_demux_func" target="_top">ifnet_demux_func</a></code>, which is called with a raw packet from the interface, and returns the protocol family value of the protocol that should process the packet. It can do this using either the demux descriptors registered with <code><a href="../../../Reference/KPI_Reference/kpi_interface/CompositePage.html#//apple_ref/c/tdef/ifnet_add_proto_func" target="_top">ifnet_add_proto_func</a></code> or hard-coded logic. If the packet does not match any protocol, the function should return <code><a href="../../../../Carbon/Reference/Open_Transport/Reference/reference.html#//apple_ref/c/econst/ENOENT" target="_top">ENOENT</a></code>.</p></li><li class="li"><p><code><a href="../../../Reference/KPI_Reference/kpi_interface/CompositePage.html#//apple_ref/c/tdef/ifnet_detached_func" target="_top">ifnet_detached_func</a></code>, which is called when your interface is detached.</p></li><li class="li"><p><code><a href="../../../Reference/KPI_Reference/kpi_interface/CompositePage.html#//apple_ref/c/tdef/ifnet_event_func" target="_top">ifnet_event_func</a></code>, which is called when an event occurs on a particular interface.</p></li><li class="li"><p><code><a href="../../../Reference/KPI_Reference/kpi_interface/CompositePage.html#//apple_ref/c/tdef/ifnet_framer_func" target="_top">ifnet_framer_func</a></code>, which is called with outgoing packets before sending them to outgoing interface filters, and is expected to wrap the packet with a stack frame appropriate to the interface type.</p></li><li class="li"><p><code><a href="../../../Reference/KPI_Reference/kpi_interface/CompositePage.html#//apple_ref/c/tdef/ifnet_ioctl_func" target="_top">ifnet_ioctl_func</a></code>, which is called whenever an ioctl is received for the interface. The network interface is expected to pass these on to the I/O Kit driver if it is necessary and appropriate to do so. All undefined ioctls are reserved for future Apple use. You should use <code>kern_control</code> if you need to add additional control mechanisms.</p></li><li class="li"><p><code><a href="../../../Reference/KPI_Reference/kpi_interface/CompositePage.html#//apple_ref/c/tdef/ifnet_output_func" target="_top">ifnet_output_func</a></code>, which is called with a packet that is ready to be sent out the wire. The network interface is expected to transmit the packet and free the mbuf associated with it. For network interfaces backed by I/O Kit drivers, this callback generally calls a function in the I/O Kit driver that handles both of these tasks.</p></li><li class="li"><p><code><a href="../../../Reference/KPI_Reference/kpi_interface/CompositePage.html#//apple_ref/c/tdef/ifnet_set_bpf_tap" target="_top">ifnet_set_bpf_tap</a></code>, which is called by the stack to set the BPF tap function that is installed on the interface. This callback is optional, but recommended; if you do not add this function, BPF cannot be used with your interface.</p><div class="notebox"><a name="//apple_ref/doc/uid/TP40001858-CH231-DontLinkElementID_65" title="Note"></a><p><strong>Note:</strong>&nbsp;To support BPF, in addition to defining an <code><a href="../../../Reference/KPI_Reference/kpi_interface/CompositePage.html#//apple_ref/c/tdef/ifnet_set_bpf_tap" target="_top">ifnet_set_bpf_tap</a></code> callback, your KEXT must also call <code><a href="../../../Reference/KernelIOKitFramework/bpf_h/index.html#//apple_ref/c/func/bpfattach" target="_top">bpfattach</a></code> after attaching the interface to the stack.</p></div></li></ul><p>Good examples of many of these functions can be found in <code>bsd/net/ether_if_module.c</code> in the <code>xnu</code> (kernel) source tree.</p><a name="//apple_ref/doc/uid/TP40001858-CH231-DontLinkElementID_19" title="Installing and Removing Network Interfaces"></a><h2>Installing and Removing Network Interfaces</h2><p>The following functions are typically called (in the following order) to support the dynamic insertion and removal of network interfaces:</p><ol class="ol"><li class="li"><p><code><a href="../../../Reference/KPI_Reference/kpi_interface/CompositePage.html#//apple_ref/c/func/ifnet_allocate" target="_top">ifnet_allocate</a></code>, which allocates an interface structure.</p></li><li class="li"><p><code><a href="../../../Reference/KPI_Reference/kpi_interface/CompositePage.html#//apple_ref/c/func/ifnet_attach" target="_top">ifnet_attach</a></code>, which attaches an interface to the global interface list.</p></li><li class="li"><p><code><a href="../../../Reference/KernelIOKitFramework/bpf_h/index.html#//apple_ref/c/func/bpfattach" target="_top">bpfattach</a></code>, which enables BPF support on an interface (optional).</p></li><li class="li"><p><code><a href="../../../Reference/KPI_Reference/kpi_interface/CompositePage.html#//apple_ref/c/func/ifnet_detach" target="_top">ifnet_detach</a></code>, which removes an interface from the global interface list.</p></li><li class="li"><p><code><a href="../../../Reference/KPI_Reference/kpi_interface/CompositePage.html#//apple_ref/c/func/ifnet_release" target="_top">ifnet_release</a></code>, which releases a reference to an interface structure. If the reference count reaches zero (0), the structure will be freed. This release matches the <code><a href="../../../Reference/KPI_Reference/kpi_interface/CompositePage.html#//apple_ref/c/func/ifnet_allocate" target="_top">ifnet_allocate</a></code> call earlier, and should be called <em>after</em> calling <code><a href="../../../Reference/KPI_Reference/kpi_interface/CompositePage.html#//apple_ref/c/func/ifnet_detach" target="_top">ifnet_detach</a></code>.</p></li></ol><p>The related function <code><a href="../../../Reference/KPI_Reference/kpi_interface/CompositePage.html#//apple_ref/c/func/ifnet_reference" target="_top">ifnet_reference</a></code> can be used (generally by other KEXTs) to increase the reference count of an interface structure. These calls must be balanced by an equal number of calls to <code><a href="../../../Reference/KPI_Reference/kpi_interface/CompositePage.html#//apple_ref/c/func/ifnet_release" target="_top">ifnet_release</a></code>.</p><a name="//apple_ref/doc/uid/TP40001858-CH231-DontLinkElementID_20" title="Protocol Plumbers"></a><h2>Protocol Plumbers</h2><p>Protocol plumbers, as mentioned previously, are responsible for attaching a protocol to a network interface. When a protocol needs to attach to an interface, it calls a function that looks up the plumber designated for that protocol and interface type, then calls that plumber’s plumb handler.</p><p>Protocol plumbers define the following callbacks, which are called by protocols:</p><ul class="ul"><li class="li"><p><code><a href="../../../Reference/KPI_Reference/kpi_protocol/CompositePage.html#//apple_ref/c/tdef/proto_plumb_handler" target="_top">proto_plumb_handler</a></code>, which is called to attach a protocol to an interface. This typically consists of a call to the interface’s <code><!--a-->ifnet_attach_protocol<!--/a--></code> callback.</p></li><li class="li"><p><code><a href="../../../Reference/KPI_Reference/kpi_protocol/CompositePage.html#//apple_ref/c/tdef/proto_unplumb_handler" target="_top">proto_unplumb_handler</a></code>, which is called to detach a protocol from an interface. The unplumb handler should call the <code><!--a-->ifnet_detach_protocol<!--/a--></code> function, but may do other cleanup such as freeing any storage allocated in the <code><!--a-->proto_plumb_handler<!--/a--></code> callback.</p></li></ul><div class="notebox"><a name="//apple_ref/doc/uid/TP40001858-CH231-DontLinkElementID_66" title="Note"></a><p><strong>Note:</strong>&nbsp;The protocol unplumb handler is optional. If it is <code>NULL</code>, the stack will directly call <code><a href="../../../Reference/KPI_Reference/kpi_interface/CompositePage.html#//apple_ref/c/func/ifnet_detach_protocol" target="_top">ifnet_detach_protocol</a></code> to unplumb the protocol. The plumber only needs to specify an unplumb handler if it needs to do additional cleanup.</p></div><p>When attaching a protocol to an interface, the protocol plumber typically fills in the following fields in the <code><a href="../../../Reference/KPI_Reference/kpi_interface/CompositePage.html#//apple_ref/c/tag/ifnet_attach_proto_param" target="_top">ifnet_attach_proto_param</a></code> structure, many of which may be defined as part of the protocol itself. This mechanism provides the opportunity for the protocol plumber to intercept these calls and take interface-specific actions where needed.</p><ul class="ul"><li class="li"><p><code><a href="../../../Reference/KPI_Reference/kpi_interface/CompositePage.html#//apple_ref/c/tdef/proto_media_detached" target="_top">proto_media_detached</a></code> (optional), which is used to notify the protocol that it is being detached.</p></li><li class="li"><p><code><a href="../../../Reference/KPI_Reference/kpi_interface/CompositePage.html#//apple_ref/c/tdef/proto_media_event" target="_top">proto_media_event</a></code> (optional), which is called to notify a protocol about interface-specific events.</p></li><li class="li"><p><code><a href="../../../Reference/KPI_Reference/kpi_interface/CompositePage.html#//apple_ref/c/tdef/proto_media_input" target="_top">proto_media_input</a></code> (required), which is used to deliver an inbound packet to the protocol for processing.</p></li><li class="li"><p><code><a href="../../../Reference/KPI_Reference/kpi_interface/CompositePage.html#//apple_ref/c/tdef/proto_media_ioctl" target="_top">proto_media_ioctl</a></code> (optional), which is typically the protocol’s ioctl handling function.</p></li><li class="li"><p><code><a href="../../../Reference/KPI_Reference/kpi_interface/CompositePage.html#//apple_ref/c/tdef/proto_media_preout" target="_top">proto_media_preout</a></code> (required), which is called just before a packet is transmitted. This allows the protocol to specify a media-specific frame type and destination.</p></li><li class="li"><p><code><a href="../../../Reference/KPI_Reference/kpi_interface/CompositePage.html#//apple_ref/c/tdef/proto_media_resolve_multi" target="_top">proto_media_resolve_multi</a></code> (optional), which is used to obtain a link layer address for a given protocol layer multicast address. This is only necessary if your interface supports multicast.</p></li><li class="li"><p><code><a href="../../../Reference/KPI_Reference/kpi_interface/CompositePage.html#//apple_ref/c/tdef/proto_media_send_arp" target="_top">proto_media_send_arp</a></code> (optional), which is used to obtain the link layer address corresponding to a given protocol layer unicast address. This is necessary for all non-point-to-point interfaces.</p></li></ul><p>Examples of these functions can be found in <code>bsd/net/ether_inet_pr_module.c</code> in the <code>xnu</code> (kernel) source tree.</p><a name="//apple_ref/doc/uid/TP40001858-CH231-DontLinkElementID_21" title="Sending Data"></a><h2>Sending Data</h2><p>The following steps describe the process of sending a packet, using Ethernet as the example medium:</p><ol class="ol"><li class="li"><p>The <code>ip_output</code> routine in the IP protocol stack calls <code>ifnet_output</code>.</p></li><li class="li"><p>The <code><a href="../../../Reference/KPI_Reference/kpi_interface/CompositePage.html#//apple_ref/c/func/ifnet_output" target="_top">ifnet_output</a></code> function calls the protocol plumber’s <code><a href="../../../Reference/KPI_Reference/kpi_interface/CompositePage.html#//apple_ref/c/tdef/proto_media_preout" target="_top">proto_media_preout</a></code> function. In the case of IP, this function calls <code><a href="../../../Reference/KPI_Reference/in_arp/CompositePage.html#//apple_ref/c/func/inet_arp_lookup" target="_top">inet_arp_lookup</a></code>.</p></li><li class="li"><p>If the ARP cache does not contain an entry for the IP address, <code><a href="../../../Reference/KPI_Reference/in_arp/CompositePage.html#//apple_ref/c/func/inet_arp_lookup" target="_top">inet_arp_lookup</a></code> then calls the protocol plumber’s <code><a href="../../../Reference/KPI_Reference/kpi_interface/CompositePage.html#//apple_ref/c/tdef/proto_media_send_arp" target="_top">proto_media_send_arp</a></code> callback to resolve the target IP address into a media access control (MAC) address.</p></li><li class="li"><p>When the <code><a href="../../../Reference/KPI_Reference/kpi_interface/CompositePage.html#//apple_ref/c/tdef/proto_media_preout" target="_top">proto_media_preout</a></code> callback returns, the <code><a href="../../../Reference/KPI_Reference/kpi_interface/CompositePage.html#//apple_ref/c/func/ifnet_output" target="_top">ifnet_output</a></code> function calls the network interface’s <code><a href="../../../Reference/KPI_Reference/kpi_interface/CompositePage.html#//apple_ref/c/tdef/ifnet_framer_func" target="_top">ifnet_framer_func</a></code> function. This framing function prepends interface-specific frame data to the packet.</p></li><li class="li"><p>If any interface filters are present, their <code><a href="../../../Reference/KPI_Reference/kpi_interfacefilter/CompositePage.html#//apple_ref/c/tdef/iff_output_func" target="_top">iff_output_func</a></code> callbacks are called consecutively.</p></li><li class="li"><p>The <code><a href="../../../Reference/KPI_Reference/kpi_interface/CompositePage.html#//apple_ref/c/func/ifnet_output" target="_top">ifnet_output</a></code> function calls the network interface’s <code><a href="../../../Reference/KPI_Reference/kpi_interface/CompositePage.html#//apple_ref/c/tdef/ifnet_output_func" target="_top">ifnet_output_func</a></code> callback, which transmits the packet and frees the mbuf.</p></li></ol><a name="//apple_ref/doc/uid/TP40001858-CH231-DontLinkElementID_22" title="Receiving Data"></a><h2>Receiving Data</h2><p>The following steps describe the process of receiving a packet:</p><ol class="ol"><li class="li"><p>The hardware driver or its support code calls <code><a href="../../../Reference/KPI_Reference/kpi_interface/CompositePage.html#//apple_ref/c/func/ifnet_input" target="_top">ifnet_input</a></code> with pointers to its <code>ifnet</code> structure (<code><!--a target="_top" -->ifnet_t<!--/a--></code>) and <code>mbuf</code> chain (<code><!--a target="_top" -->mbuf_t<!--/a--></code>).</p></li><li class="li"><p>The packet is queued. Processing resumes on a different thread.</p></li><li class="li"><p>The <code><a href="../../../Reference/KPI_Reference/kpi_interface/CompositePage.html#//apple_ref/c/func/ifnet_input" target="_top">ifnet_input</a></code> function calls the network interface’s <code><a href="../../../Reference/KPI_Reference/kpi_interface/CompositePage.html#//apple_ref/c/tdef/ifnet_demux_func" target="_top">ifnet_demux_func</a></code> function for the interface.</p></li><li class="li"><p>The demultiplexing function identifies the frame and returns a <code><a href="../../../Reference/KPI_Reference/kpi_interface/CompositePage.html#//apple_ref/c/tdef/protocol_family_t" target="_top">protocol_family_t</a></code> value to indicate which protocol should handle the packet.</p></li><li class="li"><p>The <code><a href="../../../Reference/KPI_Reference/kpi_interface/CompositePage.html#//apple_ref/c/func/ifnet_input" target="_top">ifnet_input</a></code> function calls the attached interface filters (if any) sequentially.</p></li><li class="li"><p>Any packets not matching an attached protocol are dropped, as are any promiscuous packets.</p></li><li class="li"><p>The <code><a href="../../../Reference/KPI_Reference/kpi_interface/CompositePage.html#//apple_ref/c/func/ifnet_input" target="_top">ifnet_input</a></code> function calls the protocol plumber’s <code><a href="../../../Reference/KPI_Reference/kpi_interface/CompositePage.html#//apple_ref/c/tdef/proto_media_input" target="_top">proto_media_input</a></code> function. The plumber is specific to a given protocol/interface combination.</p></li></ol><div class="notebox"><a name="//apple_ref/doc/uid/TP40001858-CH231-DontLinkElementID_67" title="Note"></a><p><strong>Note:</strong>&nbsp;The Ethernet-specific module for IP receives the frame and delivers the packet to the protocol's <code><a href="../../../Reference/KPI_Reference/kpi_protocol/CompositePage.html#//apple_ref/c/func/proto_input" target="_top">proto_input</a></code> routine.</p></div>
+
+        <br /><br /> 
+        
+        <div class="mini_nav_text" align="left">
+        <span class="navButtons">
+        <a href="../interface_filter_nke/interface_filter_nke.html">&lt; Previous Page</a><span style="margin-left: 8px"><a href="../reference/reference.html">Next Page &gt;</a></span>
+        </span>
+        <span id="showHideTOCLowerSpan">
+        <a href="#" onclick="showHideTOC();"><img src="../../../../Resources/Images/show_toc_icon.gif" width="15" height="14" border="0" style="margin-bottom: -2px;" alt="" /></a> <a href="#" onclick="showHideTOC();">Hide TOC</a>
+        </span>
+        </div>
+
+        <br/><hr /><div align="center"><p class="content_text" lang="en" dir="ltr"> <!--#if expr="0=1" -->&#x00a9; 2003, 2009 Apple Inc. All Rights Reserved. &#40;<!--#endif -->Last updated: 2009-03-02<!--#if expr="0=1" -->&#041;<!--#endif --></p></div>
+
+        
+        <div class="hideOnPrint hideInXcode">
+        <!-- start of footer -->
+        	<table width="100%" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/documentation/Darwin/Conceptual/NKEConceptual/interface_nke/interface_nke.html%3Fid%3DTP40001858-2.3&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/documentation/Darwin/Conceptual/NKEConceptual/interface_nke/interface_nke.html%3Fid%3DTP40001858-2.3&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/documentation/Darwin/Conceptual/NKEConceptual/interface_nke/interface_nke.html%3Fid%3DTP40001858-2.3&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+
+        <!--#include virtual="/includes/framesetfooter" -->
+        <!-- end of footer -->
+        </div>
+    </div>
+</body>
+</html>

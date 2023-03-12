@@ -1,0 +1,151 @@
+<html lang="en">
+<head>
+<title>Asm Blocks and Functions - Using the GNU Compiler Collection (GCC)</title>
+<meta http-equiv="Content-Type" content="text/html">
+<meta name="description" content="Using the GNU Compiler Collection (GCC)">
+<meta name="generator" content="makeinfo 4.8">
+<link title="Top" rel="start" href="index.html#Top">
+<link rel="up" href="C-Extensions.html#C-Extensions" title="C Extensions">
+<link rel="prev" href="Explicit-Reg-Vars.html#Explicit-Reg-Vars" title="Explicit Reg Vars">
+<link rel="next" href="Alternate-Keywords.html#Alternate-Keywords" title="Alternate Keywords">
+<link href="http://www.gnu.org/software/texinfo/" rel="generator-home" title="Texinfo Homepage">
+<!--
+Copyright (C) 1988, 1989, 1992, 1993, 1994, 1995, 1996, 1997, 1998,
+1999, 2000, 2001, 2002, 2003, 2004, 2005 Free Software Foundation, Inc.
+
+Permission is granted to copy, distribute and/or modify this document
+under the terms of the GNU Free Documentation License, Version 1.2 or
+any later version published by the Free Software Foundation; with the
+Invariant Sections being ``GNU General Public License'' and ``Funding
+Free Software'', the Front-Cover texts being (a) (see below), and with
+the Back-Cover Texts being (b) (see below).  A copy of the license is
+included in the section entitled ``GNU Free Documentation License''.
+
+(a) The FSF's Front-Cover Text is:
+
+     A GNU Manual
+
+(b) The FSF's Back-Cover Text is:
+
+     You have freedom to copy and modify this GNU Manual, like GNU
+     software.  Copies published by the Free Software Foundation raise
+     funds for GNU development.-->
+<meta http-equiv="Content-Style-Type" content="text/css">
+<style type="text/css"><!--
+  pre.display { font-family:inherit }
+  pre.format  { font-family:inherit }
+  pre.smalldisplay { font-family:inherit; font-size:smaller }
+  pre.smallformat  { font-family:inherit; font-size:smaller }
+  pre.smallexample { font-size:smaller }
+  pre.smalllisp    { font-size:smaller }
+  span.sc    { font-variant:small-caps }
+  span.roman { font-family:serif; font-weight:normal; } 
+  span.sansserif { font-family:sans-serif; font-weight:normal; } 
+--></style>
+</head>
+<body>
+<div class="node">
+<p>
+<a name="Asm-Blocks-and-Functions"></a>
+Next:&nbsp;<a rel="next" accesskey="n" href="Alternate-Keywords.html#Alternate-Keywords">Alternate Keywords</a>,
+Previous:&nbsp;<a rel="previous" accesskey="p" href="Explicit-Reg-Vars.html#Explicit-Reg-Vars">Explicit Reg Vars</a>,
+Up:&nbsp;<a rel="up" accesskey="u" href="C-Extensions.html#C-Extensions">C Extensions</a>
+<hr>
+</div>
+
+<h3 class="section">5.39 Blocks and Functions of Assembly Language</h3>
+
+<p>(This feature is APPLE ONLY.)
+
+ <p>In addition to writing single statements in assembly, you can also
+define blocks and entire functions to use a mixed assembly and C
+syntax.  The syntax follows that used in Metrowerks' CodeWarrior on
+PowerPC and Microsoft Visual Studio on x86.  This extension must be
+explicitly enabled with the <samp><span class="option">-fasm-blocks</span></samp> option.
+
+ <p>The block syntax consists of <code>asm</code> followed by braces, with the
+assembly instructions on separate lines.  (However, <code>';'</code> may be
+used to put several instructions on one line in CW-style, and
+<code>asm</code> in either style.)  You write labels with either a preceding
+<code>'@'</code> or a trailing <code>':'</code> (or both, if you prefer); labels
+are always local to the asm block, and there is no way for a label in
+one block to refer to a label in another block.  Comments and lexical
+rules are as for standard C/C++.
+
+<pre class="verbatim">
+int foo (int arg) {
+  register int bar;
+  asm {
+    li bar, 42
+    add bar, arg, bar ; nop ; ; nop
+  }
+  return bar;
+}
+</pre>
+
+ <p>The function syntax uses <code>asm</code> as a keyword in the function
+definition.  In this form, C declarations may appear at the beginning
+of the function body, in order to declare variables that you want to
+use in the body, but may not be used after the first assembly opcode
+or label (even in C99 or C++).
+
+<pre class="verbatim">
+asm int baz (int arg1) {
+    register int loc1, loc2;
+    @123
+    li loc1,4 * 89
+    nand. r5,arg1,loc1
+    ble- cr0, @123
+    otherlab: nop
+    mr r3,r5
+}
+</pre>
+
+ <p>Note that the compiler just passes the instructions through to the
+assembler with only necessary changes, such as a substitution of
+globally unique labels.  Assembly syntax errors will therefore be
+reported by the assembler.
+
+ <p>Also note that the use of literal registers (such as r3) in functions
+may not work properly with functions that are being inlined.
+
+ <p>The following PowerPC instructions are assumed to affect memory: <code>l...</code>
+except <code>la</code>, <code>li</code> and <code>lis</code> (all memory loads),
+<code>st...</code> (all memory stores), <code>sc</code>, <code>td...</code>,
+<code>trap</code>, <code>tw...</code>.  All other instructions are assumed to not
+affect memory.
+
+ <p>The following PowerPC instructions take a memory operand (address operand) as
+their second operand, all other instructions are assumed to not:
+
+ <p><code>la</code>, <code>lbzu</code>, <code>ld</code>, <code>ldu</code>, <code>lfd</code>,
+<code>lfdu</code>, <code>lfs</code>, <code>lfsu</code>, <code>lha</code>, <code>lhau</code>,
+<code>lhz</code>, <code>lhzu</code>, <code>lmw</code>, <code>lwa</code>, <code>lwz</code>,
+<code>lwzu</code>, <code>stb</code>, <code>stbu</code>, <code>std</code>, <code>stdu</code>,
+<code>stfd</code>, <code>stfdu</code>, <code>stfs</code>, <code>stfsu</code>, <code>sth</code>,
+<code>sthu</code>, <code>stmw</code>, <code>stw</code>, <code>stwu</code>.
+
+ <p>Arguments that require substitution beyond vector registers, floating
+point registers, general registers are not supported; an example
+would be trying to use the compiler to allocate condition code
+registers instead of just writting a specific condition code register.
+
+ <p>On x86, the following instructions are not yet implemented by the assembler:
+
+ <p><code>bound r m</code>,
+<code>cmovpe r rm</code>,
+<code>cmovpo r rm</code>,
+<code>cmovz r rm</code>,
+<code>ins m d</code>,
+<code>lods m</code>,
+<code>movs m m</code>
+<code>scas m</code>,
+<code>stos m</code>, and
+<code>xlat m</code>.
+
+ <p>Note, the letters after the instructions are the usual x86 contraint
+letters for the operands. 
+<!-- APPLE LOCAL end CW asm blocks -->
+
+ </body></html>
+

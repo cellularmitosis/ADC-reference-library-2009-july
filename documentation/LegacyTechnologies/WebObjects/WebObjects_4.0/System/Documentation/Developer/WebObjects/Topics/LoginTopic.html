@@ -1,0 +1,1243 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML EXPERIMENTAL 970324//EN">
+<HTML>
+<HEAD>
+<META NAME="GENERATOR" CONTENT="Adobe FrameMaker 5.5/HTML Export Filter">
+<LINK REL="STYLESHEET" HREF="LoginTopic.css">
+<TITLE> </TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+<!--start of banner -->
+<!--#include virtual="/includes/framesetheader" -->
+<!-- end of banner -->
+<!--start of path -->
+<font face="Geneva,Helvetica,Arial" size="1">
+<b>PATH<spacer type="horizontal" size="5">&nbsp;</b>
+ <a href="../../../../../webobjects.html" target="_top">WebObjects 4.0 Documentation</a> <b>&gt;</b>
+ <a href="TopicsTOC.html" target="_top">WebObjects Programming Topics</a>
+</font>
+<br><br>
+<!--end of path -->
+
+
+<H1 CLASS="TopictTitleTOC">
+Implementing a Login Panel
+</H1>
+<DIV>
+<H2 CLASS="Synopsis">
+<A NAME="pgfId=606101">
+ </A>
+Synopsis<DIV>
+<IMG SRC="LoginTopic-1.gif">
+</DIV>
+</H2>
+<P CLASS="Body">
+<A NAME="pgfId=606102">
+ </A>
+Describes how to use WebObjects to implement a reusable login panel with the HTTP `Basic' Authorization scheme, how to secure the login connection using SSL, and how to validate a login against a custom database.</P>
+</DIV>
+<DIV>
+<H2 CLASS="Heading1">
+<A NAME="pgfId=606103">
+ </A>
+Discussion<DIV>
+<IMG SRC="LoginTopic-1.gif">
+</DIV>
+</H2>
+<P CLASS="Body">
+<A NAME="pgfId=606105">
+ </A>
+WebObjects applications commonly require authentication code, often in the form of a login panel.  This topic implements a login panel class that you can subclass and use in your applications.</P>
+<P CLASS="Body">
+<A NAME="pgfId=617830">
+ </A>
+WebObjects login panels can be implemented in the following ways:</P>
+<UL>
+<P CLASS="Bulleted">
+<A NAME="pgfId=617833">
+ </A>
+&#183;	Using a basic HTML page with a login form containing text fields and a Submit button</P>
+<P CLASS="Bulleted">
+<A NAME="pgfId=606107">
+ </A>
+&#183;		Using the HTTP/1.x Basic authentication protocol with the browser's built-in authentication panel</P>
+</UL>
+<P CLASS="Body">
+<A NAME="pgfId=606108">
+ </A>
+Creating a login form using HTML is very easy but suffers two disadvantages: the login credentials are sent in clear text all the way to the application server, and the page's HTML requires maintenance. HTTP-based access authentication uses a browser's login panel to capture the users login information and encodes (but does not encrypt) the login credentials all the way to the application server. Combining either of these login approaches with a secure connection between the browser and the HTTP server using SSL yields a very secure login solution. </P>
+<P CLASS="Body">
+<A NAME="pgfId=606109">
+ </A>
+This programming topic implements a login using the HTTP 1.x Basic authentication scheme, specified in the HTTP/1.0 and HTTP/1.1 standards. The implementation has two phases: presentation and validation. Presentation involves implementing the HTTP/1.x Basic Authentication scheme, decoding the user's login credentials, and presenting an error response if the login fails. Validation involves validating the user's credentials against a database or authentication server, tracking login attempts, and recording users that have been locked out because they exceeded the maximum number of login attempts.</P>
+<DIV>
+<H4 CLASS="Heading2">
+<A NAME="pgfId=606110">
+ </A>
+Using HTTP/1.x Basic Authentication</H4>
+<P CLASS="Body">
+<A NAME="pgfId=609419">
+ </A>
+HTTP defines a simple challenge-response authentication protocol: when a client requests a secure document, the server challenges the client, whereupon the client supplies his credentials, i.e., a user ID and a password. The documents are organized in &quot;realms&quot;. Once the user is permitted to access a particular realm, his browser will cache the login credentials and respond automatically and transparently to further challenges by the server. The authentication realm can have the following values:				</P>
+<TABLE>
+<TR>
+<TD ROWSPAN="1" COLSPAN="1">
+<P CLASS="CellHeading">
+<A NAME="pgfId=609478">
+ </A>
+Realm Value		</P>
+</TD>
+<TD ROWSPAN="1" COLSPAN="1">
+<P CLASS="CellHeading">
+<A NAME="pgfId=609480">
+ </A>
+Authentication Space</P>
+</TD>
+</TR>
+<TR>
+<TD ROWSPAN="1" COLSPAN="1">
+<P CLASS="CellBody">
+<A NAME="pgfId=609482">
+ </A>
+Application Name</P>
+</TD>
+<TD ROWSPAN="1" COLSPAN="1">
+<P CLASS="CellBody">
+<A NAME="pgfId=609484">
+ </A>
+Authenticated one for all application sessions.</P>
+</TD>
+</TR>
+<TR>
+<TD ROWSPAN="1" COLSPAN="1">
+<P CLASS="CellBody">
+<A NAME="pgfId=609486">
+ </A>
+sessionID</P>
+</TD>
+<TD ROWSPAN="1" COLSPAN="1">
+<P CLASS="CellBody">
+<A NAME="pgfId=609488">
+ </A>
+Authenticated for a single application session.</P>
+</TD>
+</TR>
+<TR>
+<TD ROWSPAN="1" COLSPAN="1">
+<P CLASS="CellBody">
+<A NAME="pgfId=609490">
+ </A>
+Page Name	</P>
+</TD>
+<TD ROWSPAN="1" COLSPAN="1">
+<P CLASS="CellBody">
+<A NAME="pgfId=609492">
+ </A>
+Authenticated for a particular page in all sessions.</P>
+</TD>
+</TR>
+<TR>
+<TD ROWSPAN="1" COLSPAN="1">
+<P CLASS="CellBody">
+<A NAME="pgfId=609494">
+ </A>
+SessionID+Page Name</P>
+</TD>
+<TD ROWSPAN="1" COLSPAN="1">
+<P CLASS="CellBody">
+<A NAME="pgfId=609496">
+ </A>
+Authenticated for a particular page in one session.</P>
+</TD>
+</TR>
+<TR>
+<TD ROWSPAN="1" COLSPAN="1">
+<P CLASS="CellBody">
+<A NAME="pgfId=609498">
+ </A>
+ContextId</P>
+</TD>
+<TD ROWSPAN="1" COLSPAN="1">
+<P CLASS="CellBody">
+<A NAME="pgfId=609500">
+ </A>
+Authenticated for one request only.</P>
+</TD>
+</TR>
+</TABLE>
+<P CLASS="Warning">
+<A NAME="pgfId=609026">
+ </A>
+<DIV>
+<IMG SRC="LoginTopic-1.gif">
+</DIV>
+Note	Once the user exits the browser, all of his 	authenticated realms are lost because<BR>
+	the browser forgets his username and password.<DIV>
+<IMG SRC="LoginTopic-1.gif">
+</DIV>
+</P>
+<P CLASS="Body">
+<A NAME="pgfId=621419">
+ </A>
+The state of the authentication process is stored in the <EM CLASS="Code">
+session</EM>
+ object using the <EM CLASS="Code">
+authState</EM>
+ variable. Table 1 shows the authentication request-response loop:</P>
+<TABLE>
+<CAPTION>
+<H6 CLASS="TableTitle">
+<A NAME="pgfId=611483">
+ </A>
+TABLE 1. Request-Response Loop</H6>
+</CAPTION>
+<TR>
+<TD ROWSPAN="1" COLSPAN="1">
+<P CLASS="CellHeading">
+<A NAME="pgfId=611489">
+ </A>
+Browser</P>
+</TD>
+<TD ROWSPAN="1" COLSPAN="1">
+<P CLASS="CellHeading">
+<A NAME="pgfId=611491">
+ </A>
+Current Page</P>
+</TD>
+<TD ROWSPAN="1" COLSPAN="1">
+<P CLASS="CellHeading">
+<A NAME="pgfId=611493">
+ </A>
+Authenticated Page</P>
+</TD>
+</TR>
+<TR>
+<TD ROWSPAN="1" COLSPAN="1">
+<P CLASS="CellBody">
+<A NAME="pgfId=611495">
+ </A>
+Submits request for authenticated page.</P>
+<P CLASS="CellBody">
+<A NAME="pgfId=611496">
+ </A>
+Brings up login panel if realm was not previously authenticated.</P>
+<P CLASS="CellBody">
+<A NAME="pgfId=611497">
+ </A>
+Sets authorization header set to Basic &quot;some_base64_encoded_login_String&quot; and sends authorization request. </P>
+<P CLASS="CellBody">
+<A NAME="pgfId=611498">
+ </A>
+Displays Authenticated page.</P>
+<P CLASS="CellBody">
+<A NAME="pgfId=611499">
+ </A>
+Displays Error page.</P>
+</TD>
+<TD ROWSPAN="1" COLSPAN="1">
+<P CLASS="CellBody">
+<A NAME="pgfId=611501">
+ </A>
+Invokes requested method to create page.</P>
+<P CLASS="CellBody">
+<A NAME="pgfId=611502">
+ </A>
+Creates new Authenticated page.</P>
+<P CLASS="CellBody">
+<A NAME="pgfId=611503">
+ </A>
+Sets new page's authState var to &quot;authNeeded&quot;.</P>
+<P CLASS="CellBody">
+<A NAME="pgfId=611504">
+ </A>
+Returns Authenticated page with modified content and HTTP status. </P>
+<P CLASS="CellBody">
+<A NAME="pgfId=611505">
+ </A>
+Receives same request  to invoke method. </P>
+<P CLASS="CellBody">
+<A NAME="pgfId=611506">
+ </A>
+Creates or returns new Authenticated page.</P>
+<P CLASS="CellBody">
+<A NAME="pgfId=611507">
+ </A>
+Returns normal Authenticated page with HTTP status 200.</P>
+<P CLASS="CellBody">
+<A NAME="pgfId=611508">
+ </A>
+Returns Authenticated page with error content and HTTP 403 status. </P>
+</TD>
+<TD ROWSPAN="1" COLSPAN="1">
+<P CLASS="CellBody">
+<A NAME="pgfId=611510">
+ </A>
+Overrides appendToResponse, invokes super.appendToResponse, then invokes handleAuthorizationRequest()</P>
+<P CLASS="CellBody">
+<A NAME="pgfId=611511">
+ </A>
+If authState = &quot;authNeeded&quot;, sets HTTP status to 401, sets www-authenticate header to `Basic' realm=someSessionId  and sets authState to &quot;authLogin&quot;.</P>
+<P CLASS="CellBody">
+<A NAME="pgfId=611512">
+ </A>
+If authState = &quot;authLogin&quot;, decode and parse Base64 encoded login string and  perform validation. Sets authState to &quot;accessDenied&quot; or &quot;authenticated&quot;.             </P>
+<P CLASS="CellBody">
+<A NAME="pgfId=611513">
+ </A>
+If authState = &quot;authenticated&quot;, generates normal response page .</P>
+<P CLASS="CellBody">
+<A NAME="pgfId=611514">
+ </A>
+If authState = &quot;accessDenied&quot;, sets HTTP status to 403 and content to HTTP 403(Unauthorized)</P>
+</TD>
+</TR>
+</TABLE>
+<P CLASS="Body">
+<A NAME="pgfId=611516">
+ </A>
+When your application receives a request for a specific page, or a method invocation in the current page, it can challenge the request by sending a special response that causes the browser to display the authentication panel. </P>
+</DIV>
+<DIV>
+<H4 CLASS="Heading2">
+<A NAME="pgfId=606159">
+ </A>
+The &quot;Authenticated App&quot; Example </H4>
+<P CLASS="Body">
+<A NAME="pgfId=606160">
+ </A>
+This application has two pages, implemented in Figures 1 and 2. The <EM CLASS="Code">
+Main</EM>
+ page is a welcome page with a link to login and continue. The second page is the page containing secure data. In <EM CLASS="Code">
+Main</EM>
+, <EM CLASS="Code">
+anAction()</EM>
+ is invoked when the user's request to login is received. This method creates the new page, a subclass of  <EM CLASS="Code">
+AuthenticatedComponent</EM>
+, that displays the login panel and validates the login. Once the login is validated, the page returns its normal contents. In Figure 1, the <EM CLASS="Code">
+page.authenticateComponent()</EM>
+ message flags that <EM CLASS="Code">
+page</EM>
+ requires authentication. The login panel is displayed when <EM CLASS="Code">
+page</EM>
+ is returned.</P>
+<DIV>
+<H5 CLASS="Code-Listing">
+<A NAME="pgfId=608480">
+ </A>
+Figure 1.  Java Code for the Main Page</H5>
+<DIV>
+<pre>public class Main extends WOComponent {</pre></DIV>
+<A NAME="pgfId=608482">
+ </A>
+<DIV>
+<pre>    public WOComponent anAction()</pre></DIV>
+<A NAME="pgfId=608484">
+ </A>
+<DIV>
+<pre>    {</pre></DIV>
+<A NAME="pgfId=608486">
+ </A>
+<DIV>
+<pre>        AuthenticatedComponent page;</pre></DIV>
+<A NAME="pgfId=608488">
+ </A>
+<DIV>
+<pre>        page=(AuthenticatedComponent)this.pageWithName("NewPage");</pre></DIV>
+<A NAME="pgfId=608490">
+ </A>
+<DIV>
+<pre>        page.authenticateComponent(this.session().sessionID());</pre></DIV>
+<A NAME="pgfId=608492">
+ </A>
+<DIV>
+<pre>        return page;</pre></DIV>
+<A NAME="pgfId=608494">
+ </A>
+<DIV>
+<pre>    }</pre></DIV>
+<A NAME="pgfId=608496">
+ </A>
+<DIV>
+<pre>}</pre></DIV>
+<A NAME="pgfId=608498">
+ </A>
+<DIV>
+<pre>//NewPage.java code fragment</pre></DIV>
+<A NAME="pgfId=608500">
+ </A>
+<DIV>
+<pre>public class NewPage extends AuthenticatedComponent {. . . . . .</pre></DIV>
+<A NAME="pgfId=608502">
+ </A>
+<P CLASS="Body">
+<A NAME="pgfId=621496">
+ </A>
+&nbsp;</P>
+<P CLASS="Body">
+<A NAME="pgfId=606178">
+ </A>
+When<EM CLASS="Code">
+ page.authenticateComponent() </EM>
+is invoked, the <EM CLASS="Code">
+authState </EM>
+variable is set to<EM CLASS="Code">
+ </EM>
+&quot;authNeeded&quot;<EM CLASS="Code">
+ </EM>
+and is stored in the session dictionary along with <EM CLASS="Code">
+authSpace</EM>
+. In this example <EM CLASS="Code">
+authSpace</EM>
+ contains the authentication realm; it  is set to the <EM CLASS="Code">
+sessionID</EM>
+ to indicate that authentication is only required once per session.</P>
+</DIV>
+<DIV>
+<H5 CLASS="Code-Listing">
+<A NAME="pgfId=608532">
+ </A>
+Figure 2.  Java Code for the Secure Page</H5>
+<DIV>
+<pre>public class AuthenticatedComponent extends WOComponent{</pre></DIV>
+<A NAME="pgfId=608534">
+ </A>
+<DIV>
+<pre>public void authenticateComponent(String authSpace){</pre></DIV>
+<A NAME="pgfId=608536">
+ </A>
+<DIV>
+<pre>    String authState=(String)this.session().objectForKey("authState");</pre></DIV>
+<A NAME="pgfId=608538">
+ </A>
+<DIV>
+<pre>    if(authState==null){</pre></DIV>
+<A NAME="pgfId=608540">
+ </A>
+<DIV>
+<pre>        this.session().setObjectForKey("authNeeded","authState");</pre></DIV>
+<A NAME="pgfId=608542">
+ </A>
+<DIV>
+<pre>        this.session().setObjectForKey(authSpace,"authSpace");</pre></DIV>
+<A NAME="pgfId=608544">
+ </A>
+<DIV>
+<pre>    }</pre></DIV>
+<A NAME="pgfId=608546">
+ </A>
+<DIV>
+<pre>...</pre></DIV>
+<A NAME="pgfId=608548">
+ </A>
+<P CLASS="Body">
+<A NAME="pgfId=606192">
+ </A>
+The <EM CLASS="Code">
+appendToResponse()</EM>
+ method, invoked automatically when a page is returned, is overridden to display the login panel. For clarity, this example implements the guts of the response generator in a separate method:  <EM CLASS="Code">
+responseForAuthorization(WOResponse aResponse, String aRealm ), </EM>
+where  parameter <EM CLASS="Code">
+aRealm </EM>
+refers to the protection space. The superclass version of<EM CLASS="Code">
+ appendToResponse()</EM>
+ must be called first to generate the initial WOResponse. </P>
+</DIV>
+<DIV>
+<H5 CLASS="Code-Listing">
+<A NAME="pgfId=608561">
+ </A>
+Figure 3.  Java Code for Overriding appendToResponse</H5>
+<DIV>
+<pre>// in the AuthenticatedComponent class</pre></DIV>
+<A NAME="pgfId=608563">
+ </A>
+<DIV>
+<pre></pre></DIV>
+<A NAME="pgfId=621761">
+ </A>
+<DIV>
+<pre>public void appendToResponse(WOResponse aResponse, WOContext aContext)</pre></DIV>
+<A NAME="pgfId=621746">
+ </A>
+<DIV>
+<pre>{</pre></DIV>
+<A NAME="pgfId=621747">
+ </A>
+<DIV>
+<pre>    String sessionId;</pre></DIV>
+<A NAME="pgfId=621748">
+ </A>
+<DIV>
+<pre>    super.appendToResponse(aResponse, aContext);</pre></DIV>
+<A NAME="pgfId=621749">
+ </A>
+<DIV>
+<pre>    sessionId=(String)this.session().objectForKey("authSpace");</pre></DIV>
+<A NAME="pgfId=621750">
+ </A>
+<DIV>
+<pre>    responseForAuthorization(aResponse, sessionId);</pre></DIV>
+<A NAME="pgfId=621751">
+ </A>
+<DIV>
+<pre>}</pre></DIV>
+<A NAME="pgfId=621752">
+ </A>
+<P CLASS="Body">
+<A NAME="pgfId=621753">
+ </A>
+&nbsp;</P>
+<P CLASS="Body">
+<A NAME="pgfId=621551">
+ </A>
+&nbsp;</P>
+<P CLASS="Body">
+<A NAME="pgfId=606204">
+ </A>
+Figure 4 shows the <EM CLASS="Code">
+responseForAuthorization</EM>
+ code which actually generates the response. If the <EM CLASS="Code">
+authState</EM>
+  is <EM CLASS="Code">
+&quot;authNeeded&quot;</EM>
+, the response is initialized with the HTTP status set to 401. The<EM CLASS="Code">
+ WWW-Authenticate </EM>
+header is set with the value <EM CLASS="Code">
+Basic realm=&quot;some sessionID&quot;</EM>
+. When the browser receives this response, it pops up a login panel requesting the user ID and password. When the user enters this information, the browser sends it back to the web server along with the original request. This request contains an <EM CLASS="Code">
+Authorization </EM>
+header and the <EM CLASS="Code">
+&lt;Base64 encoded&gt; </EM>
+credentials having the format: <EM CLASS="Code">
+Basic &lt;userid:password&gt;.</EM>
+ </P>
+<P CLASS="Body">
+<A NAME="pgfId=606205">
+ </A>
+If the validation is unsuccessful, <EM CLASS="Code">
+responseForAuthorization</EM>
+ returns a response with HTTP status 403 (Unauthorized). If the validation is successful, <EM CLASS="Code">
+responseForAuthorization</EM>
+ returns the response page unmodified. You can add code to handle users that attempt too many unsuccessful logins. Possible strategies are:</P>
+<UL>
+<P CLASS="Bulleted">
+<A NAME="pgfId=606206">
+ </A>
+&#183;		Terminate the session after the 403 response is sent by invoking<BR>
+<EM CLASS="Code">
+WebApplication.session().terminate();<BR>
+</EM>
+The session will terminate after the response is sent.</P>
+<P CLASS="Bulleted">
+<A NAME="pgfId=606209">
+ </A>
+&#183;		Record the remote user's IP address and disallow further login attempts from this IP address for a limited time. You can get the IP address of the remote host by reading the value of the <EM CLASS="Code">
+x-webobjects-remote-host </EM>
+header from the request, then terminate the session.</P>
+</UL>
+</DIV>
+<DIV>
+<H5 CLASS="Code-Listing">
+<A NAME="pgfId=608632">
+ </A>
+Figure 4.  Java Code for responseForAuthorization</H5>
+<DIV>
+<pre>String ipAddr=aRequest.headerForKey("x-webobjects-remote-host");</pre></DIV>
+<A NAME="pgfId=608634">
+ </A>
+<DIV>
+<pre></pre></DIV>
+<A NAME="pgfId=621574">
+ </A>
+<DIV>
+<pre>//In AuthenticatedComponent</pre></DIV>
+<A NAME="pgfId=608636">
+ </A>
+<DIV>
+<pre>public void responseForAuthorization(WOResponse aResponse,String aRealm )</pre></DIV>
+<A NAME="pgfId=608638">
+ </A>
+<DIV>
+<pre>{ </pre></DIV>
+<A NAME="pgfId=608640">
+ </A>
+<DIV>
+<pre>    NSData errorBytes;</pre></DIV>
+<A NAME="pgfId=608642">
+ </A>
+<DIV>
+<pre>    String errorText= </pre></DIV>
+<A NAME="pgfId=608644">
+ </A>
+<DIV>
+<pre>        "HTTP/1.0 403 Unauthorized Access";</pre></DIV>
+<A NAME="pgfId=621575">
+ </A>
+<DIV>
+<pre>    String authState=(String)this.session().objectForKey("authState");</pre></DIV>
+<A NAME="pgfId=608646">
+ </A>
+<DIV>
+<pre>    if(authState!=null  )</pre></DIV>
+<A NAME="pgfId=608648">
+ </A>
+<DIV>
+<pre>    {</pre></DIV>
+<A NAME="pgfId=608650">
+ </A>
+<DIV>
+<pre>        String encodedAuth=this.context().</pre></DIV>
+<A NAME="pgfId=608652">
+ </A>
+<DIV>
+<pre>            request().headerForKey("authorization");</pre></DIV>
+<A NAME="pgfId=621576">
+ </A>
+<DIV>
+<pre></pre></DIV>
+<A NAME="pgfId=621710">
+ </A>
+<DIV>
+<pre>        if(encodedAuth!=null && authState.equals("authLogin"))</pre></DIV>
+<A NAME="pgfId=608654">
+ </A>
+<DIV>
+<pre>        {</pre></DIV>
+<A NAME="pgfId=608656">
+ </A>
+<DIV>
+<pre>            handleAuthorizationRequest(encodedAuth);</pre></DIV>
+<A NAME="pgfId=608658">
+ </A>
+<DIV>
+<pre>            authState=(String)this.session().objectForKey("authState");</pre></DIV>
+<A NAME="pgfId=608660">
+ </A>
+<DIV>
+<pre>        }</pre></DIV>
+<A NAME="pgfId=608662">
+ </A>
+<DIV>
+<pre></pre></DIV>
+<A NAME="pgfId=621711">
+ </A>
+<DIV>
+<pre>        if(authState.equals("authenticated"))</pre></DIV>
+<A NAME="pgfId=621583">
+ </A>
+<DIV>
+<pre>            return;</pre></DIV>
+<A NAME="pgfId=621594">
+ </A>
+<DIV>
+<pre>        else</pre></DIV>
+<A NAME="pgfId=608668">
+ </A>
+<DIV>
+<pre>        {</pre></DIV>
+<A NAME="pgfId=621709">
+ </A>
+<DIV>
+<pre>            errorBytes = new NSData(errorText.getBytes());</pre></DIV>
+<A NAME="pgfId=608670">
+ </A>
+<DIV>
+<pre>            aResponse.setContent(errorBytes);</pre></DIV>
+<A NAME="pgfId=621601">
+ </A>
+<DIV>
+<pre>            aResponse.setHeader(new Integer(errorBytes.length()).</pre></DIV>
+<A NAME="pgfId=608674">
+ </A>
+<DIV>
+<pre>                toString(), "content-length");</pre></DIV>
+<A NAME="pgfId=621643">
+ </A>
+<DIV>
+<pre>            aResponse.setHeader("text/html" , "content-type");</pre></DIV>
+<A NAME="pgfId=608676">
+ </A>
+<DIV>
+<pre>            if(authState.equals("authNeeded")  )//validation needed</pre></DIV>
+<A NAME="pgfId=608678">
+ </A>
+<DIV>
+<pre>            {</pre></DIV>
+<A NAME="pgfId=608680">
+ </A>
+<DIV>
+<pre>                aResponse.setStatus(401); //authorization request</pre></DIV>
+<A NAME="pgfId=608682">
+ </A>
+<DIV>
+<pre>                aResponse.setHeader(</pre></DIV>
+<A NAME="pgfId=608684">
+ </A>
+<DIV>
+<pre>                    "Basic realm=\"" + aRealm + "\"" , "WWW-Authenticate");</pre></DIV>
+<A NAME="pgfId=621602">
+ </A>
+<DIV>
+<pre>                this.session().setObjectForKey("authLogin","authState");</pre></DIV>
+<A NAME="pgfId=608686">
+ </A>
+<DIV>
+<pre>            }</pre></DIV>
+<A NAME="pgfId=608688">
+ </A>
+<DIV>
+<pre>            else if(authState.equals("accessDenied"))</pre></DIV>
+<A NAME="pgfId=608690">
+ </A>
+<DIV>
+<pre>                aResponse.setStatus(403);// unauthorized status</pre></DIV>
+<A NAME="pgfId=621609">
+ </A>
+<DIV>
+<pre>        }	</pre></DIV>
+<A NAME="pgfId=621616">
+ </A>
+<DIV>
+<pre>    }</pre></DIV>
+<A NAME="pgfId=621638">
+ </A>
+<DIV>
+<pre>}</pre></DIV>
+<A NAME="pgfId=621708">
+ </A>
+<P CLASS="Body">
+<A NAME="pgfId=606254">
+ </A>
+Figure 5 shows the code that decodes the credentials and invokes the validation code. The authorization header value is extracted from the request and Base64 decoded with <EM CLASS="Code">
+sun.misc.BASE64Decoder</EM>
+ (included with the standard Java Developer Kit (JDK)). The decoded header is parsed to extract the user name and password, which are sent to the validation code.</P>
+</DIV>
+<DIV>
+<H5 CLASS="Code-Listing">
+<A NAME="pgfId=608742">
+ </A>
+Figure 5.  Java Code to Extract Credentials</H5>
+<DIV>
+<pre>//In AuthenticatedComponent</pre></DIV>
+<A NAME="pgfId=608744">
+ </A>
+<DIV>
+<pre>public  void handleAuthorizationRequest(String encodedAuth)</pre></DIV>
+<A NAME="pgfId=608746">
+ </A>
+<DIV>
+<pre>{</pre></DIV>
+<A NAME="pgfId=608748">
+ </A>
+<DIV>
+<pre>    String decodedAuth=null;</pre></DIV>
+<A NAME="pgfId=608750">
+ </A>
+<DIV>
+<pre>    EOEnterpriseObject validatedUser;</pre></DIV>
+<A NAME="pgfId=608752">
+ </A>
+<DIV>
+<pre>    sun.misc.BASE64Decoder decoder=new sun.misc.BASE64Decoder();</pre></DIV>
+<A NAME="pgfId=608754">
+ </A>
+<DIV>
+<pre></pre></DIV>
+<A NAME="pgfId=608756">
+ </A>
+<DIV>
+<pre>    //encoded string starts after "Basic "</pre></DIV>
+<A NAME="pgfId=621804">
+ </A>
+<DIV>
+<pre>    encodedAuth=encodedAuth.substring(encodedAuth.indexOf(" ")+1);</pre></DIV>
+<A NAME="pgfId=608758">
+ </A>
+<DIV>
+<pre>    try{        </pre></DIV>
+<A NAME="pgfId=608760">
+ </A>
+<DIV>
+<pre>        decodedAuth=new String(decoder.decodeBuffer((new ByteArrayInputStream</pre></DIV>
+<A NAME="pgfId=608762">
+ </A>
+<DIV>
+<pre>            (encodedAuth.getBytes()))));</pre></DIV>
+<A NAME="pgfId=621805">
+ </A>
+<DIV>
+<pre>    } catch(IOException ex) {}</pre></DIV>
+<A NAME="pgfId=608764">
+ </A>
+<DIV>
+<pre>    </pre></DIV>
+<A NAME="pgfId=608766">
+ </A>
+<DIV>
+<pre>    //extract username:password, assume methods and ivars exist</pre></DIV>
+<A NAME="pgfId=621806">
+ </A>
+<DIV>
+<pre>    String userName=userNameFromDecodedAuthString(decodedAuth);</pre></DIV>
+<A NAME="pgfId=608768">
+ </A>
+<DIV>
+<pre>    String password=passwordFromDecodedAuthString(decodedAuth);</pre></DIV>
+<A NAME="pgfId=608770">
+ </A>
+<DIV>
+<pre></pre></DIV>
+<A NAME="pgfId=608772">
+ </A>
+<DIV>
+<pre>    //then validate. Again, assume this exists</pre></DIV>
+<A NAME="pgfId=621811">
+ </A>
+<DIV>
+<pre>    if ((validatedUser=validateUserNameAndPassword(userName,</pre></DIV>
+<A NAME="pgfId=608774">
+ </A>
+<DIV>
+<pre>        password))!=null) {</pre></DIV>
+<A NAME="pgfId=621807">
+ </A>
+<DIV>
+<pre>        this.session().setObjectForKey("authenticated","authState");</pre></DIV>
+<A NAME="pgfId=608776">
+ </A>
+<DIV>
+<pre>        this.session().setObjectForKey(validatedUser,"validatedUser");</pre></DIV>
+<A NAME="pgfId=621810">
+ </A>
+<DIV>
+<pre>    } else {</pre></DIV>
+<A NAME="pgfId=608780">
+ </A>
+<DIV>
+<pre>       this.session().setObjectForKey("authNeeded","authState");</pre></DIV>
+<A NAME="pgfId=608784">
+ </A>
+<DIV>
+<pre>    }</pre></DIV>
+<A NAME="pgfId=608786">
+ </A>
+<DIV>
+<pre>}</pre></DIV>
+<A NAME="pgfId=608788">
+ </A>
+<DIV>
+<pre></pre></DIV>
+<A NAME="pgfId=608790">
+ </A>
+<DIV>
+<pre>public static String userNameFromDecodedAuthString(String auth) {</pre></DIV>
+<A NAME="pgfId=621814">
+ </A>
+<DIV>
+<pre>    if(auth!=null){</pre></DIV>
+<A NAME="pgfId=608792">
+ </A>
+<DIV>
+<pre>        StringTokenizer st=new StringTokenizer(auth,":",true);</pre></DIV>
+<A NAME="pgfId=608794">
+ </A>
+<DIV>
+<pre>        String username;</pre></DIV>
+<A NAME="pgfId=608796">
+ </A>
+<DIV>
+<pre>        if(( username=st.nextToken())!=null){</pre></DIV>
+<A NAME="pgfId=608798">
+ </A>
+<DIV>
+<pre>            if(!username.equals(":")){</pre></DIV>
+<A NAME="pgfId=608800">
+ </A>
+<DIV>
+<pre>                return username;</pre></DIV>
+<A NAME="pgfId=608802">
+ </A>
+<DIV>
+<pre>            }</pre></DIV>
+<A NAME="pgfId=608804">
+ </A>
+<DIV>
+<pre>        }</pre></DIV>
+<A NAME="pgfId=608806">
+ </A>
+<DIV>
+<pre>    }</pre></DIV>
+<A NAME="pgfId=608808">
+ </A>
+<DIV>
+<pre>    return "";</pre></DIV>
+<A NAME="pgfId=608810">
+ </A>
+<DIV>
+<pre>}</pre></DIV>
+<A NAME="pgfId=608812">
+ </A>
+<DIV>
+<pre>public static String passwordFromDecodedAuthString(String auth ) {</pre></DIV>
+<A NAME="pgfId=608814">
+ </A>
+<DIV>
+<pre>    if(auth!=null){</pre></DIV>
+<A NAME="pgfId=608816">
+ </A>
+<DIV>
+<pre>        StringTokenizer st=new StringTokenizer(auth,":",true);</pre></DIV>
+<A NAME="pgfId=608818">
+ </A>
+<DIV>
+<pre>        if(st.countTokens()==3){</pre></DIV>
+<A NAME="pgfId=608820">
+ </A>
+<DIV>
+<pre>            st.nextToken(); st.nextToken();</pre></DIV>
+<A NAME="pgfId=608822">
+ </A>
+<DIV>
+<pre>            return st.nextToken();</pre></DIV>
+<A NAME="pgfId=608824">
+ </A>
+<DIV>
+<pre>        }</pre></DIV>
+<A NAME="pgfId=608826">
+ </A>
+<DIV>
+<pre>        else if(st.countTokens()==2){</pre></DIV>
+<A NAME="pgfId=608828">
+ </A>
+<DIV>
+<pre>            st.nextToken();</pre></DIV>
+<A NAME="pgfId=608830">
+ </A>
+<DIV>
+<pre>            String passwd=st.nextToken();</pre></DIV>
+<A NAME="pgfId=608832">
+ </A>
+<DIV>
+<pre>            if(!passwd.equals(":"))</pre></DIV>
+<A NAME="pgfId=608834">
+ </A>
+<DIV>
+<pre>                return passwd;</pre></DIV>
+<A NAME="pgfId=608836">
+ </A>
+<DIV>
+<pre>        }</pre></DIV>
+<A NAME="pgfId=608838">
+ </A>
+<DIV>
+<pre>    }</pre></DIV>
+<A NAME="pgfId=608840">
+ </A>
+<DIV>
+<pre>    return "";</pre></DIV>
+<A NAME="pgfId=608842">
+ </A>
+<DIV>
+<pre>}</pre></DIV>
+<A NAME="pgfId=608844">
+ </A>
+<P CLASS="Body">
+<A NAME="pgfId=621568">
+ </A>
+&nbsp;</P>
+</DIV>
+</DIV>
+<DIV>
+<H4 CLASS="Heading2">
+<A NAME="pgfId=606315">
+ </A>
+Implementing Validation </H4>
+<P CLASS="Body">
+<A NAME="pgfId=606316">
+ </A>
+Once the login credentials have been received, decoded, and parsed, they must be validated. Several options exist:</P>
+<UL>
+<P CLASS="Bulleted">
+<A NAME="pgfId=606317">
+ </A>
+&#183;		Authentication on LDAP server</P>
+<P CLASS="Bulleted">
+<A NAME="pgfId=606318">
+ </A>
+&#183;		Custom database with username, password, access rights, and so on</P>
+<P CLASS="Bulleted">
+<A NAME="pgfId=606319">
+ </A>
+&#183;		Create a new database connection with users login credentials.</P>
+</UL>
+<P CLASS="Body">
+<A NAME="pgfId=606320">
+ </A>
+We discuss the second option, authenticating against a custom database with login information. The following example assumes an existing database with user data and an EOModel. Once the login validation method is invoked, a fetch is performed against the login credentials. </P>
+<DIV>
+<H5 CLASS="Code-Listing">
+<A NAME="pgfId=608891">
+ </A>
+Figure 6.  Java Code</H5>
+<DIV>
+<pre>//In AuthenticatedComponent</pre></DIV>
+<A NAME="pgfId=608893">
+ </A>
+<DIV>
+<pre></pre></DIV>
+<A NAME="pgfId=621835">
+ </A>
+<DIV>
+<pre>public EOEnterpriseObject validateUserNameAndPassword </pre></DIV>
+<A NAME="pgfId=608895">
+ </A>
+<DIV>
+<pre>    (String username, String password)</pre></DIV>
+<A NAME="pgfId=621836">
+ </A>
+<DIV>
+<pre>{</pre></DIV>
+<A NAME="pgfId=608897">
+ </A>
+<DIV>
+<pre>    EOQualifier qual;</pre></DIV>
+<A NAME="pgfId=608899">
+ </A>
+<DIV>
+<pre>    EOFetchSpecification fs;</pre></DIV>
+<A NAME="pgfId=608901">
+ </A>
+<DIV>
+<pre>    NSMutableArray args = new NSMutableArray();</pre></DIV>
+<A NAME="pgfId=608903">
+ </A>
+<DIV>
+<pre>    EOEditingContext ec=new EOEditingContext();</pre></DIV>
+<A NAME="pgfId=608905">
+ </A>
+<DIV>
+<pre>    args.addObject(username);</pre></DIV>
+<A NAME="pgfId=621837">
+ </A>
+<DIV>
+<pre>    args.addObject(password);</pre></DIV>
+<A NAME="pgfId=608909">
+ </A>
+<DIV>
+<pre></pre></DIV>
+<A NAME="pgfId=608911">
+ </A>
+<DIV>
+<pre>    qual = EOQualifier.qualifierWithQualifierFormat</pre></DIV>
+<A NAME="pgfId=621848">
+ </A>
+<DIV>
+<pre>        ("userName = %@ AND password = %@", args);</pre></DIV>
+<A NAME="pgfId=621846">
+ </A>
+<DIV>
+<pre>    fs=new EOFetchSpecification("Login", qual, null);</pre></DIV>
+<A NAME="pgfId=608913">
+ </A>
+<DIV>
+<pre>    NSArray im=ec.objectsWithFetchSpecification(fs);</pre></DIV>
+<A NAME="pgfId=608915">
+ </A>
+<DIV>
+<pre></pre></DIV>
+<A NAME="pgfId=608917">
+ </A>
+<DIV>
+<pre>    if(im.count()==1)</pre></DIV>
+<A NAME="pgfId=621847">
+ </A>
+<DIV>
+<pre>        return (EOEnterpriseObject)im.objectAtIndex(0);</pre></DIV>
+<A NAME="pgfId=608919">
+ </A>
+<DIV>
+<pre>    return null;</pre></DIV>
+<A NAME="pgfId=608921">
+ </A>
+<DIV>
+<pre>}</pre></DIV>
+<A NAME="pgfId=608923">
+ </A>
+<P CLASS="Body">
+<A NAME="pgfId=621834">
+ </A>
+&nbsp;</P>
+</DIV>
+</DIV>
+<DIV>
+<H4 CLASS="Heading2">
+<A NAME="pgfId=606341">
+ </A>
+How Secure?</H4>
+<P CLASS="Body">
+<A NAME="pgfId=606342">
+ </A>
+Using an HTML or HTTP Authorization login panel by itself does little to protect the login credentials from potential intruders. The login panel based on an HTML form is the least secure, offering no real protection except the ability to hide the user's password on the screen, because the login information is sent in clear text all the way back to the WebObjects application server. </P>
+<P CLASS="Body">
+<A NAME="pgfId=606343">
+ </A>
+Using the browser authentication panel, login information is Base64 encoded all the way to the WebObjects application server. Although safer than clear text, it is easily decoded.</P>
+<P CLASS="Body">
+<A NAME="pgfId=621849">
+ </A>
+Using the Secure Socket Layer (SSL) with either of these login approaches yields an excellent and secure Web application login solution. Even with SSL, the login credentials remain unencrypted between the HTTP server and WebObjects application server. However, this link is usually highly secure, especially if it's behind a firewall. </P>
+</DIV>
+<DIV>
+<H4 CLASS="Heading2">
+<A NAME="pgfId=606344">
+ </A>
+Securing the Login with SSL</H4>
+<P CLASS="Body">
+<A NAME="pgfId=606345">
+ </A>
+To get a secure connection between the browser and the HTTP server using SSL,  two things are needed:</P>
+<UL>
+<P CLASS="Bulleted">
+<A NAME="pgfId=606346">
+ </A>
+&#183;		An HTTP server &quot;Security Certificate&quot; signed by a Certificate Authority (CA) such as Verisign</P>
+<P CLASS="Bulleted">
+<A NAME="pgfId=606347">
+ </A>
+&#183;		Redirection of the URL by modifying the URL prefix from http:// to https://</P>
+</UL>
+<P CLASS="Body">
+<A NAME="pgfId=606348">
+ </A>
+To redirect the URL, you must modify the location header of the response in the appendToResponse method of the page, session, or application:</P>
+<DIV>
+<pre>rsp.setHeader("https://"+this.context().request().headerForKey("host")+this.context().componentActionURL(), "location");</pre></DIV>
+<A NAME="pgfId=606349">
+ </A>
+<P CLASS="Body">
+<A NAME="pgfId=606350">
+ </A>
+To make the connection insecure after the login is complete, you can do the following:</P>
+<DIV>
+<pre>rsp.setHeader("http://"+this.context().request().headerForKey("host")+this.context().componentActionURL(), "location");</pre></DIV>
+<A NAME="pgfId=606351">
+ </A>
+<P CLASS="Body">
+<A NAME="pgfId=606352">
+ </A>
+These methods should be placed in <EM CLASS="Code">
+responseForAuthorization()</EM>
+.</P>
+</DIV>
+<DIV>
+<H4 CLASS="Heading2">
+<A NAME="pgfId=606353">
+ </A>
+Gotcha's</H4>
+<P CLASS="Body">
+<A NAME="pgfId=606354">
+ </A>
+Netscape HTTP servers will not pass the Authorization header to Common Gateway Interface (CGI) programs; you must use the NSAPI adapter included with WebObjects. Microsoft IIS servers must be configured for &quot;Basic Authentication.&quot; Microsoft Peer Web Server does not directly support  &quot;Basic Authentication,&quot; but can be made to work by making the following registry entry in: </P>
+<P CLASS="Body">
+<A NAME="pgfId=606356">
+ </A>
+HKEY_LOCAL_MACHINE/SYSTEM/CurrentControlSet/Services/W3SVC/Parameters</P>
+<P CLASS="Body">
+<A NAME="pgfId=606357">
+ </A>
+Change NTAuthentication 				&quot;NTLM&quot; to NTAuthentication 			&quot;basic&quot; and disable the &quot;Basic Authentication&quot; option in the Internet Service Manager.</P>
+</DIV>
+</DIV>
+<DIV>
+<H2 CLASS="Heading1">
+<A NAME="pgfId=606361">
+ </A>
+See Also<DIV>
+<IMG SRC="LoginTopic-1.gif">
+</DIV>
+</H2>
+<UL>
+<P CLASS="Bulleted">
+<A NAME="pgfId=606362">
+ </A>
+&#183;		Fetching with an Editing Context</P>
+</UL>
+</DIV>
+<DIV>
+<H2 CLASS="Heading1">
+<A NAME="pgfId=606365">
+ </A>
+Questions<DIV>
+<IMG SRC="LoginTopic-1.gif">
+</DIV>
+</H2>
+<UL>
+<P CLASS="Bulleted">
+<A NAME="pgfId=606366">
+ </A>
+&#183;		How do I create a login panel?</P>
+<P CLASS="Bulleted">
+<A NAME="pgfId=606367">
+ </A>
+&#183;		How do I use browser authentication in a WebObjects application?</P>
+<P CLASS="Bulleted">
+<A NAME="pgfId=606368">
+ </A>
+&#183;		How do I implement SSL from a WebObjects application?</P>
+<P CLASS="Bulleted">
+<A NAME="pgfId=606369">
+ </A>
+&#183;		How can I implement a dedicated database connect per user login?</P>
+</UL>
+</DIV>
+<DIV>
+<H2 CLASS="Heading1">
+<A NAME="pgfId=606370">
+ </A>
+Keywords<DIV>
+<IMG SRC="LoginTopic-1.gif">
+</DIV>
+</H2>
+<UL>
+<P CLASS="Bulleted">
+<A NAME="pgfId=606371">
+ </A>
+&#183;		Login Panel</P>
+<P CLASS="Bulleted">
+<A NAME="pgfId=606372">
+ </A>
+&#183;		Browser authentication</P>
+<P CLASS="Bulleted">
+<A NAME="pgfId=606373">
+ </A>
+&#183;		Security</P>
+</UL>
+</DIV>
+<DIV>
+<H2 CLASS="Heading1">
+<A NAME="pgfId=606374">
+ </A>
+Revision History<DIV>
+<IMG SRC="LoginTopic-1.gif">
+</DIV>
+</H2>
+<P CLASS="Body">
+<A NAME="pgfId=606375">
+ </A>
+10 July, 1998. Kelly Kazem. First Draft.</P>
+<P CLASS="Body">
+<A NAME="pgfId=621897">
+ </A>
+19 November, 1998. Clif Liu. Second Draft.</P>
+<DIV>
+<pre></pre></DIV>
+<A NAME="pgfId=602450">
+ </A>
+</DIV>
+
+
+<!--start of footer -->
+<!--#include virtual="/includes/framesetfooter" -->
+<!-- end of footer -->
+
+</body>
+</HTML>

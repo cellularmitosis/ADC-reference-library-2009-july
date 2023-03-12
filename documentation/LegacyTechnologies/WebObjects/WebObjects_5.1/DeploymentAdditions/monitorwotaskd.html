@@ -1,0 +1,88 @@
+<HTML>
+<HEAD>
+<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=iso-8859-1">
+<META NAME="Generator" CONTENT="Microsoft Word 97/98">
+<TITLE>WebObjects 5 Monitor & wotaskd</TITLE>
+</HEAD>
+<BODY>
+
+<B><FONT FACE="Times" SIZE=6><P>Monitor and wotaskd </P>
+</FONT></B><FONT FACE="Times">
+<P>This document describes changes made to Monitor, wotaskd, and application instance interactions since WebObjects 4.5</P>
+
+</FONT><B><FONT FACE="Times" SIZE=4><P>Overview</P></FONT><FONT FACE="Times" SIZE=2> 
+</FONT></B><FONT FACE="Times">
+
+<P>The lifebeat mechanism has been changed to improve reliability and response times to changes of instance state. Lifebeats from WebObjects applications are now sent over TCP sockets with a default period of 30 seconds. If the application is multithreaded the lifebeats will be sent from their own thread; otherwise, a timer in the main run loop will send them. Lifebeats are of four types: has started, lifebeat, will stop, and will crash. These types allow wotaskd to be notified quickly of changes and enable the web server adaptor to respond quickly. For example, if an application is exiting normally, the 'will stop' lifebeat is sent from the application to wotaskd. This is especially useful when scheduling is used.  See the Adaptor documentation for information on changes to the web server adaptor since WebObjects 4.5. </P>
+
+<P>&nbsp;</P>
+<P>Monitor has been updated to be more responsive and perform more validation:</P>
+
+<P>- Communication timeouts are nearly an order of magnitude shorter when communicating with unresponsive wotaskds.</P>
+<P>- Hosts are only valid if they can be resolved to an IP address. </P>
+<P>- Application names and arguments are stripped of invalid characters. </P>
+<P>- The user interface has been updated. </P>
+
+<P>&nbsp;</P>
+<P>wotaskd has been updated to be more responsive and reliable:</P>
+
+<P>- Communication timeouts are shorter.</P>
+<P>- wotaskd's listen port is configurable.</P>
+<P>- Applications are started with that wotaskd's listen port as their lifebeat destination port.</P>
+<P>- Applications not in the SiteConfig are registered with a negative port number. This allows developers to test their applications through the web server adaptor without making them available to the outside world. (See the Adaptor changes documentation.) </P>
+
+<P>The configuration directory for wotaskd and Monitor can be changed using the default "-WODeploymentConfigurationDirectory &lt;Path&gt;".</P>
+
+</FONT><B><FONT FACE="Times" SIZE=6><P>Monitor</P></FONT><FONT FACE="Times" SIZE=1> 
+
+</FONT></B><FONT FACE="Times"><P>Monitor should be run on one and only one host for a site.  Each instance of Monitor maintains its own SiteConfig information that is pushed to the application host.  When you have two instances of Monitor running on different hosts and launching applications on the same host, each Monitor instance will alternately push their different SiteConfig information to the application host, overwriting the other&copy;s information each time.  (For example, with wotaskd running with the same listen port on all hosts, if you run Monitor on Host D, add an application that runs on Host B and Host E, then run Monitor on Host Z and add an application to run on Host B you are going to have conflicts on Host B because Monitor run from Host D and Host Z will have different SiteConfigs. These different SiteConfigs will be pushed to Host B, alternately overwriting each other. Do not do this.)</P>
+
+<P>When a host is deleted in Monitor the instances running on that host are stopped and the SiteConfig on that host is reset to an empty state as long as Monitor is not also running on that host.</P>
+</FONT><FONT FACE="Times" SIZE=4>
+</FONT><FONT FACE="Times"><P>The exception history has been removed from the detail page.</P>
+</FONT><FONT FACE="Times" SIZE=4>
+<B><P>Hosts and Applications</P>
+</B></FONT><FONT FACE="Times" SIZE=1>
+</FONT><FONT FACE="Times"><B><P>Hosts</P> </B>
+
+<P>Monitor now ensures that it can resolve a hostname or IP address before it will add it to the list of hosts; unresolved names will not be accepted.  Monitor will also not allow you to add the same host more than once. Hosts are considered equivalent if they resolve to the same IP address.</P>
+
+<B><P>Applications </P></B>
+
+When you add an application in Monitor the name will be stripped of characters that could cause problems if present in URLs or XML tags. The allowed characters are </FONT><FONT FACE="Times" SIZE=3>[A-Z],[a-z],[0-9], "-", </FONT><FONT FACE="Times">and</FONT><FONT FACE="Times" SIZE=3> "."</FONT><FONT FACE="Times">.</FONT><FONT FACE="Times" SIZE=3>
+</FONT><FONT FACE="Times"><P> </P>
+
+<P>The additional arguments field is also cleansed of extra spaces and new-line characters at the end of the line. Extra spaces between arguments are removed in an attempt to reduce problems with starting instances. However, this will cause problems if you have custom arguments that contain spaces, e.g. '-WOCustomerDefault "a value with spaces"'. </P>
+</FONT><FONT FACE="Times" SIZE=1>
+</FONT><FONT FACE="Times" SIZE=4><B><P>Application Instance Arguments and Defaults </P>
+</B></FONT><FONT FACE="Times">
+For complete specifications of the application instance arguments, see Monitor's help page.</FONT>
+<FONT FACE="Times" SIZE=6><B><P>wotaskd </P>
+</B></FONT><B><FONT FACE="Times" SIZE=4><P>wotaskd Command Line Arguments and Defaults </P></FONT></B>
+<FONT FACE="Times"><P>
+For complete specifications of the wotaskd command line arguments and defaults, see Monitor's help page.</P>
+</FONT><B><FONT FACE="Times" SIZE=4><P>Changing wotaskd's Listen Port </P>
+</FONT></B><FONT FACE="Times" SIZE=2>
+</FONT><FONT FACE="Times"><P>If you want to change which port is used by applications for their lifebeat messages, you must set the port on wotaskd, Monitor, and all instances launched.</P>
+
+<P>To configure wotaskd to listen on a different port launch wotaskd with "-WOPort&#149;&lt;#&gt;". To configure Monitor and instances to send to a different port launch them with "-WOLifebeatDestinationPort&#149;&lt;#&gt;". Note '&lt;#&gt;' represents the same integer.</P>
+
+<P>wotaskd will automatically launch application instances with -WOLifebeatDestinationPort set to its listen port. Monitor is not started by wotaskd so its startup arguments will also need to be changed to match. </P>
+
+<P>Launched in this way, you can have separate sets of wotaskd/Monitor/instances running on the same network and they won't know about each other.  These different groups should not have applications configured with the same names. The instance executables can be the same, just not the name for the application they are known as in the SiteConfig. This is because the instance numbers are not unique across these groups and the web server adaptor will get confused about which application instance maps to which instance.</P>
+</FONT><FONT FACE="Times" SIZE=2>
+</FONT><FONT FACE="Times" SIZE=4><B><P>Accessing wotaskd when a password is set in Monitor </P>
+</B></FONT><FONT FACE="Times" SIZE=1>
+</FONT><FONT FACE="Times"><P>Once a password is set in Monitor, wotaskds running on hosts which are configured in Monitor will no longer respond to http:/&lt;hostname&gt;:1085.  In order for a response to be returned, they will require a header with the encrypted password. This is the desired behavior for a deployment environment.</P>
+
+<P>To find out what wotaskd is reporting you can either look at the SiteConfig.conf files on the host, use the new wotaskd link in Monitor's HostsPage, or use the following steps to view the information remotely:</P>
+
+<P>- Look at the SiteConfig.conf on the machine running Monitor </P>
+<P>- Find the line with "</FONT><FONT FACE="Times" SIZE=3>Password = &lt;encrypted-string&gt;;</FONT><FONT FACE="Times">" </P>
+<P>- Execute </FONT><FONT FACE="Times" SIZE=3>'telnet &lt;hostname&gt; 1085' </P>
+</FONT><FONT FACE="Times"><P>- Once connected type: </P>
+</FONT><FONT FACE="Times" SIZE=3><P>GET / </P>
+<P>password: &lt;encrypted-string&gt; </P>
+<P>&lt;return&gt; </P>
+</FONT><FONT FACE="Times"></FONT></BODY>
+</HTML>

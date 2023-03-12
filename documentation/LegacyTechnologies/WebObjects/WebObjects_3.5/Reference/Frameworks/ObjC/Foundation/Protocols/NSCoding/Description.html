@@ -1,0 +1,210 @@
+<html><head><title></title></head>
+
+<body bgcolor="#ffffff">
+
+ 
+
+ 
+
+<a name="53"></a>
+
+<h1>
+
+<FONT COLOR="#000066">
+
+ <a name="//apple_ref/occ/intf/NSCoding">NSCoding</a>
+
+</FONT>
+
+</h1>
+
+<p><B>Adopted By:	</B><BR>
+
+Various OpenStep classes
+
+
+
+<p><B>Declared In:	</B><BR>
+
+Foundation/NSObject.h
+
+
+
+<p><a name="83">
+
+<a name="description"></a>
+
+<H2>Protocol Description
+
+</H2>
+
+</a>The NSCoding protocol declares the two methods that a class must implement so that instances of that class can be encoded and decoded. This capability provides the basis for archiving (where objects and other structures are stored on disk) and distribution (where objects are copied to different address spaces). See the NSCoder and NSArchiver class specifications for an introduction to coding.<p>
+
+In keeping with object-oriented design principles, an object being encoded or decoded is responsible for encoding and decoding its instance variables. A coder instructs the object to do so by invoking <code>encodeWithCoder:</code> or <code>initWithCoder:</code>. <code>encodeWithCoder:</code> instructs the object to encode its instance variables to the coder provided; an object can receive this method any number of times. <code>initWithCoder:</code> instructs the object to initialize itself from data in the coder provided; as such, it replaces any other initialization method and is only sent once per object. Any object class that should be codable must adopt the NSCoding protocol and implement its methods.<p>
+
+When an object receives an <code>encodeWithCoder:</code> message, it should encode all of its vital instance variables, after sending a message to <code>super</code> if its superclass also conforms to the NSCoding protocol. An object doesn't have to encode all of its instance variables. Some values may not be important to reestablish and others may be derivable from related state upon decoding. Other instance variables should be encoded only under certain conditions (for example, with <code>encodeConditionalObject:</code>, as described in the NSArchiver class specification).<p>
+
+For example, suppose you were creating a fictitious MapView class that displays a legend and a map at various magnifications. The MapView class defines several instance variables, including the name of the map and the current magnification. The MapView class also contains instance variables for several related views. The <code>encodeWithCoder:</code> method of MapView might look like the following:<p>
+
+<blockquote><pre>- (void)encodeWithCoder:(NSCoder *)coder<br>{<br>    [super encodeWithCoder:coder];<br>    [coder encodeValueOfObjCType:@encode(char *) at:mapName];<br>    [coder encodeValueOfObjCType:@encode(unsigned int) at:&amp;magnification];<br>    [coder encodeObject:legendView];<br>    [coder encodeConditionalObject:auxiliaryView];<br>    return;<br>}
+
+</pre></blockquote><p>This example assumes that the superclass of MapView also supports the NSCoding protocol. If the superclass of your class does not support NSCoding, you should omit the line that invokes super's <code>encodeWithCoder:</code> method.<p>
+
+<code>encodeValueOfObjCType:at:</code> and <code>encodeObject:</code> are coder methods that you can use to encode instance variables of your class. You can use these and other methods of the coder to encode id's, scalars, C arrays, structs, strings, and pointers to any of these types. The coder also defines corresponding methods for decoding values. See the NSCoder, NSArchiver, and NSUnarchiver class specifications for a list of methods.<p>
+
+The <code>@encode()</code> compiler directive generates an Objective-C type code from a type expression. See <em>Object-Oriented Programming and the Objective-C Language</em> for more information.<p>
+
+Similarly, in <code>initWithCoder:</code> the object should first send a message to <code>super</code> (if appropriate) to initialize inherited instance variables, and then it should decode and initialize its own. MapView's implementation of <code>initWithCoder:</code> might look like this:<p>
+
+<blockquote><pre>- (id)initWithCoder:(NSCoder *)coder<br>{<br>    self = [super initWithCoder:coder];<br>    [coder decodeValueOfObjCType:@encode(char *) at:mapName];<br>    [coder decodeValueOfObjCType:@encode(unsigned int) at:&amp;magnification];<br>    legendView = [[coder decodeObject] retain];<br>    auxiliaryView = [[coder decodeObject] retain];<br>    return self;<br>}
+
+</pre></blockquote><p>Note the assignment of the return value of <code>initWithCoder:</code> to <code>self</code> in the example above. This is done in the subclass because the superclass, in its implementation of <code>initWithCoder:</code>, may decide to return a object other than itself. If the superclass of your class does not support NSCoding, you should invoke super's designated initializer instead of <code>initWithCoder:</code>.<p>
+
+<h3>
+
+<a name="95">
+
+ Making Substitutions During Coding
+
+</a>
+
+</h3>
+
+During encoding or decoding a coder object invokes methods that allow the object being coded to substitute a replacement class or instance for itself. This allows archives to be shared among implementations with different class hierarchies or simply different versions of a class (for example, class clusters take advantage of this feature). It also allows classes that should maintain unique instances to enforce this policy on decoding (for example, there need only be a single NSFont instance for a given typeface and size).<p>
+
+Substitution methods are declared by NSObject, and come in two flavors: generic and specialized. The generic methods are these:<p>
+
+<Table Border="3">
+
+<caption></caption>
+
+<tr><th><b>Method</b>
+
+</th><th><b>Typical Use</b>
+
+</th></tr>
+
+<tr><td scope="row">classForCoder
+
+</td><td>Allows an object, before being encoded, to substitute a class other than 
+
+its own. For example, the private subclasses of a class cluster substitute 
+
+the name of their public superclass when being archived.
+
+</td></tr>
+
+<tr><td scope="row">replacementObjectForCoder:
+
+</td><td>Allows an object, before being encoded, to substitute another instance in 
+
+its place.
+
+</td></tr>
+
+<tr><td scope="row">awakeAfterUsingCoder:
+
+</td><td>Allows an object, after being decoded, to substitute another object for 
+
+itself. For example, an object that represents a font might, upon being 
+
+decoded, release itself and return an existing object having the same 
+
+font description as itself. In this way, redundant objects can be 
+
+eliminated.
+
+</td></tr>
+
+
+
+</Table>
+
+
+
+<Table>
+
+<tr><td>
+
+</Table>
+
+<p>
+
+The specialized substitution methods are analogous to <code>classForCoder</code> and <code>replacementObjectForCoder:</code>,<code> </code>but they're designed for (and invoked by) a specific, concrete coder subclass.  NSArchiver invokes <code>classForArchiver:</code> and <code>replacementObjectForArchiver:</code>, while NSPortCoder invokes <code>classForPortCoder</code> and <code>replacementObjectForPortCoder:</code>.  (There isn't a specialized version of <code>awakeAfterUsingCoder:</code>.)  By implementing these specialized methods, your class can base its coding behavior on the specific coder class being used. For more information on these methods, see their method descriptions in the NSObject class specification, as well as the class description in the NSPortCoder class specification.<p>
+
+<a name="99">
+
+<HR WIDTH=50% ALIGN=LEFT>
+
+<h2>Method Types
+
+</h2>
+
+</a><dl>
+
+<dt>Encoding and decoding objects<dd><dl><dd><dl><dd><dl><dd><dl>
+
+<dt><a href="#//apple_ref/occ/intfm/NSCoding/encodeWithCoder:">- encodeWithCoder:</a><dt><a href="#//apple_ref/occ/intfm/NSCoding/initWithCoder:">- initWithCoder:</a></dl></dd>
+
+</dl></dd></dl></dd></dl></dd></dl>
+
+<HR WIDTH=50% ALIGN=LEFT>
+
+<a name="instm"></a>
+
+<h2>Instance Methods</h2>  
+
+
+
+
+
+<a name="104"></a>
+
+<h3>
+
+ <a name="//apple_ref/occ/intfm/NSCoding/encodeWithCoder:">encodeWithCoder:</a>
+
+</h3>
+
+- (void)<code>encodeWithCoder:</code>(NSCoder *)<em>encoder
+
+</em>
+
+<P>Encodes the receiver using <em>encoder</em>.<p>
+
+<hr WIDTH=25% ALIGN=LEFT>
+
+<a name="107"></a>
+
+<h3> <a name="//apple_ref/occ/intfm/NSCoding/initWithCoder:">initWithCoder:</a></h3>
+
+- (id)<code>initWithCoder:</code>(NSCoder *)<em>decoder
+
+</em>
+
+<P>Initializes a newly allocated instance from data in <em>decoder</em>. Returns <code>self</code>.<p>
+
+
+
+ 
+
+
+
+
+
+
+
+<i>Copyright &#169; 1997, Apple Computer, Inc.   All rights
+
+reserved.</i>
+
+
+
+<!-- Last updated: 06/17/97 16:32:30 -->
+
+
+
+</body>
+
+</html>
+

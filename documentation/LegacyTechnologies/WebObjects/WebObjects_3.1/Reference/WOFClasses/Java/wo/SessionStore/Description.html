@@ -1,0 +1,152 @@
+<html>
+
+<body bgcolor="#FFFFFF">
+
+<CENTER><H1>Class next.wo.SessionStore</H1></CENTER>
+
+<a name="description"></a><CENTER><H2>CLASS DESCRIPTION</H2></CENTER>
+
+<!-- extends:next.util.NextObject -->
+
+<DL>
+
+<DT><B>Extends:</B></DT><DD>next.util.NextObject</DD>
+
+</DL>
+
+<P>
+
+SessionStore, an abstract superclass, offers an object abstraction for storing client state per session. The application object (WebApplication) uses an instance of a concrete SessionStore subclass to implement a strategy for storing and retrieving session state. You typically set the SessionStore during application initialization through WebApplication's <b>setSessionStore</b> method.
+<P>
+An application first creates a session (WebSession) when it receives a request without a session ID. When this first request has been handled, the application stores the WebSession object under a randomly generated session ID by invoking its own <b>saveSession</b> method. This method by default forwards the message to the chosen SessionStore and that SessionStore takes care of the details of saving session state. When the next request comes in for that session, the application restores the session by sending itself <b>restoreSession</b>, which by default is forwarded to the application's SessionStore. The SessionStore then asks the Context of the transaction for the session ID of the session. Based on the implementation of the SessionStore, the session object is located and returned.
+<P>
+A few private concrete subclasses of SessionStore are implemented for the developer's convenience:
+<UL>
+<LI>A <i>server</i> SessionStore (the default) stores session state in the server, in application memory. The <b>serverSessionStore</b> method returns this SessionStore.<BR>
+<BR>
+<LI>A <i>page</i> SessionStore stores the session state in hidden fields in the HTML page returned to the client. The <b>pageSessionStore</b> method returns this SessionStore.<BR>
+<BR>
+<LI>A <i>cookie</i> SessionStore embeds session state in "cookies," special HTTP headers that enable the exchange of state between the client and the server. The <b>cookieSessionStoreWithDistributionDomain</b> method returns this SessionStore. <BR>
+</UL>
+<P>
+See the chapter <a href="../../../../../DevGuide/State/ManagingState.book.html" target=_top>Managing State</a> in the <i>WebObjects Developers Guide</i> for the purposes, mechanisms, and limitations of session store in the server, page, and cookies. 
+<P>
+You can create a custom session store by making a subclass of SessionStore. The subclass should properly implement the <b>saveSession</b> and <b>restoreSession</b> methods (using the session ID as the key for storage) and should have a public method that the application object can use to obtain an instance. Some interesting session stores could be:
+<ul>
+<li>A flat file session store that stores user sessions on the server in flat files.<br>
+<br>
+<li>A database session store that stores session data in a database as blobs, with the session ID as the primary key. This kind of SessionStore can be shared by many instances of the same WebObjects application, thus distributing the load (requests) among the instances.<br>
+<br>
+<li>An adaptive session store that stores session state either in cookies or on the server, depending on what the client supports.<br>
+</ul>
+<p>
+If you create your own SessionStore class that generates persistent objects, you should implement an algorithm that cleans up session state after the session is inactive for a long time. The server SessionStore provided by WebObjects performs this clean-up properly, but the API is not yet public.
+<br>
+<hr>
+
+<!-- methods -->
+
+<a name="methods"><CENTER><H2>METHODS</H2></CENTER></a>
+
+<!-- methKey:cookieSessionStoreWithDistributionDomain(public) meth:cookieSessionStoreWithDistributionDomain descr:<TT>public static next.wo.SessionStore <B>cookieSessionStoreWithDistributionDomain</B>(java.lang.String <I>aString</I>, boolean <I>flag</I>)</TT> -->
+
+<H3><a name="cookieSessionStoreWithDistributionDomain(public)">cookieSessionStoreWithDistributionDomain</a></H3>
+
+<TT>public static next.wo.SessionStore <B>cookieSessionStoreWithDistributionDomain</B>(java.lang.String <I>aDomain</I>, boolean <I>secure</I>)</TT>
+
+<P>
+
+Returns a SessionStore that saves session state in <i>cookies</i>. Cookies are implemented as the HTTP header "Set-Cookie." This header includes several key-value pairs, the most important (and the only required) one being the name of the cookie and its data value. The name is automatically generated from the creation date, while the data consists of the session object, after it's been serialized and archived into an ASCII form. This method lets you modify only two of the other key-value pairs, both of which limit access to the cookie:
+<ul>
+<li><i>aDomain</i> identifies the Internet domain name for which the cookie is valid (for example, <b>apple.com</b>). The path within the domain for which cookies are valid is always limited to the directory of the current application. If <i>aDomain</i> contains an empty string, the cookies of the application are valid for all domains on which the application is running. (The <i>aDomain</i> argument cannot be <b>null</b>.) <BR>
+<BR>
+<li><i>secure</i> specifies whether the cookie can be transmitted only through a secure communications channel, such as SHTTP.
+</ul>
+<P>
+Your compiled WebSession subclasses must also implement the Coding interface and the <b>WebSession(</b>Coder<b>)</b> constructor to archive and unarchive object state. (If you are storing the entire page in the session object, you should also implement the Coding interface and the <b>Component(</b>Coder<b>)</b> constructor for the Component representing the page.) The necessity for archiving results from how state is stored in cookies. A WebObjects application stores state in the page by first serializing the session object into "raw" binary data (a data object), converting the data object to ASCII, which it then puts in a cookie (an HTTP header). It restores session state by converting the ASCII archive into binary data and then deserializing the data into a WebSession object. (Scripted sessions and components do not need to implement archiving, since this is automatically done for them.)
+<P>
+Unlike state storage in the page, cookies do not require the use of forms. However, they do impose a severe limitation on the size of the archived session object. Cookies cannot be greater that 4000 bytes, and it is recommended that they not exceed 2000 bytes. This limitation is not only inherent in cookies but is exacerbated by the difference in how servers implement the cookie specification. Given this limitation, cookies can be best used for such things as storing keys used to fetch information from a database.
+<br>
+<hr>
+
+<!-- methKey:pageSessionStore(public) meth:pageSessionStore descr:<TT>public static next.wo.SessionStore <B>pageSessionStore</B>()</TT> -->
+
+<H3><a name="pageSessionStore(public)">pageSessionStore</a></H3>
+
+<TT>public static next.wo.SessionStore <B>pageSessionStore</B>()</TT>
+
+<P>
+
+Returns a SessionStore that stores session state in the client, in a <i>hidden</i> field on an HTML page. By this means, a page carries a record of its state at the time of its creation. The hidden field, defined in the HTML specification as an input element of type "hidden," does not display its value but is instead used for passing information between the client and server. In WebObjects, hidden fields are represented by the dynamic element WOStateStorage. If you choose page SessionStore as your storage strategy, the page must have a form (WOForm) that contains a WOStateStorage element. 
+<P>
+Your compiled WebSession subclasses must also implement the Coding interface and the <b>WebSession(</b>Coder<b>)</b> constructor to archive and unarchive object state. (If you are storing the entire page in the session object, you should also implement the Coding interface and the <b>Component(</b>Coder<b>)</b> constructor for the Component representing the page.) The necessity for archiving results from how state is stored in the page. A WebObjects application stores state in the page by first serializing the session object into "raw" binary data (a data object), converting the data object to ASCII, which it then puts in a hidden field in a form. It restores session state by converting the ASCII archive into binary data and then deserializing the data into a WebSession object. (Scripted sessions and components do not need to implement archiving, since this is automatically done for them.)
+<P>
+Page session store has several limitations to keep in mind when you select a storage strategy:
+<ul>
+<li>The hidden field (or WOStateStorage) can only exist within a form. So if you want your application to preserve state throughout a session, every page of an application must have a form containing this field.<BR>
+<BR>
+<LI>If a page has multiple forms, each of those forms must have the hidden field (WOStateStorage).<BR>
+<BR>
+<LI>Backtracking can produce erroneous or unexpected results. The state data in the hidden field amounts to a "snapshot" of the page at the time of its creation, so backtracking to an earlier version of a page in a session could restore state that has since become outdated.<BR>
+<BR>
+<LI>If the "page" whose state is stored is really an HTML frame, related data shown by the frames can easily become out of sync, unless you implement your own strategy for coordinating things.
+<BR>
+<hr>
+
+<!-- methKey:restoreSession(public) meth:restoreSession descr:<TT>public next.wo.WebSession <B>restoreSession</B>()</TT> -->
+
+<H3><a name="restoreSession(public)">restoreSession</a></H3>
+
+<TT>public next.wo.WebSession <B>restoreSession</B>()</TT>
+
+<P>
+
+Implemented by a private concrete subclass to restore the current session object from a particular type of storage. You can always find out which session will be restored by asking the Context object for the ID of the current session, for example:
+<PRE>    Context aContext = WebApplication.application().context();
+    String sid = aContext.session().sessionID();
+</PRE>
+
+<P>
+You may use the coding constructor for the session (<b>WebSession(</b>Coder<b>)</b>) to restore session state from the archived data.
+<P>
+The default implementation of this method does nothing.
+<hr>
+
+<!-- methKey:saveSession(public) meth:saveSession descr:<TT>public void <B>saveSession</B>(next.wo.WebSession <I>aWebSession</I>)</TT> -->
+
+<H3><a name="saveSession(public)">saveSession</a></H3>
+
+<TT>public void <B>saveSession</B>(next.wo.WebSession <I>aWebSession</I>)</TT>
+
+<P>
+
+Implemented by a private concrete subclass to save the current session object using a particular strategy for state storage. The default implementation of this method does nothing.
+<P>
+You may use the Coding interface method <b>encodeWithCoder</b> to save session state to archived data.
+<P>
+The default implementation of this method does nothing.
+<br>
+<hr>
+
+<!-- methKey:serverSessionStore(public) meth:serverSessionStore descr:<TT>public static next.wo.SessionStore <B>serverSessionStore</B>()</TT> -->
+
+<H3><a name="serverSessionStore(public)">serverSessionStore</a></H3>
+
+<TT>public static next.wo.SessionStore <B>serverSessionStore</B>()</TT>
+
+<P>
+
+Returns a SessionStore object that stores session state in application memory. 
+Since this is the default storage strategy, you do not need to explicitly set the session store during application initialization if this is the strategy you want.
+<P>
+
+State storage in the server is the most secure and is the easiest to implement. You can also easily manage the amount of storage consumed by setting session timeouts, limiting the size of the page-instance cache, and page uniquing. (See <a href="../../../../../DevGuide/State/ManagingState.book.html" target=_top>Managing State</a> in the <i>WebObjects Developers Guide</i> for details on these techniques.)
+<p>
+Server session store does have one important drawback: It restricts balancing of the processing load among instances of the same application. Because session state is stored in the memory of a particular application instance, all requests<P>
+You may use the coding constructor for the session (<b>WebSession(</b>Coder<b>)</b>) to restore session state from the archived data.
+ of that session have to be routed to the same application instance.
+<hr>
+
+</body>
+
+</html>

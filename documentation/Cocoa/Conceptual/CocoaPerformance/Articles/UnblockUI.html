@@ -1,0 +1,149 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+<head>
+	<title>Cocoa Performance Guidelines: Unblocking Your User Interface</title>
+	<meta id="Generator" name="Generator" content="Gutenberg"/>
+	<meta id="GeneratorVersion" name="GeneratorVersion" content="v132"/>
+	<meta http-equiv="content-type" content="text/html;charset=utf-8"/>
+	<meta id="Copyright" name="Copyright" content="Copyright 2009 Apple Inc. All Rights Reserved."/>
+	<meta id="IndexTitle" name="IndexTitle" content="Unblocking Your User Interface"/>
+	<meta id="xcode-display" name="xcode-display" content="render"/>
+	<meta id="toc-file" name="toc-file" content="../toc.html"/>
+	<meta id="RESOURCES" content="../../../../Resources" />
+	
+	<link rel="stylesheet" type="text/css" href="../../../../Resources/CSS/frameset_styles.css"/>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/lib/prototype.js"></script>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/lib/scriptaculous.js"></script>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/page.js"></script>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/pedia.js"></script>
+	<!--[if lte IE 6]>
+		<style type="text/css">
+			/*<![CDATA[*/ 
+			html {overflow-x:auto; overflow-y:hidden;  }
+			/*]]>*/
+		</style>
+	<![endif]-->
+</head>
+<body bgcolor="#ffffff" onload="initialize_page();"><a name="//apple_ref/doc/uid/TP40001442" title="Unblocking Your User Interface"></a>
+    <noscript>
+    <div id="tocMenu">
+        <iframe id="toc_content" name="toc_content" SRC="../toc.html" width="210" height="100%" align="left" frameborder="0">This document set is best viewed in a browser that supports iFrames.</iframe>
+    </div>
+    </noscript>
+    <div id="bodyText">
+        <a name="top"></a>
+        <div class="hideOnPrint hideInXcode">
+        <!-- start of header -->
+        <!--#include virtual="/includes/framesetheader" -->
+        <!-- end of header -->
+        </div>
+        
+        <!-- start of path -->
+<div class="breadcrumb hideOnPrint hideInXcode"><a href="http://developer.apple.com/" target="_top">ADC Home</a> &gt; <a href="../../../../../referencelibrary/index.html#//apple_ref/doc/uid/TP30000943" target="_top">Reference Library</a> &gt; <a href="../../../../index.html#//apple_ref/doc/uid/TP30000440" target="_top">Guides</a> &gt; <a href="../../../index.html#//apple_ref/doc/uid/TP30000440-TP30000416" target="_top">Cocoa</a> &gt; <a href="../../../Performance-date.html#//apple_ref/doc/uid/TP30000440-TP30000416-TP30000901" target="_top">Performance</a> &gt; <a href="../index.html" target="_top">Cocoa Performance Guidelines</a> &gt; </div><br class="hideInXcode"/><!-- end of path -->
+        
+        <div class="mini_nav_text" align="left">
+        <span class="navButtons">
+        <a href="GeneralInfo.html">&lt; Previous Page</a><span style="margin-left: 8px"><a href="CustomViews.html">Next Page &gt;</a></span>
+        </span>
+        <span id="showHideTOCUpperSpan">
+        <a href="#" onclick="showHideTOC();"><img src="../../../../Resources/Images/show_toc_icon.gif" width="15" height="14" border="0" style="margin-bottom: -2px;" alt="" hideText="Hide TOC" showText="Show TOC" /></a> <a href="#" onclick="showHideTOC();">Hide TOC</a>
+        </span>
+        </div>
+        
+        
+        <a name="//apple_ref/doc/uid/TP40001442-BCIGJEGI" title="Unblocking Your User Interface"></a><hr /><H1>Unblocking Your User Interface</H1>
+
+<p>In a Cocoa application, the main thread runs the user interface, that is, all drawing and all events are handled on the main thread. If your application performs any lengthy synchronous operations on that thread, your user interface can become unresponsive and trigger the spinning cursor. To avoid this, you should shorten the amount of time consumed by those operations, defer their execution, or move them to secondary threads. </p>
+
+<!-- This template is being used for both PDF and HTML. -->
+
+    
+    <!-- TopicBook.pm uses this template for its miniTOCs, but needs a different title. -->
+    <h4>Contents:</h4>
+    
+    
+    <p class="blockquote">
+    
+        
+			
+			
+				<a href="UnblockUI.html#//apple_ref/doc/uid/TP40001442-112061-BCIIEFBH">Deferring the Execution of Operations</a>
+				
+			<br/>
+			
+        
+			
+			
+				<a href="UnblockUI.html#//apple_ref/doc/uid/TP40001442-112280">Using Run Loop Observers</a>
+				
+			<br/>
+			
+        
+			
+			
+				<a href="UnblockUI.html#//apple_ref/doc/uid/TP40001442-112209">Using Threads</a>
+				
+			<br/>
+			
+        
+
+    </p><br/>
+
+<a name="//apple_ref/doc/uid/TP40001442-112061" title="Deferring the Execution of Operations"></a><a name="//apple_ref/doc/uid/TP40001442-112061-BCIIEFBH" title="Deferring the Execution of Operations"></a><h2>Deferring the Execution of Operations</h2>
+<p>If you have operations that can be deferred or broken into chunks and performed incrementally, doing so can help performance. Operations that are iterative or modular in nature, such as scratch calculations, can usually be performed in small chunks. By performing a few of these calculations at idle time using asynchronous notifications<a name="//apple_ref/doc/uid/TP40001442-DontLinkElementID_43"></a><a name="//apple_ref/doc/uid/TP40001442-DontLinkElementID_44"></a>, you can avoid blocking your main thread. To register for idle time notifications<a name="//apple_ref/doc/uid/TP40001442-DontLinkElementID_45"></a>, you would simply post a notification object to the default queue and ask for it to be dispatched at idle time, as shown in the following example:</p>
+<div class="codesample"><table><tr><td scope="row"><pre>NSNotification* myNotification = [NSNotification notificationWithName:@"MyIdleNotification" object:myIdleHandlerObject];<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>[[NSNotificationQueue defaultQueue] enqueueNotification:myNotification postingStyle:NSPostWhenIdle];<span></span></pre></td></tr></table></div>
+<p>Timers<a name="//apple_ref/doc/uid/TP40001442-DontLinkElementID_46"></a> offer another way to do small amounts of work at more regular intervals. The advantage of timers is that they fire at a known time. The disadvantage is that they fire regardless of how busy your application is, which could still cause a perceptible delay. For information on how to set up a timer, see <em><a href="../../Timers/index.html#//apple_ref/doc/uid/10000061i" target="_top">Timer Programming Topics for Cocoa</a></em>. </p>
+<a name="//apple_ref/doc/uid/TP40001442-112280" title="Using Run Loop Observers"></a><h2>Using Run Loop Observers</h2><a name="//apple_ref/doc/uid/TP40001442-DontLinkElementID_47"></a>
+<p>Another way to defer an operation is to hook into the run loops of your application’s threads. By adding a CFRunLoopObserver to a run loop, you can receive notifications at certain points in the execution of that run loop. For example, you can be notified before timers are processed, before input sources are processed, or before or after the run loop sleeps.</p>
+<p>To create a run loop observer, you must first define a callback function of type <code>CFRunLoopObserverCallBack</code><a name="//apple_ref/doc/uid/TP40001442-DontLinkElementID_48"></a>. The following code shows a sample implementation of this method. The <code>info</code> parameter contains data you want passed to your handler when it is called, which in this case is an instance of the fictional MyObject. </p>
+<div class="codesample"><table><tr><td scope="row"><pre>void MyRunLoopObserver(CFRunLoopObserverRef observer,<span></span></pre></td></tr><tr><td scope="row"><pre>                            CFRunLoopActivity activity,<span></span></pre></td></tr><tr><td scope="row"><pre>                            void* info)<span></span></pre></td></tr><tr><td scope="row"><pre>{<span></span></pre></td></tr><tr><td scope="row"><pre>    MyObject* theObject = (MyObject*)info;<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>    // Perform your tasks here.<span></span></pre></td></tr><tr><td scope="row"><pre>}<span></span></pre></td></tr></table></div>
+<p>After you define your callback function, you need to create the run loop observer and install it on the current run loop. The following code shows you how to do this from a Cocoa method. The code requests that the callback function be run before any timers are processed or before the run loop goes to sleep. Note that the last parameter to <code>CFRunLoopObserverCreate</code><a name="//apple_ref/doc/uid/TP40001442-DontLinkElementID_49"></a> is the <code>self</code> variable, which is assumed to be the instance of MyObject that the callback handler expects. </p>
+<div class="codesample"><table><tr><td scope="row"><pre>- (void) installRunLoopObserver<span></span></pre></td></tr><tr><td scope="row"><pre>{<span></span></pre></td></tr><tr><td scope="row"><pre>    CFRunLoopObserverRef myObserver = NULL;<span></span></pre></td></tr><tr><td scope="row"><pre>    int myActivities = kCFRunLoopBeforeTimers | kCFRunLoopBeforeWaiting;<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>    // Create the observer reference.<span></span></pre></td></tr><tr><td scope="row"><pre>    myObserver = CFRunLoopObserverCreate(NULL,<span></span></pre></td></tr><tr><td scope="row"><pre>                            myActivities,<span></span></pre></td></tr><tr><td scope="row"><pre>                            YES,        /* repeat */<span></span></pre></td></tr><tr><td scope="row"><pre>                            0,<span></span></pre></td></tr><tr><td scope="row"><pre>                            &amp;MyRunLoopObserver,<span></span></pre></td></tr><tr><td scope="row"><pre>                            (void*)self);<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>    if (myObserver)<span></span></pre></td></tr><tr><td scope="row"><pre>    {<span></span></pre></td></tr><tr><td scope="row"><pre>        // Now add it to the current run loop<span></span></pre></td></tr><tr><td scope="row"><pre>        CFRunLoopAddObserver(CFRunLoopGetCurrent(),<span></span></pre></td></tr><tr><td scope="row"><pre>                            myObserver,<span></span></pre></td></tr><tr><td scope="row"><pre>                            kCFRunLoopCommonModes);<span></span></pre></td></tr><tr><td scope="row"><pre>    }<span></span></pre></td></tr><tr><td scope="row"><pre>}<span></span></pre></td></tr></table></div>
+<a name="//apple_ref/doc/uid/TP40001442-112209" title="Using Threads"></a><h2>Using Threads</h2><a name="//apple_ref/doc/uid/TP40001442-DontLinkElementID_50"></a>
+<p>Secondary threads are an excellent way to perform lengthy operations without blocking your user interface. If your application performs several sequential operations, you could also create a worker thread to handle new requests as they arise. The advantage of threads is that they can offer significant performance gains, especially on multiprocessor systems. The disadvantage is that you must plan carefully to make sure two or more threads do not try to manipulate the same data at the same time.</p>
+<p>For more information about creating and managing threads, see <em><a href="../../Multithreading/index.html#//apple_ref/doc/uid/10000057i" target="_top">Threading Programming Guide</a></em>. </p>
+
+        <br/><br/> 
+
+        <div class="mini_nav_text" align="left">
+        <span class="navButtons">
+        <a href="GeneralInfo.html">&lt; Previous Page</a><span style="margin-left: 8px"><a href="CustomViews.html">Next Page &gt;</a></span>
+        </span>
+        <span id="showHideTOCLowerSpan">
+        <a href="#" onclick="showHideTOC();"><img src="../../../../Resources/Images/show_toc_icon.gif" width="15" height="14" border="0" style="margin-bottom: -2px;" alt="" /></a> <a href="#" onclick="showHideTOC();">Hide TOC</a>
+        </span>
+        </div>
+
+        <br/><hr /><div align="center"><p class="content_text" lang="en" dir="ltr"> <!--#if expr="0=1" -->&#x00a9; 2004, 2005 Apple Computer, Inc. All Rights Reserved. &#40;<!--#endif -->Last updated: 2005-08-11<!--#if expr="0=1" -->&#041;<!--#endif --></p></div>
+
+        
+        <div class="hideOnPrint hideInXcode">
+        <!-- start of footer -->
+        	<table width="100%" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/documentation/Cocoa/Conceptual/CocoaPerformance/Articles/UnblockUI.html%3Fid%3DTP40001448-1.2&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/documentation/Cocoa/Conceptual/CocoaPerformance/Articles/UnblockUI.html%3Fid%3DTP40001448-1.2&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/documentation/Cocoa/Conceptual/CocoaPerformance/Articles/UnblockUI.html%3Fid%3DTP40001448-1.2&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+
+        <!--#include virtual="/includes/framesetfooter" -->
+        <!-- end of footer -->
+        </div>
+    </div>
+</body>
+</html>

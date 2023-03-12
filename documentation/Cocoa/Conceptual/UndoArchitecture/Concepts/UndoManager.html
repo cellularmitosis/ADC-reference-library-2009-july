@@ -1,0 +1,190 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+<head>
+	<title>Undo Architecture: Undo Manager</title>
+	<meta id="Generator" name="Generator" content="Gutenberg"/>
+	<meta id="GeneratorVersion" name="GeneratorVersion" content="v132"/>
+	<meta http-equiv="content-type" content="text/html;charset=utf-8"/>
+	<meta id="Copyright" name="Copyright" content="Copyright 2009 Apple Inc. All Rights Reserved."/>
+	<meta id="IndexTitle" name="IndexTitle" content="Undo Manager"/>
+	<meta id="xcode-display" name="xcode-display" content="render"/>
+	<meta id="toc-file" name="toc-file" content="../toc.html"/>
+	<meta id="RESOURCES" content="../../../../Resources" />
+	
+	<link rel="stylesheet" type="text/css" href="../../../../Resources/CSS/frameset_styles.css"/>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/lib/prototype.js"></script>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/lib/scriptaculous.js"></script>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/page.js"></script>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/pedia.js"></script>
+	<!--[if lte IE 6]>
+		<style type="text/css">
+			/*<![CDATA[*/ 
+			html {overflow-x:auto; overflow-y:hidden;  }
+			/*]]>*/
+		</style>
+	<![endif]-->
+</head>
+<body bgcolor="#ffffff" onload="initialize_page();"><a name="//apple_ref/doc/uid/20000205" title="Undo Manager"></a>
+    <noscript>
+    <div id="tocMenu">
+        <iframe id="toc_content" name="toc_content" SRC="../toc.html" width="210" height="100%" align="left" frameborder="0">This document set is best viewed in a browser that supports iFrames.</iframe>
+    </div>
+    </noscript>
+    <div id="bodyText">
+        <a name="top"></a>
+        <div class="hideOnPrint hideInXcode">
+        <!-- start of header -->
+        <!--#include virtual="/includes/framesetheader" -->
+        <!-- end of header -->
+        </div>
+        
+        <!-- start of path -->
+<div class="breadcrumb hideOnPrint hideInXcode"><a href="http://developer.apple.com/" target="_top">ADC Home</a> &gt; <a href="../../../../../referencelibrary/index.html#//apple_ref/doc/uid/TP30000943" target="_top">Reference Library</a> &gt; <a href="../../../../index.html#//apple_ref/doc/uid/TP30000440" target="_top">Guides</a> &gt; <a href="../../../index.html#//apple_ref/doc/uid/TP30000440-TP30000416" target="_top">Cocoa</a> &gt; <a href="../../../DataManagement-date.html#//apple_ref/doc/uid/TP30000440-TP30000416-TP30000445" target="_top">Data Management</a> &gt; <a href="../index.html" target="_top">Undo Architecture</a> &gt; </div><br class="hideInXcode"/><!-- end of path -->
+        
+        <div class="mini_nav_text" align="left">
+        <span class="navButtons">
+        <a href="../UndoArchitecture.html">&lt; Previous Page</a><span style="margin-left: 8px"><a href="../Tasks/RegisteringUndo.html">Next Page &gt;</a></span>
+        </span>
+        <span id="showHideTOCUpperSpan">
+        <a href="#" onclick="showHideTOC();"><img src="../../../../Resources/Images/show_toc_icon.gif" width="15" height="14" border="0" style="margin-bottom: -2px;" alt="" hideText="Hide TOC" showText="Show TOC" /></a> <a href="#" onclick="showHideTOC();">Hide TOC</a>
+        </span>
+        </div>
+        
+        
+        <a name="//apple_ref/doc/uid/20000205-CJBDJCCJ" title="Undo Manager"></a><hr /><H1>Undo Manager</H1>
+
+<p>NSUndoManager is a general-purpose recorder of operations
+for undo and redo. You register an undo operation by specifying
+the object that is changing (or the owner of that object), along
+with a method to invoke to revert its state, and the arguments for
+that method. NSUndoManager groups all operations within a single
+cycle of the run loop, so that performing an undo reverts all changes
+that occurred during the loop. Also, when performing undo an NSUndoManager
+saves the operations reverted so that you can redo the undos.</p>
+<p>NSUndoManager is implemented as a class of the Foundation
+framework because executables other than applications might want
+to revert changes to their states. For example, you might have an
+interactive command-line tool with undo and redo commands; or there
+could be Distributed Object implementations that can revert operations
+“over the wire.” However, users typically see undo and redo
+as application features. The Application Kit implements undo and
+redo in its NSTextView object and makes it easy to implement it
+in objects along the responder chain. For more on the role of the
+Application Kit in undo and redo, see <span class="content_text"><a href="../Tasks/UsingUndoAppKit.html#//apple_ref/doc/uid/20000213-CJBJBEII">“Using Undo in Applications.”</a></span></p>
+
+<!-- This template is being used for both PDF and HTML. -->
+
+    
+    <!-- TopicBook.pm uses this template for its miniTOCs, but needs a different title. -->
+    <h4>Contents:</h4>
+    
+    
+    <p class="blockquote">
+    
+        
+			
+			
+				<a href="UndoManager.html#//apple_ref/doc/uid/20000205-74904">Undo Operations and Groups</a>
+				
+			<br/>
+			
+        
+			
+			
+				<a href="UndoManager.html#//apple_ref/doc/uid/20000205-112683">The Undo and Redo Stacks</a>
+				
+			<br/>
+			
+        
+
+    </p><br/>
+
+<a name="//apple_ref/doc/uid/20000205-74904" title="Undo Operations and Groups"></a><h2>Undo Operations and Groups</h2>
+<p>An undo operation is a method for reverting a change to an
+object, along with the arguments needed to revert the change (for
+example, its state before the change). Undo operations are typically
+collected in undo groups, which represent whole revertible actions,
+and are stored on a stack. Redo operations and groups are simply
+undo operations stored on a separate stack (described below). When
+an NSUndoManager performs undo or redo, it is actually undoing or
+redoing an entire group of operations. For example, a user could
+change the type face and the font size of some text. An application
+might package both attribute-setting operations as a group, so
+when the user chooses Undo, both type face and font size are reverted.
+To undo a single operation, it must still be packaged in a group.</p>
+<p>NSUndoManager normally creates undo groups automatically during
+the run loop. The first time it is asked to record an undo operation
+in the run loop, it creates a new group. Then, at the end of the
+loop, it closes the group. You can create additional, nested undo groups
+within these default groups using the <code>beginUndoGrouping</code> and <code>enableUndoRegistration</code> methods.
+You can also turn off the default grouping behavior using <code>setGroupsByEvent:</code>.</p>
+<a name="//apple_ref/doc/uid/20000205-112683" title="The Undo and Redo Stacks"></a><h2>The Undo and Redo Stacks</h2>
+<p>Undo groups are stored on a stack, with the oldest groups
+at the bottom and the newest at the top. The undo stack is unlimited
+by default, but you can restrict it to a maximum number of groups
+using the <code>setLevelsOfUndo:</code> method. When
+the stack exceeds the maximum, the oldest undo groups are dropped
+from the bottom.</p>
+<p>Initially, both stacks are empty. Recording undo operations
+adds to the undo stack, but the redo stack remains empty until undo
+is performed. Performing undo causes the reverting operations in
+the latest group to be applied to their objects. Since these operations
+cause changes to the objects’ states, the objects presumably register
+new operations with the NSUndoManager, this time in the reverse
+direction from the original operations. Since the NSUndoManager
+is in the process of performing undo, it records these operations
+as redo operations on the redo stack. Consecutive undos add to the
+redo stack. Subsequent redo operations pull the operations off the
+redo stack, apply them to the objects, and push them back onto the
+undo stack.</p>
+<p>The redo stack’s contents last as long as undo and redo
+are performed successively. However, because applying a new change
+to an object invalidates the previous changes, as soon as a new
+undo operation is registered, the redo stack is cleared. This prevents
+redo from returning objects to an inappropriate prior state. You
+can check for the ability to undo and redo with the <code>canUndo</code> and <code>canRedo</code> methods.</p>
+
+        <br/><br/> 
+
+        <div class="mini_nav_text" align="left">
+        <span class="navButtons">
+        <a href="../UndoArchitecture.html">&lt; Previous Page</a><span style="margin-left: 8px"><a href="../Tasks/RegisteringUndo.html">Next Page &gt;</a></span>
+        </span>
+        <span id="showHideTOCLowerSpan">
+        <a href="#" onclick="showHideTOC();"><img src="../../../../Resources/Images/show_toc_icon.gif" width="15" height="14" border="0" style="margin-bottom: -2px;" alt="" /></a> <a href="#" onclick="showHideTOC();">Hide TOC</a>
+        </span>
+        </div>
+
+        <br/><hr /><div align="center"><p class="content_text" lang="en" dir="ltr"> <!--#if expr="0=1" -->&#x00a9; 2002 Apple Computer, Inc. All Rights Reserved. &#40;<!--#endif -->Last updated: 2002-11-12<!--#if expr="0=1" -->&#041;<!--#endif --></p></div>
+
+        
+        <div class="hideOnPrint hideInXcode">
+        <!-- start of footer -->
+        	<table width="100%" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/documentation/Cocoa/Conceptual/UndoArchitecture/Concepts/UndoManager.html%3Fid%3D10000010i-2.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/documentation/Cocoa/Conceptual/UndoArchitecture/Concepts/UndoManager.html%3Fid%3D10000010i-2.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/documentation/Cocoa/Conceptual/UndoArchitecture/Concepts/UndoManager.html%3Fid%3D10000010i-2.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+
+        <!--#include virtual="/includes/framesetfooter" -->
+        <!-- end of footer -->
+        </div>
+    </div>
+</body>
+</html>

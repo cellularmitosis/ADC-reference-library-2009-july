@@ -1,0 +1,585 @@
+<html>
+
+<body bgcolor="#FFFFFF">
+
+<CENTER><H1>Class next.util.Coder</H1></CENTER>
+
+<a name="description"></a><CENTER><H2>CLASS DESCRIPTION</H2></CENTER>
+
+<!-- extends:next.util.NextObject -->
+
+<DL>
+
+<DT><B>Extends:</B></DT><DD>next.util.NextObject</DD>
+
+</DL>
+
+<P>
+
+Coder is a class that takes data from dynamic memory and codes them into and out of some other format. This capability provides the basis for archiving (where objects and data items are stored on disk) and distribution (where objects and data items are copied between different processes or threads).Instances of Coder are referred to as coder objects, or simply coders.
+<P>
+Coder operates on objects, scalars, and Java arrays. A coder object stores object type information along with the data, so an object decoded from a stream of bytes is normally of the same class as the object that was originally encoded into the stream.
+
+<H3>Encoding and Decoding Objects and Data Items</H3>
+To encode or decode an object or data item, you must first create a coder object, then send it a message defined by Coder or by a subclass to actually encode or decode the item. <!-- Coder itself defines no particular method for creating a coder; this typically varies with the subclass. NSArchiver and NSUnarchiver, for example, use initForWritingWithMutableData: and initForReadingWithData:. NSPortCoders are created and used by NSConnection objects; you never create one of these yourself.-->
+<P>
+To encode an object or data item, use any of the <B>encode...</B> methods.<!--  This sample code fragment uses the NSArchiver concrete subclass of Coder to archive a custom object called myMapView:
+MapView *myMapView;   /* Assume this exists. */
+NSMutableData *data
+NSArchiver *archiver;
+BOOL result;
+
+data = [NSMutableData mutableData];
+archiver = [[NSArchiver alloc] initForWritingWithMutableData:data];
+[archiver encodeRootObject:myMapView];
+result = [data writeToFile:@"/tmp/MapArchive" atomically:YES];
+NSArchiver also provides a convenience method for archiving immediately to a file, rendering the example above as:
+result = [NSArchiver archiveRootObject:myMapView toFile:@"/tmp/MapArchive"];
+-->
+<P>
+In order for a coder to restore an object, the object must provide a constructor that takes a coder as its argument, as in the following:
+<P><TT> 
+	public MyCodingClass(next.util.Coder coder)
+</TT><P>
+This constructor would use the various <B>decode...</B> methods provided by this class to populate instance variables. These <B>decode...</B> methods must correspond to the original <B>encode...</B> methods (as given in the individual method descriptions). Matching these is important, as the method originally used determines the format of the encoded data. See the Coding interface specification for more information.
+<P>
+Coder's interface is quite general. Concrete subclasses aren't required to properly implement all of Coder's methods, and may explicitly restrict themselves to certain types of operations.<!-- For example, NSArchiver doesn't implement the decode... methods, and NSUnarchiver doesn't implement the encode... methods.
+When to Retain a Decoded Object
+You can decode an object value in two ways. The first is explicitly, using the decodeObject method (or any decode...Object method). When decoding an object explicitly you must follow the object ownership convention, and retain the object returned if you intend to keep it. Otherwise the object is owned by the coder and will be released when the coder is released.
+The second means of decoding an object is implicitly, using the decodeValueOfObjCType:at: method or one of its variants, decodeArrayOfObjCType:count:at: and decodeValuesOfObjCTypes:. These methods fill a value already claimed by the invoker, so you are responsible for releasing decoded object values. This behavior can prove useful for optimizing large decoding operations, as it obviates the need for sending a retain message to each decoded object.
+-->
+<H3>
+Managing Object Graphs
+</H3>
+Objects frequently contain pointers to other objects, creating a graph of references that may contain cycles, objects that must be shared upon decoding, and inessential objects. Coder declares <B>encodeObject</B>; it allows a subclass to manage these cases.<!--  As implemented by a subclass, encodeRootObject: should encode the given object along with any objects it contains references to, and so on recursively, keeping track of multiple references to each object to avoid redundancy.  To allow one part of a graph to be encoded without the rest, encodeConditionalObject: should encode an object only if it's unconditionally encoded elsewhere in the graph.
+However, Coder's implementations of encodeRootObject: and encodeConditionalObject: simply encode the object unconditionally, whether or not it's already been encoded. A concrete subclass that supports object graphs must override these two methods. See the NSArchiver class specification for more information on managing object graphs.
+Creating a Subclass of Coder
+Coder's abstract implementation is based on these methods: encodeValueOfObjCType:at:, decodeValueOfObjCType:at:, encodeDataObject:, decodeDataObject:, and versionForClassName:. To create a functional coder subclass, you must implement at least these methods. Other methods that can be overridden for more specialized behavior are:
+(an initialization method)
+encodeRootObject:
+encodeConditionalObject:
+encodeBycopyObject:
+encodeByrefObject:
+setObjectZone:
+objectZone
+See the individual method descriptions for more information, and the NSArchiver class specification for an example of a concrete subclass.
+Note that encodeObject: and decodeObject are not among the basic methods. They're defined abstractly to invoke encodeValueOfObjCType:at: or decodeValueOfObjCType:at: with an Objective-C type code of "@". Your implementations of the latter two methods must handle this case, invoking the object's encodeWithCoder: or initWithCoder: method and sending the proper substitution messages (as described in the NSCoding protocol specification) to the object before encoding it and after decoding it.
+ Here's a skeletal implementation for encoding an object value:
+- (void)encodeValueOfObjCType:(const char *)type at:(const void *)value
+{
+    switch (type[0]) {
+
+        /* Code for handling other types. */
+
+        case '@':
+            id theObject = (id)value;
+            Class substituteClass;
+            id substituteObject;
+
+            substituteObject = [theObject replacementObjectForCoder:self];
+            if (!substituteObject) {
+                [self encodeObject:nil];
+            }
+            substituteClass = [substituteObject classForCoder:self];
+            [self encodeClassName:[[substituteObject class] name]
+                  intoClassName:[substituteClass name]];
+            if (substituteObject) [substituteObject encodeWithCoder:self];
+            break;
+
+        default:
+            /* Handle default case. */
+            break;
+    }
+
+    return;
+}
+This example first uses replacementObjectForCoder: to ask the object being encoded whether it wants to substitute a different object for itself. The object returned is used for all following work. In similar fashion, the object now being encoded is asked using classForCoder: what class it should be encoded as. This example uses a contrived encodeClassName:intoClassName: method to record this substitution (NSArchiver actually implements such a method; see its class specification for more information). Finally, the object being encoded is directed to encode itself using encodeWithCoder:.
+In general, the object being coded is fully responsible for coding itself. <!-- A few classes, however, push responsibility back on the coder, whether for performance reasons or because proper support depends on more information than the object itself has. The two notable classes in Foundation that do this are NSData and NSPort. NSData's low-level nature makes optimization important. For this reason, an NSData always asks its coder to handle its contents directly using the encodeDataObject: and decodeDataObject: methods described in this class specification. Similarly, an NSPort asks its coder to handle it using the encodePortObject: and decodePortObject: methods (which only NSPortCoder implements). This is because an NSPort represents information kept in the operating system itself, which requires special handling for transmission to another process.
+These special cases don't affect users of coder objects, since the redirection is handled by the classes themselves in their NSCoding protocol methods. An implementor of a concrete coder subclass, however, must encode NSData and NSPort objects itself, and take care not to send an encodeWithCoder: or initWithCoder: message to the NSData or NSPort object. Failure to do so can result in an infinite loop.
+-->
+<hr>
+
+</body>
+
+</html><html>
+
+<body bgcolor="#FFFFFF"><!-- constructors -->
+
+<a name="constructors"><CENTER><H2>CONSTRUCTORS</H2></CENTER></a>
+
+<!-- consKey:Coder(public) cons:Coder descr:<TT>public  <B>Coder</B>()</TT> -->
+
+<H3><a name="Coder(public)">Coder</a></H3>
+
+   <TT>public  <B>Coder</B>()</TT>
+
+<P>
+
+Returns a newly-allocated and initialized Coder object.
+<P>
+
+<!-- <B>See Also: </B>[See Also's go here] -->
+
+<hr>
+
+</body>
+
+</html><html>
+
+<body bgcolor="#FFFFFF"><!-- methods -->
+
+<a name="methods"><CENTER><H2>METHODS</H2></CENTER></a>
+
+<!-- methKey:decodeByte(public) meth:decodeByte descr:<TT>public byte <B>decodeByte</B>()</TT> -->
+
+<H3><a name="decodeByte(public)">decodeByte</a></H3>
+
+<TT>public byte <B>decodeByte</B>()</TT>
+
+<P>
+
+Decodes and returns a single byte that was previously encoded with <B>encodeByte</B>.
+<P>
+
+<!-- <B>See Also: </B>[See Also's go here] -->
+
+<hr>
+
+<!-- methKey:decodeBytes(public) meth:decodeBytes descr:<TT>public byte[] <B>decodeBytes</B>()</TT> -->
+
+<H3><a name="decodeBytes(public)">decodeBytes</a></H3>
+
+<TT>public byte[] <B>decodeBytes</B>()</TT>
+
+<P>
+
+Decodes and returns an array of bytes that were previously encoded with <B>encodeBytes</B>.
+<P>
+
+<!-- <B>See Also: </B>[See Also's go here] -->
+
+<hr>
+
+<!-- methKey:decodeChar(public) meth:decodeChar descr:<TT>public char <B>decodeChar</B>()</TT> -->
+
+<H3><a name="decodeChar(public)">decodeChar</a></H3>
+
+<TT>public char <B>decodeChar</B>()</TT>
+
+<P>
+
+Decodes and returns a single character that was previously encoded with <B>encodeChar</B>.
+<P>
+
+<!-- <B>See Also: </B>[See Also's go here] -->
+
+<hr>
+
+<!-- methKey:decodeChars(public) meth:decodeChars descr:<TT>public char[] <B>decodeChars</B>()</TT> -->
+
+<H3><a name="decodeChars(public)">decodeChars</a></H3>
+
+<TT>public char[] <B>decodeChars</B>()</TT>
+
+<P>
+
+Decodes and returns an array of characters that were previously encoded with <B>encodeChars</B>.
+<P>
+
+<!-- <B>See Also: </B>[See Also's go here] -->
+
+<hr>
+
+<!-- methKey:decodeDouble(public) meth:decodeDouble descr:<TT>public double <B>decodeDouble</B>()</TT> -->
+
+<H3><a name="decodeDouble(public)">decodeDouble</a></H3>
+
+<TT>public double <B>decodeDouble</B>()</TT>
+
+<P>
+
+Decodes and returns a double that was previously encoded with <B>encodeDouble</B>.
+<P>
+
+<!-- <B>See Also: </B>[See Also's go here] -->
+
+<hr>
+
+<!-- methKey:decodeDoubles(public) meth:decodeDoubles descr:<TT>public double[] <B>decodeDoubles</B>()</TT> -->
+
+<H3><a name="decodeDoubles(public)">decodeDoubles</a></H3>
+
+<TT>public double[] <B>decodeDoubles</B>()</TT>
+
+<P>
+
+Decodes and returns an array of doubles that were previously encoded with <B>encodeDoubles</B>.
+<P>
+
+<!-- <B>See Also: </B>[See Also's go here] -->
+
+<hr>
+
+<!-- methKey:decodeFloat(public) meth:decodeFloat descr:<TT>public float <B>decodeFloat</B>()</TT> -->
+
+<H3><a name="decodeFloat(public)">decodeFloat</a></H3>
+
+<TT>public float <B>decodeFloat</B>()</TT>
+
+<P>
+
+Decodes and returns a float that was previously encoded with <B>encodeFloat</B>.
+<P>
+
+<!-- <B>See Also: </B>[See Also's go here] -->
+
+<hr>
+
+<!-- methKey:decodeFloats(public) meth:decodeFloats descr:<TT>public float[] <B>decodeFloats</B>()</TT> -->
+
+<H3><a name="decodeFloats(public)">decodeFloats</a></H3>
+
+<TT>public float[] <B>decodeFloats</B>()</TT>
+
+<P>
+
+Decodes and returns an array of floats that were previously encoded with <B>encodeFloats</B>.
+<P>
+
+<!-- <B>See Also: </B>[See Also's go here] -->
+
+<hr>
+
+<!-- methKey:decodeInt(public) meth:decodeInt descr:<TT>public int <B>decodeInt</B>()</TT> -->
+
+<H3><a name="decodeInt(public)">decodeInt</a></H3>
+
+<TT>public int <B>decodeInt</B>()</TT>
+
+<P>
+
+Decodes and returns an integer that was previously encoded with <B>encodeInt</B>.
+<P>
+
+<!-- <B>See Also: </B>[See Also's go here] -->
+
+<hr>
+
+<!-- methKey:decodeInts(public) meth:decodeInts descr:<TT>public int[] <B>decodeInts</B>()</TT> -->
+
+<H3><a name="decodeInts(public)">decodeInts</a></H3>
+
+<TT>public int[] <B>decodeInts</B>()</TT>
+
+<P>
+
+Decodes and returns an array of integers that were previously encoded with <B>encodeInts</B>.
+<P>
+
+<!-- <B>See Also: </B>[See Also's go here] -->
+
+<hr>
+
+<!-- methKey:decodeLong(public) meth:decodeLong descr:<TT>public long <B>decodeLong</B>()</TT> -->
+
+<H3><a name="decodeLong(public)">decodeLong</a></H3>
+
+<TT>public long <B>decodeLong</B>()</TT>
+
+<P>
+
+Decodes and returns a long that was previously encoded with <B>encodeLong</B>.
+<P>
+
+<!-- <B>See Also: </B>[See Also's go here] -->
+
+<hr>
+
+<!-- methKey:decodeObject(public) meth:decodeObject descr:<TT>public java.lang.Object <B>decodeObject</B>()</TT> -->
+
+<H3><a name="decodeObject(public)">decodeObject</a></H3>
+
+<TT>public java.lang.Object <B>decodeObject</B>()</TT>
+
+<P>
+
+Decodes and returns an object that was previously encoded with <B>encodeObject</B>.
+<P>
+
+<!-- <B>See Also: </B>[See Also's go here] -->
+
+<hr>
+
+<!-- methKey:decodeObjects(public) meth:decodeObjects descr:<TT>public java.lang.Object[] <B>decodeObjects</B>()</TT> -->
+
+<H3><a name="decodeObjects(public)">decodeObjects</a></H3>
+
+<TT>public java.lang.Object[] <B>decodeObjects</B>()</TT>
+
+<P>
+
+Decodes and returns an array of objects that were previously encoded with <B>encodeObjects</B>.
+<P>
+
+<!-- <B>See Also: </B>[See Also's go here] -->
+
+<hr>
+
+<!-- methKey:decodeShort(public) meth:decodeShort descr:<TT>public short <B>decodeShort</B>()</TT> -->
+
+<H3><a name="decodeShort(public)">decodeShort</a></H3>
+
+<TT>public short <B>decodeShort</B>()</TT>
+
+<P>
+
+Decodes and returns a short integer that was previously encoded with <B>encodeShort</B>.
+<P>
+
+<!-- <B>See Also: </B>[See Also's go here] -->
+
+<hr>
+
+<!-- methKey:decodeShorts(public) meth:decodeShorts descr:<TT>public short[] <B>decodeShorts</B>()</TT> -->
+
+<H3><a name="decodeShorts(public)">decodeShorts</a></H3>
+
+<TT>public short[] <B>decodeShorts</B>()</TT>
+
+<P>
+
+Decodes and returns an array of short integers that were previously encoded with <B>encodeShorts</B>.
+<P>
+
+<!-- <B>See Also: </B>[See Also's go here] -->
+
+<hr>
+
+<!-- methKey:encodeByte(public) meth:encodeByte descr:<TT>public void <B>encodeByte</B>(byte <I>aByte</I>)</TT> -->
+
+<H3><a name="encodeByte(public)">encodeByte</a></H3>
+
+<TT>public void <B>encodeByte</B>(byte <I>aByte</I>)</TT>
+
+<P>
+
+Encodes <I>aByte</I>. This method must be matched by a subsequent <B>decodeByte</B> message.
+<P>
+
+<!-- <B>See Also: </B>[See Also's go here] -->
+
+<hr>
+
+<!-- methKey:encodeBytes(public) meth:encodeBytes descr:<TT>public void <B>encodeBytes</B>(byte[] <I>bytes</I>)</TT> -->
+
+<H3><a name="encodeBytes(public)">encodeBytes</a></H3>
+
+<TT>public void <B>encodeBytes</B>(byte[] <I>bytes</I>)</TT>
+
+<P>
+
+Encodes <I>bytes</I>. This method must be matched by a subsequent <B>decodeBytes</B> message.
+<P>
+
+<!-- <B>See Also: </B>[See Also's go here] -->
+
+<hr>
+
+<!-- methKey:encodeChar(public) meth:encodeChar descr:<TT>public void <B>encodeChar</B>(char <I>aChar</I>)</TT> -->
+
+<H3><a name="encodeChar(public)">encodeChar</a></H3>
+
+<TT>public void <B>encodeChar</B>(char <I>aChar</I>)</TT>
+
+<P>
+
+Encodes <I>aChar</I>. This method must be matched by a subsequent <B>decodeChar</B> message.
+<P>
+
+<!-- <B>See Also: </B>[See Also's go here] -->
+
+<hr>
+
+<!-- methKey:encodeChars(public) meth:encodeChars descr:<TT>public void <B>encodeChars</B>(char[] <I>chars</I>)</TT> -->
+
+<H3><a name="encodeChars(public)">encodeChars</a></H3>
+
+<TT>public void <B>encodeChars</B>(char[] <I>chars</I>)</TT>
+
+<P>
+
+Encodes <I>chars</I>. This method must be matched by a subsequent <B>decodeChars</B> message.
+<P>
+
+<!-- <B>See Also: </B>[See Also's go here] -->
+
+<hr>
+
+<!-- methKey:encodeDouble(public) meth:encodeDouble descr:<TT>public void <B>encodeDouble</B>(double <I>aDouble</I>)</TT> -->
+
+<H3><a name="encodeDouble(public)">encodeDouble</a></H3>
+
+<TT>public void <B>encodeDouble</B>(double <I>aDouble</I>)</TT>
+
+<P>
+
+Encodes <I>aDouble</I>. This method must be matched by a subsequent <B>decodeDouble</B> message.
+<P>
+
+<!-- <B>See Also: </B>[See Also's go here] -->
+
+<hr>
+
+<!-- methKey:encodeDoubles(public) meth:encodeDoubles descr:<TT>public void <B>encodeDoubles</B>(double[] <I>doubles</I>)</TT> -->
+
+<H3><a name="encodeDoubles(public)">encodeDoubles</a></H3>
+
+<TT>public void <B>encodeDoubles</B>(double[] <I>doubles</I>)</TT>
+
+<P>
+
+Encodes <I>doubles</I>. This method must be matched by a subsequent <B>decodeDoubles</B> message.
+<P>
+
+<!-- <B>See Also: </B>[See Also's go here] -->
+
+<hr>
+
+<!-- methKey:encodeFloat(public) meth:encodeFloat descr:<TT>public void <B>encodeFloat</B>(float <I>aFloat</I>)</TT> -->
+
+<H3><a name="encodeFloat(public)">encodeFloat</a></H3>
+
+<TT>public void <B>encodeFloat</B>(float <I>aFloat</I>)</TT>
+
+<P>
+
+Encodes <I>aFloat</I>. This method must be matched by a subsequent <B>decodeFloat</B> message.
+<P>
+
+<!-- <B>See Also: </B>[See Also's go here] -->
+
+<hr>
+
+<!-- methKey:encodeFloats(public) meth:encodeFloats descr:<TT>public void <B>encodeFloats</B>(float[] <I>floats</I>)</TT> -->
+
+<H3><a name="encodeFloats(public)">encodeFloats</a></H3>
+
+<TT>public void <B>encodeFloats</B>(float[] <I>floats</I>)</TT>
+
+<P>
+
+Encodes <I>floats</I>. This method must be matched by a subsequent <B>decodeFloats</B> message.
+<P>
+
+<!-- <B>See Also: </B>[See Also's go here] -->
+
+<hr>
+
+<!-- methKey:encodeInt(public) meth:encodeInt descr:<TT>public void <B>encodeInt</B>(int <I>anInt</I>)</TT> -->
+
+<H3><a name="encodeInt(public)">encodeInt</a></H3>
+
+<TT>public void <B>encodeInt</B>(int <I>anInt</I>)</TT>
+
+<P>
+
+Encodes <I>anInt</I>. This method must be matched by a subsequent <B>decodeInt</B> message.
+<P>
+
+<!-- <B>See Also: </B>[See Also's go here] -->
+
+<hr>
+
+<!-- methKey:encodeInts(public) meth:encodeInts descr:<TT>public void <B>encodeInts</B>(int[] <I>ints</I>)</TT> -->
+
+<H3><a name="encodeInts(public)">encodeInts</a></H3>
+
+<TT>public void <B>encodeInts</B>(int[] <I>ints</I>)</TT>
+
+<P>
+
+Encodes <I>ints</I>. This method must be matched by a subsequent <B>decodeInts</B> message.
+<P>
+
+<!-- <B>See Also: </B>[See Also's go here] -->
+
+<hr>
+
+<!-- methKey:encodeLong(public) meth:encodeLong descr:<TT>public void <B>encodeLong</B>(long <I>aLong</I>)</TT> -->
+
+<H3><a name="encodeLong(public)">encodeLong</a></H3>
+
+<TT>public void <B>encodeLong</B>(long <I>aLong</I>)</TT>
+
+<P>
+
+Encodes <I>aLong</I>. This method must be matched by a subsequent <B>decodeLong</B> message.
+<P>
+
+<!-- <B>See Also: </B>[See Also's go here] -->
+
+<hr>
+
+<!-- methKey:encodeObject(public) meth:encodeObject descr:<TT>public void <B>encodeObject</B>(java.lang.Object <I>anObject</I>)</TT> -->
+
+<H3><a name="encodeObject(public)">encodeObject</a></H3>
+
+<TT>public void <B>encodeObject</B>(java.lang.Object <I>anObject</I>)</TT>
+
+<P>
+
+Encodes <I>anObject</I>. This method must be matched by a subsequent <B>decodeObject</B> message.
+<P>
+
+<!-- <B>See Also: </B>[See Also's go here] -->
+
+<hr>
+
+<!-- methKey:encodeObjects(public) meth:encodeObjects descr:<TT>public void <B>encodeObjects</B>(next.util.Coding[] <I>codings</I>)</TT> -->
+
+<H3><a name="encodeObjects(public)">encodeObjects</a></H3>
+
+<TT>public void <B>encodeObjects</B>(next.util.Coding[] <I>objects</I>)</TT>
+
+<P>
+
+Encodes <I>objects</I>. This method must be matched by a subsequent <B>decodeObjects</B> message.
+<P>
+
+<!-- <B>See Also: </B>[See Also's go here] -->
+
+<hr>
+
+<!-- methKey:encodeShort(public) meth:encodeShort descr:<TT>public void <B>encodeShort</B>(short <I>aShort</I>)</TT> -->
+
+<H3><a name="encodeShort(public)">encodeShort</a></H3>
+
+<TT>public void <B>encodeShort</B>(short <I>aShort</I>)</TT>
+
+<P>
+
+Encodes <I>aShort</I>. This method must be matched by a subsequent <B>decodeShort</B> message.
+<P>
+
+<!-- <B>See Also: </B>[See Also's go here] -->
+
+<hr>
+
+<!-- methKey:encodeShorts(public) meth:encodeShorts descr:<TT>public void <B>encodeShorts</B>(short[] <I>shorts</I>)</TT> -->
+
+<H3><a name="encodeShorts(public)">encodeShorts</a></H3>
+
+<TT>public void <B>encodeShorts</B>(short[] <I>shorts</I>)</TT>
+
+<P>
+
+Encodes <I>shorts</I>. This method must be matched by a subsequent <B>decodeShorts</B> message.
+<P>
+
+<!-- <B>See Also: </B>[See Also's go here] -->
+
+<hr>
+
+</body>
+
+</html>

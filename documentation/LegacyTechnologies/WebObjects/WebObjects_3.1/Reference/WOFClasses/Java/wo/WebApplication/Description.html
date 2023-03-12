@@ -1,0 +1,2070 @@
+<HTML>
+
+<BODY bgcolor="#FFFFFF">
+
+<CENTER>
+
+  <H1>
+
+    Class next.wo.WebApplication
+
+  </H1>
+
+</CENTER>
+
+<P>
+
+<!-- extends:next.util.NextObject -->
+
+<DL>
+
+  <DT>
+
+    <B>Extends:</B>
+
+  <DD>
+
+    next.util.NextObject
+
+</DL>
+
+<HR>
+
+<A name="classAtAGlance"></A>
+
+<CENTER>
+
+  <H2>
+
+    CLASS AT A GLANCE
+
+  </H2>
+
+</CENTER>
+
+<P>
+<h4>Purpose</h4>
+<P>
+A WebApplication object receives an HTTP request from an adaptor, manages the request-response loop that processes the request, and returns a response to the adaptor. It also manages sessions, caches component definitions and page instances, and offers localization, debugging, and error-handling support.
+<H4>Principal Attributes</h4>
+<UL>
+<LI>Application bundle
+<LI>Session store
+<LI>Page and component-definition caches
+<LI>Current adaptors
+</UL>
+<H4>Creation</H4>
+WebObjects Builder (Application.wos)
+<br>
+WebApplication()
+<H4>Commonly Used Methods</H4>
+<TABLE><TR>
+<TD> pageWithName </td>
+<td>Returns a Component (page) instance identified by name.</td>
+</TR><TR>
+<TD>awake</td><TD>Allows custom application initializations during the start of a request-response cycle.</td>
+</TR><TR>
+<td>takeValuesFromRequest<BR>invokeAction<BR>appendToResponse</td><td>These three methods allow custom application logic during the value-extraction, action-invocation, and HTML-generation phases of the request-reponse loop.</td>
+</TR><TR>
+<td> setTimeOut </td><td>Sets the period of inactivity after which the application process stops executing.</td>
+</TR><TR>
+<td> setPageCacheSize </td><td>Sets the number of page instances cached in the session by the application.</td>
+</TR><TR>
+<td> setCachingEnabled</td><td>Controls whether the application caches component definitions.</td>
+</TR>
+</table>
+<BR>
+<hr>	
+<BR>
+<A name="description"></A>
+
+<CENTER>
+
+  <H2>
+
+    CLASS DESCRIPTION
+
+  </H2>
+
+</CENTER>
+
+<P>
+
+The primary role of the WebApplication class is to coordinate the handling
+
+of HTTP requests. Each application must have exactly one WebApplication object
+
+(or, simply, <I>application object</I>). The application object receives client
+
+requests from an HTTP server adaptor, manages the processing that generates
+
+a response, and returns that response--typically an object representing a
+
+Web page--to the adaptor. The adaptor, in turn, forwards the response in
+
+a suitable form to the HTTP server that originated the request.
+
+<P>
+
+In handling requests, an application object creates and manages one or more
+
+sessions; a session (represented by a WebSession object) dedicates resources
+
+to a period of access by a single user, and stores persistent state during that period.
+Conceptually, each cycle of the request-response loop (or <I>transaction</I>)
+
+takes place within a session.
+
+<P>
+
+Besides acting as a facilitator between the adaptor and the rest of the
+
+application during request handling, WebApplication performs many secondary
+
+functions. It returns pages based on component name, caches page instances
+
+and component definitions, gives access to localized resources, provides
+
+some facilities for error handling and script debugging, and furnishes a
+
+variety of data, such as the base URL and the current Context object.
+
+<P>
+
+Typical deployment schemes balance the processing load by having multiple
+
+application instances per server adaptor. A single application, in turn,
+
+can interact with multiple adaptors; for example, an application can
+
+simultaneously communicate with secure-socket and Distributed Object adaptors
+
+as well as HTTP adaptors.
+
+<P>
+
+You can instantiate ready-made application objects from the WebApplication class or you can obtain the application object from a custom subclass of WebApplication. Custom WebApplication subclasses are common in WebObjects applications since there is often a need to override the <b>awake</b>, <b>sleep</b>, <b>init</b>, and request-handling methods. Compiled WebApplication subclasses can take any name, but if the name is anything other than "Application" you must modify the application's <b>main</b> function to instantiate the application object from this class. However, if the class name is "Application," you don't need to modify <b>main</b>. In scripted
+applications, the code in the <B>Application.wos</B> file becomes the
+implementation logic of a WebApplication subclass automatically created at
+run time; the application object is instantiated from this subclass. <BR>
+
+<BR>
+
+<H2>
+
+  The Application Run Loop
+
+</H2>
+
+<P>
+
+When a WebObjects application is launched from the command line, either manually
+
+or automatically ("autostarting"), the <B>main</B> function is called. In
+
+<B>main</B> the WebApplication subclass for the application is loaded. This
+
+class sets up for request handling by:
+
+<OL>
+
+  <LI>
+
+    Parsing the command-line arguments <BR>
+
+  <LI>
+
+    Creating and initalizing an application instance <BR>
+
+  <LI>
+
+    Instantiating the adaptors with which the application will communicate <BR>
+
+</OL>
+
+<P>
+
+The application instance then has its <B>run</B> method invoked; in this
+
+method it registers its adaptors to receive run-loop events and then starts
+
+a run loop. The application remains in this run loop until it either times
+
+out, receives a <B>terminate</B> message, or has its process externally stopped.
+
+<P>
+
+The events that initiate each cycle of the run loop are not, as in a typical
+
+non-Web application, user actions such as mouse clicks or key presses. Instead
+
+they are HTTP requests originating from client browsers. A browser sends
+
+an HTTP request (according to the URL specified) to an HTTP server, which
+
+then "talks" with a WebObjects adaptor customized for that server. The adaptor
+
+packages the request in a Request object and invokes the application object's
+
+<B>handleRequest</B> method. The receipt of this message initiates a cycle
+
+of the <I>request-response</I> loop, a three-phase cycle that handles the
+
+request and returns (in most cases) a response in the form of a Web page.
+
+Each phase of the cycle centers around a message propagated from the application
+
+object to all other "interested" objects in the application:
+
+<UL>
+
+  <LI>
+
+    takeValuesFromRequest
+
+  <LI>
+
+    invokeAction
+
+  <LI>
+
+    appendToResponse
+
+</UL>
+
+<!--Need to provide links for the following chapters, or just to the DevGuide and Serving WO -->
+<P>
+
+For more on the request-response loop, see the <i>WebObjects Developers Guide</i>,
+
+particularly the chapters "<a href="../../../../../DevGuide/Intro/Start.book.html" target=_top>Introduction</a>," "<a href="../../../../../DevGuide/HowWOWorks/HowWOWorks.mif.book.html" target=_top>How WebObjects Works</a>," and
+"<a href="../../../../../DevGuide/RunLoop/RunLoop.book.html" target=_top>Integrating Your Code Into the Request-Response Loop</a>." For information on
+
+valid command-line arguments for launching an application, see the "<a href="../../../../../ServingWebObjects/ManualStarting.html" target=_top>Manually
+
+Starting WebObjects Applications</a>" section of the <i>Serving WebObjects</i> document.
+
+<BR>
+
+<BR>
+
+<A name="Caching"></A>
+
+<H2>
+
+  <A name="Caching">Caching Strategies</A>
+
+</H2>
+
+<P>
+
+The WebApplication object implements or controls three kinds of caching.
+
+You turn caching off or on in each case for reasons ranging from performance
+
+enhancement to page integrity or ease of debugging.
+
+<DL>
+
+  <DT>
+
+    <B>Component-definition caching</B> <BR>
+
+  <DD>
+
+    Component definitions are compact programmatic descriptions of components
+
+    (pages or subcomponents), and are used to create instances of those components.
+
+    When a page of an application is requested the first time, an application
+
+    parses the HTML, declaration (".wod"), and implementation files in the component
+
+    directory (".wo"), creates an internal representation of the component (the
+
+    component definition), and instantiates the Component object from it. If
+
+    caching is enabled, it stores the component definition in memory. If not,
+
+    the application must reparse the files in the component directory every time
+
+    that page is revisited.
+
+    <P>
+
+    You turn component-definition caching off and on with the
+
+    <B>setCachingEnabled</B> method. By default, it is disabled. The advantage
+
+    of having this kind of caching disabled is that you can edit a scripted component
+
+    without having to relaunch the application every time to check the results.
+
+    However, you should always enable component-definition caching when you deploy
+
+    an application since performance improves significantly when you do. You
+
+    can also control caching of individual component definitions using an identically
+
+    named Component method. Selective caching is an especially valuable technique
+
+    for very large applications where only the most common components and pages
+
+    should be cached. <BR>
+
+    <BR>
+
+  <DT>
+
+    <B>Page-instance caching</B> <BR>
+
+  <DD>
+
+    In normal processing of requests, an application caches at least one page instance. It does this because the lifecycle of a page overlaps transaction boundaries: a page "begins" by having its HTML generated and "ends" when the user navigates to a new page, which replaces the previous page in the browser. Because the application caches the page instance that once represented the response page, it can easily make it the request page for the next transaction.
+<P>
+Page-instance caching also facilitates backtracking in the client browser. It
+
+    works like this: At the end of a request-response cycle, the application
+
+    object stores the Component instance representing the response page in the
+
+    session. When the user backtracks to this page, the instance is restored
+
+    from the session object, enabling the page to display things as they were
+
+    when the user visited it the previous time. By default, page-instance caching
+
+    is enabled, with a cache limit of 30 pages.
+
+    <P>
+
+    You turn page-instance caching off by sending <B>setPageCacheSize</B> to
+
+    the application object with an argument of zero. In this case, when the user
+
+    backtracks to a page, the page is not stored in the session and so must be
+
+    re-created "from scratch"; it will show none of its previous state. This
+
+    situation is sometimes what is appropriate for certain applications. If you
+
+    wish, you can also turn this feature off and implement your own selective
+
+    page-caching scheme. Because page storage uses up application memory, you
+
+    should test for the optimum cache size before you deploy an application with
+
+    page-instance caching turned on. <BR>
+
+    <BR>
+
+  <DT>
+
+    <B>Client caching</B> <BR>
+
+  <DD>
+
+    Usually client browsers cache pages (as HTML code) so they can redisplay
+
+    them when users backtrack to them. You can turn off client caching by setting
+
+    the date and the expiration time in the response page's headers to the current
+
+    date and time. The client, however, retains the URL for the page. When the
+
+    user backtracks to the page, the client resends the URL to the server, which
+
+    returns a page based on a restored component instance. 
+
+    <P>
+
+    WebObjects turns off client caching for you when you send the application
+
+    object <B>setPageRefreshOnBacktrackEnabled</B> with an argument of
+
+    <B>true</B>. This setting is valuable when you do not want the client to
+
+    backtrack to a page that would be obsolete because of changes that might
+
+    occur in the session. In particular, if you are using WODisplayGroup's batch
+
+    and selection-management functionality, you should turn off client caching.
+
+</DL>
+
+<P>
+
+<BR>
+
+<BR>
+
+<H2>
+
+  <A name="Localization">Localization and Resource Access</A>
+
+</H2>
+
+<P>
+
+WebApplication objects, as well as the Component objects that they manage,
+
+are <I>bundles</I>. Bundles organize resources
+
+used by an executable in a file system and provide means to access those
+
+resources. For WebApplication, these means include:
+
+<UL>
+
+  <LI>
+
+    A method to access application resources (including components) through a
+
+    file-system path (<B>pathForResource</B>)<BR>
+
+    <BR>
+
+  <LI>
+
+    A method to access application resources (including components) through a
+
+    URL (<B>urlForResource</B>)<BR>
+
+    <BR>
+
+  <LI>
+
+    A method to access localized strings from a table
+
+    (<B>stringForKeyInTable</B>)
+
+</UL>
+
+<P>
+
+All three methods first look for localized versions of the application resource
+
+in <I>Language</I>.lproj subdirectories of the application wrapper (".woa"). They search the
+
+".lproj" directories (if they exist) in the preferred order of languages.
+
+If no resource is found in a language-specific subdirectory, the search continues
+
+directly under the application wrapper for the resource.
+
+<P>
+
+Localization in WebObjects depends on an array of languages stored (as String
+
+objects) in the WebSession object using WebSession's <B>setLanguages</B>.
+
+The order of languages in the array indicates the preferred order. The language
+
+names in the array should map to "<I>Language</I>.lproj" subdirectories of
+
+the ".woa" directory. Thus, if there is a "French" item in the array, there
+
+should be a French.lproj subdirectory. The ".lproj" directories should contain
+
+everything that has localized content: ".strings" tables, sounds, images,
+
+and so on. Because the application first looks for resources in localized
+
+".lproj" directories and then in a non-localized location, be sure there
+
+are no files of the same name in localized locations when no localization
+
+is supposed to occur.
+
+<P>
+
+The ".strings" file contains a simple property list that maps common keys
+
+to words, phrases, or sentences in a particular language. For instance, a
+
+Session.strings file in English.lproj might have the following content:<BR>
+
+<PRE>{
+
+    buttonTitle = "Submit your request";
+
+}
+
+</PRE>
+
+<P>
+
+<BR>
+
+<P>
+
+The Session.strings file in French.lproj would have the following:<BR>
+
+<PRE>{
+
+    buttonTitle = "Soumettez votre requete";
+
+}
+
+</PRE>
+
+<P>
+
+<BR>
+
+<P>
+
+<B>Note</B>: You can determine the language of the request sender by getting
+
+the value of the Request object's "accept-language" header. This returns
+
+a two-character value ("en", "fr", and so on) that you can then map to the
+
+language subdirectory.<BR>
+
+<BR>
+
+<BR>
+
+<H2>
+
+  Error Handling and Debugging
+
+</H2>
+
+<P>
+
+WebApplication offers developers some assistance in the areas of debugging
+
+and error handling.
+
+<UL>
+
+  <LI>
+
+    You can invoke the <B>logString</B> method at critical points in your code
+
+    to print debugging messages to the standard error device.<BR>
+
+    <BR>
+
+  <LI>
+
+    For handling exceptions that arise during request handling, WebApplication
+
+    gives the <B>handleException</B> method as well as methods for handling errors
+
+    occuring at specific points in the request-response loop (for example,
+
+    <B>handlePageRestorationError</B>). The default implementation of these methods
+
+    prints debugging information on the browser page; you can override them to
+
+    implement "friendlier" or more elaborate error handling.<BR>
+
+    <BR>
+
+  <LI>
+
+    A WebObjects application can print diagnostic messages to the standard output
+
+    device when it parses HTML code, (for example, when it encounters unbalanced
+
+    containers). You can turn this feature off and on with the
+
+    <B>setPrintsHTMLParserDiagnostics</B> method.
+
+</UL>
+
+<P>
+
+  <HR>
+
+<A name="constructors"></A>
+
+<CENTER>
+
+  <H2>
+
+    <A name="constructors">CONSTRUCTORS</A>
+
+  </H2>
+
+</CENTER>
+
+<!-- consKey:WebApplication(public) cons:WebApplication descr:<TT>public
+
+<B>WebApplication</B>()</TT> -->
+
+<H3>
+
+  <A name="WebApplication(public)">WebApplication</A>
+
+</H3>
+
+<P>
+
+<TT>public <B>WebApplication</B>()</TT>
+
+<P>
+
+Initializes and returns a WebApplication object.This constructor initializes
+
+application attributes, reads in the archive file (Application.woo), and
+
+initializes the adaptor or adaptors specified on the command line. If no
+
+adaptor is specified, WODefaultAdaptor is made the default adaptor. Some
+
+of the more interesting attribute initializations are:
+
+<UL>
+
+  <LI>
+
+    Session store is in the server.
+
+  <LI>
+
+    Page cache size is 30 pages.
+
+  <LI>
+
+    Client caching of pages is enabled (<B>pageRefreshOnBacktrackEnabled</B>
+
+    returns <B>false</B>).
+
+  <LI>
+
+    Component-definition caching is disabled (<B>isCachingEnabled</B> returns
+
+    <B>false</B>).
+
+  <LI>
+
+    Application time out is set to a very long period.
+
+</UL>
+
+<P>
+
+A exception is thrown if initialization does not succeed. 
+
+  <HR>
+
+<A name="methods"></A>
+
+<CENTER>
+
+  <H2>
+
+    <A name="methods">METHODS</A>
+
+  </H2>
+
+</CENTER>
+
+<!-- methKey:appendToResponse(public) meth:appendToResponse descr:<TT>public
+
+void <B>appendToResponse</B>(next.wo.Response <I>aResponse</I>, next.wo.Context
+
+<I>aContext</I>)</TT> -->
+
+<H3>
+
+  <A name="appendToResponse(public)">appendToResponse</A>
+
+</H3>
+
+<P>
+
+<TT>public void <B>appendToResponse</B>(next.wo.Response <I>aResponse</I>,
+
+next.wo.Context <I>aContext</I>)</TT>
+
+<P>
+
+The WebApplication object sends this message to itself to initiate the last
+
+phase of request handling. This occurs right after the
+
+<B>invokeActionForRequest</B> method has completed, typically with the return
+
+a response page. In the append-to-response phase, the application objects
+
+(particularly the response component itself) generate the HTML content of
+
+the page. WebApplication's default implementation of this method forwards
+
+the message to the session object.
+
+<P>
+
+<B>See Also: invokeAction</B>, <B>takeValuesFromRequest</B> 
+
+  <HR>
+
+<!-- methKey:application(public) meth:application descr:<TT>public static
+
+    next.wo.WebApplication <B>application</B>()</TT> -->
+
+<H3>
+
+  <A name="application(public)">application</A>
+
+</H3>
+
+<P>
+
+<TT>public static next.wo.WebApplication <B>application</B>()</TT>
+
+<P>
+
+Returns the WebApplication object for the current application. Since this
+
+is a class method, it can be invoked from anywhere in an application:
+
+<PRE>    WebApplication app = WebApplication.application()
+
+</PRE>
+
+<P>
+
+This method is similar in purpose to WOApp, the global application object
+
+in the Objective-C version of WebObjects. It may not be overridden.
+
+<P>
+
+<B>See Also: session</B>, <B>context</B> 
+
+  <HR>
+
+<!-- methKey:awake(public) meth:awake descr:<TT>public void <B>awake</B>()</TT>
+
+    -->
+
+<H3>
+
+  <A name="awake(public)">awake</A>
+
+</H3>
+
+<P>
+
+<TT>public void <B>awake</B>()</TT>
+
+<P>
+
+Invoked at the beginning of each cycle of the request-response loop, affording
+
+the opportunity to perform initializations with application-wide scope. Since the
+
+default implementation does nothing, overriden implementations do not have to call super().
+<P>
+
+<B>See Also: sleep</B> 
+
+  <HR>
+
+<!-- methKey:baseURL(public) meth:baseURL descr:<TT>public java.lang.String
+
+    <B>baseURL</B>()</TT> -->
+
+<H3>
+
+  <A name="baseURL(public)">baseURL</A>
+
+</H3>
+
+<P>
+
+<TT>public java.lang.String <B>baseURL</B>()</TT>
+
+<P>
+
+Returns the application URL relative to the server's document root, for example:
+
+<B>WebObjects/Examples/HelloWorld.woa</B>.
+
+<P>
+
+<B>See Also: name</B>, <B>path</B> 
+
+  <HR>
+
+<!-- methKey:context(public) meth:context descr:<TT>public next.wo.Context
+
+    <B>context</B>()</TT> -->
+
+<H3>
+
+  <A name="context(public)">context</A>
+
+</H3>
+
+<P>
+
+<TT>public next.wo.Context <B>context</B>()</TT>
+
+<P>
+
+Returns the application's current Context object. May not be overridden.
+
+<P>
+
+<B>See Also: </B><!-- <A href="../Context/Context.html" target=_top>Context</A>
+
+class, --> <B>application</B>, <B>session</B> 
+
+  <HR>
+
+<!-- methKey:createSession(public) meth:createSession descr:<TT>public next.wo.WebSession
+
+    <B>createSession</B>()</TT> -->
+
+<H3>
+
+  <A name="createSession(public)">createSession</A>
+
+</H3>
+
+<P>
+
+<TT>public next.wo.WebSession <B>createSession</B>()</TT>
+
+<P>
+
+Creates and returns a WebSession object to manage a session for the application.
+
+The method goes through several steps to locate the class to use for
+
+instantiating this object:
+
+<OL>
+
+  <LI>
+
+    First it looks for a compiled class of name "Session" that is a subclass
+
+    of WebSession (or WOSession if an Objective-C application). 
+<BR>
+
+<BR>
+  <LI>
+
+    If such a class does not exist, it looks for a ".wos" script with the name
+
+    of "Session" in the application wrapper (".woa" directory). 
+<BR>
+
+<BR>
+  <LI>
+
+    If the <B>Session.wos</B> script exists, the method parses the script and
+
+    dynamically adds a scripted-class subclass of WOSession to the run time.
+
+</OL>
+
+<P>
+
+The method then returns an allocated and initialized (using the default
+
+WebSession constructor) session instance of the selected class. It throws
+
+an exception if it is unable to create a new session.
+
+<P>
+
+<B>Note: </B>An implication of the foregoing description is that the names
+
+of compiled WebSession subclasses should be "Session"; if not, you will have
+
+to override this method to use the proper class to create the session object.
+
+<P>
+
+<B>See Also: restoreSession</B>, <B>saveSession</B> 
+
+  <HR>
+
+<!-- methKey:handleException(public) meth:handleException descr:<TT>public
+
+    next.wo.Response <B>handleException</B>(java.lang.Throwable <I>aThrowable</I>)</TT>
+
+    -->
+
+<H3>
+
+  <A name="handleException(public)">handleException</A>
+
+</H3>
+
+<P>
+
+<TT>public next.wo.Response <B>handleException</B>(java.lang.Throwable
+
+<I>anException</I>)</TT>
+
+<P>
+
+Invoked when an exception occurs within the request-response loop. The default
+
+behavior displays a page with debugging information. You can override this
+
+method to catch exceptions and display a "friendlier" error page.
+
+<P>
+
+<B>See Also: handlePageRestorationError</B>,
+
+<B>handleSessionCreationError</B>, <B>handleSessionRestorationError</B> 
+
+  <HR>
+
+<!-- methKey:handlePageRestorationError(public) meth:handlePageRestorationError
+
+    descr:<TT>public next.wo.Response <B>handlePageRestorationError</B>()</TT>
+
+    -->
+
+<H3>
+
+  <A name="handlePageRestorationError(public)">handlePageRestorationError</A>
+
+</H3>
+
+<P>
+
+<TT>public next.wo.Response <B>handlePageRestorationError</B>()</TT>
+
+<P>
+
+Called when a page (Component) instance cannot be restored, which typically
+
+happens when a user backtracks too far. Specifically, this method is invoked
+
+when the following occurs: the request is not the first of a session, page
+
+restoration by context ID fails, and page re-creation is disabled. The default
+
+behavior displays a page with debugging information. You can override this
+
+method to display a "friendlier" error page.
+
+<P>
+
+<B>See Also: handleException</B>, <B>handleSessionCreationError</B>,
+
+<B>handleSessionRestorationError</B> 
+
+  <HR>
+
+<!-- methKey:handleRequest(public) meth:handleRequest descr:<TT>public next.wo.Response
+
+    <B>handleRequest</B>(next.wo.Request <I>aRequest</I>)</TT> -->
+
+<H3>
+
+  <A name="handleRequest(public)">handleRequest</A>
+
+</H3>
+
+<P>
+
+<TT>public next.wo.Response <B>handleRequest</B>(next.wo.Request
+
+<I>aRequest</I>)</TT>
+
+<P>
+
+Prepares for and manages the handling of a request. The method
+
+creates the Response and Context objects used in the request-response loop
+
+and causes <B>awake</B> and <B>sleep</B> to be sent to application objects
+
+at the appropriate times. This method is invoked by the HTTP server adaptor.
+
+  <HR>
+
+<!-- methKey:handleSessionCreationError(public) meth:handleSessionCreationError
+
+    descr:<TT>public next.wo.Response <B>handleSessionCreationError</B>()</TT>
+
+    -->
+
+<H3>
+
+  <A name="handleSessionCreationError(public)">handleSessionCreationError</A>
+
+</H3>
+
+<P>
+
+<TT>public next.wo.Response <B>handleSessionCreationError</B>()</TT>
+
+<P>
+
+Called when a session (WebSession) instance cannot be created. The default
+
+behavior displays a page with debugging information. You can override this
+
+method to display a "friendlier" error page.
+
+<P>
+
+<B>See Also: handleException</B>, <B>handlePageRestorationError</B>,
+
+<B>handleSessionRestorationError</B> 
+
+  <HR>
+
+<!-- methKey:handleSessionRestorationError(public) meth:handleSessionRestorationError
+
+    descr:<TT>public next.wo.Response <B>handleSessionRestorationError</B>()</TT>
+
+    -->
+
+<H3>
+
+  <A name="handleSessionRestorationError(public)">handleSessionRestorationError</A>
+
+</H3>
+
+<P>
+
+<TT>public next.wo.Response <B>handleSessionRestorationError</B>()</TT>
+
+<P>
+
+Called when a session (WebSession) instance cannot be restored, which typically
+
+happens when the session times out. The default behavior displays a page
+
+with debugging information. You can override this method to display a
+
+"friendlier" error page.
+
+<P>
+
+<B>See Also: handleException</B>, <B>handlePageRestorationError</B>,
+
+<B>handleSessionCreationError</B> 
+
+  <HR>
+
+<!-- methKey:invokeAction(public) meth:invokeAction descr:<TT>public next.wo.Element
+
+    <B>invokeAction</B>(next.wo.Request <I>aRequest</I>, next.wo.Context <I>aContext</I>)</TT>
+
+    -->
+
+<H3>
+
+  <A name="invokeAction(public)">invokeAction</A>
+
+</H3>
+
+<P>
+
+<TT>public next.wo.Element <B>invokeAction</B>(next.wo.Request
+
+<I>aRequest</I>, next.wo.Context <I>aContext</I>)</TT>
+
+<P>
+
+The WebApplication object sends this message to itself to initiate the middle
+
+phase of request handling. In this phase, the message is propagated through
+
+the objects of the application until the dynamic element that has received
+
+the user action (for instance, a click on a button) responds to the message
+
+by triggering the method in the request component that is bound to the action.
+
+This phase occurs right after the <B>takeValuesForRequest</B> method has
+
+completed. The default WebApplication implementation of this method forwards
+
+the message to the session object.
+
+<P>
+
+<B>See Also: appendToResponse</B>, <B>takeValuesFromRequest</B> 
+
+  <HR>
+
+<!-- methKey:isCachingEnabled(public) meth:isCachingEnabled descr:<TT>public
+
+    boolean <B>isCachingEnabled</B>()</TT> -->
+
+<H3>
+
+  <A name="isCachingEnabled(public)">isCachingEnabled</A>
+
+</H3>
+
+<P>
+
+<TT>public boolean <B>isCachingEnabled</B>()</TT>
+
+<P>
+
+Returns whether component-definition caching is enabled. The default is <b>false</b>.
+
+<P>
+
+<B>See Also: setCachingEnabled</B> 
+
+  <HR>
+
+<!-- methKey:isPageRefreshOnBacktrackEnabled(public) meth:isPageRefreshOnBacktrackEnabled
+
+    descr:<TT>public boolean <B>isPageRefreshOnBacktrackEnabled</B>()</TT> -->
+
+<H3>
+
+  <A name="isPageRefreshOnBacktrackEnabled(public)">isPageRefreshOnBacktrackEnabled</A>
+
+</H3>
+
+<P>
+
+<TT>public boolean <B>isPageRefreshOnBacktrackEnabled</B>()</TT>
+
+<P>
+
+Returns whether caching of pages is disabled in the client. If so, the client
+
+does not restore request pages from its cache but re-creates them "from scratch"
+
+by resending the URL to the server. This flag is set to <B>false</B> by default.
+
+<P>
+
+<B>See Also: setPageRefreshOnBacktrackEnabled</B> 
+
+  <HR>
+
+<!-- methKey:isTerminating(public) meth:isTerminating descr:<TT>public boolean
+
+    <B>isTerminating</B>()</TT> -->
+
+<H3>
+
+  <A name="isTerminating(public)">isTerminating</A>
+
+</H3>
+
+<P>
+
+<TT>public boolean <B>isTerminating</B>()</TT>
+
+<P>
+
+Returns whether the application will terminate at the end of the current
+
+request-response loop.
+
+<P>
+
+<B>See Also: setTimeOut</B>, <B>terminate</B>, <B>timeOut</B> 
+
+  <HR>
+
+<!-- methKey:logString(public) meth:logString descr:<TT>public static void
+
+    <B>logString</B>(java.lang.String <I>aString</I>)</TT> -->
+
+<H3>
+
+  <A name="logString(public)">logString</A>
+
+</H3>
+
+<P>
+
+<TT>public static void <B>logString</B>(java.lang.String
+
+<I>aString</I>)</TT>
+
+<P>
+
+Prints a message to the standard error device (stderr). The message can include
+
+formatted variable data using String's concatenation feature, for example:
+
+<PRE>    int i = 500;
+
+    float f = 2.045;
+
+    WebApplication.logString("Amount = " + i + ", Rate = " + f ", Total = " + i*f);
+
+</PRE>
+
+<P>
+
+Note that <b>logString</b> is a static (class) method, so it can be invoked anywhere in a program, even if no reference to the application object is available. Also note that the equivalent
+method in Objective-C is <B>logWithFormat:</B>. 
+
+  <HR>
+
+<!-- methKey:name(public) meth:name descr:<TT>public java.lang.String <B>name</B>()</TT>
+
+    -->
+
+<H3>
+
+  <A name="name(public)">name</A>
+
+</H3>
+
+<P>
+
+<TT>public java.lang.String <B>name</B>()</TT>
+
+<P>
+
+Returns the name of the application, which includes all directories under
+
+<I>DOCUMENT_ROOT</I><B>/WebObjects</B> and is minus the ".woa" extension;
+
+for example "Examples/HelloWorld" is a typical application name.
+
+<P>
+
+<B>See Also: baseURL</B>, <B>path</B> 
+
+  <HR>
+
+<!-- methKey:pageCacheSize(public) meth:pageCacheSize descr:<TT>public int
+
+    <B>pageCacheSize</B>()</TT> -->
+
+<H3>
+
+  <A name="pageCacheSize(public)">pageCacheSize</A>
+
+</H3>
+
+<P>
+
+<TT>public int <B>pageCacheSize</B>()</TT>
+
+<P>
+
+Returns the size of the internal cache for page instances. The default size
+
+is 30 instances.
+
+<P>
+
+<B>See Also: setPageCacheSize</B> 
+
+  <HR>
+
+<!-- methKey:pageWithName(public) meth:pageWithName descr:<TT>public next.wo.Component
+
+    <B>pageWithName</B>(java.lang.String <I>aString</I>)</TT> -->
+
+<H3>
+
+  <A name="pageWithName(public)">pageWithName</A>
+
+</H3>
+
+<P>
+
+<TT>public next.wo.Component <B>pageWithName</B>(java.lang.String
+
+<I>aName</I>)</TT>
+
+<P>
+
+Returns a new page instance (a Component object) identified by <I>aName</I>.
+
+If <I>aName</I> is <b>null</b>, the "Main" component is assumed. If the method cannot
+
+create a valid page instance, it throws an exception.
+
+<P>
+
+<B>See Also: </B> <B>restorePageForContextID</B>, <B>savePage</B> 
+
+  <HR>
+
+<!-- methKey:path(public) meth:path descr:<TT>public java.lang.String <B>path</B>()</TT>
+
+    -->
+
+<H3>
+
+  <A name="path(public)">path</A>
+
+</H3>
+
+<P>
+
+<TT>public java.lang.String <B>path</B>()</TT>
+
+<P>
+
+Returns the file-system path of the application, which is an absolute path
+
+and includes the ".woa" extension; for example
+
+"C:/NETSCAPE/ns-home/docs/WebObjects/Examples/HelloWorldJava.woa" is a typical
+
+application path.
+
+<P>
+
+<B>See Also: baseURL</B>, <B>name</B> 
+
+  <HR>
+
+<!-- methKey:pathForResource(public) meth:pathForResource descr:<TT>public
+
+    java.lang.String <B>pathForResource</B>(java.lang.String <I>aString</I>,
+
+    java.lang.String <I>aString</I>)</TT> -->
+
+<H3>
+
+  <A name="pathForResource(public)">pathForResource</A>
+
+</H3>
+
+<P>
+
+<TT>public java.lang.String <B>pathForResource</B>(java.lang.String
+
+<I>aName</I>, java.lang.String <I>aType</I>)</TT>
+
+<P>
+
+Returns the absolute path to the application resource having the name of
+
+<I>aName</I> and an extension of <I>aType</I>. The method searches all localized
+
+application ".lproj" directories before searching directly under the ".woa" wrapper.
+
+<P>
+
+See <A href="#Localization">Localization and Resource Access</A> in the class
+
+description for further details.
+
+<P>
+
+<B>See Also: </B> <B>stringForKeyInTable</B>, <B>urlForResource</B> 
+
+  <HR>
+
+<!-- methKey:printsHTMLParserDiagnostics(public) meth:printsHTMLParserDiagnostics
+
+    descr:<TT>public boolean <B>printsHTMLParserDiagnostics</B>()</TT> -->
+
+<H3>
+
+  <A name="printsHTMLParserDiagnostics(public)">printsHTMLParserDiagnostics</A>
+
+</H3>
+
+<P>
+
+<TT>public boolean <B>printsHTMLParserDiagnostics</B>()</TT>
+
+<P>
+
+Returns whether the HTML parser prints warning messages to the standard output
+
+device (stdout) if it encounters unbalanced container elements or other
+
+syntatically incorrect HTML.
+
+<P>
+
+<B>See Also: setPrintsHTMLParserDiagnostics</B> 
+
+  <HR>
+
+<!-- methKey:restorePageForContextID(public) meth:restorePageForContextID
+
+    descr:<TT>public next.wo.Component <B>restorePageForContextID</B>(java.lang.String
+
+    <I>aString</I>)</TT> -->
+
+<H3>
+
+  <A name="restorePageForContextID(public)">restorePageForContextID</A>
+
+</H3>
+
+<P>
+
+<TT>public next.wo.Component <B>restorePageForContextID</B>(java.lang.String
+
+<I>contextID</I>)</TT>
+
+<P>
+
+Returns a page instance stored the session page cache. The key to the stored
+
+instance is the its context ID, which derives from the transaction's Context
+
+or Request objects. This method returns <B>null</B> if restoration is impossible.
+
+<P>
+
+<B>See Also: savePage</B> 
+
+  <HR>
+
+<!-- methKey:restoreSession(public) meth:restoreSession descr:<TT>public
+
+    next.wo.WebSession <B>restoreSession</B>()</TT> -->
+
+<H3>
+
+  <A name="restoreSession(public)">restoreSession</A>
+
+</H3>
+
+<P>
+
+<TT>public next.wo.WebSession <B>restoreSession</B>()</TT>
+
+<P>
+
+Restores the WebSession object representing a session. In normal request
+
+handling, this method is called at the start of a cycle of the request-response
+
+loop. The default implementation simply invokes SessionStore's
+
+<B>restoreSession</B> method, but throws an exception if the SessionStore
+
+object is missing.
+
+<P>
+
+<B>See Also: createSession</B>, <B>saveSession</B>, 
+
+  <HR>
+
+<!-- methKey:run(public) meth:run descr:<TT>public void <B>run</B>()</TT>
+
+    -->
+
+<H3>
+
+  <A name="run(public)">run</A>
+
+</H3>
+
+<P>
+
+<TT>public void <B>run</B>()</TT>
+
+<P>
+
+Runs the application in a near-indefinite run loop in the default run-loop
+
+mode. Before starting the run loop, the method sends <B>registerForEvents</B>
+
+to the application's adaptors so that they can begin receiving run-loop events.
+
+Normally, <b>run</b> is invoked in the <B>main</B> function.
+
+<P>
+
+<B>See Also: setTimeOut</B> 
+
+  <HR>
+
+<!-- methKey:savePage(public) meth:savePage descr:<TT>public void <B>savePage</B>(next.wo.Component
+
+    <I>aComponent</I>)</TT> -->
+
+<H3>
+
+  <A name="savePage(public)">savePage</A>
+
+</H3>
+
+<P>
+
+<TT>public void <B>savePage</B>(next.wo.Component <I>aComponent</I>)</TT>
+
+<P>
+
+Saves the page instance <I>aComponent</I> in the session page cache. The
+
+context ID for the current transaction is made the key for obtaining this
+
+instance in the cache using <B>restorePageForContextID</B>. 
+
+  <HR>
+
+<!-- methKey:saveSession(public) meth:saveSession descr:<TT>public void <B>saveSession</B>(next.wo.WebSession
+
+    <I>aWebSession</I>)</TT> -->
+
+<H3>
+
+  <A name="saveSession(public)">saveSession</A>
+
+</H3>
+
+<P>
+
+<TT>public void <B>saveSession</B>(next.wo.WebSession
+
+<I>aWebSession</I>)</TT>
+
+<P>
+
+Saves a WebSession object that represents a session. In normal request handling,
+
+this method is called at the end of a cycle of the request-response loop.
+
+The default implementation simply invokes SessionStore's <B>saveSession</B>
+
+method, but throws an exception if the SessionStore object is missing.
+
+<P>
+
+<B>See Also: restoreSession</B> 
+
+  <HR>
+
+<!-- methKey:session(public) meth:session descr:<TT>public next.wo.WebSession
+
+    <B>session</B>()</TT> -->
+
+<H3>
+
+  <A name="session(public)">session</A>
+
+</H3>
+
+<P>
+
+<TT>public next.wo.WebSession <B>session</B>()</TT>
+
+<P>
+
+Returns the application's current WebSession object. May not be overridden.
+
+<P>
+
+<B>See Also: application</B>, <B>context</B> 
+
+  <HR>
+
+<!-- methKey:sessionStore(public) meth:sessionStore descr:<TT>public next.wo.SessionStore
+
+    <B>sessionStore</B>()</TT> -->
+
+<H3>
+
+  <A name="sessionStore(public)">sessionStore</A>
+
+</H3>
+
+<P>
+
+<TT>public next.wo.SessionStore <B>sessionStore</B>()</TT>
+
+<P>
+
+Returns the application's current SessionStore object (which, by default,
+
+stores state in the server).
+
+<P>
+
+<B>See Also: setSessionStore</B> 
+
+  <HR>
+
+<!-- methKey:setCachingEnabled(public) meth:setCachingEnabled descr:<TT>public
+
+    void <B>setCachingEnabled</B>(boolean <I>flag</I>)</TT> -->
+
+<H3>
+
+  <A name="setCachingEnabled(public)">setCachingEnabled</A>
+
+</H3>
+
+<P>
+
+<TT>public void <B>setCachingEnabled</B>(boolean <I>flag</I>)</TT>
+
+<P>
+
+Enables or disables the caching of component definitions. Component definitions
+
+contain templates and other information about pages and subcomponents, and
+
+are used to generate instances of those components. When this flag is enabled,
+
+the application parses the script (or implementation) file, the HTML template,
+
+and the declaration (".wod") file of a component once and then stores the
+
+resulting component definition. By default, this kind of caching is disabled
+
+so that you can edit a scripted component without having to relaunch the
+
+application every time to check the results.
+You should always enable component-definition caching when you deploy an
+
+application since performance improves significantly. 
+
+
+<P>
+
+Do not confuse this type of caching with <I>page-instance caching</I> (see
+
+<B>setPageCacheSize</B>). <A href="#Caching">Caching Strategies</A> in the class description provides further details.
+
+<P>
+
+<B>See Also: isCachingEnabled</B> 
+
+  <HR>
+
+<!-- methKey:setPageCacheSize(public) meth:setPageCacheSize descr:<TT>public
+
+    void <B>setPageCacheSize</B>(int <I>anInt</I>)</TT> -->
+
+<H3>
+
+  <A name="setPageCacheSize(public)">setPageCacheSize</A>
+
+</H3>
+
+<P>
+
+<TT>public void <B>setPageCacheSize</B>(int <I>anInt</I>)</TT>
+
+<P>
+
+Sets whether caching of page instances will occur <I>and</I> the number of
+
+pages the cache will hold. When page-instance caching is enabled, the application
+
+stores the Component instance corresponding to the response page in the session.
+
+When the page is backtracked to, it restores it from the session and makes
+
+it the request page. The state of the page is retained. By default, page-instance
+
+caching is enabled, with a cache limit of 30 pages.
+
+<P>
+
+You turn page-instance caching off by invoking this method with an argument
+
+of zero. In this case, when the user backtracks to a page, the page is not
+
+stored in the session and so must be re-created "from scratch." Do not confuse
+
+this type of caching with <I>component-definition caching</I> (see
+
+<B>setCachingEnabled</B>).
+
+<P>
+
+See <A href="#Caching">Caching Strategies</A> in the class description for
+
+further details.
+
+<P>
+
+<B>See Also: pageCacheSize</B> 
+
+  <HR>
+
+<!-- methKey:setPageRefreshOnBacktrackEnabled(public) meth:setPageRefreshOnBacktrackEnabled
+
+    descr:<TT>public void <B>setPageRefreshOnBacktrackEnabled</B>(boolean <I>flag</I>)</TT>
+
+    -->
+
+<H3>
+
+  <A name="setPageRefreshOnBacktrackEnabled(public)">setPageRefreshOnBacktrackEnabled</A>
+
+</H3>
+
+<P>
+
+<TT>public void <B>setPageRefreshOnBacktrackEnabled</B>(boolean
+
+<I>flag</I>)</TT>
+
+<P>
+
+When <I>flag</I> is <B>true</B>, disables caching of pages by the client
+
+by setting the page's expiration-time header to the current date and time.
+
+(By default, this attribute is set to <B>false</B>.) Disabling of client
+
+caching affects what happens during backtracking. With client caching turned
+
+off, the browser resends the URL to the server for the page requested by
+
+backtracking. The application must return a new page to the browser
+
+(corresponding to a new Component instance). This behavior is desirable when
+
+you do not want the user to backtrack to a page that might be obsolete because
+
+of changes that have occurred in the session.
+
+<P>
+
+When this flag is turned on and a request corresponding to a client backtrack
+
+occurs, the retrieved page will only be asked to regenerate its response.
+
+The first two phases of a normal request-response loop (value extraction
+
+from the request and action invocation) do not occur.
+
+<P>
+
+See <A href="#Caching">Caching Strategies</A> in the class description for
+
+further details.
+
+<P>
+
+<B>See Also: pageRefreshOnBacktrackEnabled</B> 
+
+  <HR>
+
+<!-- methKey:setPrintsHTMLParserDiagnostics(public) meth:setPrintsHTMLParserDiagnostics
+
+    descr:<TT>public void <B>setPrintsHTMLParserDiagnostics</B>(boolean <I>flag</I>)</TT>
+
+    -->
+
+<H3>
+
+  <A name="setPrintsHTMLParserDiagnostics(public)">setPrintsHTMLParserDiagnostics</A>
+
+</H3>
+
+<P>
+
+<TT>public void <B>setPrintsHTMLParserDiagnostics</B>(boolean
+
+<I>flag</I>)</TT>
+
+<P>
+
+Sets whether the HTML parser prints warning messages to the standard output
+
+device (stdout) if it encounters unbalanced container elements or other
+
+syntatically incorrect HTML.
+
+<P>
+
+<B>See Also: printsHTMLParserDiagnostics</B> 
+
+  <HR>
+
+<!-- methKey:setSessionStore(public) meth:setSessionStore descr:<TT>public
+
+    void <B>setSessionStore</B>(next.wo.SessionStore <I>aSessionStore</I>)</TT>
+
+    -->
+
+<H3>
+
+  <A name="setSessionStore(public)">setSessionStore</A>
+
+</H3>
+
+<P>
+
+<TT>public void <B>setSessionStore</B>(next.wo.SessionStore
+
+<I>aSessionStore</I>)</TT>
+
+<P>
+
+Set the session-store object for the application. By default, an object that
+
+stores session state in process memory (that is, in the server) is used.
+
+The session-store object specifies the state storage strategy for the whole
+
+application. This object is responsible for making session objects persistent.
+
+WebObjects supports state storage in the server, in the page, and in cookies.
+
+You should set the session store object when the application starts up, before
+
+the first request is handled.
+
+<P>
+
+<B>See Also: sessionStore</B> 
+
+  <HR>
+
+<!-- methKey:setTimeOut(public) meth:setTimeOut descr:<TT>public void <B>setTimeOut</B>(double
+
+    <I>aDouble</I>)</TT> -->
+
+<H3>
+
+  <A name="setTimeOut(public)">setTimeOut</A>
+
+</H3>
+
+<P>
+
+<TT>public void <B>setTimeOut</B>(double <I>seconds</I>)</TT>
+
+<P>
+
+Sets the number of seconds the application can experience inactivity (no
+
+HTTP requests) before it terminates execution.
+
+<P>
+
+<B>See Also: timeOut</B> 
+
+  <HR>
+
+<!-- methKey:sleep(public) meth:sleep descr:<TT>public void <B>sleep</B>()</TT>
+
+    -->
+
+<H3>
+
+  <A name="sleep(public)">sleep</A>
+
+</H3>
+
+<P>
+
+<TT>public void <B>sleep</B>()</TT>
+
+<P>
+
+Invoked at the conclusion of a request-handling cycle to give an application
+
+the opportunity for deallocating objects created and initialized in its
+
+<B>awake</B> method. The default implementation does nothing. 
+
+  <HR>
+
+<!-- methKey:stringForKeyInTable(public) meth:stringForKeyInTable descr:<TT>public
+
+    java.lang.String <B>stringForKeyInTable</B>(java.lang.String <I>aString</I>,
+
+    java.lang.String <I>aString</I>, java.lang.String <I>aString</I>)</TT> -->
+
+<H3>
+
+  <A name="stringForKeyInTable(public)">stringForKeyInTable</A>
+
+</H3>
+
+<P>
+
+<TT>public java.lang.String <B>stringForKeyInTable</B>(java.lang.String
+
+<I>aKey</I>, java.lang.String <I>aTable</I>, java.lang.String
+
+<I>defaultValue</I>)</TT>
+
+<P>
+
+Returns a localized string from string table "<I>aTable</I>.strings" using
+
+<I>aKey</I> to look it up. If no string value for the key is found in the
+
+table, <I>defaultValue</I> (optional) is returned. The method first searches
+
+the "<I>aTable</I>.strings" file, if it exists, in each localized (".lproj")
+
+subdirectories of the application wrapper; searching proceeds in the order
+
+of the language list maintained by the WebSession object<!-- (for details, see
+
+the <B>setLanguages</B> method of the
+
+<A href="../WebSession/WebSession.html" target=_top> WebSession</A> class)-->.
+
+If no string value matching the key is found, the search then continues to
+
+the "<I>aTable</I>.strings" file (if it exists) directly under the application
+
+wrapper (the directory with the "woa" extension).
+
+<P>
+
+See <A href="#Localization">Localization and Resource Access</A> in the class
+
+description for further details.
+
+<P>
+
+<B>See Also: pathForResource</B>, <B>urlForResource</B> 
+
+  <HR>
+
+<!-- methKey:takeValuesFromRequest(public) meth:takeValuesFromRequest descr:<TT>public
+
+    void <B>takeValuesFromRequest</B>(next.wo.Request <I>aRequest</I>, next.wo.Context
+
+    <I>aContext</I>)</TT> -->
+
+<H3>
+
+  <A name="takeValuesFromRequest(public)">takeValuesFromRequest</A>
+
+</H3>
+
+<P>
+
+<TT>public void <B>takeValuesFromRequest</B>(next.wo.Request <I>aRequest</I>,
+
+next.wo.Context <I>aContext</I>)</TT>
+
+<P>
+
+The WebApplication object sends this message to itself to start the first
+
+phase of request handling. In this phase, the message is propagated to the
+
+session and component objects involved in the request as well as the request
+
+page's dynamic elements. Each dynamic element acquires any entered data or
+
+changed state (such as a check in a check box) associated with an attribute
+
+and assigns the value to the variable bound to the attribute. The default
+
+WebApplication implementation of this method forwards the message to the
+
+session object.
+
+<P>
+
+<B>See Also: appendToResponse</B>, <B>invokeAction</B> 
+
+  <HR>
+
+<!-- methKey:terminate(public) meth:terminate descr:<TT>public void <B>terminate</B>()</TT>
+
+    -->
+
+<H3>
+
+  <A name="terminate(public)">terminate</A>
+
+</H3>
+
+<P>
+
+<TT>public void <B>terminate</B>()</TT>
+
+<P>
+
+Terminates the application process. Termination does not take place until
+
+the handling of the current request has completed.
+
+<P>
+
+<B>See Also: isTerminating</B>, <B>setTimeOut</B> 
+
+  <HR>
+
+<!-- methKey:timeOut(public) meth:timeOut descr:<TT>public double <B>timeOut</B>()</TT>
+
+    -->
+
+<H3>
+
+  <A name="timeOut(public)">timeOut</A>
+
+</H3>
+
+<P>
+
+<TT>public double <B>timeOut</B>()</TT>
+
+<P>
+
+Returns the application's time-out interval: a period (in seconds) of inactivity
+
+before the application terminates execution. The default application time-out
+
+interval is a very large number.
+
+<P>
+
+<B>See Also: setTimeOut</B> 
+
+  <HR>
+
+<!-- methKey:urlForResource(public) meth:urlForResource descr:<TT>public
+
+    java.lang.String <B>urlForResource</B>(java.lang.String <I>aString</I>, java.lang.String
+
+    <I>aString</I>)</TT> -->
+
+<H3>
+
+  <A name="urlForResource(public)">urlForResource</A>
+
+</H3>
+
+<P>
+
+<TT>public java.lang.String <B>urlForResource</B>(java.lang.String
+
+<I>aName</I>, java.lang.String <I>aType</I>)</TT>
+
+<P>
+
+Returns the URL associated with an application resource having a name of
+
+<I>aName</I> and an extension of <I>aType</I>. The method searches all localized
+
+application ".lproj" directories before searching directly under the ".woa"
+
+wrapper for the resource.
+
+<P>
+
+See <A href="#Localization">Localization and Resource Access</A> in the class
+
+description for further details.
+
+<P>
+
+<B>See Also: pathForResource</B>, <B>stringForKeyInTable</B> 
+
+  <HR>
+
+</BODY></HTML>
+

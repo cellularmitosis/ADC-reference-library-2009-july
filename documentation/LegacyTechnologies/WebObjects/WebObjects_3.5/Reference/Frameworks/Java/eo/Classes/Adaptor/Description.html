@@ -1,0 +1,433 @@
+<html><head><title></title></head>
+<body bgcolor="#ffffff">
+ 
+ 
+<h1>
+<FONT COLOR="#000066">
+<a name="816">
+ <a name="//apple_ref/java/cl/Adaptor">Adaptor</a>
+</a>
+</FONT>
+</h1>
+<p><B>Extends:</B><BR>  
+next.util.NextObject
+
+<p><p>
+<a name="4610"></a>
+<HR WIDTH=75% SIZE=4 ALIGN=LEFT>
+<H3>
+<FONT COLOR="#201040">
+Class At A Glance
+</FONT>
+</H3>
+<dl><a name="4611"></a>
+<dt><h4>Purpose</h4>
+<dl>
+<dt>Adaptor is a class that defines how an Enterprise Objects Framework application connects to a database server. Concrete subclasses of Adaptor override many of its methods in terms of the client libraries for a specific RDBMS. You typically don't interact with adaptor objects directly; rather, the Enterprise Objects Framework creates instances of a concrete adaptor subclass automatically and handles all the necessary interactions with those instances. If you're not writing a concrete adaptor subclass, there aren't very many methods you need to use, and you'll rarely invoke them directly.
+</dl>
+<a name="5968"></a>
+<dt><h4>Principle Attributes</h4>
+</dl><ul><li>Dictionary of connection information<br>
+<li>Array of adaptor contexts<br>
+</ul><dl><a name="4618"></a>
+<dt><h4>Creation<p>
+<Table Border="3">
+<caption></caption>
+<tr><td scope="row">Other Framework classes create them.
+</td><td>Adaptor instances are generally created 
+automatically.
+</td></tr>
+<tr><td scope="row"><a href="#4931">adaptorWithModel</a>
+</td><td>Creates a new adaptor with the adaptor name 
+in the specified model.
+</td></tr>
+<tr><td scope="row"><a href="#4943">adaptorWithName</a>
+</td><td>Creates a new adaptor with the specified 
+name.
+</td></tr>
+
+</Table>
+
+<Table>
+<tr><td scope="row">
+</Table>
+</h4>
+<a name="4628"></a>
+<dt><h4>Commonly Used Methods<p>
+<Table Border="3">
+<caption></caption>
+<tr><td><a href="#2162">assertConnectionDictionaryIsValid</a>
+</td><td>Verifies that the adaptor can connect with its 
+connection information.
+</td></tr>
+<tr><td scope="row"><a href="#3148">setConnectionDictionary</a>
+</td><td>Sets the connection dictionary.
+</td></tr>
+
+</Table>
+
+<Table>
+<tr><td scope="row">
+</Table>
+</h4>
+</dl><HR WIDTH=75% SIZE=4 ALIGN=LEFT>
+<p><a name="4638"></a>
+<a name="description"></a>
+<H2>Class Description
+</H2>
+Adaptor is a class that provides concrete subclasses with a structure for connecting to a database. A concrete subclass of Adaptor provides database-specific method implementations and represents a single database server. You never interact with instances of the Adaptor class, but you use its static methods, <a href="#4943"><code>adaptorWithName</code></a> and <a href="#4931"><code>adaptorWithModel</code></a>, to create instances of a concrete subclass. The Adaptor class defines the methods that find and load the concrete adaptors from bundles. However, you rarely interact with a concrete adaptor either. Generally, adaptors are automatically created and used by other classes in the Enterprise Objects Framework.<p>
+The Adaptor, <a href="../AdaptorContext/Frameset.html#618" target="_top">AdaptorContext</a>, and <a href="../AdaptorChannel/Frameset.html#816" target="_top">AdaptorChannel</a> classes form the <em>adaptor level</em> of the Enterprise Objects Framework. An Adaptor can manage several AdaptorContexts, each of which represents a transaction scope on the database server. An AdaptorContext can in turn manage several AdaptorChannels, each of which handles actual access to the data on the server. An adaptor for a particular database may support a limited number of contexts per adaptor or channels per context, but an adaptor is guaranteed at least one of each.<p>
+<p><img src="../Adaptor.anc.gif"><p><p>
+<a name="4651">
+<b>Figure 1 </b>
+The Adaptor Level
+</a>
+<p>Typically an application uses higher level objects such as an EditingContext and a <a href="../DatabaseContext/Frameset.html#816" target="_top">DatabaseContext</a> that drive the adaptor level objects (<a href="#4661">Figure 2</a>). Consequently, you don't usually have to interact with them. Each of the adaptor level classes have counterparts in the <em>database level</em> that use the adaptor level to interact with the database. In turn, classes in the <em>control layer</em> use database level classes to perform their operations.<p>
+<p><img src="../Adaptor.anc1.gif"><p><p>
+<a name="4661">
+<b>Figure 2 </b>
+The Adaptor Level and Higher Level Classes
+</a>
+<p>If your application includes an EditingContext as shown in <a href="#4661">Figure 2</a>, the editing context creates its database level objects, and the database level objects create their own adaptor level objects. Once the network of objects is in place your code can interact with an object in the adaptor level, but it's rarely necessary. Most applications that explicitly message adaptor level objects do so to perform one of the following tasks:<p>
+<ul><li>Set or validate the adaptor's connection dictionary with the Adaptor methods <a href="#3148"><code>setConnectionDictionary</code></a>, and <a href="#2162"><code>assertConnectionDictionaryIsValid</code></a>.<p>
+<li>Fine-tune transaction management with the AdaptorContext methods <a href="../AdaptorContext/Frameset.html#1599" target="_top"><code>beginTransaction</code></a>, <a href="../AdaptorContext/Frameset.html#1639" target="_top"><code>commitTransaction</code></a>, and <a href="../AdaptorContext/Frameset.html#1694" target="_top"><code>rollbackTransaction</code></a>.<p>
+<li>Execute stored procedures and raw SQL statements using the AdaptorChannel methods <a href="../AdaptorChannel/Frameset.html#2744" target="_top"><code>executeStoredProcedure</code></a> and <a href="../AdaptorChannel/Frameset.html#2624" target="_top"><code>evaluateExpression</code></a>.<p>
+</ul><p>
+<h3>
+<a name="4975">
+ Accessing An Editing Context's Adaptor Level Objects
+</a>
+</h3>
+To access an EditingContext's adaptor level objects, you get the editing context's ObjectStoreCoordinator from the editing context, you get a DatabaseContext from the object store coordinator, and you get the adaptor level objects from there. The following code demonstrates the process.<p>
+<blockquote><pre>EditingContext editingContext;    // Assume this exists.<br>String entityName;                // Assume this exists. <br>FetchSpecification fspec; <br>ObjectStoreCoordinator rootStore;<br>DatabaseContext dbContext;<br>Adaptor adaptor;<br>AdaptorContext adContext;<br>    <br>fspec = new FetchSpecification(entityName, null, null);<br>rootStore = (ObjectStoreCoordinator)editingContext.rootObjectStore();<br>dbContext = (DatabaseContext)rootStore.objectStoreForFetchSpecification(fspec);<br>adaptor = dbContext.database().adaptor();<br>adContext = dbContext.adaptorContext();
+</pre></blockquote><p>This example first creates a fetch specification, providing just the entity name as an argument. Of course, you can use a fetch specification that has non-<code>null</code> values for all of its arguments, but only the entity name is used by the ObjectStore <a href="../ObjectStoreCoordinator/Frameset.html#" target="_top"><code>objectStoreForFetchSpecification</code></a> method. Next, the example gets the editing context's ObjectStoreCoordinator using the EditingContext method <code>rootObjectStore</code>. <code>rootObjectStore</code> returns an ObjectStore and not an ObjectStoreCoordinator, because it's possible to substitute a custom object store in place of an object store coordinator. Similarly, the ObjectStoreCoordinator method <code>objectStoreForFetchSpecification</code> returns a CooperatingObjectStore instead of a DatabaseContext because it's possible to substitute a custom cooperating object store in place of a database context. If your code performs any such substitutions, you should alter the above code example to match your custom object store's API. See the class specifications for ObjectStore, ObjectStoreCoordinator, and CooperatingObjectStore for more information.<p>
+An EditingContext's ObjectStoreCoordinator can have more than one set of database and adaptor level objects. Consequently, to get a database context from the object store coordinator, you have to provide information that the coordinator can use to choose the correct database context. The code example above provides a FetchSpecification using the method <a href="../ObjectStoreCoordinator/Frameset.html#" target="_top"><code>objectStoreForFetchSpecification</code></a>, but you could specify different criteria by using one of the following ObjectStoreCoordinator methods instead:<p>
+<Table Border="3">
+<caption></caption>
+<tr><th><b>Method</b>
+</th><th><b>Description</b>
+</th></tr>
+<tr><td scope="row">cooperatingObjectStores
+</td><td>Returns an array of the ObjectStoreCoordinator's cooperating object stores.
+</td></tr>
+<tr><td scope="row">objectStoreForGlobalID
+</td><td>Returns the cooperating object store for the enterprise object identified by the 
+provided GlobalID<em>.
+</em></td></tr>
+<tr><td scope="row">objectStoreForObject
+</td><td>Returns the cooperating object store for the provided enterprise object.
+</td></tr>
+
+</Table>
+
+<Table>
+<tr><td>
+</Table>
+<p>
+After you have the database context, you can get the corresponding Adaptor and AdaptorContext as shown in the example above.<p>
+<h3>
+<a name="4677">
+ Creating Adaptor Level Objects and Connecting Them To The Server
+</a>
+</h3>
+Not all applications require higher level objects to drive the adaptor level. For example, you might bypass the database level and control layer entirely if you're writing an application, such as a report writer, that is concerned only with raw data and not with the methods that an enterprise object couples to that data. At the adaptor level, each database row is returned as a dictionary. An application that bypasses higher level database level and control layer objects must create its own adaptor level objects.<p>
+You normally create an adaptor with the method <a href="#4931"><code>adaptorWithModel</code></a>, specifying an existing Model object (see the <a href="../Model/Frameset.html#816" target="_top">Model</a> class specification for information on loading a model file). The model contains the name of the adaptor bundle it needs, and also contains database connection information so that an application can connect immediately without requiring the user to type a password. The connection information consists of all the values, such as user name and password, needed to connect to the database server. It's stored in a dictionary whose keys identify the information the server expects, and whose values are the values that the adaptor will try when connecting. Each adaptor uses different keys; see your adaptor's documentation for keys it uses.<p>
+A newly created adaptor has no adaptor contexts; to create a new context send your adaptor a <a href="#5414"><code>createAdaptorContext</code></a> message.<p>
+<p>
+<h3>
+<a name="4690">
+ Creating an Adaptor Subclass
+</a>
+</h3>
+Enterprise Objects Framework provides concrete adaptors for three standard relational database management systems-Informix, Oracle, and Sybase-as well as a concrete adaptor for ODBC-compliant databases. You may want to create a subclass of one of these adaptors to extend its behavior, or you may want to create a concrete Adaptor subclass for a different database or persistent storage system. Adaptor provides many default method implementations that are sufficient for concrete subclasses:<p>
+<ul><li><a href="#5069">assignExternalInfoForEntireModel</a><br>
+<li><a href="#2228">connectionDictionary</a><br>
+<li><a href="#2248">contexts</a><br>
+<li><a href="#2263">databaseEncoding</a><br>
+<li><a href="#2273">delegate</a><br>
+<li><a href="#2406">hasOpenChannels</a><br>
+<li><a href="#2436">name</a><br>
+</ul>The following methods establish structure and conventions that other Enterprise Objects Framework classes depend on and should be overridden with caution:<p>
+<ul><li><a href="#4931">adaptorWithModel</a><br>
+<li><a href="#4943">adaptorWithName</a><br>
+<li><a href="#5129">setExpressionClassNameForAdaptorClassName</a><br>
+<li><a href="#3148">setConnectionDictionary</a><br>
+<li><a href="#2451">setDelegate</a><br>
+</ul>If you override any of the above instance methods (<code>setConnectionDictionary</code> or <code>setDelegate</code>), your implementations should incorporate the superclass's implementation through a message to <code>super</code>.<p>
+The remaining Adaptor methods must be overridden by concrete adaptor subclasses in terms of the persistent storage system with which it interacts:<p>
+<ul><li><a href="#5055">assignExternalInfoForAttribute</a><br>
+<li><a href="#5087">assignExternalInfoForEntity</a><br>
+<li><a href="#5110">externalTypesWithModel</a><br>
+<li><a href="#5119">internalTypeForExternalTypeInModel</a><br>
+<li><a href="#2162">assertConnectionDictionaryIsValid</a><br>
+<li><a href="#5414">createAdaptorContext</a><br>
+<li><a href="#2334">fetchedValueForDataValue</a><br>
+<li><a href="#2339">fetchedValueForDateValue</a><br>
+<li><a href="#2304">fetchedValueForNumberValue</a><br>
+<li><a href="#2379">fetchedValueForStringValue</a><br>
+<li><a href="#2392">fetchedValueForValue</a><br>
+<li><a href="#2426">isValidQualifierTypeInModel</a><br>
+</ul><a name="4797">
+<HR WIDTH=50% ALIGN=LEFT>
+<h2>Method Types
+</h2>
+</a><dl>
+<dt>Creating an EOAdaptor<dl><dl><dl><dl>
+<dt><a href="#4943">adaptorWithName</a><dt><a href="#4931">adaptorWithModel</a></dl>
+</dl></dl></dl><dt>Accessing an adaptor's name<dl><dl><dl><dl>
+<dt><a href="#2436">name</a></dl>
+</dl></dl></dl><dt>Accessing the names of all available adaptors<dl><dl><dl><dl>
+<dt><a href="#5102">availableAdaptorNames</a></dl>
+</dl></dl></dl><dt>Accessing connection information<dl><dl><dl><dl>
+<dt><a href="#2162">assertConnectionDictionaryIsValid</a><dt><a href="#2228">connectionDictionary</a><dt><a href="#3148">setConnectionDictionary</a><dt><a href="#2263">databaseEncoding</a></dl>
+</dl></dl></dl><dt>Performing database-specific transformations on values<dl><dl><dl><dl>
+<dt><a href="#2392">fetchedValueForValue</a><dt><a href="#2334">fetchedValueForDataValue</a><dt><a href="#2339">fetchedValueForDateValue</a><dt><a href="#2304">fetchedValueForNumberValue</a><dt><a href="#2379">fetchedValueForStringValue</a></dl>
+</dl></dl></dl><dt>Servicing models<dl><dl><dl><dl>
+<dt><a href="#2223">canServiceModel</a><dt><a href="#5119">internalTypeForExternalTypeInModel</a><dt><a href="#5110">externalTypesWithModel</a><dt><a href="#5069">assignExternalInfoForEntireModel</a><dt><a href="#5087">assignExternalInfoForEntity</a><dt><a href="#5055">assignExternalInfoForAttribute</a><dt><a href="#2426">isValidQualifierTypeInModel</a></dl>
+</dl></dl></dl><dt>Creating adaptor contexts<dl><dl><dl><dl>
+<dt><a href="#5414">createAdaptorContext</a><dt><a href="#2248">contexts</a></dl>
+</dl></dl></dl><dt>Checking connection status<dl><dl><dl><dl>
+<dt><a href="#2406">hasOpenChannels</a></dl>
+</dl></dl></dl><dt>Accessing a default expression class<dl><dl><dl><dl>
+<dt><a href="#5129">setExpressionClassNameForAdaptorClassName</a></dl>
+</dl></dl></dl><dt>Accessing the delegate<dl><dl><dl><dl>
+<dt><a href="#2451">setDelegate</a><dt><a href="#2273">delegate</a></dl>
+</dl></dl></dl></dl>
+<HR WIDTH=50% ALIGN=LEFT>
+<a name="4926"></a>
+<a name="clm"></a>
+<h2>Static Methods</h2>  
+
+
+<a name="4931"></a>
+<h3>
+ <a name="//apple_ref/java/clm/Adaptor/adaptorWithModel">adaptorWithModel</a>
+</h3>
+public static java.lang.Object <code>adaptorWithModel</code>(next.eo.Model <em>aModel</em>)
+
+<P>Creates and returns a new adaptor by extracting the adaptor name from <em>aModel</em>, invoking <code><a href="#4943">adaptorWithName</a></code> and assigning <em>aModel</em>'s connection dictionary to the new adaptor. Throws an exception if <em>aModel</em> is <code>null,</code> if <em>aModel</em>'s adaptor name is <code>null</code>, or if the adaptor named in <em>aModel</em> can't be loaded.<p>
+<B>See also: </B>  
+<a href="../Model/Frameset.html#2259" target="_top"><code>adaptorName</code></a>(Model), <a href="#3148"><code>setConnectionDictionary</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="4943"></a>
+<h3> <a name="//apple_ref/java/clm/Adaptor/adaptorWithName">adaptorWithName</a></h3>
+public static java.lang.Object <code>adaptorWithName</code>(java.lang.String <em>name</em>)
+
+<P>Creates and returns a new adaptor, loading it from the framework named <em>name</em> if necessary. For example, this code excerpt creates an adaptor from a framework named <code>AcmeEOAdaptor.framework</code>:<p>
+<blockquote><pre>Adaptor myAdaptor = Adaptor.adaptorWithName("Acme");
+</pre></blockquote><p>This method searches the application's main bundle, <code>~/Library/Frameworks</code>, <code>LocalLibrary/Frameworks</code>, and <code>NextLibrary/Frameworks</code> for the first framework whose base filename (that is, the filename without the ".framework" extension) corresponds to <em>name</em>. However, note that dynamic loading isn't available on PDO platforms. Consequently, you must statically link your adaptor into applications for PDO: In this case, <a href="#4943"><code>adaptorWithName</code></a> simply looks in the runtime for an adaptor class corresponding with the specified name. Throws an exception if <em>name</em> is <code>null</code> or if an adaptor class corresponding with <em>name</em> can't be found.<p>
+Usually you'd use <a href="#4931"><code>adaptorWithModel</code></a> to create a new adaptor, but you can use this method when you don't have a model. In fact, this method is typically used when you're creating an adaptor for the purpose of creating a model from an existing database.<p>
+<hr WIDTH=25% ALIGN=LEFT>
+<a name="5055"></a>
+<h3> <a name="//apple_ref/java/clm/Adaptor/assignExternalInfoForAttribute">assignExternalInfoForAttribute</a></h3>
+public static void <code>assignExternalInfoForAttribute</code>(next.eo.Attribute <em>anAttribute</em>)
+
+<P>Overridden by adaptor subclasses to assign database-specific characteristics to <em>anAttribute</em>. Adaptor's implementation  assigns an external type and then assigns a column name based on the attribute name. For example, <a href="#5055"><code>assignExternalInfoForAttribute</code></a> assigns the column name "FIRST_NAME" to an attribute named "firstName". The method makes no changes to <em>anAttribute</em>'s column name if <em>anAttribute</em> is derived.<p>
+<B>See also: </B>  
+<a href="#5069"><code>assignExternalInfoForEntireModel</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="5069"></a>
+<h3> <a name="//apple_ref/java/clm/Adaptor/assignExternalInfoForEntireModel">assignExternalInfoForEntireModel</a></h3>
+public static void <code>assignExternalInfoForEntireModel</code>(next.eo.Model <em>aModel</em>)
+
+<P>Assigns database-specific characteristics to <em>aModel</em>. Used in EOModeler to switch a model's adaptor. This method examines each entity in <em>aModel</em>. If an entity's external name is not set and all of the entity's attribute's external names are not set, then this method uses <a href="#5087"><code>assignExternalInfoForEntity</code></a> and <a href="#5055"><code>assignExternalInfoForAttribute</code></a> to assign external names. If the entity's external name is set or if any of the entity's attributes' external names are set, then the method doesn't assign external names to the entity or any of its attributes. Regardless, this method  assigns external types for all the model's attributes.<p>
+<hr WIDTH=25% ALIGN=LEFT>
+<a name="5087"></a>
+<h3> <a name="//apple_ref/java/clm/Adaptor/assignExternalInfoForEntity">assignExternalInfoForEntity</a></h3>
+public static void <code>assignExternalInfoForEntity</code>(next.eo.Entity <em>anEntity</em>)
+
+<P>Overridden by adaptor subclasses to assign database-specific characteristics to <em>anEntity</em>. Adaptor's implementation assigns an external name to <em>anEntity</em> based on <em>anEntity</em>'s name. For example, <code><a href="#5087"></code><code>assignExternalInfoForEntity</code><code></a></code> assigns the external name "MOVIE" to an entity named "Movie". An adaptor subclass should override this method to assign additional database-specific characteristics, if any.<p>
+<B>See also: </B>  
+<a href="#5069"><code>assignExternalInfoForEntireModel</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="5102"></a>
+<h3> <a name="//apple_ref/java/clm/Adaptor/availableAdaptorNames">availableAdaptorNames</a></h3>
+public static next.util.ImmutableVector <code>availableAdaptorNames</code>()
+
+<P>Returns an array containing the names of all available adaptors. If no adaptors are found, this method returns an empty array.<p>
+<hr WIDTH=25% ALIGN=LEFT>
+<a name="5110"></a>
+<h3> <a name="//apple_ref/java/clm/Adaptor/externalTypesWithModel">externalTypesWithModel</a></h3>
+public static next.util.ImmutableVector <code>externalTypesWithModel</code>(next.eo.Model <em>aModel</em>)
+
+<P>Implemented by subclasses to return the names of the database types (such as Sybase "varchar" or Oracle "NUMBER") for use with the adaptor. <em>aModel</em> is an optional argument that can be used to supplement the adaptor's set of database types with additional, user-defined database types. See your adaptor's documentation for information on if and how it uses <em>aModel</em>.<p>
+An adaptor subclass should implement this method.<p>
+<hr WIDTH=25% ALIGN=LEFT>
+<a name="5119"></a>
+<h3> <a name="//apple_ref/java/clm/Adaptor/internalTypeForExternalTypeInModel">internalTypeForExternalTypeInModel</a></h3>
+public static java.lang.String <code>internalTypeForExternalTypeInModel</code>(java.lang.String <em>extType</em>, 
+next.eo.Model <em>aModel</em>)
+
+<P>Implemented by subclasses to return the name of the Java class used to represent values stored in the database as <em>extType</em>. <em>aModel</em> is an optional argument that can be used to supplement the adaptor's set of type mappings with additional mappings for user-defined database types. See your adaptor's documentation for information on if and how it uses <em>model</em>. Returns <code>null</code> if no mapping for <em>extType</em> is found.<p>
+An adaptor subclass should implement this method.<p>
+<hr WIDTH=25% ALIGN=LEFT>
+<a name="5129"></a>
+<h3> <a name="//apple_ref/java/clm/Adaptor/setExpressionClassNameForAdaptorClassName">setExpressionClassNameForAdaptorClassName</a></h3>
+public static void 
+<code>setExpressionClassNameForAdaptorClassName</code>(java.lang.String <em>sqlExpressionClassName</em>, 
+java.lang.String <em>adaptorClassName</em>)
+
+<P>Sets the expression class for instances of the class named <em>adaptorClassName</em> to <em>sqlExpressionClassName</em>. If <em>sqlExpressionClassName</em> is <code>null</code>, restores the expression class to the default. Throws an exception if <em>adaptorClassName</em> is <code>null</code> or the empty string.<p>
+Use this method to substitute a subclass of SQLExpression for the expression class provided by the adaptor. <p>
+<HR WIDTH=50% ALIGN=LEFT>
+<a name="instm"></a>
+<h2>Instance Methods</h2>  
+
+
+<a name="2162"></a>
+<h3>
+ <a name="//apple_ref/java/instm/Adaptor/assertConnectionDictionaryIsValid">assertConnectionDictionaryIsValid</a>
+</h3>
+public void <code>assertConnectionDictionaryIsValid</code>()
+
+<P>Implemented by subclasses to verify that the adaptor can connect to the database server with its connection dictionary. Briefly forms a connection to the server to validate the connection dictionary and then closes the connection. Throws an exception if the connection dictionary contains invalid information.<p>
+An adaptor subclass must override this method without invoking Adaptor's implementation.<p>
+<B>See also: </B>  
+<a href="#3148"><code>setConnectionDictionary</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="2223"></a>
+<h3> <a name="//apple_ref/java/instm/Adaptor/canServiceModel">canServiceModel</a></h3>
+public boolean <code>canServiceModel</code>(next.eo.Model <em>aModel</em>)
+
+<P>Returns <code>true</code> if the receiver can service <em>aModel</em>, <code>false</code> otherwise. Adaptor's implementation returns <code>true</code> if the receiver's connection dictionary is equal to <em>aModel</em>'s connection dictionary as determined by next.util.ImmutableHashtable's <code>equals</code> method.<p>
+A subclass of Adaptor doesn't need to override this method.<p>
+<hr WIDTH=25% ALIGN=LEFT>
+<a name="2228"></a>
+<h3> <a name="//apple_ref/java/instm/Adaptor/connectionDictionary">connectionDictionary</a></h3>
+public next.util.ImmutableHashtable <code>connectionDictionary</code>()
+
+<P>Returns the receiver's connection dictionary, or <code>null</code> if the adaptor doesn't have one. The connection dictionary contains the values, such as user name and password, needed to connect to the database server. The dictionary's keys identify the information the server expects, and its values are the values that the adaptor will try when connecting. Each adaptor uses different keys; see your adaptor's documentation for keys it uses.<p>
+A subclass of Adaptor doesn't need to override this method.<p>
+<B>See also: </B>  
+<a href="#3148"><code>setConnectionDictionary</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="2248"></a>
+<h3> <a name="//apple_ref/java/instm/Adaptor/contexts">contexts</a></h3>
+public next.util.ImmutableVector <code>contexts</code>()
+
+<P>Returns the adaptor contexts created by the receiver, or<code> null</code> if no adaptor contexts have been created. A subclass of Adaptor doesn't need to override this method.<p>
+<B>See also: </B>  
+<a href="#5414"><code>createAdaptorContext</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="5414"></a>
+<h3> <a name="//apple_ref/java/instm/Adaptor/createAdaptorContext">createAdaptorContext</a></h3>
+public next.eo.AdaptorContext <code>createAdaptorContext</code>()
+
+<P>Implemented by subclasses to create and return a new AdaptorContext, or <code>null</code> if a new context can't be created. A newly created Adaptor has no contexts.<p>
+An adaptor subclass must override this method without invoking Adaptor's implementation.<p>
+<B>See also: </B>  
+<a href="#2248"><code>contexts</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="2263"></a>
+<h3> <a name="//apple_ref/java/instm/Adaptor/databaseEncoding">databaseEncoding</a></h3>
+public int <code>databaseEncoding</code>()
+
+<P>Returns the string encoding used to encode and decode database strings. An adaptor's database encoding is stored in the connection dictionary with the key "databaseEncoding". If the connection dictionary doesn't have an entry for the database encoding, the default C string encoding is used. This method throws an exception if the receiver's database encoding isn't valid.<p>
+A database system stores strings in a particular character set. The Framework needs to know what character set the database system uses so it can encode and decode strings coming from and going to the database server. The string encoding returned from this method specifies the character set the Framework uses.<p>
+A subclass of Adaptor doesn't need to override this method.<p>
+<hr WIDTH=25% ALIGN=LEFT>
+<a name="2273"></a>
+<h3> <a name="//apple_ref/java/instm/Adaptor/delegate">delegate</a></h3>
+public java.lang.Object <code>delegate</code>()
+
+<P>Returns the receiver's delegate or <code>null</code> if a delegate has not been assigned. A subclass of Adaptor doesn't need to override this method.<p>
+<B>See also: </B>  
+<a href="#2451"><code>setDelegate</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="2334"></a>
+<h3> <a name="//apple_ref/java/instm/Adaptor/fetchedValueForDataValue">fetchedValueForDataValue</a></h3>
+public next.util.ImmutableBytes <code>fetchedValueForDataValue</code>(next.util.ImmutableBytes <em>value</em>, 
+next.eo.Attribute <em>anAttribute</em>)
+
+<P>Overridden by subclasses to return the value that the receiver's database server would ultimately store for <em>value</em> if it was inserted or updated in the column described by <em>anAttribute</em>. This method is invoked from <a href="#2392"><code>fetchedValueForValue</code></a> when the value argument is a next.util.ImmutableBytes.<p>
+Adaptor's implementation returns <em>value</em> unchanged. An adaptor subclass should override this method if the adaptor's database performs transformations on binary types, such as BLOBs.<p>
+<hr WIDTH=25% ALIGN=LEFT>
+<a name="2339"></a>
+<h3> <a name="//apple_ref/java/instm/Adaptor/fetchedValueForDateValue">fetchedValueForDateValue</a></h3>
+public next.util.CalendarDate <code>fetchedValueForDateValue</code>(next.util.CalendarDate <em>aCalendarDate</em>, 
+next.eo.Attribute <em>anAttribute</em>)
+
+<P>Overridden by subclasses to return the value that the receiver's database server would ultimately store for <em>aCalendarDate</em> if it was inserted or updated in the column described by <em>anAttribute</em>. This method is invoked from <a href="#2392"><code>fetchedValueForValue</code></a> when the value argument is a date.<p>
+Adaptor's implementation returns <em>aCalendarDate</em> unchanged. An adaptor subclass should override this method to convert or format date values. For example, a concrete adaptor subclass could set <em>aCalendarDate</em>'s millisecond value to 0.<p>
+<hr WIDTH=25% ALIGN=LEFT>
+<a name="2304"></a>
+<h3> <a name="//apple_ref/java/instm/Adaptor/fetchedValueForNumberValue">fetchedValueForNumberValue</a></h3>
+public java.lang.Number <code>fetchedValueForNumberValue</code>(java.lang.Number <em>aNumber</em>, 
+next.eo.Attribute <em>anAttribute</em>)
+
+<P>Overridden by subclasses to return the value that the receiver's database server would ultimately store for <em>aNumber</em> if it was inserted or updated in the column described by <em>anAttribute</em>. This method is invoked from <a href="#2392"><code>fetchedValueForValue</code></a> when the value argument is a number.<p>
+Adaptor's implementation returns <em>aNumber</em> unchanged. An adaptor subclass should override this method to convert or format numeric values. For example, a concrete adaptor subclass should probably round <em>aNumber</em> according to the precision and scale of <em>anAttribute</em>.<p>
+<hr WIDTH=25% ALIGN=LEFT>
+<a name="2379"></a>
+<h3> <a name="//apple_ref/java/instm/Adaptor/fetchedValueForStringValue">fetchedValueForStringValue</a></h3>
+public java.lang.String <code>fetchedValueForStringValue</code>(java.lang.String <em>aString</em>, 
+next.eo.Attribute <em>anAttribute</em>)
+
+<P>Overridden by subclasses to return the value that the receiver's database server would ultimately store for <em>aString</em> if it was inserted or updated in the column described by <em>anAttribute</em>. This method is invoked from <a href="#2392"><code>fetchedValueForValue</code></a> when the value argument is a string.<p>
+Adaptor's implementation trims trailing spaces and returns <code>null</code> for zero-length strings. An adaptor subclass should override this method to perform any additional conversion or formatting on string values.<p>
+<hr WIDTH=25% ALIGN=LEFT>
+<a name="2392"></a>
+<h3> <a name="//apple_ref/java/instm/Adaptor/fetchedValueForValue">fetchedValueForValue</a></h3>
+public java.lang.Object <code>fetchedValueForValue</code>(java.lang.Object <em>anObject</em>, 
+next.eo.Attribute <em>anAttribute</em>)
+
+<P>Returns the value that the receiver's database server would ultimately store for <em>anObject</em> if it was inserted or updated in the column described by <em>anAttribute</em>. The Framework uses this method to keep enterprise object snapshots in sync with database values. For example, assume that a product's price is marked down 15%. If the product's original price is 5.25, the sale price is 5.25*.85, or 4.4625. When the Framework updates the product's price, the database server truncates the price to 4.46 (assuming the scale of the database's price column is 2). Before performing the update, the Framework sends the adaptor a<em> </em><code><a href="#2392">fetchedValueForValue</a></code> message with the value 4.4625. The adaptor performs the database-specific transformation and returns 4.46. The Framework assigns the truncated value to the product object and to the product object's snapshot and then proceeds with the update.<p>
+An adaptor subclass can override this method or one of the data type-specific <code>fetchedValue...</code> methods. Adaptor's implementation of <code><a href="#2392">fetchedValueForValue</a></code> invokes one of the data type-specific methods depending on <em>anObject</em>'s class. If <em>anObject</em> is not a string, number, date, or data object (that is, an instance of java.lang.String, java.lang.Number, next.util.Date, next.util.ImmutableBytes, or any of their subclasses),<em> </em><code><a href="#2392">fetchedValueForValue</a></code> returns <em>anObject</em> unchanged.<p>
+This method invokes the next.eo.AdaptorDelegates method <code>fetchedValueForAttribute</code> which can override the adaptor's default behavior.<p>
+<B>See also: </B>  
+<a href="#2334"><code>fetchedValueForDataValue</code></a>, <a href="#2339"><code>fetchedValueForDateValue</code></a>, <a href="#2304"><code>fetchedValueForNumberValue</code></a>, 
+<a href="#2379"><code>fetchedValueForStringValue</code></a>, <a href="../Attribute/Frameset.html#3543" target="_top"><code>valueFactoryMethod</code></a> (Attribute)
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="2406"></a>
+<h3> <a name="//apple_ref/java/instm/Adaptor/hasOpenChannels">hasOpenChannels</a></h3>
+public boolean <code>hasOpenChannels</code>()
+
+<P>Returns <code>true</code> if any of the receiver's contexts have open channels, <code>false</code> otherwise. A subclass of Adaptor doesn't need to override this method.<p>
+<B>See also: </B>  
+<a href="../AdaptorContext/Frameset.html#660" target="_top"><code>hasOpenChannels</code></a> (AdaptorContext)
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="2426"></a>
+<h3> <a name="//apple_ref/java/instm/Adaptor/isValidQualifierTypeInModel">isValidQualifierTypeInModel</a></h3>
+public boolean <code>isValidQualifierTypeInModel</code>(java.lang.String <em>typeName</em>, next.eo.Model <em>aModel</em>)
+
+<P>Implemented by subclasses to return <code>true</code> if an attribute of type <em>typeName</em> can be used in a qualifier (a SQL WHERE clause) sent to the database server, or <code>false</code> otherwise. <em>typeName</em> is the name of a type as required by the database server, such as Sybase "varchar" or Oracle "NUMBER". <em>aModel</em> is an optional argument that can be used to supplement the adaptor's set of type mappings with additional mappings for user-defined database types. See your adaptor's documentation for information on if and how it uses <em>aModel</em>. <p>
+An adaptor subclass must override this method without invoking Adaptor's implementation.<p>
+<hr WIDTH=25% ALIGN=LEFT>
+<a name="2436"></a>
+<h3> <a name="//apple_ref/java/instm/Adaptor/name">name</a></h3>
+public java.lang.String <code>name</code>()
+
+<P>Returns the adaptor's name; this is usually the base filename of the framework from which the adaptor was loaded. For example, if an adaptor was loaded from a framework named <code>AcmeEOAdaptor.framework</code>, this method returns "Acme".<p>
+A subclass of Adaptor doesn't need to override this method.<p>
+<B>See also: </B>  
+<a href="#4943"><code>adaptorWithName</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="3148"></a>
+<h3> <a name="//apple_ref/java/instm/Adaptor/setConnectionDictionary">setConnectionDictionary</a></h3>
+public void <code>setConnectionDictionary</code>(next.util.ImmutableHashtable <em>dictionary</em>)
+
+<P>Sets the adaptor's connection dictionary to <em>dictionary</em>, which must only contain java.lang.String, next.util.ImmutableBytes, next.util.ImmutableHashtable, and next.util.ImmutableVector objects. Throws an exception if there are any open channels-you can't change connection information while the adaptor is connected.<p>
+A subclass of Adaptor doesn't need to override this method. A subclass that does override this method must incorporate the superclass's version through a message to <code>super</code>.<p>
+<B>See also: </B>  
+<a href="#2228"><code>connectionDictionary</code></a>, <a href="#2406"><code>hasOpenChannels</code></a>, <a href="#2162"><code>assertConnectionDictionaryIsValid</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="2451"></a>
+<h3> <a name="//apple_ref/java/instm/Adaptor/setDelegate">setDelegate</a></h3>
+public void <code>setDelegate</code>(java.lang.Object <em>delegate</em>)
+
+<P>Sets the receiver's delegate to <em>delegate</em>, or removes its delegate if <em>delegate</em> is <code>null</code>. A subclass of Adaptor doesn't need to override this method. A subclass that does override this method must incorporate the superclass's version through a message to <code>super</code>.<p>
+<B>See also: </B>  
+<a href="#2273"><code>delegate</code></a>
+<p><p>
+
+ 
+
+
+
+<i>Copyright &#169; 1998, Apple Computer, Inc.   All rights
+reserved.</i>
+
+<!-- Last updated: 01/18/98 16:07:22 -->
+
+</body>
+</html>

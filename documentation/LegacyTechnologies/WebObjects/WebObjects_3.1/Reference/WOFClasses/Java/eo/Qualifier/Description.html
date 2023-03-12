@@ -1,0 +1,215 @@
+<html>
+
+<body bgcolor="#FFFFFF">
+
+<CENTER><H1>Class next.eo.Qualifier</H1></CENTER>
+
+<a name="description"></a><CENTER><H2>CLASS DESCRIPTION</H2></CENTER>
+
+<!-- extends:next.util.NextObject -->
+
+<DL>
+
+<DT><B>Extends:</B></DT><DD>next.util.NextObject</DD>
+
+</DL>
+
+<P>
+
+Qualifier is an abstract class for objects that hold information used to restrict selections on objects or database rows according to specified criteria. Qualifiers aren't based on SQL and they don't rely upon an EOModel. Thus, the same qualifier can be used both to perform in-memory searches and to fetch from the database. 
+<P>
+The subclasses of Qualifier are as follows:
+<!-- 
+EOKeyValueQualifier	Compares the named property of an object to a supplied value, for example, "weight > 150".
+EOKeyComparisonQualifier	Compares the named property of one object with the named
+	property of another, for example "name = wife.name".
+-->
+<DL>
+<DT><B>AndQualifier</B></DT><DD>Contains multiple qualifiers, which it conjoins. For example, "name = 'Fred' AND age < 20".
+<DT><B>OrQualifier</B></DT><DD>Contains multiple qualifiers, which it disjoins. For example, "name = 'Fred' OR name = 'Ethel'".
+<DT><B>NotQualifier</B></DT><DD>Contains a single qualifier, which it negates. For example, "NOT (name = 'Fred')".
+<!-- EOSQLQualifier           	Contains unstructured text that can be transformed into a SQL
+	expression. EOSQLQualifier is provided for backward compatibility 
+	with pre-2.0 Enterprise Objects Framework releases and to provide a 
+	way to create SQL expressions with any arbitrary SQL. Because
+	EOSQLQualifiers can't be evaluated against objects in memory,
+ 	you should use Qualifier whenever possible and only use
+ 	EOSQLQualifier in cases that absolutely require it.
+-->
+</DL>
+<!-- With the exception of EOSQLQualifier, all of the subclasses are essentially key-value based and implement the protocol QualifierEvaluation, which means that their objects can be evaluated in memory. The subclasses also implement the protocol QualifierSQLGeneration, which allows them to generate SQL. Note that all of the SQL generation functionality is contained in the access layer. For more information, see the specifications for QualifierEvaluation, QualifierSQLGeneration, and the individual subclasses.
+--> 
+<H3>Creating a Qualifier</H3>
+As described above, there are several Qualifier subclasses, each of which represents a different semantic. However, in most cases you simply create a qualifier using the Qualifier constructor. <!-- class method qualifierWithQualifierFormat:, as follows:
+Qualifier *qual = [Qualifier 
+	qualifierWithQualifierFormat:@"lastName = 'Smith'"];
+--> 
+<P>
+The qualifier or group of qualifiers that result from such a statement is based on the contents of the format string you provide. For example, giving the format string "lastName = 'Smith'" <!-- as an argument to qualifierWithQualifierFormat: --> returns a Qualifier object.<!-- But you don't normally need to be concerned with this level of detail.-->
+<P>
+The format strings you use to create a qualifier can be compound logical expressions, such as "firstName = 'Fred' AND age < 20". When you create a qualifier, compound logical expressions are translated into a tree of Qualifier nodes. Logical operators such as AND and OR become AndQualifiers and OrQualifiers, respectively. These qualifiers conjoin (AND) or disjoin (OR) a group of sub-qualifiers. <!-- This is illustrated in Figure 1, in which the format string "salary > 300 AND firstName = 'Angela' AND manager.name = 'Fred'" has been translated into a tree of qualifiers.
+
+Qualifier Tree for salary > 300 AND firstName = "Angela" AND manager.name = "Fred"
+The qualifierWithQualifierFormat: method can't be used to create an instance of EOSQLQualifier. This is because EOSQLQualifier uses a non-structured syntax to provide backward compatibility with pre-2.0 Enterprise Objects Framework releases. It also requires an entity. To create an instance of EOSQLQualifier, you'd use a statement such as the following:
+	
+	myQual = [[EOSQLQualifier alloc] initWithEntity:myEntity format:myFormatString];
+-->
+<H3>Constructing Format Strings</H3>
+As described above, you typically create a qualifier from a format string by using the appropriate constructor. <!-- qualifierWithQualifierFormat:. --> This method takes as an argument a format string somewhat like that used with the standard C <B>printf()</B> function. The format string can embed strings, numbers, and objects using the conversion specifications listed below. This allows qualifiers to be built dynamically. The following table lists the conversion specifications you can use in a format string and their corresponding data types.
+<pre>
+<B>Conversion
+Specification    Expected Value or Result</B>
+%s               A constant C string (const char *)
+%d               An int
+%f               A float or double
+%@               An id argument-valid objects are EOAttribute,
+                 NSString, or anything that responds to
+                 <B>expressionValueForContext:</B>. The behavior
+                 of this conversion specification depends on its
+                 position. It can either be an object whose
+                 description method returns a key (in other
+                 words, an NSString), or a value such as an
+                 NSString, NSNumber, NSCalendarDate, and so on.
+%%               Results in a literal % character
+</pre>
+If you use an unrecognized character in a conversion specification (for example, %x), an exception is raised.
+<P>
+For example, suppose you have an Employee entity with the properties <B>empID</B>, <B>firstName</B>, <B>lastName</B>, <B>salary</B>, and <B>department</B> (representing a to-one relationship to the employee's department), and a Department entity with properties <B>deptID</B> and <B>name</B>. You could construct simple qualifier strings like the following:
+<P>
+<TT>
+lastName = 'Smith'<br>
+salary > 2500<br>
+department.name = 'Personnel'<br>
+</TT>
+<P>
+<!-- 
+The following examples build qualifiers similar to the qualifier strings described above, but take the specific values from an already-fetched enterprise object:
+myQualifier = [Qualifier qualifierWithQualifierFormat:@"%@ = %@", 	
+	@"lastName", [anEmployee lastName]];
+myQualifier = [Qualifier qualifierWithQualifierFormat:@"%@ > %f", 
+	@"salary", [anEmployee salary]];
+myQualifier = [Qualifier qualifierWithQualifierFormat:@"%@ = %@",
+ 	@"department.name", [aDept name]];
+The enterprise objects here implement convenience methods for directly accessing the given attributes: lastName and salary for Employee objects, and name for Department objects.
+-->
+Unlike a string literal, the %@ conversion specification is never surrounded by single quotes.<!-- :
+	
+	// For a literal string value such as Smith, you use single quotes.
+	[Qualifier qualifierWithQualifierFormat:@"lastName = 'Smith'"];
+
+	// For the conversion specification %@, you don't use quotes
+	[Qualifier qualifierWithQualifierFormat:@"lastName = %@", @"Jones"];
+-->
+<P>
+Typically format strings include only two data types: strings and numbers. Single-quoted or double-quoted strings are NSStrings, non-quoted numbers are NSNumber, and non-quoted strings are keys. You can get around this limitation by performing explicit casting, as described in the section "Using Different Data Types."
+<P>
+The operators you can use in constructing qualifiers are  =, ==, !=, <, >, <=, >=, "contains," and "like". The like operator can be used with wildcards to perform pattern matching, as described in the following section.
+
+<H3>Using Wildcards</H3>
+When you use the like operator in a qualifier expression, you can use the * and ? wildcard characters to perform pattern matching, for example:
+<P><TT>
+@"lastName like 'Jo*'"
+</TT><P>
+matches Jones, Johnson, Jolsen, Josephs, and so on.
+<P>
+The ? character just matches a single character, for example:
+<P><TT>
+@"lastName like 'Jone?'"
+</TT><P>
+matches Jones.
+<P>
+The asterisk character (*) is only interpreted as a wildcard in expressions that use the <B>like</B> operator. For example, in the following statement, the character * is treated as a literal value, not as a wildcard:
+<P><TT>
+@"lastName = 'Jo*'"		// The * character doesn't act as a wildcard in this statement.
+</TT>
+
+<H3>Using Selectors in Qualifier Expressions</H3>
+The format strings you use to initialize a qualifier can include selectors. The parser recognizes a selector as an unquoted string followed by a colon, such as <B>myMethod:</B>. For example:
+<P><TT>
+	point1 isInside: area
+<br>
+	firstName isAnagramOfString: "Computer"
+</TT><P>
+Selectors in a qualifier are parsed and applied in memory; that is, they can't be used in SQL generation.
+
+<H3>Using Different Data Types</H3>
+As stated in the section "Constructing Format Strings," format strings normally include only two data types: strings and numbers. To get around this limitation, you can perform explicit casting. 
+<P>
+For example, CalendarDate and DecimalNumber are two classes that are likely to be used in qualifiers. You can construct format strings that for objects of these classes as follows:
+<P><TT>
+	hireDate = (CalendarDate)"Sept 14, 1993"
+<br>
+	salary = (DecimalNumber)"15000.02"
+</TT><P>
+When you use this approach, qualifiers are constructed by <!-- looking up the class and invoking [[class alloc] initWithString:stringValue]. Therefore, this technique only works for classes that implement initWithString:. --> passing the string to a constructor that accepts a string value. Therefore, this technique only works for classes that have such a constructor.
+<!--
+<H3>Using Qualifier's Subclasses</H3>
+You rarely need to explicitly create an instance of AndQualifier, OrQualifier, or NotQualifier. However, you may want to create instances of EOKeyValueQualifier and EOKeyComparisionQualifier. The primary advantage of this is that it lets you exercise more control over how the qualifier is constructed, which is desirable in some cases.
+The following code excerpt uses EOKeyValueQualifier to select all objects whose "isOut" key is equal to YES. Once constructed, the qualifier is used to filter an in-memory array.
+// Create the qualifier
+Qualifier *qual = [[EOKeyValueQualifier alloc] initWithKey:@"isOut"
+	    operatorSelector:QualifierOperatorEqual
+	    value:[NSNumber numberWithBool:YES]];
+
+// Filter an array and return it   
+return [[self allRentals] filteredArrayUsingQualifier:qual];
+filteredArrayUsingQualifier: is a method that Enterprise Objects Framework adds to NSArray. It's used for filtering in-memory arrays.
+-->
+<H3>Creating Subclasses</H3>
+Qualifier offers extensibility across two dimensions: new classes can be added to extend qualifier semantics, and categories can be added to extend functionality (for example, to provide in-memory evaluation).
+<!-- Subclasses used to evaluate objects in memory must implement the QualifierEvaluation protocol. Subclasses used to generate SQL queries must conform to the QualifierSQLGeneration protocol. -->
+<hr>
+
+</body>
+
+</html><html>
+
+<body bgcolor="#FFFFFF"><!-- constructors -->
+
+<a name="constructors"><CENTER><H2>CONSTRUCTORS</H2></CENTER></a>
+
+<!-- consKey:Qualifier(public) cons:Qualifier descr:<TT>public  <B>Qualifier</B>()</TT>:<TT>public  <B>Qualifier</B>(java.lang.String <I>aString</I>, next.util.ImmutableVector <I>anImmutableVector</I>)</TT> -->
+
+<H3><a name="Qualifier(public)">Qualifier</a></H3>
+
+<TT>public  <B>Qualifier</B>()</TT><br>
+
+<TT>public  <B>Qualifier</B>(java.lang.String <I>qualifierFormat</I>, next.util.ImmutableVector <I>arguments</I>)</TT>
+
+<P>
+
+Returns a newly-allocated and initialized Qualifier object. If the parameters are supplied, this method parses the format string <I>qualifierFormat</I> and the specified <I>arguments</I>, using them to initialize the Qualifier. The format characters (for example, %@, %d, %f) in <I>qualifierFormat</I> cause the method to search in the <I>arguments</I> array for values.
+<P>
+Based on the content of I>qualifierFormat</I>, this method generates a tree of the basic qualifier types. For example, the format string "firstName = 'Joe' AND department = 'Facilities'" generates an AndQualifier that contains two "sub" Qualifiers. Note that this method performs no verification to ensure that keys referred to by the format string <I>qualifierFormat</I> exist. It raises an exception if <I>qualifierFormat</I> contains any syntax errors.
+<P>
+
+<!-- <B>See Also: </B>[See Also's go here] -->
+
+<hr>
+
+</body>
+
+</html><html>
+
+<body bgcolor="#FFFFFF"><!-- methods -->
+
+<a name="methods"><CENTER><H2>METHODS</H2></CENTER></a>
+
+<!-- methKey:vectorByFilteringWithQualifier(public) meth:vectorByFilteringWithQualifier descr:<TT>public static next.util.ImmutableVector <B>vectorByFilteringWithQualifier</B>(next.util.ImmutableVector <I>anImmutableVector</I>, next.eo.Qualifier <I>aQualifier</I>)</TT> -->
+
+<H3><a name="vectorByFilteringWithQualifier(public)">vectorByFilteringWithQualifier</a></H3>
+
+<TT>public static next.util.ImmutableVector <B>vectorByFilteringWithQualifier</B>(next.util.ImmutableVector <I>anImmutableVector</I>, next.eo.Qualifier <I>aQualifier</I>)</TT>
+
+<P>
+
+Returns a new immutable vector that contains only the objects from <I>anImmutableVector</I> that match <I>aQualifier</I>.
+<P>
+
+<!-- <B>See Also: </B>[See Also's go here] -->
+
+<hr>
+
+</body>
+
+</html>

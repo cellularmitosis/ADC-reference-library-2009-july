@@ -1,0 +1,165 @@
+<HTML>
+	<HEAD>
+		<meta http-equiv="content-type" content="text/html;charset=iso-8859-1">
+		<meta name="generator" content="XML_Publisher">
+		<meta name="Copyright" content="Copyright 2001 Apple Computer, Inc. All Rights Reserved.">
+        <title>Extend
+a Controller Class</title>
+		</HEAD>
+	<BODY bgcolor="#ffffff">
+<!-- start of header -->
+<!--#include virtual="/includes/framesetheader" -->
+<!-- end of header --> <!-- insert Show/Hide frames -->
+<script type="text/javascript" language="JavaScript"><!--
+function loadFrames(){
+if (top == self || (parent.frames[1].name != content))
+    top.location.href = 'index.html?' + location.href;
+}
+
+if (self != top) {
+  // loaded in frames
+  document.write('<a href="'+self.location+'" target="_top"><img src="../images/hideframes.gif" border="0" alt="Hide Frames"></a>');
+  }
+else {
+  // not loaded frames
+	document.write('<a href="JavaScript:loadFrames()"><img src="../images/showframes.gif" border="0" alt="Show Frames"></a>');
+}
+//--></script>
+<!-- end Show/Hide frames -->
+<a href="Use_Assistant.html" target="content"><img src="../images/previous.gif" border="0"></a>&nbsp;<a href="Additional_Exercise.html" target="content"><img src="../images/next.gif" border="0"></a>&nbsp;<!-- apple_doc:infillMarkerTop -->  
+<!-- apple_doc: pageHeadingStart --><a name = "TPXREF137"></a><a name="-687170"></a><h3><font face="Lucida Grande,Helvetica,Arial">Extend
+a Controller Class</font></h3><!-- apple_doc: pageHeadingEnd -->
+
+<p>Using Assistant to add an action may not provide you with
+the flexibility you need. Furthermore, the methods you added in
+the last section are not really appropriate in business logic classes.
+They are better suited to a dedicated controller class.</p>
+<p>Extending a controller class and writing a rule to use it
+is the best way to provide custom actions in your application. It
+is much more flexible than just using Assistant and it's much better
+than the next two options, which both require freezing XML. Anytime
+you freeze XML, you lose a lot of the dynamism of the rule system.
+This means, for instance, that you are not as able to use the rule
+system to localize your application or provide access controls via
+rules. Also, subclassing controller classes doesn't incur the
+costs associated with writing completely custom controllers. </p>
+<p>The dynamically generated user interfaces in Java Client rely
+on a core set of classes: EOFormController; EOQueryController; EOListController.
+You can take real advantage of WebObjects' excellent object-oriented
+design to extend these classes to provide custom behavior.</p>
+<p>Add a new file to your application called "CustomFormController.java."
+Add it to the Web Server target. Copy and paste the code for it,
+shown in  <a href="#TPXREF139">Listing 5-1</a>.</p>
+<a name = "TPXREF139"></a><a name="-689119"></a><p><b><font face="Geneva,Helvetica,Arial" size="2">Listing 5-1 CustomFormController
+code</font></b></p>
+<pre>package admissions.client;
+
+import java.io.*;
+import javax.swing.*;
+import java.awt.*;
+import com.webobjects.foundation.*;
+import com.webobjects.eocontrol.*;
+import com.webobjects.eointerface.*;
+import com.webobjects.eoapplication.*;
+import com.webobjects.eogeneration.client.*;
+import com.webobjects.eodistribution.client.*;
+
+public class CustomFormController extends EOFormController {
+
+    public CustomFormController(EOXMLUnarchiver unarchiver) {
+        super(unarchiver);
+    }
+
+    protected NSArray defaultActions() {
+        Icon icon = EOUserInterfaceParameters.localizedIcon(&quot;ActionIconOk&quot;);
+        NSMutableArray actions = new NSMutableArray();
+
+        actions.addObject(EOAction.actionForControllerHierarchy(&quot;sendRecordViaEmail&quot;,
+           &quot;Send Record Via Email&quot;, &quot;Send Record Via Email&quot;, icon, null, null, 300, 50,
+           false));
+        return EOAction.mergedActions(actions, super.defaultActions());
+    }
+
+    public boolean canPerformActionNamed(String actionName) {
+        return actionName.equals(&quot;sendRecordViaEmail&quot;) ||
+               super.canPerformActionNamed(actionName);
+    }
+
+    public void sendRecordViaEmail() {
+        _distributedObjectStore().invokeRemoteMethodWithKeyPath(new EOEditingContext(),
+        &quot;session&quot;,&quot;clientSideRequestSendRecordViaEmail&quot;, new Class[]
+        {EOEnterpriseObject.class}, new Object[] { selectedObject()}, true);
+    }
+
+
+    private EODistributedObjectStore _distributedObjectStore() {
+           EOObjectStore objectStore = EOEditingContext.defaultParentObjectStore();
+        if ((objectStore == null) || (!(objectStore instanceof EODistributedObjectStore)))
+        {
+            throw new IllegalStateException(&quot;Default parent object store needs to be an
+              EODistributedObjectStore&quot;);
+        }
+        return (EODistributedObjectStore)objectStore;
+    }
+
+}</pre>
+<p>When you examine this code, you'll notice that two of its
+methods are those you added in the last section. So you can remove
+both <code>sendRecordViaEmail</code> and <code>_distributedObjectStore</code> from
+the client-side <code>Student.java</code> class.
+The <code>defaultActions</code> method adds to the application's
+actions and <code>canPerformActionNamed</code> authorizes
+the invocation of the <code>sendRecordViaEmail</code> method. </p>
+<p>To use this class in form windows for the Student entity,
+you need to add a rule to the project's <code>d2w.d2wmodel</code> file:</p>
+<dl>
+<dt><b>Left-Hand Side:</b></dt>
+<dd><code> ((task='form') and (controllerType='entityController')
+and (entity.name='Student'))</code></dd>
+<dt><b>Key:</b></dt>
+<dd><code>className</code></dd>
+<dt><b>Value:</b></dt>
+<dd><code>&quot;admissions.client.CustomFormController&quot;</code></dd>
+<dt><b>Priority:</b></dt>
+<dd><code>50</code></dd></dl>
+<p>You add the <code>d2w.d2wmodel</code> file
+to a project by making a new file of type "Empty File," naming
+it "d2w.d2wmodel," and associating it with the Application Server
+target.</p>
+<p>Build and run the application and remove the action you added
+with Assistant (you can either make this an "Other Property Key"
+in Assistant or find the rule in the <code>user.d2wmodel</code> file
+and delete it by hand). If successful, form windows for the Student
+entity should look like  <a href="#CIHIHIJI">Figure 5-29</a>.</p>
+<br><a name = "CIHIHIJI"></a><a name="-690034"></a><p><b><font face="Geneva,Helvetica,Arial" size="2">Figure
+5-29 Image form window with new buttons</font></b></p>
+ <img src = "../Art/customactionwithcontroller.gif" alt = "[image: ../Art/customactionwithcontroller.gif]">
+
+<p>Clicking the Send Record Via Email button should send an email
+with the current record's information to the recipients you declared
+in the method in <code>Session.java</code>,
+which constructs and sends the email.</p>
+
+<br>
+    <!-- insert Show/Hide frames -->
+<script type="text/javascript" language="JavaScript"><!--
+function loadFrames(){
+if (top == self || (parent.frames[1].name != content))
+    top.location.href = 'index.html?' + location.href;
+}
+
+if (self != top) {
+  // loaded in frames
+  document.write('<a href="'+self.location+'" target="_top"><img src="../images/hideframes.gif" border="0" alt="Hide Frames"></a>');
+  }
+else {
+  // not loaded frames
+	document.write('<a href="JavaScript:loadFrames()"><img src="../images/showframes.gif" border="0" alt="Show Frames"></a>');
+}
+//--></script>
+<!-- end Show/Hide frames -->
+<a href="Use_Assistant.html" target="content"><img src="../images/previous.gif" border="0"></a>&nbsp;<a href="Additional_Exercise.html" target="content"><img src="../images/next.gif" border="0"></a>&nbsp;<!-- apple_doc:infillMarkerBottom --> <br><br><p><hr><font face="Geneva,Helvetica,Arial" size="2">&#169; 2002 Apple Computer, Inc. (Last Updated May 1, 2002)</font></p><!-- start of footer -->
+<!--#include virtual="/includes/framesetfooter" -->
+<!-- end of footer -->
+</body>
+</html>

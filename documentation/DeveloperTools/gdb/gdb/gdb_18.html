@@ -1,0 +1,994 @@
+<HTML>
+<HEAD>
+<!-- This HTML file has been created by texi2html 1.51
+     from /SourceCache/gdb/gdb-960/src/gdb/doc/gdb.texinfo on 18 May 2008 -->
+
+<TITLE>Debugging with gdb - Debugging remote programs</TITLE>
+</HEAD>
+<BODY>
+Go to the <A HREF="gdb_1.html">first</A>, <A HREF="gdb_17.html">previous</A>, <A HREF="gdb_19.html">next</A>, <A HREF="gdb_36.html">last</A> section, <A HREF="gdb_toc.html">table of contents</A>.
+<P><HR><P>
+
+
+<H1><A NAME="SEC156" HREF="gdb_toc.html#TOC156">Debugging remote programs</A></H1>
+
+
+
+<H2><A NAME="SEC157" HREF="gdb_toc.html#TOC157">Connecting to a remote target</A></H2>
+
+<P>
+On the GDB host machine, you will need an unstripped copy of
+your program, since GDB needs symobl and debugging information.
+Start up GDB as usual, using the name of the local copy of your
+program as the first argument.
+
+</P>
+<P>
+<A NAME="IDX834"></A>
+If you're using a serial line, you may want to give GDB the
+<SAMP>`--baud'</SAMP> option, or use the <CODE>set remotebaud</CODE> command
+(see section <A HREF="gdb_18.html#SEC160">Remote configuration</A>) before the
+<CODE>target</CODE> command.
+
+</P>
+<P>
+After that, use <CODE>target remote</CODE> to establish communications with
+the target machine.  Its argument specifies how to communicate--either
+via a devicename attached to a direct serial line, or a TCP or UDP port
+(possibly to a terminal server which in turn has a serial line to the
+target).  For example, to use a serial line connected to the device
+named <TT>`/dev/ttyb'</TT>:
+
+</P>
+
+<PRE>
+target remote /dev/ttyb
+</PRE>
+
+<P>
+<A NAME="IDX835"></A>
+To use a TCP connection, use an argument of the form
+<CODE><VAR>host</VAR>:<VAR>port</VAR></CODE> or <CODE>tcp:<VAR>host</VAR>:<VAR>port</VAR></CODE>.
+For example, to connect to port 2828 on a
+terminal server named <CODE>manyfarms</CODE>:
+
+</P>
+
+<PRE>
+target remote manyfarms:2828
+</PRE>
+
+<P>
+If your remote target is actually running on the same machine as
+your debugger session (e.g. a simulator of your target running on
+the same host), you can omit the hostname.  For example, to connect
+to port 1234 on your local machine:
+
+</P>
+
+<PRE>
+target remote :1234
+</PRE>
+
+<P>
+
+</P>
+<P>
+Note that the colon is still required here.
+
+</P>
+<P>
+<A NAME="IDX836"></A>
+To use a UDP connection, use an argument of the form
+<CODE>udp:<VAR>host</VAR>:<VAR>port</VAR></CODE>.  For example, to connect to UDP port 2828
+on a terminal server named <CODE>manyfarms</CODE>:
+
+</P>
+
+<PRE>
+target remote udp:manyfarms:2828
+</PRE>
+
+<P>
+When using a UDP connection for remote debugging, you should keep in mind
+that the `U' stands for "Unreliable".  UDP can silently drop packets on
+busy or unreliable networks, which will cause havoc with your debugging
+session.
+
+</P>
+<P>
+Now you can use all the usual commands to examine and change data and to
+step and continue the remote program.
+
+</P>
+<P>
+<A NAME="IDX837"></A>
+<A NAME="IDX838"></A>
+Whenever GDB is waiting for the remote program, if you type the
+interrupt character (often <KBD>C-C</KBD>), GDB attempts to stop the
+program.  This may or may not succeed, depending in part on the hardware
+and the serial drivers the remote system uses.  If you type the
+interrupt character once again, GDB displays this prompt:
+
+</P>
+
+<PRE>
+Interrupted while waiting for the program.
+Give up (and stop debugging it)?  (y or n)
+</PRE>
+
+<P>
+If you type <KBD>y</KBD>, GDB abandons the remote debugging session.
+(If you decide you want to try again later, you can use <SAMP>`target
+remote'</SAMP> again to connect once more.)  If you type <KBD>n</KBD>, GDB
+goes back to waiting.
+
+</P>
+<DL COMPACT>
+
+<DT><CODE>detach</CODE>
+<DD>
+<A NAME="IDX839"></A>
+ 
+When you have finished debugging the remote program, you can use the
+<CODE>detach</CODE> command to release it from GDB control.
+Detaching from the target normally resumes its execution, but the results
+will depend on your particular remote stub.  After the <CODE>detach</CODE>
+command, GDB is free to connect to another target.
+
+<A NAME="IDX840"></A>
+<DT><CODE>disconnect</CODE>
+<DD>
+The <CODE>disconnect</CODE> command behaves like <CODE>detach</CODE>, except that
+the target is generally not resumed.  It will wait for GDB
+(this instance or another one) to connect and continue debugging.  After
+the <CODE>disconnect</CODE> command, GDB is again free to connect to
+another target.
+
+<A NAME="IDX841"></A>
+<A NAME="IDX842"></A>
+<DT><CODE>monitor <VAR>cmd</VAR></CODE>
+<DD>
+This command allows you to send commands directly to the remote
+monitor.
+</DL>
+
+
+
+<H2><A NAME="SEC158" HREF="gdb_toc.html#TOC158">Using the <CODE>gdbserver</CODE> program</A></H2>
+
+<P>
+<A NAME="IDX843"></A>
+<A NAME="IDX844"></A>
+<CODE>gdbserver</CODE> is a control program for Unix-like systems, which
+allows you to connect your program with a remote GDB via
+<CODE>target remote</CODE>---but without linking in the usual debugging stub.
+
+</P>
+<P>
+<CODE>gdbserver</CODE> is not a complete replacement for the debugging stubs,
+because it requires essentially the same operating-system facilities
+that GDB itself does.  In fact, a system that can run
+<CODE>gdbserver</CODE> to connect to a remote GDB could also run
+GDB locally!  <CODE>gdbserver</CODE> is sometimes useful nevertheless,
+because it is a much smaller program than GDB itself.  It is
+also easier to port than all of GDB, so you may be able to get
+started more quickly on a new system by using <CODE>gdbserver</CODE>.
+Finally, if you develop code for real-time systems, you may find that
+the tradeoffs involved in real-time operation make it more convenient to
+do as much development work as possible on another system, for example
+by cross-compiling.  You can use <CODE>gdbserver</CODE> to make a similar
+choice for debugging.
+
+</P>
+<P>
+GDB and <CODE>gdbserver</CODE> communicate via either a serial line
+or a TCP connection, using the standard GDB remote serial
+protocol.
+
+</P>
+<DL COMPACT>
+
+<DT><EM>On the target machine,</EM>
+<DD>
+you need to have a copy of the program you want to debug.
+<CODE>gdbserver</CODE> does not need your program's symbol table, so you can
+strip the program if necessary to save space.  GDB on the host
+system does all the symbol handling.
+
+To use the server, you must tell it how to communicate with GDB;
+the name of your program; and the arguments for your program.  The usual
+syntax is:
+
+
+<PRE>
+target&#62; gdbserver <VAR>comm</VAR> <VAR>program</VAR> [ <VAR>args</VAR> ... ]
+</PRE>
+
+<VAR>comm</VAR> is either a device name (to use a serial line) or a TCP
+hostname and portnumber.  For example, to debug Emacs with the argument
+<SAMP>`foo.txt'</SAMP> and communicate with GDB over the serial port
+<TT>`/dev/com1'</TT>:
+
+
+<PRE>
+target&#62; gdbserver /dev/com1 emacs foo.txt
+</PRE>
+
+<CODE>gdbserver</CODE> waits passively for the host GDB to communicate
+with it.
+
+To use a TCP connection instead of a serial line:
+
+
+<PRE>
+target&#62; gdbserver host:2345 emacs foo.txt
+</PRE>
+
+The only difference from the previous example is the first argument,
+specifying that you are communicating with the host GDB via
+TCP.  The <SAMP>`host:2345'</SAMP> argument means that <CODE>gdbserver</CODE> is to
+expect a TCP connection from machine <SAMP>`host'</SAMP> to local TCP port 2345.
+(Currently, the <SAMP>`host'</SAMP> part is ignored.)  You can choose any number
+you want for the port number as long as it does not conflict with any
+TCP ports already in use on the target system (for example, <CODE>23</CODE> is
+reserved for <CODE>telnet</CODE>).<A NAME="DOCF6" HREF="gdb_foot.html#FOOT6">(6)</A>  You must use the same port number with the host GDB
+<CODE>target remote</CODE> command.
+
+On some targets, <CODE>gdbserver</CODE> can also attach to running programs.
+This is accomplished via the <CODE>--attach</CODE> argument.  The syntax is:
+
+
+<PRE>
+target&#62; gdbserver <VAR>comm</VAR> --attach <VAR>pid</VAR>
+</PRE>
+
+<VAR>pid</VAR> is the process ID of a currently running process.  It isn't necessary
+to point <CODE>gdbserver</CODE> at a binary for the running process.
+
+<A NAME="IDX845"></A>
+<A NAME="IDX846"></A>
+You can debug processes by name instead of process ID if your target has the
+<CODE>pidof</CODE> utility:
+
+
+<PRE>
+target&#62; gdbserver <VAR>comm</VAR> --attach `pidof <VAR>PROGRAM</VAR>`
+</PRE>
+
+In case more than one copy of <VAR>PROGRAM</VAR> is running, or <VAR>PROGRAM</VAR>
+has multiple threads, most versions of <CODE>pidof</CODE> support the
+<CODE>-s</CODE> option to only return the first process ID.
+
+<DT><EM>On the host machine,</EM>
+<DD>
+connect to your target (see section <A HREF="gdb_18.html#SEC157">Connecting to a remote target</A>).
+For TCP connections, you must start up <CODE>gdbserver</CODE> prior to using
+the <CODE>target remote</CODE> command.  Otherwise you may get an error whose
+text depends on the host system, but which usually looks something like
+<SAMP>`Connection refused'</SAMP>.  You don't need to use the <CODE>load</CODE>
+command in GDB when using <CODE>gdbserver</CODE>, since the program is
+already on the target.  However, if you want to load the symbols (as
+you normally would), do that with the <CODE>file</CODE> command, and issue
+it <EM>before</EM> connecting to the server; otherwise, you will get an
+error message saying <CODE>"Program is already running"</CODE>, since the
+program is considered running after the connection.
+
+</DL>
+
+
+
+<H2><A NAME="SEC159" HREF="gdb_toc.html#TOC159">Using the <CODE>gdbserve.nlm</CODE> program</A></H2>
+
+<P>
+<A NAME="IDX847"></A>
+<CODE>gdbserve.nlm</CODE> is a control program for NetWare systems, which
+allows you to connect your program with a remote GDB via
+<CODE>target remote</CODE>.
+
+</P>
+<P>
+GDB and <CODE>gdbserve.nlm</CODE> communicate via a serial line,
+using the standard GDB remote serial protocol.
+
+</P>
+<DL COMPACT>
+
+<DT><EM>On the target machine,</EM>
+<DD>
+you need to have a copy of the program you want to debug.
+<CODE>gdbserve.nlm</CODE> does not need your program's symbol table, so you
+can strip the program if necessary to save space.  GDB on the
+host system does all the symbol handling.
+
+To use the server, you must tell it how to communicate with
+GDB; the name of your program; and the arguments for your
+program.  The syntax is:
+
+
+<PRE>
+load gdbserve [ BOARD=<VAR>board</VAR> ] [ PORT=<VAR>port</VAR> ]
+              [ BAUD=<VAR>baud</VAR> ] <VAR>program</VAR> [ <VAR>args</VAR> ... ]
+</PRE>
+
+<VAR>board</VAR> and <VAR>port</VAR> specify the serial line; <VAR>baud</VAR> specifies
+the baud rate used by the connection.  <VAR>port</VAR> and <VAR>node</VAR> default
+to 0, <VAR>baud</VAR> defaults to 9600bps.
+
+For example, to debug Emacs with the argument <SAMP>`foo.txt'</SAMP>and
+communicate with GDB over serial port number 2 or board 1
+using a 19200bps connection:
+
+
+<PRE>
+load gdbserve BOARD=1 PORT=2 BAUD=19200 emacs foo.txt
+</PRE>
+
+<DT><EM></EM>
+<DD>
+On the GDB host machine, connect to your target (see section <A HREF="gdb_18.html#SEC157">Connecting to a remote target</A>).
+
+</DL>
+
+
+
+<H2><A NAME="SEC160" HREF="gdb_toc.html#TOC160">Remote configuration</A></H2>
+
+<P>
+<A NAME="IDX848"></A>
+<A NAME="IDX849"></A>
+This section documents the configuration options available when
+debugging remote programs.  For the options related to the File I/O
+extensions of the remote protocol, see section <A HREF="gdb_33.html#SEC318">The <SAMP>`system'</SAMP> function call</A>.
+
+</P>
+<DL COMPACT>
+
+<DT><CODE>set remoteaddresssize <VAR>bits</VAR></CODE>
+<DD>
+<A NAME="IDX850"></A>
+<A NAME="IDX851"></A>
+Set the maximum size of address in a memory packet to the specified
+number of bits.  GDB will mask off the address bits above
+that number, when it passes addresses to the remote target.  The
+default value is the number of bits in the target's address.
+
+<DT><CODE>show remoteaddresssize</CODE>
+<DD>
+Show the current value of remote address size in bits.
+
+<DT><CODE>set remotebaud <VAR>n</VAR></CODE>
+<DD>
+<A NAME="IDX852"></A>
+Set the baud rate for the remote serial I/O to <VAR>n</VAR> baud.  The
+value is used to set the speed of the serial port used for debugging
+remote targets.
+
+<DT><CODE>show remotebaud</CODE>
+<DD>
+Show the current speed of the remote connection.
+
+<DT><CODE>set remotebreak</CODE>
+<DD>
+<A NAME="IDX853"></A>
+<A NAME="IDX854"></A>
+If set to on, GDB sends a <CODE>BREAK</CODE> signal to the remote
+when you press the <KBD>Ctrl-C</KBD> key to interrupt the program running
+on the remote.  If set to off, GDB sends the <SAMP>`Strl-C'</SAMP>
+character instead.  The default is off, since most remote systems
+expect to see <SAMP>`Ctrl-C'</SAMP> as the interrupt signal.
+
+<DT><CODE>show remotebreak</CODE>
+<DD>
+Show whether GDB sends <CODE>BREAK</CODE> or <SAMP>`Ctrl-C'</SAMP> to
+interrupt the remote program.
+
+<DT><CODE>set remotedebug</CODE>
+<DD>
+<A NAME="IDX855"></A>
+<A NAME="IDX856"></A>
+<A NAME="IDX857"></A>
+Control the debugging of the remote protocol.  When enabled, each
+packet sent to or received from the remote target is displayed.  The
+defaults is off.
+
+<DT><CODE>show remotedebug</CODE>
+<DD>
+Show the current setting of the remote protocol debugging.
+
+<DT><CODE>set remotedevice <VAR>device</VAR></CODE>
+<DD>
+<A NAME="IDX858"></A>
+Set the name of the serial port through which to communicate to the
+remote target to <VAR>device</VAR>.  This is the device used by
+GDB to open the serial communications line to the remote
+target.  There's no default, so you must set a valid port name for the
+remote serial communications to work.  (Some varieties of the
+<CODE>target</CODE> command accept the port name as part of their
+arguments.)
+
+<DT><CODE>show remotedevice</CODE>
+<DD>
+Show the current name of the serial port.
+
+<DT><CODE>set remotelogbase <VAR>base</VAR></CODE>
+<DD>
+Set the base (a.k.a. radix) of logging serial protocol
+communications to <VAR>base</VAR>.  Supported values of <VAR>base</VAR> are:
+<CODE>ascii</CODE>, <CODE>octal</CODE>, and <CODE>hex</CODE>.  The default is
+<CODE>ascii</CODE>.
+
+<DT><CODE>show remotelogbase</CODE>
+<DD>
+Show the current setting of the radix for logging remote serial
+protocol.
+
+<DT><CODE>set remotelogfile <VAR>file</VAR></CODE>
+<DD>
+<A NAME="IDX859"></A>
+Record remote serial communications on the named <VAR>file</VAR>.  The
+default is not to record at all.
+
+<DT><CODE>show remotelogfile.</CODE>
+<DD>
+Show the current setting  of the file name on which to record the
+serial communications.
+
+<DT><CODE>set remotetimeout <VAR>num</VAR></CODE>
+<DD>
+<A NAME="IDX860"></A>
+<A NAME="IDX861"></A>
+Set the timeout limit to wait for the remote target to respond to
+<VAR>num</VAR> seconds.  The default is 2 seconds.
+
+<DT><CODE>show remotetimeout</CODE>
+<DD>
+Show the current number of seconds to wait for the remote target
+responses.
+
+<A NAME="IDX862"></A>
+<A NAME="IDX863"></A>
+@anchor{set remote hardware-watchpoint-limit}
+@anchor{set remote hardware-breakpoint-limit}
+<DT><CODE>set remote hardware-watchpoint-limit <VAR>limit</VAR></CODE>
+<DD>
+<DT><CODE>set remote hardware-breakpoint-limit <VAR>limit</VAR></CODE>
+<DD>
+Restrict GDB to using <VAR>limit</VAR> remote hardware breakpoint or
+watchpoints.  A limit of -1, the default, is treated as unlimited.
+
+<DT><CODE>set remote fetch-register-packet</CODE>
+<DD>
+<DT><CODE>set remote set-register-packet</CODE>
+<DD>
+<DT><CODE>set remote P-packet</CODE>
+<DD>
+<DT><CODE>set remote p-packet</CODE>
+<DD>
+<A NAME="IDX864"></A>
+<A NAME="IDX865"></A>
+<A NAME="IDX866"></A>
+Determine whether GDB can set and fetch registers from the
+remote target using the <SAMP>`P'</SAMP> packets.  The default depends on the
+remote stub's support of the <SAMP>`P'</SAMP> packets (GDB queries
+the stub when this packet is first required).
+
+<DT><CODE>show remote fetch-register-packet</CODE>
+<DD>
+<DT><CODE>show remote set-register-packet</CODE>
+<DD>
+<DT><CODE>show remote P-packet</CODE>
+<DD>
+<DT><CODE>show remote p-packet</CODE>
+<DD>
+Show the current setting of using the <SAMP>`P'</SAMP> packets for setting and
+fetching registers from the remote target.
+
+<A NAME="IDX867"></A>
+<A NAME="IDX868"></A>
+<DT><CODE>set remote binary-download-packet</CODE>
+<DD>
+<DT><CODE>set remote X-packet</CODE>
+<DD>
+Determine whether GDB sends downloads in binary mode using
+the <SAMP>`X'</SAMP> packets.  The default is on.
+
+<DT><CODE>show remote binary-download-packet</CODE>
+<DD>
+<DT><CODE>show remote X-packet</CODE>
+<DD>
+Show the current setting of using the <SAMP>`X'</SAMP> packets for binary
+downloads.
+
+<DT><CODE>set remote read-aux-vector-packet</CODE>
+<DD>
+<A NAME="IDX869"></A>
+<A NAME="IDX870"></A>
+Set the use of the remote protocol's <SAMP>`qPart:auxv:read'</SAMP> (target
+auxiliary vector read) request.  This request is used to fetch the
+remote target's <STRONG>auxiliary vector</STRONG>, see section <A HREF="gdb_9.html#SEC69">Operating system auxiliary information</A>.  The default setting depends on the remote stub's
+support of this request (GDB queries the stub when this
+request is first required).  See section <A HREF="gdb_33.html#SEC306">General Query Packets</A>, for
+more information about this request.
+
+<DT><CODE>show remote read-aux-vector-packet</CODE>
+<DD>
+Show the current setting of use of the <SAMP>`qPart:auxv:read'</SAMP> request.
+
+<DT><CODE>set remote symbol-lookup-packet</CODE>
+<DD>
+<A NAME="IDX871"></A>
+Set the use of the remote protocol's <SAMP>`qSymbol'</SAMP> (target symbol
+lookup) request.  This request is used to communicate symbol
+information to the remote target, e.g., whenever a new shared library
+is loaded by the remote (see section <A HREF="gdb_16.html#SEC147">Commands to specify files</A>).  The
+default setting depends on the remote stub's support of this request
+(GDB queries the stub when this request is first required).
+See section <A HREF="gdb_33.html#SEC306">General Query Packets</A>, for more information about this
+request.
+
+<DT><CODE>show remote symbol-lookup-packet</CODE>
+<DD>
+Show the current setting of use of the <SAMP>`qSymbol'</SAMP> request.
+
+<DT><CODE>set remote verbose-resume-packet</CODE>
+<DD>
+<A NAME="IDX872"></A>
+<A NAME="IDX873"></A>
+<A NAME="IDX874"></A>
+<A NAME="IDX875"></A>
+Set the use of the remote protocol's <SAMP>`vCont'</SAMP> (descriptive resume)
+request.  This request is used to resume specific threads in the
+remote target, and to single-step or signal them.  The default setting
+depends on the remote stub's support of this request (GDB
+queries the stub when this request is first required).  This setting
+affects debugging of multithreaded programs: if <SAMP>`vCont'</SAMP> cannot be
+used, GDB might be unable to single-step a specific thread,
+especially under <CODE>set scheduler-locking off</CODE>; it is also
+impossible to pause a specific thread.  See section <A HREF="gdb_33.html#SEC304">Packets</A>, for
+more details.
+
+<DT><CODE>show remote verbose-resume-packet</CODE>
+<DD>
+Show the current setting of use of the <SAMP>`vCont'</SAMP> request
+
+<DT><CODE>set remote software-breakpoint-packet</CODE>
+<DD>
+<DT><CODE>set remote hardware-breakpoint-packet</CODE>
+<DD>
+<DT><CODE>set remote write-watchpoint-packet</CODE>
+<DD>
+<DT><CODE>set remote read-watchpoint-packet</CODE>
+<DD>
+<DT><CODE>set remote access-watchpoint-packet</CODE>
+<DD>
+<DT><CODE>set remote Z-packet</CODE>
+<DD>
+<A NAME="IDX876"></A>
+<A NAME="IDX877"></A>
+These commands enable or disable the use of <SAMP>`Z'</SAMP> packets for
+setting breakpoints and watchpoints in the remote target.  The default
+depends on the remote stub's support of the <SAMP>`Z'</SAMP> packets
+(GDB queries the stub when each packet is first required).
+The command <CODE>set remote Z-packet</CODE>, kept for back-compatibility,
+turns on or off all the features that require the use of <SAMP>`Z'</SAMP>
+packets.
+
+<DT><CODE>show remote software-breakpoint-packet</CODE>
+<DD>
+<DT><CODE>show remote hardware-breakpoint-packet</CODE>
+<DD>
+<DT><CODE>show remote write-watchpoint-packet</CODE>
+<DD>
+<DT><CODE>show remote read-watchpoint-packet</CODE>
+<DD>
+<DT><CODE>show remote access-watchpoint-packet</CODE>
+<DD>
+<DT><CODE>show remote Z-packet</CODE>
+<DD>
+Show the current setting of <SAMP>`Z'</SAMP> packets usage.
+
+<DT><CODE>set remote get-thread-local-storage-address</CODE>
+<DD>
+<A NAME="IDX878"></A>
+<A NAME="IDX879"></A>
+This command enables or disables the use of the <SAMP>`qGetTLSAddr'</SAMP>
+(Get Thread Local Storage Address) request packet.  The default
+depends on whether the remote stub supports this request.
+See section <A HREF="gdb_33.html#SEC306">General Query Packets</A>, for more details about this
+packet.
+
+<DT><CODE>show remote get-thread-local-storage-address</CODE>
+<DD>
+<A NAME="IDX880"></A>
+Show the current setting of <SAMP>`qGetTLSAddr'</SAMP> packet usage.
+</DL>
+
+
+
+<H2><A NAME="SEC161" HREF="gdb_toc.html#TOC161">Implementing a remote stub</A></H2>
+
+<P>
+<A NAME="IDX881"></A>
+<A NAME="IDX882"></A>
+<A NAME="IDX883"></A>
+The stub files provided with GDB implement the target side of the
+communication protocol, and the GDB side is implemented in the
+GDB source file <TT>`remote.c'</TT>.  Normally, you can simply allow
+these subroutines to communicate, and ignore the details.  (If you're
+implementing your own stub file, you can still ignore the details: start
+with one of the existing stub files.  <TT>`sparc-stub.c'</TT> is the best
+organized, and therefore the easiest to read.)
+
+</P>
+<P>
+<A NAME="IDX884"></A>
+To debug a program running on another machine (the debugging
+<STRONG>target</STRONG> machine), you must first arrange for all the usual
+prerequisites for the program to run by itself.  For example, for a C
+program, you need:
+
+</P>
+
+<OL>
+<LI>
+
+A startup routine to set up the C runtime environment; these usually
+have a name like <TT>`crt0'</TT>.  The startup routine may be supplied by
+your hardware supplier, or you may have to write your own.
+
+<LI>
+
+A C subroutine library to support your program's
+subroutine calls, notably managing input and output.
+
+<LI>
+
+A way of getting your program to the other machine--for example, a
+download program.  These are often supplied by the hardware
+manufacturer, but you may have to write your own from hardware
+documentation.
+</OL>
+
+<P>
+The next step is to arrange for your program to use a serial port to
+communicate with the machine where GDB is running (the <STRONG>host</STRONG>
+machine).  In general terms, the scheme looks like this:
+
+</P>
+<DL COMPACT>
+
+<DT><EM>On the host,</EM>
+<DD>
+GDB already understands how to use this protocol; when everything
+else is set up, you can simply use the <SAMP>`target remote'</SAMP> command
+(see section <A HREF="gdb_17.html#SEC150">Specifying a Debugging Target</A>).
+
+<DT><EM>On the target,</EM>
+<DD>
+you must link with your program a few special-purpose subroutines that
+implement the GDB remote serial protocol.  The file containing these
+subroutines is called  a <STRONG>debugging stub</STRONG>.
+
+On certain remote targets, you can use an auxiliary program
+<CODE>gdbserver</CODE> instead of linking a stub into your program.
+See section <A HREF="gdb_18.html#SEC158">Using the <CODE>gdbserver</CODE> program</A>, for details.
+</DL>
+
+<P>
+The debugging stub is specific to the architecture of the remote
+machine; for example, use <TT>`sparc-stub.c'</TT> to debug programs on
+SPARC boards.
+
+</P>
+<P>
+<A NAME="IDX885"></A>
+These working remote stubs are distributed with GDB:
+
+</P>
+<DL COMPACT>
+
+<DT><CODE>i386-stub.c</CODE>
+<DD>
+<A NAME="IDX886"></A>
+<A NAME="IDX887"></A>
+<A NAME="IDX888"></A>
+For Intel 386 and compatible architectures.
+
+<DT><CODE>m68k-stub.c</CODE>
+<DD>
+<A NAME="IDX889"></A>
+<A NAME="IDX890"></A>
+<A NAME="IDX891"></A>
+For Motorola 680x0 architectures.
+
+<DT><CODE>sh-stub.c</CODE>
+<DD>
+<A NAME="IDX892"></A>
+<A NAME="IDX893"></A>
+<A NAME="IDX894"></A>
+For Renesas SH architectures.
+
+<DT><CODE>sparc-stub.c</CODE>
+<DD>
+<A NAME="IDX895"></A>
+<A NAME="IDX896"></A>
+For SPARC architectures.
+
+<DT><CODE>sparcl-stub.c</CODE>
+<DD>
+<A NAME="IDX897"></A>
+<A NAME="IDX898"></A>
+<A NAME="IDX899"></A>
+For Fujitsu SPARCLITE architectures.
+
+</DL>
+
+<P>
+The <TT>`README'</TT> file in the GDB distribution may list other
+recently added stubs.
+
+</P>
+
+
+
+<H3><A NAME="SEC162" HREF="gdb_toc.html#TOC162">What the stub can do for you</A></H3>
+
+<P>
+<A NAME="IDX900"></A>
+The debugging stub for your architecture supplies these three
+subroutines:
+
+</P>
+<DL COMPACT>
+
+<DT><CODE>set_debug_traps</CODE>
+<DD>
+<A NAME="IDX901"></A>
+<A NAME="IDX902"></A>
+This routine arranges for <CODE>handle_exception</CODE> to run when your
+program stops.  You must call this subroutine explicitly near the
+beginning of your program.
+
+<DT><CODE>handle_exception</CODE>
+<DD>
+<A NAME="IDX903"></A>
+<A NAME="IDX904"></A>
+This is the central workhorse, but your program never calls it
+explicitly--the setup code arranges for <CODE>handle_exception</CODE> to
+run when a trap is triggered.
+
+<CODE>handle_exception</CODE> takes control when your program stops during
+execution (for example, on a breakpoint), and mediates communications
+with GDB on the host machine.  This is where the communications
+protocol is implemented; <CODE>handle_exception</CODE> acts as the GDB
+representative on the target machine.  It begins by sending summary
+information on the state of your program, then continues to execute,
+retrieving and transmitting any information GDB needs, until you
+execute a GDB command that makes your program resume; at that point,
+<CODE>handle_exception</CODE> returns control to your own code on the target
+machine.
+
+<DT><CODE>breakpoint</CODE>
+<DD>
+<A NAME="IDX905"></A>
+Use this auxiliary subroutine to make your program contain a
+breakpoint.  Depending on the particular situation, this may be the only
+way for GDB to get control.  For instance, if your target
+machine has some sort of interrupt button, you won't need to call this;
+pressing the interrupt button transfers control to
+<CODE>handle_exception</CODE>---in effect, to GDB.  On some machines,
+simply receiving characters on the serial port may also trigger a trap;
+again, in that situation, you don't need to call <CODE>breakpoint</CODE> from
+your own program--simply running <SAMP>`target remote'</SAMP> from the host
+GDB session gets control.
+
+Call <CODE>breakpoint</CODE> if none of these is true, or if you simply want
+to make certain your program stops at a predetermined point for the
+start of your debugging session.
+</DL>
+
+
+
+<H3><A NAME="SEC163" HREF="gdb_toc.html#TOC163">What you must do for the stub</A></H3>
+
+<P>
+<A NAME="IDX906"></A>
+The debugging stubs that come with GDB are set up for a particular
+chip architecture, but they have no information about the rest of your
+debugging target machine.
+
+</P>
+<P>
+First of all you need to tell the stub how to communicate with the
+serial port.
+
+</P>
+<DL COMPACT>
+
+<DT><CODE>int getDebugChar()</CODE>
+<DD>
+<A NAME="IDX907"></A>
+Write this subroutine to read a single character from the serial port.
+It may be identical to <CODE>getchar</CODE> for your target system; a
+different name is used to allow you to distinguish the two if you wish.
+
+<DT><CODE>void putDebugChar(int)</CODE>
+<DD>
+<A NAME="IDX908"></A>
+Write this subroutine to write a single character to the serial port.
+It may be identical to <CODE>putchar</CODE> for your target system; a
+different name is used to allow you to distinguish the two if you wish.
+</DL>
+
+<P>
+<A NAME="IDX909"></A>
+<A NAME="IDX910"></A>
+If you want GDB to be able to stop your program while it is
+running, you need to use an interrupt-driven serial driver, and arrange
+for it to stop when it receives a <CODE>^C</CODE> (<SAMP>`\003'</SAMP>, the control-C
+character).  That is the character which GDB uses to tell the
+remote system to stop.
+
+</P>
+<P>
+Getting the debugging target to return the proper status to GDB
+probably requires changes to the standard stub; one quick and dirty way
+is to just execute a breakpoint instruction (the "dirty" part is that
+GDB reports a <CODE>SIGTRAP</CODE> instead of a <CODE>SIGINT</CODE>).
+
+</P>
+<P>
+Other routines you need to supply are:
+
+</P>
+<DL COMPACT>
+
+<DT><CODE>void exceptionHandler (int <VAR>exception_number</VAR>, void *<VAR>exception_address</VAR>)</CODE>
+<DD>
+<A NAME="IDX911"></A>
+Write this function to install <VAR>exception_address</VAR> in the exception
+handling tables.  You need to do this because the stub does not have any
+way of knowing what the exception handling tables on your target system
+are like (for example, the processor's table might be in ROM,
+containing entries which point to a table in RAM).
+<VAR>exception_number</VAR> is the exception number which should be changed;
+its meaning is architecture-dependent (for example, different numbers
+might represent divide by zero, misaligned access, etc).  When this
+exception occurs, control should be transferred directly to
+<VAR>exception_address</VAR>, and the processor state (stack, registers,
+and so on) should be just as it is when a processor exception occurs.  So if
+you want to use a jump instruction to reach <VAR>exception_address</VAR>, it
+should be a simple jump, not a jump to subroutine.
+
+For the 386, <VAR>exception_address</VAR> should be installed as an interrupt
+gate so that interrupts are masked while the handler runs.  The gate
+should be at privilege level 0 (the most privileged level).  The
+SPARC and 68k stubs are able to mask interrupts themselves without
+help from <CODE>exceptionHandler</CODE>.
+
+<DT><CODE>void flush_i_cache()</CODE>
+<DD>
+<A NAME="IDX912"></A>
+On SPARC and SPARCLITE only, write this subroutine to flush the
+instruction cache, if any, on your target machine.  If there is no
+instruction cache, this subroutine may be a no-op.
+
+On target machines that have instruction caches, GDB requires this
+function to make certain that the state of your program is stable.
+</DL>
+
+<P>
+You must also make sure this library routine is available:
+
+</P>
+<DL COMPACT>
+
+<DT><CODE>void *memset(void *, int, int)</CODE>
+<DD>
+<A NAME="IDX913"></A>
+This is the standard library function <CODE>memset</CODE> that sets an area of
+memory to a known value.  If you have one of the free versions of
+<CODE>libc.a</CODE>, <CODE>memset</CODE> can be found there; otherwise, you must
+either obtain it from your hardware manufacturer, or write your own.
+</DL>
+
+<P>
+If you do not use the GNU C compiler, you may need other standard
+library subroutines as well; this varies from one stub to another,
+but in general the stubs are likely to use any of the common library
+subroutines which <CODE>gcc</CODE> generates as inline code.
+
+</P>
+
+
+
+<H3><A NAME="SEC164" HREF="gdb_toc.html#TOC164">Putting it all together</A></H3>
+
+<P>
+<A NAME="IDX914"></A>
+In summary, when your program is ready to debug, you must follow these
+steps.
+
+</P>
+
+<OL>
+<LI>
+
+Make sure you have defined the supporting low-level routines
+(see section <A HREF="gdb_18.html#SEC163">What you must do for the stub</A>):
+
+<PRE>
+<CODE>getDebugChar</CODE>, <CODE>putDebugChar</CODE>,
+<CODE>flush_i_cache</CODE>, <CODE>memset</CODE>, <CODE>exceptionHandler</CODE>.
+</PRE>
+
+<LI>
+
+Insert these lines near the top of your program:
+
+
+<PRE>
+set_debug_traps();
+breakpoint();
+</PRE>
+
+<LI>
+
+For the 680x0 stub only, you need to provide a variable called
+<CODE>exceptionHook</CODE>.  Normally you just use:
+
+
+<PRE>
+void (*exceptionHook)() = 0;
+</PRE>
+
+but if before calling <CODE>set_debug_traps</CODE>, you set it to point to a
+function in your program, that function is called when
+<CODE>GDB</CODE> continues after stopping on a trap (for example, bus
+error).  The function indicated by <CODE>exceptionHook</CODE> is called with
+one parameter: an <CODE>int</CODE> which is the exception number.
+
+<LI>
+
+Compile and link together: your program, the GDB debugging stub for
+your target architecture, and the supporting subroutines.
+
+<LI>
+
+Make sure you have a serial connection between your target machine and
+the GDB host, and identify the serial port on the host.
+
+<LI>
+
+Download your program to your target machine (or get it there by
+whatever means the manufacturer provides), and start it.
+
+<LI>
+
+To start remote debugging, run GDB on the host machine, and specify
+as an executable file the program that is running in the remote machine.
+This tells GDB how to find your program's symbols and the contents
+of its pure text.
+
+<LI>
+
+Start GDB on the host, and connect to the target
+(see section <A HREF="gdb_18.html#SEC157">Connecting to a remote target</A>).
+
+
+<PRE>
+target remote udp:manyfarms:2828
+</PRE>
+
+When using a UDP connection for remote debugging, you should keep in mind
+that the `U' stands for "Unreliable".  UDP can silently drop packets on
+busy or unreliable networks, which will cause havoc with your debugging
+session.
+
+</OL>
+
+<P><HR><P>
+Go to the <A HREF="gdb_1.html">first</A>, <A HREF="gdb_17.html">previous</A>, <A HREF="gdb_19.html">next</A>, <A HREF="gdb_36.html">last</A> section, <A HREF="gdb_toc.html">table of contents</A>.
+</BODY>
+</HTML>

@@ -1,0 +1,1121 @@
+<html><head><title></title></head>
+<body bgcolor="#ffffff">
+ 
+ 
+<h1>
+<FONT COLOR="#000066">
+<a name="12113">
+ <a name="//apple_ref/java/cl/SQLExpression">SQLExpression</a>
+</a>
+</FONT>
+</h1>
+<p><B>Extends:</B><BR>  
+next.util.NextObject
+
+<p><a name="12115"></a>
+<a name="description"></a>
+<H2>Class Description
+</H2>
+SQLExpression is a superclass that defines how to build SQL statements for adaptor channels. You don't typically use instances of SQLExpression; rather, you use SQLExpression subclasses written to work with a particular RDBMS and corresponding adaptor. A concrete subclass of SQLExpression overrides many of its methods in terms of the query language syntax for its specific RDBMS. SQLExpression objects are used internally by the Framework, and unless you're creating a concrete adaptor, you won't ordinarily need to interact with SQLExpression objects yourself. You most commonly create and use an SQLExpression object when you want to send an SQL statement directly to the server. In this case, you simply create an expression with the SQLExpression static method <a href="#5997"><code>expressionForString</code></a>, and send the expression object to an adaptor channel using AdaptorChannel's <a href="../AdaptorChannel/Frameset.html#2624" target="_top"><code>evaluateExpression</code></a> method.<p>
+<h3>
+<a name="6180">
+ Building Expressions
+</a>
+</h3>
+The following four methods create SQLExpression objects for the four basic database operations-select, insert, update, and delete:<p>
+<ul><li><a href="#6065">selectStatementForAttributes</a><br>
+<li><a href="#6026">insertStatementForRow</a><br>
+<li><a href="#11750">updateStatementForRow</a><br>
+<li><a href="#5956">deleteStatementWithQualifier</a><br>
+</ul>Unless you're implementing an SQLExpression subclass, these and the static method <a href="#5997"><code>expressionForString</code></a> are the only SQLExpression methods you should ever need. If, on the other hand, you are creating a subclass, you need to understand the mechanics of how SQLExpression builds SQL statements. Each of the creation methods above creates an SQLExpression, initializes the expression with a specified entity, and sends the new expression object one of the following <code>prepare...</code> methods:<p>
+<ul><li><a href="#5491">prepareSelectExpressionWithAttributes</a><br>
+<li><a href="#5486">prepareInsertExpressionWithRow</a><br>
+<li><a href="#5496">prepareUpdateExpressionWithRow</a><br>
+<li><a href="#7833">prepareDeleteExpressionForQualifier</a><br>
+</ul>The <code>prepare...</code> methods, in turn, invoke a corresponding <code>assemble...</code> method, first generating values for the <code>assemble...</code> method's arguments. The <code>assemble...</code> methods:<p>
+<ul><li><a href="#5074">assembleSelectStatementWithAttributes</a><br>
+<li><a href="#5064">assembleInsertStatementWithRow</a><br>
+<li><a href="#5079">assembleUpdateStatementWithRow</a><br>
+<li><a href="#5059">assembleDeleteStatementWithQualifier</a><br>
+</ul>combine their arguments into SQL statements that the database server can understand.<p>
+These three sets of methods establish a framework in which SQL statements are generated. The bulk of the remaining methods generate pieces of an SQL statement.<p>
+An individual SQL statement is constructed by combining the SQL strings for any model or value objects specified in the "build" method in the appropriate form. An SQL string for a modeling or value object is a string representation of the object that the database understands; for example, the SQL string for an Entity is ultimately its table name. An SQLExpression gets the SQL strings for attributes and values with the methods <a href="#5704"><code>sqlStringForAttributeNamed</code></a> and <a href="#5822"><code>sqlStringForValue</code></a>. If necessary, it also formats the SQL strings according to an Attribute's "read" or "write" format with the static method <a href="#6007"><code>formatSQLString</code></a>.<p>
+Each of the "build" methods above invokes a number of instance methods. These methods are documented individually below.<p>
+<h3>
+<a name="6248">
+ Using Table Aliases
+</a>
+</h3>
+By default, SQLExpression uses table aliases in SELECT statements. For example, the following SELECT statement uses table aliases:<p>
+<blockquote><pre>SELECT t0.FIRST_NAME, t0.LAST_NAME, t1.NAME<br>FROM EMPLOYEE t0, DEPARTMENT t1<br>WHERE t0.DEPARTMENT_ID = t1.DEPARTMENT_ID
+</pre></blockquote><p>The EMPLOYEE table is aliased t0, and the DEPARTMENT table is aliased t1. Table aliases are necessary in some SELECT statements-when a table contains a self-referential relationship, for example. Assume the EMPLOYEE table contains a manager column. Managers are also employees, so to retrieve all the employees whose manager is Bob Smith, the SELECT statement looks like this:<p>
+<blockquote><pre>SELECT t0.FIRST_NAME, t0.LAST_NAME<br>FROM EMPLOYEE t0, EMPLOYEE t1<br>WHERE t1.FIRST_NAME = "BOB" AND t1.LAST_NAME = "SMITH" AND<br>    t0.MANAGER_ID = t1.EMPLOYEE_ID 
+</pre></blockquote><p>When the Framework maps operations on enterprise objects to operations on database rows, it reduces insert, update, and delete operations to one or more single-table operations. As a result, SQLExpression assumes that INSERT, UPDATE, and DELETE statements are always single-table operations, and does not use table aliases in the statements of these types.<p>
+In addition, if SQLExpression detects that all the attributes in a SELECT statement's attribute list are flattened attributes and they're all flattened from the same table, the expression doesn't use table aliases. For example, suppose that an SQLExpression object is created to select a customer's credit card. In the application, a customer object has a credit card object as one of its properties, and all operations on credit cards are described in terms of a customer. As a result, the expression object is initialized with the entity for the Customer object. Rather than create a statement like the following:<p>
+<blockquote><pre>SELECT t1.TYPE, t1.NUMBER, t1.EXPIRATION, t1.CREDIT_LIMIT, t1.CUSTOMER_ID<br>FROM CUSTOMER t0, CREDIT_CARD t1<br>WHERE t1.CUSTOMER_ID = t0.CUSTOMER_ID AND t1.CUSTOMER_ID = 459
+</pre></blockquote><p>SQLExpression detects that all the attributes correspond to columns in the CREDIT_CARD table and creates the following statement:<p>
+<blockquote><pre>SELECT TYPE, NUMBER, EXPIRATION, CREDIT_LIMIT, CUSTOMER_ID<br>FROM CREDIT_CARD<br>WHERE CUSTOMER_ID = 459
+</pre></blockquote><p><h3>
+<a name="6267">
+ Bind Variables
+</a>
+</h3>
+Some RDBMS client libraries use bind variables. A bind variable is a placeholder used in an SQL statement that is replaced with an actual value after the database server determines an execution plan. If you are writing an adaptor for a database server that uses bind variables, you must override the following SQLExpression methods:<p>
+<ul><li><a href="#5129">bindVariableDictionaryForAttribute</a><br>
+<li><a href="#5415">mustUseBindVariableForAttribute</a><br>
+<li><a href="#5658">shouldUseBindVariableForAttribute</a><br>
+</ul>If your adaptor doesn't need to use bind variables, the default implementations of the bind variable methods are sufficient.<p>
+<h3>
+<a name="8552">
+ Generating SQL for EOModeler's Schema Generation
+</a>
+</h3>
+SQLExpression provides a set of methods that generate SQL that can be used to create a database. EOModeler uses these methods to generate scripts that you can execute from within EOModeler to create a database or that you can copy and paste into an interactive SQL shell for your database. If you are writing an adaptor, you must ensure that the following SQLExpression method implementations are sufficient to support EOModeler's schema generation: <p>
+<ul><li><a href="#6055">schemaCreationScriptForEntities</a><br>
+<li><a href="#11149">schemaCreationStatementsForEntities</a><br>
+<li><a href="#8664">appendExpression</a><br>
+<li><a href="#5946">createTableStatementsForEntityGroup</a><br>
+<li><a href="#5951">createTableStatementsForEntityGroups</a><br>
+<li><a href="#5971">dropTableStatementsForEntityGroup</a><br>
+<li><a href="#5976">dropTableStatementsForEntityGroups</a><br>
+<li><a href="#6035">primaryKeyConstraintStatementsForEntityGroup</a><br>
+<li><a href="#6040">primaryKeyConstraintStatementsForEntityGroups</a><br>
+<li><a href="#6045">primaryKeySupportStatementsForEntityGroup</a><br>
+<li><a href="#6050">primaryKeySupportStatementsForEntityGroups</a><br>
+<li><a href="#5961">dropPrimaryKeySupportStatementsForEntityGroup</a><br>
+<li><a href="#5966">dropPrimaryKeySupportStatementsForEntityGroups</a><br>
+<li><a href="#5476">prepareConstraintStatementForRelationship</a><br>
+<li><a href="#6002">foreignKeyConstraintStatementsForRelationship</a><br>
+<li><a href="#4910">addCreateClauseForAttribute</a><br>
+<li><a href="#5167">columnTypeStringForAttribute</a><br>
+<li><a href="#4991">allowsNullClauseForConstraint</a><br>
+</ul><a name="830">
+<HR WIDTH=50% ALIGN=LEFT>
+<h2>Method Types
+</h2>
+</a><dl>
+<dt>Constructors<dl><dl><dl><dl>
+<dt><a href="#3774">SQLExpression</a></dl>
+</dl></dl></dl><dt>Creating an SQLExpression object<dl><dl><dl><dl>
+<dt><a href="#6065">selectStatementForAttributes</a><dt><a href="#6026">insertStatementForRow</a><dt><a href="#11750">updateStatementForRow</a><dt><a href="#5956">deleteStatementWithQualifier</a><dt><a href="#5997">expressionForString</a></dl>
+</dl></dl></dl><dt>Building SQL Expressions<dl><dl><dl><dl>
+<dt><a href="#5491">prepareSelectExpressionWithAttributes</a><dt><a href="#5486">prepareInsertExpressionWithRow</a><dt><a href="#5496">prepareUpdateExpressionWithRow</a><dt><a href="#7833">prepareDeleteExpressionForQualifier</a><dt><a href="#5638">setStatement</a><dt><a href="#5832">statement</a></dl>
+</dl></dl></dl><dt>Generating SQL for attributes and values<dl><dl><dl><dl>
+<dt><a href="#6007">formatSQLString</a><dt><a href="#6021">formatValueForAttribute</a><dt><a href="#6012">formatStringValue</a><dt><a href="#5822">sqlStringForValue</a><dt><a href="#5704">sqlStringForAttributeNamed</a><dt><a href="#5699">sqlStringForAttribute</a><dt><a href="#5709">sqlStringForAttributePath</a></dl>
+</dl></dl></dl><dt>Generating SQL for names of database objects<dl><dl><dl><dl>
+<dt><a href="#5807">sqlStringForSchemaObjectName</a><dt><a href="#6104">setUseQuotedExternalNames</a><dt><a href="#6170">useQuotedExternalNames</a><dt><a href="#5297">externalNameQuoteCharacter</a></dl>
+</dl></dl></dl><dt>Generating an attribute list<dl><dl><dl><dl>
+<dt><a href="#4959">addSelectListAttribute</a><dt><a href="#4921">addInsertListAttribute</a><dt><a href="#4964">addUpdateListAttribute</a><dt><a href="#5018">appendItemToListString</a><dt><a href="#5399">listString</a></dl>
+</dl></dl></dl><dt>Generating a value list<dl><dl><dl><dl>
+<dt><a href="#4921">addInsertListAttribute</a><dt><a href="#4964">addUpdateListAttribute</a><dt><a href="#1063">valueList</a></dl>
+</dl></dl></dl><dt>Generating a table list<dl><dl><dl><dl>
+<dt><a href="#5837">tableListWithRootEntity</a><dt><a href="#4986">aliasesByRelationshipPath</a></dl>
+</dl></dl></dl><dt>Generating the join clause<dl><dl><dl><dl>
+<dt><a href="#5377">joinExpression</a><dt><a href="#4943">addJoinClause</a><dt><a href="#5069">assembleJoinClause</a><dt><a href="#5372">joinClauseString</a></dl>
+</dl></dl></dl><dt>Generating a search pattern<dl><dl><dl><dl>
+<dt><a href="#6109">sqlPatternFromShellPattern</a><dt><a href="#6114">sqlPatternFromShellPatternWithEscapeCharacter</a></dl>
+</dl></dl></dl><dt>Generating a relational operator<dl><dl><dl><dl>
+<dt><a href="#5812">sqlStringForSelector</a></dl>
+</dl></dl></dl><dt>Accessing the where clause<dl><dl><dl><dl>
+<dt><a href="#1130">whereClauseString</a></dl>
+</dl></dl></dl><dt>Generating an order by clause<dl><dl><dl><dl>
+<dt><a href="#4948">addOrderByAttributeOrdering</a><dt><a href="#5425">orderByString</a></dl>
+</dl></dl></dl><dt>Accessing the lock clause<dl><dl><dl><dl>
+<dt><a href="#5404">lockClause</a></dl>
+</dl></dl></dl><dt>Assembling a statement<dl><dl><dl><dl>
+<dt><a href="#5074">assembleSelectStatementWithAttributes</a><dt><a href="#5064">assembleInsertStatementWithRow</a><dt><a href="#5079">assembleUpdateStatementWithRow</a><dt><a href="#5059">assembleDeleteStatementWithQualifier</a></dl>
+</dl></dl></dl><dt>Generating SQL for qualifiers<dl><dl><dl><dl>
+<dt><a href="#8301">sqlStringForQualifier</a><dt><a href="#5720">sqlStringForConjoinedQualifiers</a><dt><a href="#5725">sqlStringForDisjoinedQualifiers</a><dt><a href="#5746">sqlStringForKeyComparisonQualifier</a><dt><a href="#5751">sqlStringForKeyValueQualifier</a><dt><a href="#5761">sqlStringForNegatedQualifier</a></dl>
+</dl></dl></dl><dt>Managing bind variables<dl><dl><dl><dl>
+<dt><a href="#6099">setUseBindVariables</a><dt><a href="#6165">useBindVariables</a><dt><a href="#4905">addBindVariableDictionary</a><dt><a href="#5124">bindVariableDictionaries</a><dt><a href="#5129">bindVariableDictionaryForAttribute</a><dt><a href="#5415">mustUseBindVariableForAttribute</a><dt><a href="#5658">shouldUseBindVariableForAttribute</a></dl>
+</dl></dl></dl><dt>Using table aliases<dl><dl><dl><dl>
+<dt><a href="#5595">setUseAliases</a><dt><a href="#5847">useAliases</a></dl>
+</dl></dl></dl><dt>Accessing the entity<dl><dl><dl><dl>
+<dt><a href="#5292">entity</a></dl>
+</dl></dl></dl><dt>Creating a schema generation script<dl><dl><dl><dl>
+<dt><a href="#6055">schemaCreationScriptForEntities</a><dt><a href="#11149">schemaCreationStatementsForEntities</a><dt><a href="#8664">appendExpression</a></dl>
+</dl></dl></dl><dt>Generating table definition part of schema generation script for a list of entity groups<dl><dl><dl><dl>
+<dt><a href="#5951">createTableStatementsForEntityGroups</a><dt><a href="#5976">dropTableStatementsForEntityGroups</a><dt><a href="#6040">primaryKeyConstraintStatementsForEntityGroups</a><dt><a href="#6050">primaryKeySupportStatementsForEntityGroups</a><dt><a href="#5966">dropPrimaryKeySupportStatementsForEntityGroups</a></dl>
+</dl></dl></dl><dt>Generating table definition part of schema generation script for an entity group<dl><dl><dl><dl>
+<dt><a href="#5946">createTableStatementsForEntityGroup</a><dt><a href="#5971">dropTableStatementsForEntityGroup</a><dt><a href="#6035">primaryKeyConstraintStatementsForEntityGroup</a><dt><a href="#6045">primaryKeySupportStatementsForEntityGroup</a><dt><a href="#5961">dropPrimaryKeySupportStatementsForEntityGroup</a></dl>
+</dl></dl></dl><dt>Generating attribute definition part of schema generation script<dl><dl><dl><dl>
+<dt><a href="#4910">addCreateClauseForAttribute</a><dt><a href="#5167">columnTypeStringForAttribute</a><dt><a href="#4991">allowsNullClauseForConstraint</a></dl>
+</dl></dl></dl><dt>Generating relationship constraint part of schema generation script<dl><dl><dl><dl>
+<dt><a href="#6002">foreignKeyConstraintStatementsForRelationship</a><dt><a href="#5476">prepareConstraintStatementForRelationship</a></dl>
+</dl></dl></dl></dl>
+<HR WIDTH=50% ALIGN=LEFT>
+<a name="3766"></a>
+<a name="cons"></a>
+<h2>Constructors</h2>  
+
+
+<a name="3774"></a>
+<h3>
+ SQLExpression
+</h3>
+public <code>next.eo.SQLExpression</code>(next.eo.Entity <em>anEntity</em>)
+
+<P>Creates a new SQLExpression. If <em>anEntity</em> is provided, the new SQLExpression is rooted to <em>anEntity</em>.<p>
+<B>See also: </B>  
+<a href="#5292"><code>entity</code></a>
+<p><HR WIDTH=50% ALIGN=LEFT>
+<a name="5941"></a>
+<a name="clm"></a>
+<h2>Static Methods</h2>  
+
+
+<a name="8664"></a>
+<h3>
+ <a name="//apple_ref/java/clm/SQLExpression/appendExpression">appendExpression</a>
+</h3>
+public static void <code>appendExpression</code>(next.eo.SQLExpression <em>anSQLExpression</em>, 
+java.lang.String <em>script</em>)
+
+<P>Append's <em>anSQLExpression</em>'s <a href="#5832"><code>statement</code></a> to <em>script</em> along with any necessary delimiter. SQLExpression's implementation append the SQL statement for <em>anSQLExpression</em> to <em>script</em> followed by a semicolon and a newline. A subclass of SQLExpression only needs to override this method if the delimiter for its database server is different. For example, the Oracle and Informix use the default implementation, whereas the Sybase adaptor appends the word "go" instead of a semicolon.<p>
+<B>See also: </B>  
+<a href="#5951"><code>createTableStatementsForEntityGroups</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="5946"></a>
+<h3> <a name="//apple_ref/java/clm/SQLExpression/createTableStatementsForEntityGroup">createTableStatementsForEntityGroup</a></h3>
+public static next.util.ImmutableVector 
+<code>createTableStatementsForEntityGroup</code>(next.util.ImmutableVector <em>entityGroup</em>)
+
+<P>Returns an array of SQLExpression objects that define the SQL necessary to create a table for <em>entityGroup</em>, an array of Entity objects that have the same <a href="../Entity/Frameset.html#3887" target="_top"><code>externalName</code></a>. Returns an empty array if entityGroup is <code>null</code> or empty.<p>
+SQLExpression's implementation does the following:<p>
+<ol>
+<a name="9186">
+<li>Creates an SQLExpression object.<p>
+</a><a name="9187">
+<li>Sets the expression's <a href="#5292"><code>entity</code></a> to the first entity in <em>entityGroup</em>.<p>
+</a><a name="9188">
+<li>Adds a create clause for each Attribute in <em>entityGroup</em>'s Entities.<p>
+</a><a name="9192">
+<li>Sets the expression's <a href="#5832"><code>statement</code></a> to CREATE TABLE <em>TABLE_NAME</em> (<em>LIST_STRING</em>), where <em>TABLE_NAME</em> is the <code>externalName</code> of the Entity objects in <em>entityGroup</em> and <em>LIST_STRING</em> is the expression's <code>listString</code>.<p>
+</a><a name="9193">
+<li>Adds the expression to an array.<p>
+</a><a name="9194">
+<li>Returns the array.<p>
+</a></ol>
+The following is an example of a CREATE TABLE statement produced by the default implementation:<p>
+<blockquote><pre>create table  EMPLOYEE (<br>    EMP_ID      int  not null ,<br>    DEPT_ID     int  null ,<br>    LAST_NAME   varchar( 40 )  not null ,<br>    PHONE       char( 12 )  null ,<br>    HIRE_DATE   date  null ,<br>    SALARY      number( 7 , 2 )  null<br>)
+</pre></blockquote><p>If a subclass's database server's table creation semantics are different, the subclass should override this method or one or more of the following methods as appropriate:<p>
+<ul><li><a href="#4910">addCreateClauseForAttribute</a><br>
+<li><a href="#5167">columnTypeStringForAttribute</a><br>
+<li><a href="#4991">allowsNullClauseForConstraint</a><br>
+</ul><B>See also: </B>  
+<a href="#5951"><code>createTableStatementsForEntityGroups</code></a>, <a href="#5971"><code>dropTableStatementsForEntityGroup</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="5951"></a>
+<h3> <a name="//apple_ref/java/clm/SQLExpression/createTableStatementsForEntityGroups">createTableStatementsForEntityGroups</a></h3>
+public static next.util.ImmutableVector 
+<code>createTableStatementsForEntityGroups</code>(next.util.ImmutableVector <em>entityGroups</em>)
+
+<P>Returns an array of SQLExpression objects that define the SQL necessary to create the tables specified in <em>entityGroups</em>. An entity group is an array of Entity objects that have the same <a href="../Entity/Frameset.html#3887" target="_top"><code>externalName</code></a>, and <em>entityGroups</em> is an array of entity groups. Returns an empty array if <em>entityGroups</em> is <code>null</code> or empty. SQLExpression's implementation invokes <a href="#5946"><code>createTableStatementsForEntityGroup</code></a> for each entity group in <em>entityGroups</em> and returns an array of all the resulting SQLExpressions.<p>
+<B>See also: </B>  
+<a href="#11149"><code>schemaCreationStatementsForEntities</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="5956"></a>
+<h3> <a name="//apple_ref/java/clm/SQLExpression/deleteStatementWithQualifier">deleteStatementWithQualifier</a></h3>
+public static next.eo.SQLExpression <code>deleteStatementWithQualifier</code>(next.eo.Qualifier <em>qualifier</em>, 
+java.lang.Object <em>entity</em>)
+
+<P>Creates and returns an SQL DELETE expression to delete the rows described by <em>qualifier</em>. Creates an instance of SQLExpression, initializes it with <em>entity</em> (an Entity object), and sends it a <a href="#7833"><code>prepareDeleteExpressionForQualifier</code></a> message. Throws an exception if <em>qualifier</em> is <code>null</code>.<p>
+The expression created with this method does not use table aliases because Enterprise Objects Framework assumes that all INSERT, UPDATE, and DELETE statements are single-table operations.<code> </code>As a result, all keys in <em>qualifier</em> should be simple key names; no key paths are allowed. To generate DELETE statements that do use table aliases, you must override <code>prepareDeleteExpressionForQualifier</code> to send a <a href="#5595"><code>setUseAliases</code></a>(<code>true</code>) message prior to invoking <code>super</code>'s version.<p>
+<hr WIDTH=25% ALIGN=LEFT>
+<a name="5961"></a>
+<h3> <a name="//apple_ref/java/clm/SQLExpression/dropPrimaryKeySupportStatementsForEntityGroup">dropPrimaryKeySupportStatementsForEntityGroup</a></h3>
+public static next.util.ImmutableVector 
+<code>dropPrimaryKeySupportStatementsForEntityGroup</code>(next.util.ImmutableVector <em>entityGroup</em>)
+
+<P>Returns an array of SQLExpression objects that define the SQL necessary to drop the primary key generation support for <em>entityGroup</em>, an array of Entity objects that have the same <a href="../Entity/Frameset.html#3887" target="_top"><code>externalName</code></a>. The drop statement generated by this method should be sufficient to remove the primary key support created by <a href="#6045"><code>primaryKeySupportStatementsForEntityGroup</code></a>'s statements.<p>
+SQLExpression's implementation creates a statement of the following form:<p>
+<blockquote><pre>drop sequence SEQUENCE_NAME
+</pre></blockquote><p>Where <em>SEQUENCE_NAME</em> is the <a href="../Entity/Frameset.html#4193" target="_top"><code>primaryKeyRootName</code></a> for the first entity in <em>entityGroup</em> concatenated with "_SEQ" (EMP_ID_SEQ, for example).<p>
+If a subclass uses a different primary key generation mechanism or if the subclass's database server's drop semantics are different, the subclass should override this method.<p>
+<B>See also: </B>  
+<a href="#5966"><code>dropPrimaryKeySupportStatementsForEntityGroups</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="5966"></a>
+<h3> <a name="//apple_ref/java/clm/SQLExpression/dropPrimaryKeySupportStatementsForEntityGroups">dropPrimaryKeySupportStatementsForEntityGroups</a></h3>
+public static next.util.ImmutableVector 
+<code>dropPrimaryKeySupportStatementsForEntityGroups</code>(next.util.ImmutableVector <em>entityGroup
+s</em>)
+
+<P>Returns an array of SQLExpression objects that define the SQL necessary to drop the primary key generation support for the Entities specified in <em>entityGroups</em>. An entity group is an array of Entity objects that have the same <a href="../Entity/Frameset.html#3887" target="_top"><code>externalName</code></a>, and <em>entityGroups</em> is an array of entity groups. SQLExpression's implementation invokes <a href="#5961"><code>dropPrimaryKeySupportStatementsForEntityGroup</code></a> for each entity group in <em>entityGroups</em> and returns an array of all the resulting SQLExpressions.<p>
+<B>See also: </B>  
+<a href="#11149"><code>schemaCreationStatementsForEntities</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="5971"></a>
+<h3> <a name="//apple_ref/java/clm/SQLExpression/dropTableStatementsForEntityGroup">dropTableStatementsForEntityGroup</a></h3>
+public static next.util.ImmutableVector 
+<code>dropTableStatementsForEntityGroup</code>(next.util.ImmutableVector <em>entityGroup</em>)
+
+<P>Returns an array of SQLExpression objects that define the SQL necessary to drop the table identified by <em>entityGroup</em>, an array of Entity objects that have the same <a href="../Entity/Frameset.html#3887" target="_top"><code>externalName</code></a>. The drop statement generated by this method should be sufficient to remove the table created by <a href="#5946"><code>createTableStatementsForEntityGroup</code></a>'s statements.<p>
+SQLExpression's implementation creates a statement of the following form:<p>
+<blockquote><pre>DROP TABLE TABLE_NAME
+</pre></blockquote><p>Where <em>TABLE_NAME</em> is the <code>externalName</code> of the first entity in <em>entityGroup</em>.<p>
+If a subclass's database server's drop semantics are different, the subclass should override this method.<p>
+<B>See also: </B>  
+<a href="#5976"><code>dropTableStatementsForEntityGroups</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="5976"></a>
+<h3> <a name="//apple_ref/java/clm/SQLExpression/dropTableStatementsForEntityGroups">dropTableStatementsForEntityGroups</a></h3>
+public static next.util.ImmutableVector 
+<code>dropTableStatementsForEntityGroups</code>(next.util.ImmutableVector <em>entityGroups</em>)
+
+<P>Returns an array of SQLExpression objects that define the SQL necessary to drop the tables for <em>entityGroups</em>. An entity group is an array of Entity objects that have the same <a href="../Entity/Frameset.html#3887" target="_top"><code>externalName</code></a>, and <em>entityGroups</em> is an array of entity groups. SQLExpression's implementation invokes <a href="#5976"><code>dropTableStatementsForEntityGroups</code></a> for each entity group in <em>entityGroups</em> and returns an array of all the resulting SQLExpressions.<p>
+<B>See also: </B>  
+<a href="#11149"><code>schemaCreationStatementsForEntities</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="5997"></a>
+<h3> <a name="//apple_ref/java/clm/SQLExpression/expressionForString">expressionForString</a></h3>
+public static next.eo.SQLExpression <code>expressionForString</code>(java.lang.String <em>string</em>)
+
+<P>Creates and returns an SQL expression for <em>string</em>. <em>string</em> should be a valid expression in the target query language. This method does not perform substitutions or formatting of any kind.<p>
+<B>See also: </B>  
+<a href="#5638"><code>setStatement</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="6002"></a>
+<h3> <a name="//apple_ref/java/clm/SQLExpression/foreignKeyConstraintStatementsForRelationship">foreignKeyConstraintStatementsForRelationship</a></h3>
+public static next.util.ImmutableVector 
+<code>foreignKeyConstraintStatementsForRelationship</code>(next.eo.Relationship <em>aRelationship</em>)
+
+<P>Returns an array of SQLExpression objects that define the SQL necessary to create foreign key constraints for <em>aRelationship</em>. SQLExpression's implementation generates statements such as the following:<p>
+<blockquote><pre>ALTER TABLE EMPLOYEE ADD CONSTRAINT TO_DEPARTMENT FOREIGN KEY (DEPT_ID)<br>        REFERENCES DEPARTMENT(DEPT_ID)
+</pre></blockquote><p>It returns an empty array if either of the following are true:<p>
+<ul><li><em>aRelationship</em> spans models (if <em>aRelationship</em>'s <a href="../Relationship/Frameset.html#2683" target="_top"><code>destinationEntity</code></a> is in a different model than <em>aRelationship</em>'s source <a href="../Relationship/Frameset.html#2703" target="_top"><code>entity</code></a>)<p>
+<li><em>aRelationship</em> is a to-many relationship, or if the inverse relationship of <em>aRelationship</em> is not a to-many. In other words, foreign key constraint statements are only created for to-one relationships whose inverse is a to-many.<p>
+</ul>If neither of the above are true, this method creates a new SQLExpression, assigns its entity to <em>aRelationship</em>'s entity, invokes <a href="#5476"><code>prepareConstraintStatementForRelationship</code></a>, and returns an array containing the expression.<p>
+If a subclass's database server's foreign key constraint semantics are different, the subclass should override this method or override the method <code>prepareConstraintStatementForRelationship</code>.<p>
+<B>See also: </B>  
+<a href="#11149"><code>schemaCreationStatementsForEntities</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="6007"></a>
+<h3> <a name="//apple_ref/java/clm/SQLExpression/formatSQLString">formatSQLString</a></h3>
+public static java.lang.String <code>formatSQLString</code>(java.lang.String <em>sqlString</em>, java.lang.String <em>format</em>)
+
+<P>Applies <em>format</em> (an Attribute object's "read" or "write" format) to <em>sqlString</em> (a value for the attribute). If <em>format</em> is <code>null</code>, this method returns <em>sqlString</em> unchanged.<p>
+<B>See also: </B>  
+<code>-<a href="../Attribute/Frameset.html#3470" target="_top"></code><code>readFormat</code><code></a></code> (Attribute), <a href="../Attribute/Frameset.html#3573" target="_top"><code>writeFormat</code></a> (Attribute)
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="6012"></a>
+<h3> <a name="//apple_ref/java/clm/SQLExpression/formatStringValue">formatStringValue</a></h3>
+public static java.lang.String <code>formatStringValue</code>(java.lang.String <em>string</em>)
+
+<P>Formats <em>string</em> for use as a string constant in a SQL statement. SQLExpression's implementation encloses the string in single quotes, escaping any single quotes already present in <em>string</em>. Throws an exception if <em>string</em> is <code>null</code>.<p>
+<hr WIDTH=25% ALIGN=LEFT>
+<a name="6021"></a>
+<h3> <a name="//apple_ref/java/clm/SQLExpression/formatValueForAttribute">formatValueForAttribute</a></h3>
+public static java.lang.String <code>formatValueForAttribute</code>(java.lang.Object <em>value</em>, 
+next.eo.Attribute <em>attribute</em>)
+
+<P>Overridden by subclasses to return a string representation of <em>value</em> suitable for use in an SQL statement. SQLExpression's implementation returns <em>value</em> unchanged. A subclass should override this method to format <em>value</em> depending on <em>attribute</em>'s <a href="../Attribute/Frameset.html#3362" target="_top"><code>externalType</code></a>. For example, a subclass might format a date using a special database-specific syntax or standard form or truncate numbers to <em>attribute</em>'s precision and scale.<p>
+<hr WIDTH=25% ALIGN=LEFT>
+<a name="6026"></a>
+<h3> <a name="//apple_ref/java/clm/SQLExpression/insertStatementForRow">insertStatementForRow</a></h3>
+public static next.eo.SQLExpression <code>insertStatementForRow</code>(next.util.ImmutableHashtable <em>row</em>, 
+next.eo.Entity <em>entity</em>)
+
+<P>Creates and returns an SQL INSERT expression to insert <em>row</em>. Creates an instance of SQLExpression, initializes it with <em>entity</em>, and sends it <a href="#5486"><code>prepareInsertExpressionWithRow</code></a>. Throws an exception if <em>entity</em> is <code>null</code>.<p>
+The expression created with this method does not use table aliases because Enterprise Objects Framework assumes that all INSERT, UPDATE, and DELETE statements are single-table operations.<code> </code>To generate INSERT statements that do use table aliases, you must override <code>prepareInsertExpressionWithRow</code> to send a <a href="#5595"><code>setUseAliases</code></a>(<code>true</code>) message prior to invoking <code>super</code>'s version.<p>
+<hr WIDTH=25% ALIGN=LEFT>
+<a name="6035"></a>
+<h3> <a name="//apple_ref/java/clm/SQLExpression/primaryKeyConstraintStatementsForEntityGroup">primaryKeyConstraintStatementsForEntityGroup</a></h3>
+public static next.util.ImmutableVector 
+<code>primaryKeyConstraintStatementsForEntityGroup</code>(next.util.ImmutableVector <em>entityGroup</em>)
+
+<P>Returns an array of SQLExpression objects that define the SQL necessary to create the primary key constraints for <em>entityGroup</em>, an array of Entity objects that have the same <a href="../Entity/Frameset.html#3887" target="_top"><code>externalName</code></a>. Returns an empty array if any of the primary key attributes in <em>entityGroup</em> don't have a <a href="../Attribute/Frameset.html#3310" target="_top"><code>columnName</code></a>.<p>
+SQLExpression's implementation creates a statement of the following form:<p>
+<blockquote><pre>ALTER TABLE TABLE_NAME ADD PRIMARY KEY (PRIMARY_KEY_COLUMN_NAMES)
+</pre></blockquote><p>Where <em>TABLE_NAME</em> is the <a href="../Entity/Frameset.html#3887" target="_top"><code>externalName</code></a> for the first entity in <em>entityGroup</em> and <em>PRIMARY_KEY_COLUMN_NAMES</em> is a comma-separated list of the <a href="../Attribute/Frameset.html#3310" target="_top"><code>columnName</code></a>s of the first entity's <a href="../Entity/Frameset.html#4203" target="_top"><code>primaryKeyAttributes</code></a>.<p>
+If the subclass's database server's primary key constraint semantics are different, the subclass should override this method.<p>
+<B>See also: </B>  
+<a href="#6040"><code>primaryKeyConstraintStatementsForEntityGroups</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="6040"></a>
+<h3> <a name="//apple_ref/java/clm/SQLExpression/primaryKeyConstraintStatementsForEntityGroups">primaryKeyConstraintStatementsForEntityGroups</a></h3>
+public static next.util.ImmutableVector 
+<code>primaryKeyConstraintStatementsForEntityGroups</code>(next.util.ImmutableVector <em>entityGroups</em>)
+
+<P>Returns an array of SQLExpression objects that define the SQL necessary to create the primary key constraints for the Entities specified in <em>entityGroups</em>. An entity group is an array of Entity objects that have the same <a href="../Entity/Frameset.html#3887" target="_top"><code>externalName</code></a>, and <em>entityGroups</em> is an array of entity groups. SQLExpression's implementation invokes <a href="#6035"><code>primaryKeyConstraintStatementsForEntityGroup</code></a> for each entity group in <em>entityGroups</em> and returns an array of all the resulting SQLExpressions.<p>
+<hr WIDTH=25% ALIGN=LEFT>
+<a name="6045"></a>
+<h3> <a name="//apple_ref/java/clm/SQLExpression/primaryKeySupportStatementsForEntityGroup">primaryKeySupportStatementsForEntityGroup</a></h3>
+public static next.util.ImmutableVector 
+<code>primaryKeySupportStatementsForEntityGroup</code>(next.util.ImmutableVector <em>entityGroup</em>)
+
+<P>Returns an array of SQLExpression objects that define the SQL necessary to create the primary key generation support for <em>entityGroup</em>, an array of Entity objects that have the same <a href="../Entity/Frameset.html#3887" target="_top"><code>externalName</code></a>. SQLExpression's implementation creates a statement of the following form:<p>
+<blockquote><pre>create sequence SEQUENCE_NAME
+</pre></blockquote><p>Where <em>SEQUENCE_NAME</em> is the <a href="../Entity/Frameset.html#4193" target="_top"><code>primaryKeyRootName</code></a> for the first entity in <em>entityGroup</em> concatenated with "_SEQ" (EMP_ID_SEQ, for example).<p>
+If a subclass uses a different primary key generation mechanism or if the subclass's database server's drop semantics are different, the subclass should override this method.<p>
+<B>See also: </B>  
+<a href="#6050"><code>primaryKeySupportStatementsForEntityGroups</code></a>, 
+<a href="#5961"><code>dropPrimaryKeySupportStatementsForEntityGroup</code></a>, <a href="../AdaptorChannel/Frameset.html#2704" target="_top"><code>primaryKeyForNewRowWithEntity</code></a> 
+(AdaptorChannel)
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="6050"></a>
+<h3> <a name="//apple_ref/java/clm/SQLExpression/primaryKeySupportStatementsForEntityGroups">primaryKeySupportStatementsForEntityGroups</a></h3>
+public static next.util.ImmutableVector 
+<code>primaryKeySupportStatementsForEntityGroups</code>(next.util.ImmutableVector <em>entityGroups</em>)
+
+<P>Returns an array of SQLExpression objects that define the SQL necessary to create the primary key generation support for the Entities specified in <em>entityGroups</em>. An entity group is an array of Entity objects that have the same <a href="../Entity/Frameset.html#3887" target="_top"><code>externalName</code></a>, and <em>entityGroups</em> is an array of entity groups. SQLExpression's implementation invokes <a href="#6045"><code>primaryKeySupportStatementsForEntityGroup</code></a> for each entity group in <em>entityGroups</em> and returns an array of all the resulting SQLExpressions.<p>
+<hr WIDTH=25% ALIGN=LEFT>
+<a name="6055"></a>
+<h3> <a name="//apple_ref/java/clm/SQLExpression/schemaCreationScriptForEntities">schemaCreationScriptForEntities</a></h3>
+public static java.lang.String <code>schemaCreationScriptForEntities</code>(next.util.ImmutableVector <em>entities</em>, 
+next.util.ImmutableHashtable <em>options</em>)
+
+<P>Returns a script of SQL statements suitable to create the schema for the Entity objects in <em>entities</em>. The <em>options</em> dictionary specifies the aspects of the schema for which to create SQL statements as described in the method description for <a href="#11149"><code>schemaCreationStatementsForEntities</code></a>. SQLExpression's implementation invokes <code>schemaCreationStatementsForEntities</code> with <em>entities</em> and <em>options</em> and then uses <a href="#8664"><code>appendExpression</code></a> to generate the script from the SQLExpressions generated by <code>schemaCreationStatementsForEntities</code>.<p>
+<hr WIDTH=25% ALIGN=LEFT>
+<a name="11149"></a>
+<h3> <a name="//apple_ref/java/clm/SQLExpression/schemaCreationStatementsForEntities">schemaCreationStatementsForEntities</a></h3>
+public static next.util.ImmutableVector 
+<code>schemaCreationStatementsForEntities</code>(next.util.ImmutableVector <em>entities</em>, 
+next.util.ImmutableHashtable <em>options</em>)
+
+<P>Returns an array of SQLExpressions suitable to create the schema for the Entity objects in <em>entities</em>. The <em>options</em> dictionary specifies the aspects of the schema for which to create SQLExpressions:<p>
+<Table Border="3">
+<caption></caption>
+<tr><th><b>Dictionary Key</b>
+</th><th><b>Acceptable Values (java.util.Strings)</b>
+</th><th><b>Default</b>
+</th></tr>
+<tr><td scope="row">createTables
+</td><td>"YES" or "NO"
+</td><td>YES
+</td></tr>
+<tr><td scope="row">dropTables
+</td><td>"YES" or "NO"
+</td><td>YES
+</td></tr>
+<tr><td scope="row">createPrimaryKeySupport
+</td><td>"YES" or "NO"
+</td><td>YES
+</td></tr>
+<tr><td scope="row">dropPrimaryKeySupport
+</td><td>"YES" or "NO"
+</td><td>YES
+</td></tr>
+<tr><td scope="row">primaryKeyConstraints
+</td><td>"YES" or "NO"
+</td><td>YES
+</td></tr>
+<tr><td scope="row">foreignKeyConstraints
+</td><td>"YES" or "NO"
+</td><td>YES
+</td></tr>
+
+</Table>
+
+<Table>
+<tr><td scope="row">
+</Table>
+<p>
+SQLExpression's implementation uses the methods:<p>
+<ul><li><a href="#5951">createTableStatementsForEntityGroups</a><br>
+<li><a href="#5976">dropTableStatementsForEntityGroups</a><br>
+<li><a href="#6050">primaryKeySupportStatementsForEntityGroups</a><br>
+<li><a href="#5966">dropPrimaryKeySupportStatementsForEntityGroups</a><br>
+<li><a href="#6040">primaryKeyConstraintStatementsForEntityGroups</a><br>
+<li><a href="#6002">foreignKeyConstraintStatementsForRelationship</a><br>
+</ul>to generate SQLExpressions for the support identified in <em>options</em>.<p>
+<B>See also: </B>  
+<a href="#6055"><code>schemaCreationScriptForEntities</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="6065"></a>
+<h3> <a name="//apple_ref/java/clm/SQLExpression/selectStatementForAttributes">selectStatementForAttributes</a></h3>
+public static next.eo.SQLExpression 
+<code>selectStatementForAttributes</code>(next.util.ImmutableVector <em>attributes</em>, boolean <em>lockFlag</em>, 
+next.eo.FetchSpecification <em>fetchSpecification</em>, next.eo.Entity <em>entity</em>)
+
+<P>Creates and returns an SQL SELECT expression. Creates an instance of SQLExpression, initializes it with <em>entity</em>, and sends it <a href="#5491"><code>prepareSelectExpressionWithAttributes</code></a> with the remaining arguments. The expression created with this method uses table aliases. Throws an exception if <em>attributes</em> is <code>null</code> or empty, <em>fetchSpecification</em> is <code>null</code>, or <em>entity</em> is <code>null</code>.<p>
+The expression created with this method uses table aliases.<code> </code>To generate SELECT statements that don't use them, you must override <code>prepareSelectExpressionWithAttributes</code> to send a <a href="#5595"><code>setUseAliases</code></a>(<code>false</code>) message prior to invoking <code>super</code>'s version.<p>
+<hr WIDTH=25% ALIGN=LEFT>
+<a name="6099"></a>
+<h3> <a name="//apple_ref/java/clm/SQLExpression/setUseBindVariables">setUseBindVariables</a></h3>
+public static void <code>setUseBindVariables</code>(boolean <em>flag</em>)
+
+<P>Sets according to <em>flag</em> whether all instances of SQLExpression subclasses use bind variables. By default, instances don't use bind variables; if the value for the global user default named AdaptorUseBindVariables is <code>true</code>, though, instances do use them. For more information on bind variables, see the discussion in the class description.<p>
+<B>See also: </B>  
+<a href="#6165"><code>useBindVariables</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="6104"></a>
+<h3> <a name="//apple_ref/java/clm/SQLExpression/setUseQuotedExternalNames">setUseQuotedExternalNames</a></h3>
+public static void <code>setUseQuotedExternalNames</code>(boolean <em>flag</em>)
+
+<P>Sets whether all instances of SQLExpression subclasses quote external names when they are referenced in SQL statements. By setting <em>flag</em> to <code>true</code>, you can access database tables with names such as "%return", "1st year", and "TABLE" that you couldn't otherwise access. By default, instances don't quote external names; if the value for the global user default named AdaptorQuotesExternalNames is <code>true</code>, though, instances do use quotes.<p>
+<B>See also: </B>  
+<a href="#6170"><code>useQuotedExternalNames</code></a>, <a href="#5807"><code>sqlStringForSchemaObjectName</code></a>, 
+<a href="#5297"><code>externalNameQuoteCharacter</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="6109"></a>
+<h3> <a name="//apple_ref/java/clm/SQLExpression/sqlPatternFromShellPattern">sqlPatternFromShellPattern</a></h3>
+public static java.lang.String <code>sqlPatternFromShellPattern</code>(java.lang.String <em>pattern</em>)
+
+<P>Translates a "like" qualifier to an SQL "like" expression. Invoked from <a href="#5751"><code>sqlStringForKeyValueQualifier</code></a> when the qualifier argument is a KeyValueQualifier object whose selector is QualifierOperatorLike. SQLExpression's implementation performs the following substitutions<p>
+<Table Border="3">
+<caption></caption>
+<tr><th><b>Character in pattern</b>
+</th><th><b>Substitution string</b>
+</th></tr>
+<tr><td scope="row">*
+</td><td>%
+</td></tr>
+<tr><td scope="row">?
+</td><td>_
+</td></tr>
+<tr><td scope="row">%
+</td><td>[%] <em>(unless the percent character appears in square brackets)
+</em></td></tr>
+<tr><td scope="row">_
+</td><td>[_] <em>(unless the underscore character appears in square brackets)
+</em></td></tr>
+
+</Table>
+
+<Table>
+<tr><td scope="row">
+</Table>
+<p>
+<B>See also: </B>  
+<a href="#6114"><code>sqlPatternFromShellPatternWithEscapeCharacter</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="6114"></a>
+<h3> <a name="//apple_ref/java/clm/SQLExpression/sqlPatternFromShellPatternWithEscapeCharacter">sqlPatternFromShellPatternWithEscapeCharacter</a></h3>
+public static java.lang.String 
+<code>sqlPatternFromShellPatternWithEscapeCharacter</code>(java.lang.String <em>pattern</em>, 
+char <em>escapeCharacter</em>)
+
+<P>Like<em> </em><a href="#6109"><code>sqlPatternFromShellPattern</code></a> except the argument <em>escapeCharacter</em> allows you to specify a character for escaping the wild card characters "%" and "_".<p>
+<hr WIDTH=25% ALIGN=LEFT>
+<a name="11750"></a>
+<h3> <a name="//apple_ref/java/clm/SQLExpression/updateStatementForRow">updateStatementForRow</a></h3>
+public static next.eo.SQLExpression <code>updateStatementForRow</code>(next.util.ImmutableHashtable <em>row</em>, 
+next.eo.Qualifier <em>qualifier</em>, next.eo.Entity <em>entity</em>)
+
+<P>Creates and returns an SQL UPDATE expression to update the row identified by <em>qualifier</em> with the values in <em>row</em>. <em>row</em> should only contain entries for values that have actually changed. Creates an instance of SQLExpression, initializes it with <em>entity</em>, and sends it <a href="#5496"><code>prepareUpdateExpressionWithRow</code></a>. Throws an exception if <em>row</em> is <code>null</code> or empty, <em>qualifier</em> is <code>null</code>, or <em>entity</em> is <code>null</code>.<p>
+The expression created with this method does not use table aliases because Enterprise Objects Framework assumes that all INSERT, UPDATE, and DELETE statements are single-table operations.<code> </code>As a result, all keys in <em>qualifier</em> should be simple key names; no key paths are allowed. To generate UPDATE statements that do use table aliases, you must override <a href="#5496"><code>prepareUpdateExpressionWithRow</code></a> to send a <a href="#5595"><code>setUseAliases</code></a>(<code>true</code>) message prior to invoking <code>super</code>'s version.<p>
+<hr WIDTH=25% ALIGN=LEFT>
+<a name="6165"></a>
+<h3> <a name="//apple_ref/java/clm/SQLExpression/useBindVariables">useBindVariables</a></h3>
+public static boolean <code>useBindVariables</code>()
+
+<P>Returns <code>true</code> if instances use bind variables, <code>false</code> otherwise. For more information on bind variables, see the discussion in the class description.<p>
+<B>See also: </B>  
+<a href="#6099"><code>setUseBindVariables</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="6170"></a>
+<h3> <a name="//apple_ref/java/clm/SQLExpression/useQuotedExternalNames">useQuotedExternalNames</a></h3>
+public static boolean <code>useQuotedExternalNames</code>()
+
+<P>Returns <code>true</code> if instances use quoted external names, <code>false</code> otherwise.<p>
+<B>See also: </B>  
+<a href="#6104"><code>setUseQuotedExternalNames</code></a>, <a href="#5807"><code>sqlStringForSchemaObjectName</code></a>, 
+<a href="#5297"><code>externalNameQuoteCharacter</code></a>
+<p><HR WIDTH=50% ALIGN=LEFT>
+<a name="instm"></a>
+<h2>Instance Methods</h2>  
+
+
+<a name="4905"></a>
+<h3>
+ <a name="//apple_ref/java/instm/SQLExpression/addBindVariableDictionary">addBindVariableDictionary</a>
+</h3>
+public void <code>addBindVariableDictionary</code>(next.util.MutableHashtable <em>binding</em>)
+
+<P>Adds <em>binding</em> to the receiver's array of bind variable dictionaries. <em>binding</em> is generally created using the method <a href="#5129"><code>bindVariableDictionaryForAttribute</code></a> and is added to the receiver's bind variable dictionaries in <a href="#5822"><code>sqlStringForValue</code></a> when the receiver uses a bind variable for the specified attribute. See the method description for <code>bindVariableDictionaryForAttribute</code> for a description of the contents of a bind variable dictionary, and for more information on bind variables, see the discussion in the class description.<p>
+<B>See also: </B>  
+<a href="#5124"><code>bindVariableDictionaries</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="4910"></a>
+<h3> <a name="//apple_ref/java/instm/SQLExpression/addCreateClauseForAttribute">addCreateClauseForAttribute</a></h3>
+public void <code>addCreateClauseForAttribute</code>(next.eo.Attribute <em>attribute</em>)
+
+<P>Adds the SQL string for creating <em>attribute</em> to a comma-separated list of attribute creation clauses. The list is constructed for use in a CREATE TABLE statement produced by <a href="#5946"><code>createTableStatementsForEntityGroup</code></a>. Use the method <a href="#5399"><code>listString</code></a> to access creation clauses.<p>
+SQLExpression's implementation creates clauses in the following form:<p>
+<blockquote><pre>COLUMN_NAME COLUMN_TYPE ALLOWS_NULL_CLAUSE
+</pre></blockquote><p>Where<p>
+<ul><li><em>COLUMN_NAME</em> is <em>anAttribute</em>'s <a href="../Attribute/Frameset.html#3310" target="_top"><code>columnName</code></a>.<br>
+<li><em>COLUMN_TYPE</em> is the string returned from <a href="#5167"><code>columnTypeStringForAttribute</code></a> for <em>anAttribute.</em><br>
+<li><em>ALLOWS_NULL_CLAUSE</em> is the string returned from <a href="#4991"><code>allowsNullClauseForConstraint</code></a> with <code>true</code> if <em>anAttribute</em> <a href="../Attribute/Frameset.html#3272" target="_top"><code>allowsNull</code></a> or with <code>false</code> if <em>anAttribute</em> doesn't.<br>
+</ul><hr WIDTH=25% ALIGN=LEFT>
+<a name="4921"></a>
+<h3> <a name="//apple_ref/java/instm/SQLExpression/addInsertListAttribute">addInsertListAttribute</a></h3>
+public void <code>addInsertListAttribute</code>(next.eo.Attribute <em>attribute</em>, java.lang.String <em>value</em>)
+
+<P>Adds the SQL string for <em>attribute</em> to a comma-separated list of attributes and <em>value</em> to a comma-separated list of values. Both lists are constructed for use in an INSERT statement. Use the methods <a href="#5399"><code>listString</code></a> and <a href="#1063"><code>valueList</code></a> to access the attributes and value lists.<p>
+Invokes <a href="#5018"><code>appendItemToListString</code></a> to add an SQL string for <em>attribute</em> to the receiver's <code>listString</code>, and again to add a formatted SQL string for <em>value</em> to the receiver's <code>valueList</code>.<p>
+<B>See also: </B>  
+<a href="#5699"><code>sqlStringForAttribute</code></a>, <a href="#5822"><code>sqlStringForValue</code></a>, <a href="#6021"><code>formatValueForAttribute</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="4943"></a>
+<h3> <a name="//apple_ref/java/instm/SQLExpression/addJoinClause">addJoinClause</a></h3>
+public void <code>addJoinClause</code>(java.lang.String <em>leftName</em>, java.lang.String <em>rightName</em>, int <em>semantic</em>)
+
+<P>Creates a new join clause by invoking <a href="#5069"><code>assembleJoinClause</code></a> and adds it to the receiver's join clause string. Separates join conditions already in the join clause string with the word "and". Invoked from <a href="#5377"><code>joinExpression</code></a>.<p>
+<B>See also: </B>  
+<a href="#5372"><code>joinClauseString</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="4948"></a>
+<h3> <a name="//apple_ref/java/instm/SQLExpression/addOrderByAttributeOrdering">addOrderByAttributeOrdering</a></h3>
+public void <code>addOrderByAttributeOrdering</code>(next.eo.SortOrdering <em>sortOrdering</em>)
+
+<P>Adds an attribute-direction pair ("LAST_NAME asc", for example) to the receiver's ORDER BY string. If <em>sortOrdering</em>'s selector is CompareCaseInsensitiveAscending or CompareCaseInsensitiveDescending, the string generated has the format "upper(attribute) direction". Use the method <a href="#5425"><code>orderByString</code></a> to access the ORDER BY string. <code>addOrderByAttributeOrdering</code> invokes <a href="#5018"><code>appendItemToListString</code></a> to add the attribute-direction pair.<p>
+<B>See also: </B>  
+<a href="#5704"><code>sqlStringForAttributeNamed</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="4959"></a>
+<h3> <a name="//apple_ref/java/instm/SQLExpression/addSelectListAttribute">addSelectListAttribute</a></h3>
+public void <code>addSelectListAttribute</code>(next.eo.Attribute <em>attribute</em>)
+
+<P>Adds an SQL string for <em>attribute</em> to a comma-separated list of attribute names for use in a SELECT statement. The SQL string for <em>attribute</em> is formatted with <em>attribute</em>'s "read" format. Use <a href="#5399"><code>listString</code></a> to access the list. <code>addSelectListAttribute</code> invokes <a href="#5018"><code>appendItemToListString</code></a> to add the attribute name.<p>
+<B>See also: </B>  
+<a href="#5699"><code>sqlStringForAttribute</code></a>, <a href="#6007"><code>formatSQLString</code></a>, <a href="../Attribute/Frameset.html#3470" target="_top"><code>readFormat</code></a> (Attribute)
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="4964"></a>
+<h3> <a name="//apple_ref/java/instm/SQLExpression/addUpdateListAttribute">addUpdateListAttribute</a></h3>
+public void <code>addUpdateListAttribute</code>(next.eo.Attribute <em>attribute</em>, java.lang.String <em>value</em>)
+
+<P>Adds a attribute-value assignment ("LAST_NAME = `Thomas'", for example) to a comma-separated list for use in an UPDATE statement. Formats <em>value</em> with <em>attribute</em>'s "write" format. Use <a href="#5399"><code>listString</code></a> to access the list. <a href="#4964"><code>addUpdateListAttribute</code></a> invokes <a href="#5018"><code>appendItemToListString</code></a> to add the attribute-value assignment.<p>
+<B>See also: </B>  
+<a href="#6007"><code>formatSQLString</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="4986"></a>
+<h3> <a name="//apple_ref/java/instm/SQLExpression/aliasesByRelationshipPath">aliasesByRelationshipPath</a></h3>
+public next.util.MutableHashtable <code>aliasesByRelationshipPath</code>()
+
+<P>Returns a dictionary of table aliases. The keys of the dictionary are relationship paths-"department" and "department.location", for example. The values are the table aliases for the corresponding table-"t1" and "t2", for example. The <code>aliasesByRelationshipPath</code> dictionary always has at least one entry: an entry for the SQLExpression's entity. The key of this entry is the empty string ("") and the value is "t0". The dictionary returned from this method is built up over time with successive calls to <a href="#5709"><code>sqlStringForAttributePath</code></a>.<p>
+<B>See also: </B>  
+<a href="#5837"><code>tableListWithRootEntity</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="4991"></a>
+<h3> <a name="//apple_ref/java/instm/SQLExpression/allowsNullClauseForConstraint">allowsNullClauseForConstraint</a></h3>
+public java.lang.String <code>allowsNullClauseForConstraint</code>(boolean <em>flag</em>)
+
+<P>Returns according to <em>flag</em> an adaptor specific string for use in a CREATE TABLE statement. The returned string indicates whether a column allows null values. SQLExpression's implementation returns the empty string if <em>flag</em> is <code>true</code>, "NOT NULL" otherwise. A subclass should override this if its database server's semantics are different. For example, the SybaseSLQExpression returns "null" if <em>flag</em> is <code>true</code>, the empty string otherwise.<p>
+<B>See also: </B>  
+<a href="#4910"><code>addCreateClauseForAttribute</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="5018"></a>
+<h3> <a name="//apple_ref/java/instm/SQLExpression/appendItemToListString">appendItemToListString</a></h3>
+public void <code>appendItemToListString</code>(java.lang.String <em>itemString</em>, java.lang.String <em>listString</em>)
+
+<P>Adds <em>itemString</em> to a comma-separated list. If <em>listString</em> already has entries, this method appends a comma followed by <em>itemString</em>. Invoked from <a href="#4959"><code>addSelectListAttribute</code></a>, <a href="#4921"><code>addInsertListAttribute</code></a>, <a href="#4964"><code>addUpdateListAttribute</code></a>, and <a href="#4948"><code>addOrderByAttributeOrdering</code></a>.<p>
+<hr WIDTH=25% ALIGN=LEFT>
+<a name="5059"></a>
+<h3> <a name="//apple_ref/java/instm/SQLExpression/assembleDeleteStatementWithQualifier">assembleDeleteStatementWithQualifier</a></h3>
+public java.lang.String <code>assembleDeleteStatementWithQualifier</code>(next.eo.Qualifier <em>qualifier</em>, 
+java.lang.String <em>tableList</em>, java.lang.String <em>whereClause</em>)
+
+<P>Invoked from <a href="#7833"><code>prepareDeleteExpressionForQualifier</code></a> to return an SQL DELETE statement of the form:<p>
+<blockquote><pre>DELETE FROM tableList<br>WHERE whereClause
+</pre></blockquote><p><em>qualifier</em> is the argument to <a href="#7833"><code>prepareDeleteExpressionForQualifier</code></a> from which <em>whereClause</em> was derived. It is provided for subclasses that need to generate the WHERE clause in a particular way.<p>
+<hr WIDTH=25% ALIGN=LEFT>
+<a name="5064"></a>
+<h3> <a name="//apple_ref/java/instm/SQLExpression/assembleInsertStatementWithRow">assembleInsertStatementWithRow</a></h3>
+public java.lang.String <code>assembleInsertStatementWithRow</code>(next.util.ImmutableHashtable <em>row</em>, 
+java.lang.String <em>tableList</em>, java.lang.String <em>columnList</em>, java.lang.String <em>valueList</em>)
+
+<P>Invoked from <a href="#5486"><code>prepareInsertExpressionWithRow</code></a> to return an SQL INSERT statement of the form:<p>
+<blockquote><pre>INSERT INTO tableList (columnList)<br>VALUES valueList
+</pre></blockquote><p>or, if <em>columnList</em> is <code>null</code>:<p>
+<blockquote><pre>INSERT INTO tableList<br>VALUES valueList
+</pre></blockquote><p><em>row</em> is the argument to <a href="#5486"><code>prepareInsertExpressionWithRow</code></a> from which <em>columnList</em> and <em>valueList</em> were derived. It is provided for subclasses that need to generate the list of columns and values in a particular way.<p>
+<hr WIDTH=25% ALIGN=LEFT>
+<a name="5069"></a>
+<h3> <a name="//apple_ref/java/instm/SQLExpression/assembleJoinClause">assembleJoinClause</a></h3>
+public java.lang.String <code>assembleJoinClause</code>(java.lang.String <em>leftName</em>, java.lang.String <em>rightName</em>, 
+int <em>semantic</em>)
+
+<P>Returns a join clause of the form:<p>
+<blockquote><pre>leftName operator rightName
+</pre></blockquote><p>Where operator is "=" for an inner join, "*=" for a left-outer join, and "=*" for a right-outer join. Invoked from <a href="#4943"><code>addJoinClause</code></a>.<p>
+<hr WIDTH=25% ALIGN=LEFT>
+<a name="5074"></a>
+<h3> <a name="//apple_ref/java/instm/SQLExpression/assembleSelectStatementWithAttributes">assembleSelectStatementWithAttributes</a></h3>
+public java.lang.String 
+<code>assembleSelectStatementWithAttributes</code>(next.util.ImmutableVector <em>attributes</em>, boolean <em>lock</em>, 
+next.eo.Qualifier <em>qualifier</em>, next.util.ImmutableVector <em>fetchOrder</em>, java.lang.String <em>selectString</em>, 
+java.lang.String <em>columnList</em>, java.lang.String <em>tableList</em>, java.lang.String <em>whereClause</em>, 
+java.lang.String <em>joinClause</em>, java.lang.String <em>orderByClause</em>, java.lang.String <em>lockClause</em>)
+
+<P>Invoked from <a href="#5491"><code>prepareSelectExpressionWithAttributes</code></a> to return an SQL SELECT statement of the form:<p>
+<blockquote><pre>SELECT columnList<br>FROM tableList lockClause<br>WHERE whereClause AND joinClause<br>ORDER BY orderByClause
+</pre></blockquote><p>If <em>lockClause</em> is <code>null</code>, it is omitted from the statement. Similarly, if <em>orderByClause</em> is <code>null</code>, the "ORDER BY <em>orderByClause</em>" is omitted. If either <em>whereClause</em> or <em>joinClause</em> is <code>null</code>, the "AND" and <code>null</code>-valued argument are omitted. If both are <code>null</code>, the entire WHERE clause is omitted.<p>
+<em>attributes</em>,<em> lock</em>, <em>qualifier</em>, and <em>fetchOrder</em> are the arguments to <a href="#5491"><code>prepareSelectExpressionWithAttributes</code></a> from which the other <code>assembleSelect...</code> arguments were derived. They are provided for subclasses that need to generate the clauses of the SELECT statement in a particular way.<p>
+<hr WIDTH=25% ALIGN=LEFT>
+<a name="5079"></a>
+<h3> <a name="//apple_ref/java/instm/SQLExpression/assembleUpdateStatementWithRow">assembleUpdateStatementWithRow</a></h3>
+public java.lang.String <code>assembleUpdateStatementWithRow</code>(next.util.ImmutableHashtable <em>row</em>, 
+next.eo.Qualifier <em>qualifier</em>, java.lang.String <em>tableList</em>, java.lang.String <em>updateList</em>, 
+java.lang.String <em>whereClause</em>)
+
+<P>Invoked from <a href="#5496"><code>prepareUpdateExpressionWithRow</code></a> to return an SQL UPDATE statement of the form:<p>
+<blockquote><pre>UPDATE tableList<br>SET updateList<br>WHERE whereClause
+</pre></blockquote><p><em>row</em> and <em>qualifier</em> are the arguments to <a href="#5496"><code>prepareUpdateExpressionWithRow</code></a> from which <em>updateList</em> and <em>whereClause</em> were derived. They are provided for subclasses that need to generate the clauses of the UPDATE statement in a particular way.<p>
+<hr WIDTH=25% ALIGN=LEFT>
+<a name="5124"></a>
+<h3> <a name="//apple_ref/java/instm/SQLExpression/bindVariableDictionaries">bindVariableDictionaries</a></h3>
+public next.util.ImmutableVector <code>bindVariableDictionaries</code>()
+
+<P>Returns the receiver's bind variable dictionaries. For more information on bind variables, see the discussion in the class description.<p>
+<B>See also: </B>  
+<a href="#4905"><code>addBindVariableDictionary</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="5129"></a>
+<h3> <a name="//apple_ref/java/instm/SQLExpression/bindVariableDictionaryForAttribute">bindVariableDictionaryForAttribute</a></h3>
+public next.util.MutableHashtable <code>bindVariableDictionaryForAttribute</code>(next.eo.Attribute <em>attribute</em>, 
+java.lang.Object <em>value</em>)
+
+<P>Implemented by subclasses to create and return the bind variable dictionary for <em>attribute</em> and <em>value</em>. The dictionary returned from this method must contain at least the following key-value pairs:<p>
+<Table Border="3">
+<caption></caption>
+<tr><th><b>Key</b>
+</th><th><b>Value</b>
+</th></tr>
+<tr><td scope="row">BindVariableNameKey
+</td><td>the name of the bind variable for <em>attribute
+</em></td></tr>
+<tr><td scope="row">BindVariablePlaceHolderKey
+</td><td>the placeholder string used in the SQL statement
+</td></tr>
+<tr><td scope="row">BindVariableAttributeKey
+</td><td><em>attribute
+</em></td></tr>
+<tr><td scope="row">BindVariableValueKey
+</td><td><em>value
+</em></td></tr>
+
+</Table>
+
+<Table>
+<tr><td scope="row">
+</Table>
+<p>
+An adaptor subclass may define additional entries as required by its RDBMS.<p>
+Invoked from <a href="#5822"><code>sqlStringForValue</code></a> when the message <a href="#5415"><code>mustUseBindVariableForAttribute</code></a>(<em>attribute</em>) returns <code>true</code> or when the receiver's class uses bind variables and the message <a href="#5658"><code>shouldUseBindVariableForAttribute</code></a>(<em>attribute</em>) returns <code>true</code>. For more information on bind variables, see the discussion in the class description.<p>
+A subclass that uses bind variables should implement this method without invoking SQLExpression's implementation. The subclass implementation must return a dictionary with entries for the keys listed above and may add additional keys.<p>
+<B>See also: </B>  
+<a href="#5129"><code>bindVariableDictionaryForAttribute</code></a>, <a href="#6165"><code>useBindVariables</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="5167"></a>
+<h3> <a name="//apple_ref/java/instm/SQLExpression/columnTypeStringForAttribute">columnTypeStringForAttribute</a></h3>
+public java.lang.String <code>columnTypeStringForAttribute</code>(next.eo.Attribute <em>anAttribute</em>)
+
+<P>Returns an adaptor specific type string for <em>anAttribute</em> that's suitable for use in a CREATE TABLE statement. SQLExpression's implementation creates a string based on <em>anAttribute</em>'s <a href="../Attribute/Frameset.html#3362" target="_top"><code>externalType</code></a>, <a href="../Attribute/Frameset.html#3465" target="_top"><code>precision</code></a>, and <a href="../Attribute/Frameset.html#3563" target="_top"><code>width</code></a> as follows:<p>
+<Table Border="3">
+<caption></caption>
+<tr><th><b>If Condition</b>
+</th><th><b>Generated Type String</b>
+</th></tr>
+<tr><td scope="row">precision is non-zero
+</td><td>externalType(precision, scale)
+</td></tr>
+<tr><td scope="row">precision is zero and width is non-zero
+</td><td>externalType(scale)
+</td></tr>
+<tr><td scope="row">precision and width are zero
+</td><td>externalType
+</td></tr>
+
+</Table>
+
+<Table>
+<tr><td scope="row">
+</Table>
+	<p>
+A subclass should override the default implementation if its database server requires column types in a different format.<p>
+<B>See also: </B>  
+<a href="#4910"><code>addCreateClauseForAttribute</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="5292"></a>
+<h3> <a name="//apple_ref/java/instm/SQLExpression/entity">entity</a></h3>
+public next.eo.Entity <code>entity</code>()
+
+<P>Returns the receiver's entity.<p>
+<B>See also: </B>  
+<a href="#3766">"Constructors"</a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="5297"></a>
+<h3> <a name="//apple_ref/java/instm/SQLExpression/externalNameQuoteCharacter">externalNameQuoteCharacter</a></h3>
+public java.lang.String <code>externalNameQuoteCharacter</code>()
+
+<P>Returns the string `\"' (an escaped quote character) if the receiver uses quoted external names, or the empty string ("") otherwise.<p>
+<B>See also: </B>  
+<a href="#6170"><code>useQuotedExternalNames</code></a>, <a href="#5807"><code>sqlStringForSchemaObjectName</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="5372"></a>
+<h3> <a name="//apple_ref/java/instm/SQLExpression/joinClauseString">joinClauseString</a></h3>
+public java.lang.String <code>joinClauseString</code>()
+
+<P>Returns the part of the receiver's WHERE clause that specifies join conditions. Together, the <code>joinClauseString</code> and the <code><a href="#1130">whereClauseString</a></code> make up a statement's WHERE clause. If the receiver's statement doesn't contain join conditions, this method returns an empty string.<p>
+An SQLExpression's <code>joinClauseString</code> is generally set by invoking <a href="#5377"><code>joinExpression</code></a>.<p>
+<B>See also: </B>  
+<a href="#4943"><code>addJoinClause</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="5377"></a>
+<h3> <a name="//apple_ref/java/instm/SQLExpression/joinExpression">joinExpression</a></h3>
+public void <code>joinExpression</code>()
+
+<P>Builds up the <code>joinClauseString</code> for use in a SELECT statement. For each relationship path in the <a href="#4986"><code>aliasesByRelationshipPath</code></a> dictionary, this method invokes <a href="#4943"><code>addJoinClause</code></a> for each of the relationship's Join objects.<p>
+If the <code>aliasesByRelationshipPath</code> dictionary only has one entry (the entry for the SQLExpression's entity), the <code>joinClauseString</code> is empty.<p>
+You must invoke this method <em>after</em> invoking <a href="#4959"><code>addSelectListAttribute</code></a> for each attribute to be selected and after sending <a href="../../Interfaces/QualifierSQLGeneration/Frameset.html#" target="_top"><code>sqlStringForSQLExpression</code></a>(<code>this</code>) to the qualifier for the SELECT statement. (These methods build up the <a href="#4986"><code>aliasesByRelationshipPath</code></a> dictionary by invoking <a href="#5709"><code>sqlStringForAttributePath</code></a>.)<p>
+<B>See also: </B>  
+<a href="#1130"><code>whereClauseString</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="5399"></a>
+<h3> <a name="//apple_ref/java/instm/SQLExpression/listString">listString</a></h3>
+public java.lang.String <code>listString</code>()
+
+<P>Returns a comma-separated list of attributes or "attribute = value" assignments. <code>listString</code> is built up with successive invocations of <a href="#4921"><code>addInsertListAttribute</code></a>, <a href="#4959"><code>addSelectListAttribute</code></a>, or <a href="#4964"><code>addUpdateListAttribute</code></a> for INSERT statements, SELECT statements, and UPDATE statements, respectively. The contents of <code>listString</code> vary according to the type of statement the receiver is building:<p>
+<Table Border="3">
+<caption></caption>
+<tr><th><b>Type of Statement</b>
+</th><th><b>Sample listString Contents</b>
+</th></tr>
+<tr><td scope="row">INSERT
+</td><td>FIRST_NAME, LAST_NAME, EMPLOYEE_ID
+</td></tr>
+<tr><td scope="row">UPDATE
+</td><td>FIRST_NAME = "Timothy", LAST_NAME = "Richardson"
+</td></tr>
+<tr><td scope="row">SELECT
+</td><td>t0.FIRST_NAME, t0.LAST_NAME, t1.DEPARTMENT_NAME
+</td></tr>
+
+</Table>
+
+<Table>
+<tr><td scope="row">
+</Table>
+<p>
+<hr WIDTH=25% ALIGN=LEFT>
+<a name="5404"></a>
+<h3> <a name="//apple_ref/java/instm/SQLExpression/lockClause">lockClause</a></h3>
+public java.lang.String <code>lockClause</code>()
+
+<P>Overridden by subclasses to return the SQL string used in a SELECT statement to lock selected rows. A concrete subclass of SQLExpression must override this method to return the string used by its adaptor's RDBMS.<p>
+<hr WIDTH=25% ALIGN=LEFT>
+<a name="5415"></a>
+<h3> <a name="//apple_ref/java/instm/SQLExpression/mustUseBindVariableForAttribute">mustUseBindVariableForAttribute</a></h3>
+public boolean <code>mustUseBindVariableForAttribute</code>(next.eo.Attribute <em>attribute</em>)
+
+<P>Returns <code>true</code> if the receiver must use bind variables for <em>attribute</em>, <code>false</code> otherwise. SQLExpression's implementation returns <code>false</code>. An SQL expression subclass that uses bind variables should override this method to return <code>true</code> if the underlying RDBMS requires that bind variables be used for attributes with <em>attribute</em>'s external type.<p>
+<B>See also: </B>  
+<a href="#5658"><code>shouldUseBindVariableForAttribute</code></a>, <a href="#5129"><code>bindVariableDictionaryForAttribute</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="5425"></a>
+<h3> <a name="//apple_ref/java/instm/SQLExpression/orderByString">orderByString</a></h3>
+public java.lang.String <code>orderByString</code>()
+
+<P>Returns the comma-separated list of "attribute direction" pairs ("LAST_NAME asc, FIRST_NAME asc", for example) for use in a SELECT statement.<p>
+<B>See also: </B>  
+<a href="#4948"><code>addOrderByAttributeOrdering</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="5476"></a>
+<h3> <a name="//apple_ref/java/instm/SQLExpression/prepareConstraintStatementForRelationship">prepareConstraintStatementForRelationship</a></h3>
+public void <code>prepareConstraintStatementForRelationship</code>(next.eo.Relationship <em>relationship</em>, 
+next.util.ImmutableVector <em>sourceColumns</em>, next.util.ImmutableVector <em>destinationColumns</em>)
+
+<P>Sets the receiver's <a href="#5832"><code>statement</code></a> to an adaptor specific constraint for <em>relationship</em>. SQLExpression's implementation generates statements of the form:<p>
+<blockquote><pre>ALTER TABLE TABLE_NAME ADD CONSTRAINT CONSTRAINT_NAME<br>    FOREIGN KEY (SOURCE_KEY_LIST)<br>    REFERENCES DESTINATION_TABLE_NAME (DESTINATION_KEY_LIST)
+</pre></blockquote><p>Where<p>
+<ul><li><em>TABLE_NAME</em> is the external name of the receiver's entity.<p>
+<li><em>CONSTRAINT_NAME</em> is the external name of the receiver's entity, <em>relationship</em>'s name, and the string "FK", concatenated with underbars between them (EMPLOYEE_MANAGER_FK, for example),<p>
+<li><em>SOURCE_KEY_LIST</em> is a comma-separated list of the source columns in <em>sourceColumns</em>.<p>
+<li><em>DESTINATION_TABLE_NAME</em> is the external name of <em>relationship</em>'s destination entity.<p>
+<li><em>DESTINATION_KEY_LIST </em>is a comma-separated list of the destination columns in <em>destinationColumns</em><p>
+</ul><B>See also: </B>  
+<a href="#6002"><code>foreignKeyConstraintStatementsForRelationship</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="7833"></a>
+<h3> <a name="//apple_ref/java/instm/SQLExpression/prepareDeleteExpressionForQualifier">prepareDeleteExpressionForQualifier</a></h3>
+public void <code>prepareDeleteExpressionForQualifier</code>(next.eo.Qualifier <em>qualifier</em>)
+
+<P>Generates a DELETE statement by performing the following steps:<p>
+<ol>
+<a name="7815">
+<li>Sends an <a href="../../Interfaces/QualifierSQLGeneration/Frameset.html#" target="_top"><code>sqlStringForSQLExpression</code></a>(<code>this</code>) message to <em>qualifier</em> to generate the receiver's <code><a href="#1130">whereClauseString</a></code>.<p>
+</a><a name="7822">
+<li>Invokes <a href="#5837"><code>tableListWithRootEntity</code></a> to get the table name for the FROM clause.<p>
+</a><a name="7826">
+<li>Invokes <a href="#5059"><code>assembleDeleteStatementWithQualifier</code></a>.<p>
+</a></ol>
+<B>See also: </B>  
+<a href="#5956"><code>deleteStatementWithQualifier</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="5486"></a>
+<h3> <a name="//apple_ref/java/instm/SQLExpression/prepareInsertExpressionWithRow">prepareInsertExpressionWithRow</a></h3>
+public void <code>prepareInsertExpressionWithRow</code>(next.util.ImmutableHashtable <em>row</em>)
+
+<P>Generates an INSERT statement by performing the following steps:<p>
+<ol>
+<a name="7839">
+<li>Invokes <a href="#4921"><code>addInsertListAttribute</code></a> for each entry in <em>row</em> to prepare the comma-separated list of attributes and the corresponding list of values.<em> </em><p>
+</a><a name="7843">
+<li>Invokes <a href="#5837"><code>tableListWithRootEntity</code></a> to get the table name.<p>
+</a><a name="7847">
+<li>Invokes <a href="#5064"><code>assembleInsertStatementWithRow</code></a>.<p>
+</a></ol>
+<B>See also: </B>  
+<a href="#6026"><code>insertStatementForRow</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="5491"></a>
+<h3> <a name="//apple_ref/java/instm/SQLExpression/prepareSelectExpressionWithAttributes">prepareSelectExpressionWithAttributes</a></h3>
+public void <code>prepareSelectExpressionWithAttributes</code>(next.util.ImmutableVector <em>attributes</em>, 
+boolean <em>lockFlag</em>, next.eo.FetchSpecification <em>fetchSpecification</em>)
+
+<P>Generates a SELECT statement by performing the following steps:<p>
+<ol>
+<a name="7861">
+<li>Invokes <a href="#4959"><code>addSelectListAttribute</code></a> for each entry in <em>attributes</em> to prepare the comma-separated list of attributes.<em> </em><p>
+</a><a name="7862">
+<li>Sends an <a href="../../Interfaces/QualifierSQLGeneration/Frameset.html#" target="_top"><code>sqlStringForSQLExpression</code></a>(<code>this</code>) message to <em>fetchSpecification</em>'s qualifier<em> </em>to generate the receiver's <a href="#1130"><code>whereClauseString</code></a>. <p>
+</a><a name="7869">
+<li>Invokes <a href="#4948"><code>addOrderByAttributeOrdering</code></a> for each AttributeOrdering object in <em>fetchSpecification</em>.<em> </em>First conjoins the qualifier in <em>fetchSpecification</em> with the restricting qualifier, if any, of the receiver's entity.<p>
+</a><a name="7876">
+<li>Invokes <a href="#5377"><code>joinExpression</code></a> to generate the receiver's <a href="#5372"><code>joinClauseString</code></a>.<p>
+</a><a name="7880">
+<li>Invokes <a href="#5837"><code>tableListWithRootEntity</code></a> to get the comma-separated list of tables for the FROM clause.<p>
+</a><a name="7884">
+<li>If <em>lockFlag</em> is <code>true</code>, invokes <a href="#5404"><code>lockClause</code></a> to get the SQL string to lock selected rows.<p>
+</a><a name="7887">
+<li>Invokes <a href="#5074"><code>assembleSelectStatementWithAttributes</code></a>.<p>
+</a></ol>
+<B>See also: </B>  
+<a href="#6065"><code>selectStatementForAttributes</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="5496"></a>
+<h3> <a name="//apple_ref/java/instm/SQLExpression/prepareUpdateExpressionWithRow">prepareUpdateExpressionWithRow</a></h3>
+public void <code>prepareUpdateExpressionWithRow</code>(next.util.ImmutableHashtable <em>row</em>, 
+next.eo.Qualifier <em>qualifier</em>)
+
+<P>Generates an UPDATE statement by performing the following steps:<p>
+<ol>
+<a name="7902">
+<li>Invokes <a href="#4964"><code>addUpdateListAttribute</code></a> for each entry in <em>row</em> to prepare the comma-separated list of "attribute = value" assignments.<em> </em><p>
+</a><a name="7903">
+<li>Sends an <a href="../../Interfaces/QualifierSQLGeneration/Frameset.html#" target="_top"><code>sqlStringForSQLExpression</code></a>(<code>this</code>) message to <em>qualifier</em> to generate the receiver's <code><a href="#1130">whereClauseString</a></code>.<p>
+</a><a name="7910">
+<li>Invokes <a href="#5837"><code>tableListWithRootEntity</code></a> to get the table name for the FROM clause.<p>
+</a><a name="7914">
+<li>Invokes <a href="#5079"><code>assembleUpdateStatementWithRow</code></a>.<p>
+</a></ol>
+<B>See also: </B>  
+<a href="#11750"><code>updateStatementForRow</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="5638"></a>
+<h3> <a name="//apple_ref/java/instm/SQLExpression/setStatement">setStatement</a></h3>
+public void <code>setStatement</code>(java.lang.String <em>string</em>)
+
+<P>Sets the receiver's SQL statement to <em>string</em>, which should be a valid expression in the target query language. Use this method-instead of a <code>prepare...</code> method-to directly assign an SQL string to an SQLExpression object. This method does not perform substitutions or formatting of any kind. <p>
+<B>See also: </B>  
+<a href="#5997"><code>expressionForString</code></a>, <a href="#5832"><code>statement</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="5595"></a>
+<h3> <a name="//apple_ref/java/instm/SQLExpression/setUseAliases">setUseAliases</a></h3>
+public void <code>setUseAliases</code>(boolean <em>flag</em>)
+
+<P>Tells the receiver whether or not to use table aliases.<p>
+<B>See also: </B>  
+<a href="#5847"><code>useAliases</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="5658"></a>
+<h3> <a name="//apple_ref/java/instm/SQLExpression/shouldUseBindVariableForAttribute">shouldUseBindVariableForAttribute</a></h3>
+public boolean <code>shouldUseBindVariableForAttribute</code>(next.eo.Attribute <em>attribute</em>)
+
+<P>Returns <code>true</code> if the receiver can provide a bind variable dictionary for <em>attribute</em>, <code>false</code> otherwise. Bind variables aren't used for values associated with this attribute when the static method <a href="#6165"><code>useBindVariables</code></a> returns <code>false</code>. SQLExpression's implementation returns <code>false</code>. An SQL expression subclass should override this method to return <code>true</code> if the receiver should use bind variables for attributes with <em>attribute</em>'s external type. It should also return <code>true</code> for any attribute for which the receiver must use bind variables.<p>
+<B>See also: </B>  
+<a href="#5415"><code>mustUseBindVariableForAttribute</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="5699"></a>
+<h3> <a name="//apple_ref/java/instm/SQLExpression/sqlStringForAttribute">sqlStringForAttribute</a></h3>
+public java.lang.String <code>sqlStringForAttribute</code>(next.eo.Attribute <em>attribute</em>)
+
+<P>Returns the SQL string for <em>attribute</em>, complete with a table alias if the receiver uses table aliases. Invoked from <a href="#5704"><code>sqlStringForAttributeNamed</code></a> when the attribute name is not a path.<p>
+<B>See also: </B>  
+<a href="#5709"><code>sqlStringForAttributePath</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="5704"></a>
+<h3> <a name="//apple_ref/java/instm/SQLExpression/sqlStringForAttributeNamed">sqlStringForAttributeNamed</a></h3>
+public java.lang.String <code>sqlStringForAttributeNamed</code>(java.lang.String <em>name</em>)
+
+<P>Returns the SQL string for the attribute named <em>name</em>, complete with a table alias if the receiver uses table aliases. Generates the return value using <a href="#5709"><code>sqlStringForAttributePath</code></a> if <em>name</em> is an attribute path ("department.name", for example); otherwise, uses <a href="#5699"><code>sqlStringForAttribute</code></a>.<p>
+<hr WIDTH=25% ALIGN=LEFT>
+<a name="5709"></a>
+<h3> <a name="//apple_ref/java/instm/SQLExpression/sqlStringForAttributePath">sqlStringForAttributePath</a></h3>
+public java.lang.String <code>sqlStringForAttributePath</code>(next.util.ImmutableVector <em>path</em>)
+
+<P>Returns the SQL string for <em>path</em>, complete with a table alias if the receiver uses table aliases. Invoked from <a href="#5704"><code>sqlStringForAttributeNamed</code></a> when the specified attribute name is a path ("department.location.officeNumber", for example). <em>path</em> is an array of any number of Relationship objects followed by an Attribute object. The Relationship and Attribute objects each correspond to a component in path. For example, if the attribute name argument to <code>sqlStringForAttributeNamed</code> is "department.location.officeNumber", <em>path</em> is an array containing the following objects in the order listed:<p>
+<ul><li>The Relationship object in the receiver's entity named "department". (Assume the relationship's destination entity is named "Department".)<br>
+<li>The Relationship object in the Department entity named "location". (Assume the relationship's destination entity is named "Location".)<br>
+<li>The Attribute object in the Location entity named "officeNumber".<br>
+</ul>Assuming that the receiver uses aliases and the alias for the Location table is t2, the SQL string for this sample attribute path is "t2.officeNumber".<p>
+If the receiver uses table aliases, this method has the side effect of adding a "relationship path"-"alias name" entry to the <a href="#4986"><code>aliasesByRelationshipPath</code></a> dictionary.<p>
+<B>See also: </B>  
+<a href="#5699"><code>sqlStringForAttribute</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="5720"></a>
+<h3> <a name="//apple_ref/java/instm/SQLExpression/sqlStringForConjoinedQualifiers">sqlStringForConjoinedQualifiers</a></h3>
+public java.lang.String <code>sqlStringForConjoinedQualifiers</code>(next.util.ImmutableVector <em>qualifiers</em>)
+
+<P>Creates and returns an SQL string that is the result of interposing the word "AND" between the SQL strings for the qualifiers in <em>qualifiers</em>. Generates an SQL string for each qualifier by sending <a href="../../Interfaces/QualifierSQLGeneration/Frameset.html#" target="_top"><code>sqlStringForSQLExpression</code></a> messages to the qualifiers with <code>this</code> as the argument. If the SQL string for a qualifier contains only white space, it isn't included in the return value. The return value is enclosed in parentheses if the SQL strings for two or more qualifiers were ANDed together.<p>
+<hr WIDTH=25% ALIGN=LEFT>
+<a name="5725"></a>
+<h3> <a name="//apple_ref/java/instm/SQLExpression/sqlStringForDisjoinedQualifiers">sqlStringForDisjoinedQualifiers</a></h3>
+public java.lang.String <code>sqlStringForDisjoinedQualifiers</code>(next.util.ImmutableVector <em>qualifiers</em>)
+
+<P>Creates and returns an SQL string that is the result of interposing the word "OR" between the SQL strings for the qualifiers in <em>qualifiers</em>. Generates an SQL string for each qualifier by sending <a href="../../Interfaces/QualifierSQLGeneration/Frameset.html#" target="_top"><code>sqlStringForSQLExpression</code></a> messages to the qualifiers with <code>this</code> as the argument. If the SQL string for a qualifier contains only white space, it isn't included in the return value. The return value is enclosed in parentheses if the SQL strings for two or more qualifiers were ORed together.<p>
+<hr WIDTH=25% ALIGN=LEFT>
+<a name="5746"></a>
+<h3> <a name="//apple_ref/java/instm/SQLExpression/sqlStringForKeyComparisonQualifier">sqlStringForKeyComparisonQualifier</a></h3>
+public java.lang.String 
+<code>sqlStringForKeyComparisonQualifier</code>(next.eo.KeyComparisonQualifier <em>qualifier</em>)
+
+<P>Creates and returns an SQL string that is the result of interposing an operator between the SQL strings for the right and left keys in <em>qualifier</em>. Determines the SQL operator by invoking <a href="#5812"><code>sqlStringForSelector</code></a> with <em>qualifier</em>'s selector and <code>null</code> for the value. Generates SQL strings for <em>qualifier</em>'s keys by invoking <a href="#5704"><code>sqlStringForAttributeNamed</code></a> to get SQL strings. This method also formats the strings for the right and left keys using <a href="#6007"><code>formatSQLString</code></a> with the corresponding attributes' "read" formats.<p>
+<hr WIDTH=25% ALIGN=LEFT>
+<a name="5751"></a>
+<h3> <a name="//apple_ref/java/instm/SQLExpression/sqlStringForKeyValueQualifier">sqlStringForKeyValueQualifier</a></h3>
+public java.lang.String <code>sqlStringForKeyValueQualifier</code>(next.eo.KeyValueQualifier <em>qualifier</em>)
+
+<P>Creates and returns an SQL string that is the result of interposing an operator between the SQL strings for <em>qualifier</em>'s key and value. Determines the SQL operator by invoking <a href="#5812"><code>sqlStringForSelector</code></a> with <em>qualifier</em>'s selector and value. Generates an SQL string for <em>qualifier</em>'s key by invoking <a href="#5704"><code>sqlStringForAttributeNamed</code></a> to get an SQL string and <a href="#6007"><code>formatSQLString</code></a> with the corresponding attribute's "read" format. Similarly, generates an SQL string for qualifier's value by invoking <a href="#5822"><code>sqlStringForValue</code></a> to get an SQL string and <a href="#6021"><code>formatValueForAttribute</code></a> to format it. (First invokes <a href="#6109"><code>sqlPatternFromShellPattern</code></a> for the value if <em>qualifier</em>'s selector is QualifierOperatorLike.)<p>
+<hr WIDTH=25% ALIGN=LEFT>
+<a name="5761"></a>
+<h3> <a name="//apple_ref/java/instm/SQLExpression/sqlStringForNegatedQualifier">sqlStringForNegatedQualifier</a></h3>
+public java.lang.String <code>sqlStringForNegatedQualifier</code>(next.eo.Qualifier <em>qualifier</em>)
+
+<P>Creates and returns an SQL string that is the result of surrounding the SQL string for <em>qualifier</em> in parentheses and appending it to the word "not". For example, if the string for <em>qualifier</em> is "FIRST_NAME = `John'", <code>sqlStringForNegatedQualifier</code> returns the string "not (FIRST_NAME = `John')".<p>
+Generates an SQL string for <em>qualifier</em> by sending an <a href="../../Interfaces/QualifierSQLGeneration/Frameset.html#" target="_top"><code>sqlStringForSQLExpression</code></a> message to <em>qualifier</em> with <code>this</code> as the argument. If the SQL string for <em>qualifier</em> contains only white space, this method returns <code>null</code>.<p>
+<hr WIDTH=25% ALIGN=LEFT>
+<a name="8301"></a>
+<h3> <a name="//apple_ref/java/instm/SQLExpression/sqlStringForQualifier">sqlStringForQualifier</a></h3>
+public java.lang.String <code>sqlStringForQualifier</code>(next.eo.Qualifier <em>aQualifier</em>)
+
+<P>Returns a SQL statement for <em>aQualifier</em> suitable for inclusion in a WHERE clause. Invoked from an SQLExpression while it's preparing a SELECT, UPDATE, or DELETE statement. <p>
+<B>See also: </B>  
+<a href="#1130"><code>whereClauseString</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="5807"></a>
+<h3> <a name="//apple_ref/java/instm/SQLExpression/sqlStringForSchemaObjectName">sqlStringForSchemaObjectName</a></h3>
+public java.lang.String <code>sqlStringForSchemaObjectName</code>(java.lang.String <em>name</em>)
+
+<P>Returns <em>name</em> enclosed in the external name quote character if the receiver uses quoted external names, otherwise simply returns <em>name</em> unaltered.<p>
+<B>See also: </B>  
+<a href="#6170"><code>useQuotedExternalNames</code></a>, <a href="#5297"><code>externalNameQuoteCharacter</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="5812"></a>
+<h3> <a name="//apple_ref/java/instm/SQLExpression/sqlStringForSelector">sqlStringForSelector</a></h3>
+public java.lang.String <code>sqlStringForSelector</code>(next.util.Selector <em>selector</em>, java.lang.Object <em>value</em>)
+
+<P>Returns an SQL operator for <em>selector </em>and<em> value</em>. The following table summarizes SQLExpression's default mapping:<p>
+<Table Border="3">
+<caption></caption>
+<tr><th><b>Selector</b>
+</th><th><b>SQL Operator</b>
+</th></tr>
+<tr><td scope="row">QualifierOperatorIsEqual
+</td><td>"is" if value is a next.eo.Null, "=" otherwise 
+</td></tr>
+<tr><td scope="row">QualifierOperatorNotEqual
+</td><td>"is not" if <em>value</em> is a next.eo.Null, "!=" otherwise
+</td></tr>
+<tr><td scope="row">QualifierOperatorLessThan
+</td><td>"&lt;"
+</td></tr>
+<tr><td scope="row">QualifierOperatorGreaterThan
+</td><td>"&gt;"
+</td></tr>
+<tr><td scope="row">QualifierOperatorLessThanOrEqualTo
+</td><td>"&lt;="
+</td></tr>
+<tr><td scope="row">QualifierOperatorGreaterThanOrEqualTo
+</td><td>"&gt;="
+</td></tr>
+<tr><td scope="row">QualifierOperatorLike
+</td><td>"like"
+</td></tr>
+
+</Table>
+
+<Table>
+<tr><td>
+</Table>
+<p>
+Throws an exception if <em>selector</em> is an unknown operator.<p>
+<B>See also: </B>  
+<a href="#5746"><code>sqlStringForKeyComparisonQualifier</code></a>, <a href="#5751"><code>sqlStringForKeyValueQualifier</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="5822"></a>
+<h3> <a name="//apple_ref/java/instm/SQLExpression/sqlStringForValue">sqlStringForValue</a></h3>
+public java.lang.String <code>sqlStringForValue</code>(java.lang.Object <em>value</em>, java.lang.String <em>name</em>)
+
+<P>Returns a string for <em>value</em> appropriate for use in an SQL statement. If the receiver uses a bind variable for the attribute named <em>name</em>, then <code>sqlStringForValue</code> gets the bind variable dictionary for the attribute, adds it to the receiver's array of bind variables dictionaries, and returns the value for the binding's BindVariablePlaceHolderKey. Otherwise, this method invokes <a href="#6021"><code>formatValueForAttribute</code></a> and returns the formatted string for <em>value</em>.<p>
+<B>See also: </B>  
+<a href="#5415"><code>mustUseBindVariableForAttribute</code></a>, <a href="#5658"><code>shouldUseBindVariableForAttribute</code></a>, 
+<a href="#6165"><code>useBindVariables</code></a>, <a href="#5124"><code>bindVariableDictionaries</code></a>, <a href="#4905"><code>addBindVariableDictionary</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="5832"></a>
+<h3> <a name="//apple_ref/java/instm/SQLExpression/statement">statement</a></h3>
+public java.lang.String <code>statement</code>()
+
+<P>Returns the complete SQL statement for the receiver. An SQL statement can be assigned to an SQLExpression object directly using the static method <a href="#5997"><code>expressionForString</code></a> or using the instance method <a href="#5638"><code>setStatement</code></a>. Generally, however, an SQLExpression's statement is built up using one of the following methods:<p>
+<ul><li><a href="#5491">prepareSelectExpressionWithAttributes</a><br>
+<li><a href="#5486">prepareInsertExpressionWithRow</a><br>
+<li><a href="#5496">prepareUpdateExpressionWithRow</a><br>
+<li><a href="#7833">prepareDeleteExpressionForQualifier</a><br>
+</ul><hr WIDTH=25% ALIGN=LEFT>
+<a name="5837"></a>
+<h3> <a name="//apple_ref/java/instm/SQLExpression/tableListWithRootEntity">tableListWithRootEntity</a></h3>
+public java.lang.String <code>tableListWithRootEntity</code>(next.eo.Entity <em>entity</em>)
+
+<P>Returns the comma-separated list of tables for use in a SELECT, UPDATE, or DELETE statement's FROM clause. If the receiver doesn't use table aliases, the table list consists only of the table name for <em>entity</em>-"EMPLOYEE", for example. If the receiver does use table aliases (only in SELECT statements by default), the table list is a comma separated list of table names and their aliases, for example:<p>
+<blockquote><pre>EMPLOYEE t0, DEPARTMENT t1
+</pre></blockquote><p><code>tableListWithRootEntity</code> creates a string containing the table name for <em>entity</em> and a corresponding table alias ("EMPLOYEE t0", for example). For each entry in <a href="#4986"><code>aliasesByRelationshipPath</code></a>, this method appends a new table name and table alias.<p>
+<B>See also: </B>  
+<a href="#5847"><code>useAliases</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="5847"></a>
+<h3> <a name="//apple_ref/java/instm/SQLExpression/useAliases">useAliases</a></h3>
+public boolean <code>useAliases</code>()
+
+<P>Returns <code>true</code> if the receiver generates statements with table aliases, <code>false</code> otherwise. For example, the following SELECT statement uses table aliases:<p>
+<blockquote><pre>SELECT t0.FIRST_NAME, t0.LAST_NAME, t1.NAME<br>FROM EMPLOYEE t0, DEPARTMENT t1<br>WHERE t0.DEPARTMENT_ID = t1.DEPARTMENT_ID
+</pre></blockquote><p>The EMPLOYEE table has the alias t0, and the DEPARTMENT table has the alias t1. <p>
+By default, SQLExpression uses table aliases only in SELECT statements. Enterprise Objects Framework assumes that INSERT, UPDATE, and DELETE statements are single-table operations. For more information, see the discussion in the class description.<p>
+<B>See also: </B>  
+<a href="#5595"><code>setUseAliases</code></a>, <a href="#4986"><code>aliasesByRelationshipPath</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="1063"></a>
+<h3> <a name="//apple_ref/java/instm/SQLExpression/valueList">valueList</a></h3>
+public java.lang.String <code>valueList</code>()
+
+<P>Returns the comma-separated list of values used in an INSERT statement. For example, the value list for the following INSERT statement:<p>
+<blockquote><pre>INSERT EMPLOYEE (FIRST_NAME, LAST_NAME, EMPLOYEE_ID, DEPARTMENT_ID, SALARY)<br>VALUES ('Shaun', 'Hayes', 1319, 23, 4600)
+</pre></blockquote><p>is "`Shaun', `Hayes', 1319, 23, 4600". An SQLExpression's <code>valueList</code> is generated a value at a time with <a href="#4921"><code>addInsertListAttribute</code></a> messages.<p>
+<hr WIDTH=25% ALIGN=LEFT>
+<a name="1130"></a>
+<h3> <a name="//apple_ref/java/instm/SQLExpression/whereClauseString">whereClauseString</a></h3>
+public java.lang.String <code>whereClauseString</code>()
+
+<P>Returns the part of the receiver's WHERE clause that qualifies rows. The whereClauseString does not specify join conditions; the <a href="#5372"><code>joinClauseString</code></a> does that. Together, the <code>whereClauseString</code> and the <a href="#5372"><code>joinClauseString</code></a> make up a statement's where clause. For example, a qualifier for an Employee entity specifies that a statement only affects employees who belong to the Finance department and whose monthly salary is greater than $4500. Assume the corresponding where clause looks like this:<p>
+<blockquote><pre>WHERE EMPLOYEE.SALARY &gt; 4500 AND DEPARTMENT.NAME = `Finance'<br>    AND EMPLOYEE.DEPARTMENT_ID = DEPARTMENT.DEPARTMENT_ID
+</pre></blockquote><p>SQLExpression generates both a <code>whereClauseString</code> and a <a href="#5372"><code>joinClauseString</code></a> for this qualifier. The <code>whereClauseString</code> qualifies the rows and looks like this:<p>
+<blockquote><pre>EMPLOYEE.SALARY &gt; 4500 AND DEPARTMENT.NAME = `Finance'
+</pre></blockquote><p>The <a href="#5372"><code>joinClauseString</code></a> specifies the join conditions between the EMPLOYEE table and the DEPARTMENT table and looks like this:<p>
+<blockquote><pre>EMPLOYEE.DEPARTMENT_ID = DEPARTMENT.DEPARTMENT_ID
+</pre></blockquote><p>An SQLExpression's <code>whereClauseString</code> is generally set by sending a <a href="../../Interfaces/QualifierSQLGeneration/Frameset.html#" target="_top"><code>sqlStringForSQLExpression</code></a> message to a Qualifier object.<p>
+<hr WIDTH=25% ALIGN=LEFT>
+<a name="3761"></a>
+<h3> <a name="//apple_ref/java/instm/SQLExpression/"></a></h3>
+
+ 
+ 
+
+
+<i>Copyright &#169; 1998, Apple Computer, Inc.   All rights
+reserved.</i>
+
+<!-- Last updated: 01/18/98 16:13:30 -->
+
+</body>
+</html>

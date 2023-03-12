@@ -1,0 +1,527 @@
+<html>
+
+<body bgcolor="#FFFFFF">
+
+<CENTER><H1>Class next.eo.EditingContext</H1></CENTER>
+
+<a name="description"></a><CENTER><H2>CLASS DESCRIPTION</H2></CENTER>
+
+<!-- extends:next.eo.ObjectStore -->
+
+<DL>
+
+<DT><B>Extends:</B></DT><DD>next.eo.ObjectStore</DD>
+
+</DL>
+
+<P>
+
+EditingContext represents a single "object space" or document in an application. Its primary responsibility is managing a graph of enterprise objects. This object graph is a group of related business objects that represent an internally consistent view of one or more external stores.
+All objects fetched from an external store are registered in an EditingContext along with a global identifier <!--(EOGlobalID)--> that's used to uniquely identify each object to the external store. The EditingContext is responsible for watching for changes in its objects <!--(using the EOObserving protocol)--> and recording snapshots for object-based undo. A single enterprise object instance exists in one and only one EditingContext, but multiple copies of an object can exist in different EditingContexts. Thus object uniquing is scoped to a particular EditingContext.
+
+<!--Other Classes that Participate in Object Graph Management
+EditingContext works in conjunction with other classes to manage the object graph. Two other classes that play a significant role in object graph management are EOUndoManager and EOObserverCenter. EOUndoManager is a general-purpose undo stack. As a client of EOUndoManager, EditingContext registers undo events for all changes made the enterprise objects that it watches.
+The other class that plays a significant role in object graph management is EOObserverCenter. EOObserverCenter provides a notification mechanism for an observing object to find out when another object is about to change its state. "Observable" objects (typically all enterprise objects) are responsible for invoking [self willChange] prior to altering their state (in a "set" method, for instance). Objects (such as instances of EditingContext) can add themselves as observers to the objects they care about in the EOObserverCenter. They will then receive objectWillChange: notification whenever an observed object invokes [self willChange].
+-->
+ 
+<H3>Using EditingContexts in Different Configurations</H3>
+The fundamental relationship an EditingContext has is to its parent ObjectStore, which creates the object graph the EditingContext monitors. ObjectStore is an abstract class that defines a source and sink of objects for an EditingContext. The ObjectStore is responsible for constructing and registering objects, servicing object faults, and committing changes made in an EditingContext.
+<P>
+You can augment the basic configuration of an EditingContext and its parent ObjectStore in several different ways. For example, multiple EditingContexts can share the same ObjectStore, one EditingContext can act as an ObjectStore for another, and so on. The most commonly used scenarios are described in the following sections.
+
+<H4>Peer EditingContexts</H4>
+One or more "peer" EditingContexts can share a single ObjectStore. Each EditingContext has its own object graph, so for example, a given Employee row in a database can have separate object instances in each EditingContext. Changes to an object in one EditingContext don't affect the corresponding object in another EditingContext until all changes are successfully committed to the shared object store. At that time the objects in all EditingContexts are synchronized with the committed changes. This arrangement is useful when an application allows the user to edit multiple independent "documents."
+
+<H4>Nested EditingContexts</H4>
+EditingContext is a subclass of ObjectStore, which gives its instances the ability to act as ObjectStores for other EditingContexts. In other words, EditingContexts can be nested, thereby allowing a user to make edits to an object graph in one EditingContext and then discard or commit those changes to another object graph (which, in turn, may commit them to an external store). This is useful in a "drill down" style of user interface where changes in a nested dialog can be okayed (committed) or canceled (rolled back) to the previous panel.
+<P>
+When an object is fetched into a nested EditingContext, it incorporates any uncommitted changes that were made to it in its parent EditingContext. For example, suppose that in one panel you have a list of employees that allows you to edit salaries, and that the panel includes a button to display a nested panel where you can edit detail information. If you edit the salary in the parent panel, you see the modified salary in the nested panel, not the old (committed) salary from the database. Thus, conceptually, nested EditingContexts fetch through their parents.
+<!--
+EditingContext overrides several of ObjectStore's methods:
+-arrayFaultWithSourceGlobalID:relationshipName:editingContext:
+-faultForGlobalID:editingContext:
+-invalidateAllObjects
+-invalidateObjectsWithGlobalIDs:
+-objectsForSourceGlobalID:relationshipName:editingContext:
+-objectsWithFetchSpecification:editingContext:
+-refaultObject:withGlobalID:editingContext:
+-saveChangesInEditingContext:
+These methods are generally used when an EditingContext acts as an ObjectStore for another EditingContext. For more information, see the individual method descriptions. For information on setting up this configuration for interfaces loaded from nib files, see the method description for setDefaultParentObjectStore:.
+-->
+
+<H4>Getting Data from Multiple Sources</H4>
+An EditingContext's object graph can contain objects from more than one external store. In this scenario, the object store is an ObjectStoreCoordinator, which provides the abstraction of a single object store by redirecting operations to one or more EOCooperatingObjectStores.
+<P>
+In writing an application, it's likely that you'll use combinations of the different scenarios described in the above sections. 
+
+<H3>Fetching Objects</H3>
+The most common way to explicitly fetch objects from an external store in an Enterprise Objects Framework application is to use EditingContext's <B>objectsWithFetchSpecification</B> method. This method takes a fetch specification and returns an array of objects. A fetch specification includes the name of the entity for which you want to fetch objects, the qualifier (query) you want to use in the fetch, and the sort order in which you want the objects returned (if any).<!-- For example, the following code excerpt uses objectsWithFetchSpecification: to fetch default values for rental terms from the database:
+EOFetchSpecification *fetchSpec;
+NSArray *results;
+fetchSpec = [EOFetchSpecification
+fetchSpecificationWithEntityName:@"RentalTerms"
+	qualifier:[EOQualifier qualifierWithQualifierFormat:@"rentalTermID = 1"]
+	sortOrderings:nil];
+results = [editingContext objectsWithFetchSpecification:fetchSpec];
+-->
+
+<H3>The Role of EditingContext in Change Management </H3>
+An EditingContext is responsible for managing the changes that occur to the objects in its object graph. <!--For example, when a user edits a value in the user interface, the following sequence of events occurs:
+The EOAssociation passes the new value to its EODisplayGroup.
+The EODisplayGroup applies the changes to the affected enterprise object.
+The enterprise object notifies the EditingContext that it has changed.
+Specifically, the enterprise object's invocation of [self willChange] in turn invokes the EditingContext method objectWillChange:. objectWillChange: is part of the EOObserving protocol.
+The EditingContext records the object in its change list.
+Then, at the end of the event loop:
+The EditingContext records undos.
+The EditingContext broadcasts an EOObjectsChangedInStoreNotification and an EOObjectsChangedInEditingContextNotification.
+EODisplayGroups receive the change notification and update the user interface.
+All views of the data in the application refresh themselves to reflect the change.
+This sequence of events is illustrated in Figure 4.
+-->
+
+<H4>Saving Changes to the Database</H4>
+The EditingContext is also involved when changes made to enterprise objects are saved to the database.
+
+<H3>Managing Changes in Your Application</H3>
+EditingContext provides several methods for managing the changes made to objects in your application. You can use these methods to get information about objects that have changed, <!--to selectively undo and redo changes,--> and to discard all changes made to objects before these changes are committed to the database. These methods are described in the following sections.
+
+<H4>Getting Information About Changed Objects</H4>
+An EditingContext maintains information about three different kinds of changes to objects in its object graph: insertions, deletions, and updates. After these changes have been made and before they're committed to the database, you can find out which objects have changes in each of these categories by using the <B>insertedObjects</B>, <B>deletedObjects</B>, and <B>updatedObjects</B> methods. Each method returns an array containing the objects that have been inserted, deleted, and updated, respectively. The <B>hasChanges</B> method returns True or False to indicate whether any of the objects in the object graph have been inserted, deleted, or updated.
+
+<H4>Revert<!--Undo and Redo--></H4>
+EditingContext includes the <!--undo:, redo, and--> <B>revert</B> method for managing changes to objects in the object graph. <!--undo: asks the EditingContext's EOUndoManager to reverse the latest changes to objects in the object graph. redo: asks the EOUndoManager to reverse the latest undo operation.--> <B>revert</B> clears the undo stack, discards all insertions and deletions, and restores updated objects to their last committed (saved) values.
+
+<H4>Refetching the Object Graph</H4>
+You can use the <B>refetch</B> method to replace the values cached in memory (that is, in the object graph) with new values fetched from the database. 
+If you just want to discard uncommitted changes but you still want to maintain the values cached in memory, you should use <B>revert</B> instead.
+ 
+<H4>Saving Changes</H4>
+The <B>saveChanges</B> method commits changes made to objects in the object graph to an external store. When you save changes, EditingContext's lists of inserted, updated, and deleted objects are flushed.
+<P>
+Upon a successful save operation, the EditingContext's parent ObjectStore broadcasts an EOObjectsChangedInStoreNotification. Peers of the saved EditingContext receive this notification and respond by synchronizing their objects with the committed versions.
+<hr>
+
+</body>
+
+</html><html>
+
+<body bgcolor="#FFFFFF"><!-- constructors -->
+
+<a name="constructors"><CENTER><H2>CONSTRUCTORS</H2></CENTER></a>
+
+<!-- consKey:EditingContext(public) cons:EditingContext descr:<TT>public  <B>EditingContext</B>()</TT>:<TT>public  <B>EditingContext</B>(next.eo.ObjectStore <I>anObjectStore</I>)</TT> -->
+
+<H3><a name="EditingContext(public)">EditingContext</a></H3>
+
+<TT>public  <B>EditingContext</B>()</TT><br>
+
+<TT>public  <B>EditingContext</B>(next.eo.ObjectStore <I>anObjectStore</I>)</TT>
+
+<P>
+
+Returns a newly-allocated and initialized EditingContext object. If <I>anObjectStore</I> is supplied, this method initializes the receiver with <I>anObjectStore</I> as its parent ObjectStore. This method is the designated initializer for EditingContext. For more discussion of parent ObjectStores, see "Using EOEditingContexts in Different Configurations" in the class description.
+<P>
+
+<!-- <B>See Also: </B>[See Also's go here] -->
+
+<hr>
+
+</body>
+
+</html><html>
+
+<body bgcolor="#FFFFFF"><!-- methods -->
+
+<a name="methods"><CENTER><H2>METHODS</H2></CENTER></a>
+
+<!-- methKey:committedSnapshotForObject(public) meth:committedSnapshotForObject descr:<TT>public next.util.ImmutableHashtable <B>committedSnapshotForObject</B>(java.lang.Object <I>anObject</I>)</TT> -->
+
+<H3><a name="committedSnapshotForObject(public)">committedSnapshotForObject</a></H3>
+
+<TT>public next.util.ImmutableHashtable <B>committedSnapshotForObject</B>(java.lang.Object <I>anObject</I>)</TT>
+
+<P>
+
+Returns an ImmutableHashtable containing a snapshot of <I>anObject</I> that reflects its committed values (that is, its values as they were last committed to the database). In other words, this snapshot represents the state of the object before any modifications were made to it. The snapshot is updated to the newest object state after a save.
+<P>
+
+<!-- <B>See Also: </B>[See Also's go here] -->
+
+<hr>
+
+<!-- methKey:currentEventSnapshotForObject(public) meth:currentEventSnapshotForObject descr:<TT>public next.util.ImmutableHashtable <B>currentEventSnapshotForObject</B>(java.lang.Object <I>anObject</I>)</TT> -->
+
+<H3><a name="currentEventSnapshotForObject(public)">currentEventSnapshotForObject</a></H3>
+
+<TT>public next.util.ImmutableHashtable <B>currentEventSnapshotForObject</B>(java.lang.Object <I>anObject</I>)</TT>
+
+<P>
+
+Returns an ImmutableHashtable containing a snapshot of <I>anObject</I> that reflects its state as it was at the beginning of the current event loop. After the end of the current event, this snapshot is updated to hold the modified state of the object.
+<P>
+
+<!-- <B>See Also: </B>[See Also's go here] -->
+
+<hr>
+
+<!-- methKey:deleteObject(public) meth:deleteObject descr:<TT>public void <B>deleteObject</B>(java.lang.Object <I>anObject</I>)</TT> -->
+
+<H3><a name="deleteObject(public)">deleteObject</a></H3>
+
+<TT>public void <B>deleteObject</B>(java.lang.Object <I>anObject</I>)</TT>
+
+<P>
+
+Specifies that <I>anObject</I> should be removed from the receiver's parent ObjectStore when changes are committed. At that time, the object will be removed from the uniquing tables.
+<P>
+
+<!-- <B>See Also: </B>[See Also's go here] -->
+
+<hr>
+
+<!-- methKey:deletedObjects(public) meth:deletedObjects descr:<TT>public next.util.ImmutableVector <B>deletedObjects</B>()</TT> -->
+
+<H3><a name="deletedObjects(public)">deletedObjects</a></H3>
+
+<TT>public next.util.ImmutableVector <B>deletedObjects</B>()</TT>
+
+<P>
+
+Returns the objects that have been deleted from the receiver's object graph.
+<P>
+
+<!-- <B>See Also: </B>[See Also's go here] -->
+
+<hr>
+
+<!-- methKey:encodeObjectWithCoder(public) meth:encodeObjectWithCoder descr:<TT>public static void <B>encodeObjectWithCoder</B>(java.lang.Object <I>anObject</I>, next.util.Coder <I>aCoder</I>)</TT> -->
+
+<H3><a name="encodeObjectWithCoder(public)">encodeObjectWithCoder</a></H3>
+
+<TT>public static void <B>encodeObjectWithCoder</B>(java.lang.Object <I>anObject</I>, next.util.Coder <I>aCoder</I>)</TT>
+
+<P>
+
+Encodes <I>anObject</I> using <I>aCoder</I>. See the Coding interface description for more information.
+<P>
+
+<!-- <B>See Also: </B>[See Also's go here] -->
+
+<hr>
+
+<!-- methKey:hasChanges(public) meth:hasChanges descr:<TT>public boolean <B>hasChanges</B>()</TT> -->
+
+<H3><a name="hasChanges(public)">hasChanges</a></H3>
+
+<TT>public boolean <B>hasChanges</B>()</TT>
+
+<P>
+
+Returns <B>true</B> if any of the objects in the receiver's object graph have been modified-that is, if any objects have been inserted, deleted, or updated. 
+<P>
+
+<!-- <B>See Also: </B>[See Also's go here] -->
+
+<hr>
+
+<!-- methKey:initObjectWithCoder(public) meth:initObjectWithCoder descr:<TT>public static java.lang.Object <B>initObjectWithCoder</B>(java.lang.Object <I>anObject</I>, next.util.Coder <I>aCoder</I>)</TT> -->
+
+<H3><a name="initObjectWithCoder(public)">initObjectWithCoder</a></H3>
+
+<TT>public static java.lang.Object <B>initObjectWithCoder</B>(java.lang.Object <I>anObject</I>, next.util.Coder <I>aCoder</I>)</TT>
+
+<P>
+
+Initializes <I>anObject</I> from data in <I>aCoder</I>.
+<P>
+
+<!-- <B>See Also: </B>[See Also's go here] -->
+
+<hr>
+
+<!-- methKey:insertObject(public) meth:insertObject descr:<TT>public void <B>insertObject</B>(java.lang.Object <I>anObject</I>)</TT> -->
+
+<H3><a name="insertObject(public)">insertObject</a></H3>
+
+<TT>public void <B>insertObject</B>(java.lang.Object <I>anObject</I>)</TT>
+
+<P>
+
+Registers <I>anObject</I> to be inserted in the receiver's parent ObjectStore the next time changes are saved. In the meantime, <I>anObject</I> is registered in the receiver with a temporary globalID.
+<P>
+
+<!-- <B>See Also: </B>[See Also's go here] -->
+
+<hr>
+
+<!-- methKey:insertedObjects(public) meth:insertedObjects descr:<TT>public next.util.ImmutableVector <B>insertedObjects</B>()</TT> -->
+
+<H3><a name="insertedObjects(public)">insertedObjects</a></H3>
+
+<TT>public next.util.ImmutableVector <B>insertedObjects</B>()</TT>
+
+<P>
+
+Returns the objects that have been inserted into the receiver's object graph. 
+<P>
+
+<!-- <B>See Also: </B>[See Also's go here] -->
+
+<hr>
+
+<!-- methKey:lockObject(public) meth:lockObject descr:<TT>public void <B>lockObject</B>(java.lang.Object <I>anObject</I>)</TT> -->
+
+<H3><a name="lockObject(public)">lockObject</a></H3>
+
+<TT>public void <B>lockObject</B>(java.lang.Object <I>anObject</I>)</TT>
+
+<P>
+
+Attempts to lock <I>anObject</I> in the external store. <!--This method works by invoking lockObjectWithGlobalID:editingContext:.--> Throws an exception if it can't find the globalID for <I>anObject</I>. <!-- to pass to lockObjectWithGlobalID:editingContext:.-->
+<P>
+
+<!-- <B>See Also: </B>[See Also's go here] -->
+
+<hr>
+
+<!-- methKey:locksObjectsBeforeFirstModification(public) meth:locksObjectsBeforeFirstModification descr:<TT>public boolean <B>locksObjectsBeforeFirstModification</B>()</TT> -->
+
+<H3><a name="locksObjectsBeforeFirstModification(public)">locksObjectsBeforeFirstModification</a></H3>
+
+<TT>public boolean <B>locksObjectsBeforeFirstModification</B>()</TT>
+
+<P>
+
+Returns <B>true</B> if the receiver invokes <B>lockObject</B> to lock an object in the external store the first time the object is modified.
+<P>
+
+<!-- <B>See Also: </B>[See Also's go here] -->
+
+<hr>
+
+<!-- methKey:objectsWithFetchSpecification(public) meth:objectsWithFetchSpecification descr:<TT>public next.util.ImmutableVector <B>objectsWithFetchSpecification</B>(next.eo.FetchSpecification <I>aFetchSpecification</I>)</TT> -->
+
+<H3><a name="objectsWithFetchSpecification(public)">objectsWithFetchSpecification</a></H3>
+
+<TT>public next.util.ImmutableVector <B>objectsWithFetchSpecification</B>(next.eo.FetchSpecification <I>aFetchSpecification</I>)</TT>
+
+<P>
+
+<!-- Overrides ObjectStore's objectsWithFetchSpecification:editingContext: method to fetch--> Fetches objects from an external store according to the criteria specified by <I>aFetchSpecification</I> and returns them in an ImmutableVector. If one of these objects is already present in memory, this method doesn't overwrite its values with the new values from the database. This method throws an exception if an error occurs; the error message indicates the nature of the problem.
+<P>
+When an EditingContext receives this message, it forwards the message to its ObjectStore (typically an ObjectStoreCoordinator). Based on the entity name in <I>aFetchSpecification</I>, the ObjectStoreCoordinator in turn forwards the request to the appropriate DatabaseContext. The DatabaseContext then <!--obtains an EODatabaseChannel and--> performs the fetch, registering all fetched objects in the receiving editing context.
+<P>
+
+<!-- <B>See Also: </B>[See Also's go here] -->
+
+<hr>
+
+<!-- methKey:processRecentChanges(public) meth:processRecentChanges descr:<TT>public void <B>processRecentChanges</B>()</TT> -->
+
+<H3><a name="processRecentChanges(public)">processRecentChanges</a></H3>
+
+<TT>public void <B>processRecentChanges</B>()</TT>
+
+<P>
+
+Forces the receiver to process pending insertions, deletions, and updates. Normally, when objects are changed, the processing of the changes is deferred until the end of the current event. At that point, an EditingContext moves objects to the inserted, updated, and deleted lists, delete propagation is performed, undos are registered, and EOObjectsChangedInStoreNotification and EOObjectsChangedInEditingContextNotification are posted (usually causing the user interface to update). You can use this method to explicitly force changes to be processed. An EditingContext automatically invokes this method on itself before performing certain operations such as <B>saveChanges</B>. 
+<P>
+
+<!-- <B>See Also: </B>[See Also's go here] -->
+
+<hr>
+
+<!-- methKey:propagatesDeletesAtEndOfEvent(public) meth:propagatesDeletesAtEndOfEvent descr:<TT>public boolean <B>propagatesDeletesAtEndOfEvent</B>()</TT> -->
+
+<H3><a name="propagatesDeletesAtEndOfEvent(public)">propagatesDeletesAtEndOfEvent</a></H3>
+
+<TT>public boolean <B>propagatesDeletesAtEndOfEvent</B>()</TT>
+
+<P>
+
+Returns <B>true</B> if the receiver propagates deletes at the end of the event in which a change was made, <B>false</B> if it propagates deletes only right before saving changes. The default is <B>true</B>.
+<P>
+
+<!-- <B>See Also: </B>[See Also's go here] -->
+
+<hr>
+
+<!-- methKey:refaultObjects(public) meth:refaultObjects descr:<TT>public void <B>refaultObjects</B>()</TT> -->
+
+<H3><a name="refaultObjects(public)">refaultObjects</a></H3>
+
+<TT>public void <B>refaultObjects</B>()</TT>
+
+<P>
+
+Refaults all objects that haven't been inserted, deleted, or updated.
+<P>
+
+<!-- <B>See Also: </B>[See Also's go here] -->
+
+<hr>
+
+<!-- methKey:refetch(public) meth:refetch descr:<TT>public void <B>refetch</B>()</TT> -->
+
+<H3><a name="refetch(public)">refetch</a></H3>
+
+<TT>public void <B>refetch</B>()</TT>
+
+<P>
+
+This action method tells the EditingContext to refetch.<!-- It does so by invoking the invalidateAllObjects method.--> This has the effect of discarding the values of objects cached in memory and refetching them from the external store. When an EditingContext receives this message, it propagates the message down the object store hierarchy. DatabaseContexts discard their snapshots for invalidated objects and broadcast an EOObjectsChangedInStoreNotification.
+<P> 
+The final effect of this method is to refault all objects currently in memory. This refaulting in turn releases all objects not retained by your application. <!-- or by an EODisplayGroup.-->
+<P>
+If you just want to discard uncommitted changes but you don't want to sacrifice the values cached in memory, use the EditingContext <B>revert</B> method, which reverses all changes and clears the undo stack. 
+<P>
+
+<!-- <B>See Also: </B>[See Also's go here] -->
+
+<hr>
+
+<!-- methKey:revert(public) meth:revert descr:<TT>public void <B>revert</B>()</TT> -->
+
+<H3><a name="revert(public)">revert</a></H3>
+
+<TT>public void <B>revert</B>()</TT>
+
+<P>
+
+Removes everything from the undo stack, discards all insertions and deletions, and restores updated objects to their last committed values. Does not refetch from the database. <!--Note that revert doesn't automatically cause EODisplayGroups to refetch. EODisplayGroups that allow insertion and deletion of objects need to be explicitly synchronized whenever this method is invoked on their EOEditingContext. -->
+<P>
+
+<!-- <B>See Also: </B>[See Also's go here] -->
+
+<hr>
+
+<!-- methKey:saveChanges(public) meth:saveChanges descr:<TT>public void <B>saveChanges</B>()</TT> -->
+
+<H3><a name="saveChanges(public)">saveChanges</a></H3>
+
+<TT>public void <B>saveChanges</B>()</TT>
+
+<P>
+
+Commits changes made in the receiver to its parent ObjectStore.<!-- by sending it the message saveChangesInEditingContext:.--> If the parent is an ObjectStore Coordinator, it guides its DatabaseContexts through a multi-pass save operation (see the ObjectStoreCoordinator class specification for more information). If no message handler or delegate is available and a database error occurs, an exception is thrown; the error message indicates the nature of the problem.
+<P>
+
+<!-- <B>See Also: </B>[See Also's go here] -->
+
+<hr>
+
+<!-- methKey:setLocksObjectsBeforeFirstModification(public) meth:setLocksObjectsBeforeFirstModification descr:<TT>public void <B>setLocksObjectsBeforeFirstModification</B>(boolean <I>flag</I>)</TT> -->
+
+<H3><a name="setLocksObjectsBeforeFirstModification(public)">setLocksObjectsBeforeFirstModification</a></H3>
+
+<TT>public void <B>setLocksObjectsBeforeFirstModification</B>(boolean <I>flag</I>)</TT>
+
+<P>
+
+Sets according to <I>flag</I> whether the receiver invokes <B>lockObject</B> to lock an object in the external store the first time object is modified. The default is <B>false</B>. If <I>flag</I> is <B>true</B>, an exception will be thrown if a lock can't be obtained when object invokes <B>willChange</B>.
+<P>
+
+<!-- <B>See Also: </B>[See Also's go here] -->
+
+<hr>
+
+<!-- methKey:setPropagatesDeletesAtEndOfEvent(public) meth:setPropagatesDeletesAtEndOfEvent descr:<TT>public void <B>setPropagatesDeletesAtEndOfEvent</B>(boolean <I>flag</I>)</TT> -->
+
+<H3><a name="setPropagatesDeletesAtEndOfEvent(public)">setPropagatesDeletesAtEndOfEvent</a></H3>
+
+<TT>public void <B>setPropagatesDeletesAtEndOfEvent</B>(boolean <I>flag</I>)</TT>
+
+<P>
+
+Sets according to <I>flag</I> whether the receiver propagates deletes at the end of the event in which a change was made, or only just before saving changes.
+<P>
+If <I>flag</I> is <B>true</B>, deleting an enterprise object triggers delete propagation at the end of the event in which the deletion occurred (this is the default behavior). If <I>flag</I> is <B>false</B>, delete propagation isn't performed until <B>saveChanges</B> is invoked.
+<P>
+You can delete enterprise objects explicitly by using the <B>deleteObject</B> method or implicitly by removing the enterprise object from an owning relationship. <!--Delete propagation uses the delete rules in the EOClassDescription to determine whether objects related to the deleted object should also be deleted (for more information, see the EOClassDescription class specification).--> If delete propagation fails (that is, if an enterprise object refuses to be deleted-possibly due to a deny rule), all changes made during the event are rolled back. 
+<P>
+
+<!-- <B>See Also: </B>[See Also's go here] -->
+
+<hr>
+
+<!-- methKey:setStopsValidationAfterFirstError(public) meth:setStopsValidationAfterFirstError descr:<TT>public void <B>setStopsValidationAfterFirstError</B>(boolean <I>flag</I>)</TT> -->
+
+<H3><a name="setStopsValidationAfterFirstError(public)">setStopsValidationAfterFirstError</a></H3>
+
+<TT>public void <B>setStopsValidationAfterFirstError</B>(boolean <I>flag</I>)</TT>
+
+<P>
+
+Sets according to <I>flag</I> whether the receiver stops validating after the first error is encountered, or continues for all objects (validation typically occurs during a save operation). The default is <B>true</B>. Setting it to <B>false</B> is useful if the delegate <!--implements editingContext:shouldPresentException: to--> handles the presentation of aggregate exceptions. 
+<P>
+
+<!-- <B>See Also: </B>[See Also's go here] -->
+
+<hr>
+
+<!-- methKey:setUsesContextRelativeEncoding(public) meth:setUsesContextRelativeEncoding descr:<TT>public static void <B>setUsesContextRelativeEncoding</B>(boolean <I>flag</I>)</TT> -->
+
+<H3><a name="setUsesContextRelativeEncoding(public)">setUsesContextRelativeEncoding</a></H3>
+
+<TT>public static void <B>setUsesContextRelativeEncoding</B>(boolean <I>flag</I>)</TT>
+
+<P>
+
+Sets according to <I>flag</I> whether the receiver uses context-relative encoding.
+
+<P>
+
+<!-- <B>See Also: </B>[See Also's go here] -->
+
+<hr>
+
+<!-- methKey:stopsValidationAfterFirstError(public) meth:stopsValidationAfterFirstError descr:<TT>public boolean <B>stopsValidationAfterFirstError</B>()</TT> -->
+
+<H3><a name="stopsValidationAfterFirstError(public)">stopsValidationAfterFirstError</a></H3>
+
+<TT>public boolean <B>stopsValidationAfterFirstError</B>()</TT>
+
+<P>
+
+Returns <B>true</B> to indicate that the receiver should stop validating after it encounters the first error, or <B>false</B> to indicate that it should continue for all objects.
+<P>
+
+<!-- <B>See Also: </B>[See Also's go here] -->
+
+<hr>
+
+<!-- methKey:updatedObjects(public) meth:updatedObjects descr:<TT>public next.util.ImmutableVector <B>updatedObjects</B>()</TT> -->
+
+<H3><a name="updatedObjects(public)">updatedObjects</a></H3>
+
+<TT>public next.util.ImmutableVector <B>updatedObjects</B>()</TT>
+
+<P>
+
+Returns the objects in the receiver's object graph that have been updated. 
+<P>
+
+<!-- <B>See Also: </B>[See Also's go here] -->
+
+<hr>
+
+<!-- methKey:usesContextRelativeEncoding(public) meth:usesContextRelativeEncoding descr:<TT>public static boolean <B>usesContextRelativeEncoding</B>()</TT> -->
+
+<H3><a name="usesContextRelativeEncoding(public)">usesContextRelativeEncoding</a></H3>
+
+<TT>public static boolean <B>usesContextRelativeEncoding</B>()</TT>
+
+<P>
+
+Returns whether the receiver uses context-relative encoding.
+
+<P>
+
+<!-- <B>See Also: </B>[See Also's go here] -->
+
+<hr>
+
+</body>
+
+</html>

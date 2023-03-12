@@ -1,0 +1,191 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+<head>
+	<title>Kernel Extension Programming Topics: Loading Kernel Extensions at Boot Time</title>
+	<meta id="Generator" name="Generator" content="Gutenberg"/>
+	<meta id="GeneratorVersion" name="GeneratorVersion" content="v132"/>
+	<meta http-equiv="content-type" content="text/html;charset=utf-8"/>
+	<meta id="Copyright" name="Copyright" content="Copyright 2009 Apple Inc. All Rights Reserved."/>
+	<meta id="IndexTitle" name="IndexTitle" content="Loading Kernel Extensions at Boot Time"/>
+	<meta id="xcode-display" name="xcode-display" content="render"/>
+	<meta id="toc-file" name="toc-file" content="../toc.html"/>
+	<meta id="RESOURCES" content="../../../../Resources" />
+	
+	<link rel="stylesheet" type="text/css" href="../../../../Resources/CSS/frameset_styles.css"/>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/lib/prototype.js"></script>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/lib/scriptaculous.js"></script>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/page.js"></script>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/pedia.js"></script>
+	<!--[if lte IE 6]>
+		<style type="text/css">
+			/*<![CDATA[*/ 
+			html {overflow-x:auto; overflow-y:hidden;  }
+			/*]]>*/
+		</style>
+	<![endif]-->
+</head>
+<body bgcolor="#ffffff" onload="initialize_page();"><a name="//apple_ref/doc/uid/20002369" title="Loading Kernel Extensions at Boot Time"></a>
+    <noscript>
+    <div id="tocMenu">
+        <iframe id="toc_content" name="toc_content" SRC="../toc.html" width="210" height="100%" align="left" frameborder="0">This document set is best viewed in a browser that supports iFrames.</iframe>
+    </div>
+    </noscript>
+    <div id="bodyText">
+        <a name="top"></a>
+        <div class="hideOnPrint hideInXcode">
+        <!-- start of header -->
+        <!--#include virtual="/includes/framesetheader" -->
+        <!-- end of header -->
+        </div>
+        
+        <!-- start of path -->
+<div class="breadcrumb hideOnPrint hideInXcode"><a href="http://developer.apple.com/" target="_top">ADC Home</a> &gt; <a href="../../../../../referencelibrary/index.html#//apple_ref/doc/uid/TP30000943" target="_top">Reference Library</a> &gt; <a href="../../../../index.html#//apple_ref/doc/uid/TP30000440" target="_top">Guides</a> &gt; <a href="../../../index.html#//apple_ref/doc/uid/TP30000440-TP30000422" target="_top">Darwin</a> &gt; <a href="../../../Kernel-date.html#//apple_ref/doc/uid/TP30000440-TP30000422-TP30000532" target="_top">Kernel</a> &gt; <a href="../index.html" target="_top">Kernel Extension Programming Topics</a> &gt; </div><br class="hideInXcode"/><!-- end of path -->
+        
+        <div class="mini_nav_text" align="left">
+        <span class="navButtons">
+        <a href="../KEXTConceptPackaging/packaging_kext.html">&lt; Previous Page</a><span style="margin-left: 8px"><a href="../KEXTConceptDependencies/kext_dependencies.html">Next Page &gt;</a></span>
+        </span>
+        <span id="showHideTOCUpperSpan">
+        <a href="#" onclick="showHideTOC();"><img src="../../../../Resources/Images/show_toc_icon.gif" width="15" height="14" border="0" style="margin-bottom: -2px;" alt="" hideText="Hide TOC" showText="Show TOC" /></a> <a href="#" onclick="showHideTOC();">Hide TOC</a>
+        </span>
+        </div>
+        
+        
+        <a name="//apple_ref/doc/uid/20002369-BABEJEIB" title="Loading Kernel Extensions at Boot Time"></a><hr /><H1>Loading Kernel Extensions at Boot Time</H1>
+
+<p>This document describes the boot-time loading of kernel extensions (KEXTs) in Mac OS X. In particular, it focuses on the BootX booter and its use of the KEXT property <code>OSBundleRequired</code>. If you are not familiar with the boot sequence or if you would like more information on booting and system and kernel initialization, see <em><a href="../../../../MacOSX/Conceptual/BPSystemStartup/index.html#//apple_ref/doc/uid/10000172i" target="_top">System Startup Programming Topics</a></em>. More information on KEXTs and their information property lists can be found in <em><a href="../../../../DeviceDrivers/Conceptual/IOKitFundamentals/index.html#//apple_ref/doc/uid/TP0000011" target="_top">I/O Kit Fundamentals</a></em>.</p>
+
+<!-- This template is being used for both PDF and HTML. -->
+
+    
+    <!-- TopicBook.pm uses this template for its miniTOCs, but needs a different title. -->
+    <h4>Contents:</h4>
+    
+    
+    <p class="blockquote">
+    
+        
+			
+			
+				<a href="loading_kexts.html#//apple_ref/doc/uid/20002369-97078">The BootX Booter</a>
+				
+			<br/>
+			
+        
+			
+			
+				<a href="loading_kexts.html#//apple_ref/doc/uid/20002369-97330-BABDIDAF">Safe Booting</a>
+				
+			<br/>
+			
+        
+			
+			
+				<a href="loading_kexts.html#//apple_ref/doc/uid/20002369-97483">The Mkext Cache</a>
+				
+			<br/>
+			
+        
+			
+			
+				<a href="loading_kexts.html#//apple_ref/doc/uid/20002369-97632-BABIAICJ">The OSBundleRequired Property</a>
+				
+			<br/>
+			
+        
+
+    </p><br/>
+
+<a name="//apple_ref/doc/uid/20002369-97078" title="The BootX Booter"></a><h2>The BootX Booter</h2>
+<p>In order to mount the root file system, the kernel must contain the KEXTs that drive the hardware required to access the root volume. Rather than building these KEXTs into the kernel, Mac OS X provides for boot-time loading of KEXTs by the BootX booter. This is accomplished in part through use of the <code>OSBundleRequired</code> property in the root dictionary of the KEXT’s information property list (<code>Info.plist</code> file). The BootX booter, the KEXT loading utility <code>kextd</code>, and the KEXT caching utility <code>kextcache</code> use the <code>OSBundleRequired</code> property to determine which KEXTs are necessary to load or cache.</p>
+<div class="importantbox"><a name="//apple_ref/doc/uid/20002369-DontLinkElementID_34" title="Important:"></a><p><strong>Important:</strong>&nbsp;
+
+It is essential that only those KEXTs required for hardware in the boot process and the minimal set of KEXTs required to operate the system’s user interface include the <code>OSBundleRequired</code> property in their <code>Info.plist</code> files. See <span class="content_text"><a href="loading_kexts.html#//apple_ref/doc/uid/20002369-97632">“The OSBundleRequired Property”</a></span> for information on how to set this property to the correct value.</p><p></p></div>
+<p>Near the beginning of the boot sequence for Mac OS X, the BootX booter receives control from BootROM which has initialized the system hardware and selected an operating system to boot. BootX’s primary responsibility is to load the kernel environment. To do this, BootX first attempts to load a previously cached set of device drivers (called an mkext cache) for hardware that is in the boot process. If this cache is missing or corrupt, BootX searches <code>/System/Library/Extensions</code> for KEXTs whose <code>OSBundleRequired</code> property is set to a value appropriate to the type of system boot (see <span class="content_text"><a href="loading_kexts.html#//apple_ref/doc/uid/20002369-98676-BABFJFBJ">Table 1</a></span> for a complete list of values used with this property). For example, if BootX is performing a network boot, it will look for KEXTs whose <code>OSBundleRequired</code> property is set to “Network-Root”. When booting in single-user mode, BootX will load those KEXTs whose <code>OSBundleRequired</code> property is set to “Console”, in addition to loading the KEXTs required to mount the root file system. BootX ignores all KEXTs whose <code>OSBundleRequired</code> property is set to “Safe Boot” and all KEXTs whose <code>Info.plist</code> files do not contain this property at all.</p>
+<p>After the root file system is mounted, <code>kextd</code> starts and examines all the drivers available on the system. At this point, any unnecessary drivers get unloaded, freeing up memory; and <code>kextd</code> attempts to fulfill any KEXT loading requests it receives.</p>
+<a name="//apple_ref/doc/uid/20002369-97330" title="Safe Booting"></a><a name="//apple_ref/doc/uid/20002369-97330-BABDIDAF" title="Safe Booting"></a><h2>Safe Booting</h2>
+<p>The <code>OSBundleRequired</code> property is also used to facilitate safe-boot mode in which all unnecessary extensions are disabled. During a safe boot, BootX loads the KEXTs required to mount the root file system just as in other modes of booting. Then <code>kextd</code> starts and examines all the drivers on the system. If this is a safe boot, however, <code>kextd</code> will only consider loading a KEXT if the <code>OSBundleRequired</code> property is present in its <code>Info.plist</code> file. This preserves the integrity of the safe boot by ensuring that only drivers necessary for mounting root or operating the system’s user interface are loaded.</p>
+<p>Safe booting helps protect the system from the possible panic of a driver. If a driver’s <code>OSBundleRequired</code> property is set to “Root”, it will always be loaded by BootX, even in single-user or safe-boot modes. If this driver panics, the system itself may panic, requiring reinstallation of the operating system or booting off a CD. If the same driver’s <code>OSBundleRequired</code> property is set to “Safe Boot”, however, it will never be loaded by BootX. <code>kextd</code> will load it after the root file system has been mounted and if the driver panics it can be disabled by re-booting into single-user mode and then using the console to move it out of the way. The safe boot can then be restarted without the panicking driver.</p><div class="notebox"><a name="//apple_ref/doc/uid/20002369-DontLinkElementID_35" title="Note"></a><p><strong>Note:</strong>&nbsp;During the development phase of your driver, you may find it useful to set the <code>IOKitDebug</code> key in your driver’s personality to a nonzero value. If you do so, that driver personality will not be sent to the kernel during a safe boot. If all of your driver’s personalities have nonzero <code>IOKitDebug</code> values, the KEXT itself will not even be loaded into the kernel during a safe boot.</p></div>
+<p>To initiate a safe-boot, hold down the Shift key while restarting the computer.</p>
+<a name="//apple_ref/doc/uid/20002369-97483" title="The Mkext Cache"></a><h2>The Mkext Cache</h2>
+<p>The mkext cache is created by the <code>kextcache</code> utility which takes a directory of KEXTs and archives it into a compressed binary form suitable for putting in ROM or other confined space. The utility <code>kextcache</code> also makes use of the <code>OSBundleRequired</code> property when determining which KEXTs to cache. When being used to create a net-boot repository, <code>kextcache</code> includes all KEXTs with <code>OSBundleRequired</code> set to “Root”, “Network-Root”, or “Console”. When being used to create a local-boot repository, <code>kextcache</code> will include all KEXTs with <code>OSBundleRequired</code> set to “Root”, “Local-Root”, or “Console”. The default behavior of <code>kextcache</code> is to create a full cache of all KEXTs it is given. For a complete description of the use of this utility, access the Terminal application in Mac OS X (located in <code>/Applications/Utilities/</code>) and type <code>man kextcache</code>.</p>
+<a name="//apple_ref/doc/uid/20002369-97632" title="The OSBundleRequired Property"></a><a name="//apple_ref/doc/uid/20002369-97632-BABIAICJ" title="The OSBundleRequired Property"></a><h2>The OSBundleRequired Property</h2>
+<p>The <code>OSBundleRequired</code> property should appear in the root dictionary of a KEXT’s <code>Info.plist</code> if that KEXT is required to mount the root file system (such as a platform driver) or is required to operate the system’s user interface (such as a mouse or graphics driver). A driver that does not fall into either category (for example, an audio driver) should not include the <code>OSBundleRequired</code> property in its <code>Info.plist</code> at all. Such a driver will be loaded by <code>kextd</code> as needed unless booting in safe-boot mode (see <span class="content_text"><a href="loading_kexts.html#//apple_ref/doc/uid/20002369-97330">“Safe Booting”</a></span> for an explanation of this process).</p>
+<p>For KEXTs that do include this property, it is essential that it be set to the appropriate value. As explained in <span class="content_text"><a href="loading_kexts.html#//apple_ref/doc/uid/20002369-97330">“Safe Booting,”</a></span> a KEXT whose <code>OSBundleRequired</code> property is set to “Root” will always be loaded by BootX when it attempts to mount the root file system. Therefore, unless a KEXT is absolutely required to mount root, its <code>OSBundleRequired</code> property should not be set to “Root”.</p>
+<p><span class="content_text"><a href="loading_kexts.html#//apple_ref/doc/uid/20002369-98676-BABFJFBJ">Table 1</a></span> matches the values of the <code>OSBundleRequired</code> property with descriptions of the KEXTs that should use them. If a KEXT does not fit any of these descriptions, it should not include the <code>OSBundleRequired</code> property in its <code>Info.plist</code> file.</p>
+<a name="//apple_ref/doc/uid/20002369-98676-BABFJFBJ" title="Table 1Values of the OSBundleRequired property and their usages"></a><div class="tableholder"><table class="graybox" border = "0" cellspacing="0" cellpadding="5">
+<caption class="tablecaption"><a name="//apple_ref/doc/uid/20002369-98676" title="Table 1Values of the OSBundleRequired property and their usages"></a><strong>Table 1&nbsp;&nbsp;</strong>Values of the OSBundleRequired property and their usages</caption>
+
+<tr>
+<th scope="col" align="left" style="font-weight: bold" bgcolor="#CCCCCC"><p>Value</p></th>
+<th scope="col" align="left" style="font-weight: bold" bgcolor="#CCCCCC"><p>Usage</p></th>
+</tr>
+
+
+<tr>
+<td  scope="row"><p>Root</p></td>
+<td ><p>This KEXT is required to mount root, regardless of where root comes from – for example, platform drivers and families, PCI, or USB.</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>Network-Root</p></td>
+<td ><p>This KEXT is required to mount root on a remote volume—for example, the network family, Ethernet drivers, or NFS.</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>Local-Root</p></td>
+<td ><p>This KEXT is required to mount root on a local volume – for example, the storage family, disk drivers, or file systems.</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>Console</p></td>
+<td ><p>This KEXT is required to provide character console support (single-user mode) – for example, keyboard drivers or the ADB family.</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>Safe Boot</p></td>
+<td ><p>This KEXT is required even during safe-boot (unnecessary extensions disabled)—for example, mouse drivers or graphics drivers.</p></td>
+</tr>
+
+</table></div>
+
+        <br/><br/> 
+
+        <div class="mini_nav_text" align="left">
+        <span class="navButtons">
+        <a href="../KEXTConceptPackaging/packaging_kext.html">&lt; Previous Page</a><span style="margin-left: 8px"><a href="../KEXTConceptDependencies/kext_dependencies.html">Next Page &gt;</a></span>
+        </span>
+        <span id="showHideTOCLowerSpan">
+        <a href="#" onclick="showHideTOC();"><img src="../../../../Resources/Images/show_toc_icon.gif" width="15" height="14" border="0" style="margin-bottom: -2px;" alt="" /></a> <a href="#" onclick="showHideTOC();">Hide TOC</a>
+        </span>
+        </div>
+
+        <br/><hr /><div align="center"><p class="content_text" lang="en" dir="ltr"> <!--#if expr="0=1" -->&#x00a9; 2003, 2007 Apple Inc. All Rights Reserved. &#40;<!--#endif -->Last updated: 2007-10-31<!--#if expr="0=1" -->&#041;<!--#endif --></p></div>
+
+        
+        <div class="hideOnPrint hideInXcode">
+        <!-- start of footer -->
+        	<table width="100%" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/documentation/Darwin/Conceptual/KEXTConcept/KEXTConceptLoading/loading_kexts.html%3Fid%3DTP40001063-3.7&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/documentation/Darwin/Conceptual/KEXTConcept/KEXTConceptLoading/loading_kexts.html%3Fid%3DTP40001063-3.7&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/documentation/Darwin/Conceptual/KEXTConcept/KEXTConceptLoading/loading_kexts.html%3Fid%3DTP40001063-3.7&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+
+        <!--#include virtual="/includes/framesetfooter" -->
+        <!-- end of footer -->
+        </div>
+    </div>
+</body>
+</html>

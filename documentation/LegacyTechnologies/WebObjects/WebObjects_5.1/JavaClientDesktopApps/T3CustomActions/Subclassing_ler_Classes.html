@@ -1,0 +1,156 @@
+<HTML>
+	<HEAD>
+		<meta http-equiv="content-type" content="text/html;charset=iso-8859-1">
+		<meta name="generator" content="XML_Publisher">
+		<meta name="Copyright" content="Copyright 2001 Apple Computer, Inc. All Rights Reserved.">
+        <title>Subclassing
+Controller Classes</title>
+		</HEAD>
+	<BODY bgcolor="#ffffff">
+<!-- start of header -->
+<!--#include virtual="/includes/framesetheader" -->
+<!-- end of header --> <!-- insert Show/Hide frames -->
+<script type="text/javascript" language="JavaScript"><!--
+function loadFrames(){
+if (top == self || (parent.frames[1].name != content))
+    top.location.href = 'index.html?' + location.href;
+}
+
+if (self != top) {
+  // loaded in frames
+  document.write('<a href="'+self.location+'" target="_top"><img src="../images/hideframes.gif" border="0" alt="Hide Frames"></a>');
+  }
+else {
+  // not loaded frames
+	document.write('<a href="JavaScript:loadFrames()"><img src="../images/showframes.gif" border="0" alt="Show Frames"></a>');
+}
+//--></script>
+<!-- end Show/Hide frames -->
+<a href="Task_Adding_Controllers.html" target="content"><img src="../images/previous.gif" border="0"></a>&nbsp;<a href="Writing_Cus_ler_Classes.html" target="content"><img src="../images/next.gif" border="0"></a>&nbsp;<!-- apple_doc:infillMarkerTop -->  
+<!-- apple_doc: pageHeadingStart --><a name = "CIHCEJJG"></a><a name="-646782"></a><h2><font face="Lucida Grande,Helvetica,Arial">Subclassing
+Controller Classes</font></h2><!-- apple_doc: pageHeadingEnd -->
+
+<p><b>Problem:</b> You need to add actions to a controller
+yet still preserve the dynamic character of the controller.</p>
+<p><b>Solution:</b> Subclass the controller class
+and use the rule system to use it throughout the application.</p>
+<p>This technique is used in  <a href="../AdvancedTutorial/iExtend_a_Co_XREF137.html" target="_top">"Extend a Controller Class"</a> in
+the chapter  <a href="../AdvancedTutorial/iAdvanced_Tu_htmlTP1.html" target="_top">"Advanced Tutorial"</a>. </p>
+<p>Subclassing a controller class and writing a rule to use it
+is the best way to add custom actions to your application's controllers.
+As well as taking real advantage of object-oriented programming,
+it preserves the dynamism of Direct to Java Client applications.
+The other mechanisms to add actions require freezing XML, and anytime
+you freeze XML, you lose a lot of the dynamism of the rule system.</p>
+<p>The dynamically generated user interfaces in Java Client rely
+on a core set of controller classes: EOFormController, EOQueryController,
+and EOListController. In an application that, for example, stores
+images in records, you need custom actions to both select images from
+the file system and download them to the file system. This requires
+two additional action buttons in a form window, Download Image and
+Update Image.</p>
+<p>To add these actions, create a new class called FormController,
+as shown in  <a href="#CIHGEFEF">Listing 10-1</a>.</p>
+<a name = "CIHGEFEF"></a><a name="-655267"></a><p><b><font face="Geneva,Helvetica,Arial" size="2">Listing 10-1 Subclassing
+EOFormController</font></b></p>
+<pre>package assetmanager.client;
+
+import javax.swing.*;
+import com.webobjects.foundation.*;
+import com.webobjects.eocontrol.*;
+import com.webobjects.eoapplication.*;
+import com.webobjects.eogeneration.client.*;
+import com.webobjects.eodistribution.client.*;
+
+public class FormController extends EOFormController {
+
+    public FormController(EOXMLUnarchiver unarchiver) {
+        super(unarchiver);
+    }
+
+    public NSArray defaultActions() {
+        Icon icon =
+            EOUserInterfaceParameters.localizedIcon(&quot;ActionIconInspect&quot;);
+        NSMutableArray actions = new NSMutableArray();
+        actions.addObject(EOAction.actionForControllerHierarchy(&quot;saveImageToDisk&quot;,
+           &quot;Download Image&quot;, &quot;Download Image&quot;, icon, null, null, 300, 50, false));
+
+        icon = EOUserInterfaceParameters.localizedIcon(&quot;ActionIconOk&quot;);
+        actions.addObject(EOAction.actionForControllerHierarchy(&quot;updateImageInRecord&quot;,
+            &quot;Update Image&quot;, &quot;Update Image&quot;, icon, null, null, 300, 50, false));
+        return EOAction.mergedActions(actions, super.defaultActions());
+    }
+
+    public boolean canPerformActionNamed(String actionName) {
+        return actionName.equals(&quot;saveImageToDisk&quot;) ||            super.canPerformActionNamed(actionName));
+    }
+
+    public void saveImageToDisk() {
+        //some code
+    }
+
+    public void updateImageInRecord() {
+        //some code
+    }
+}    
+</pre>
+<p>Subclasses of the core controller classes must contain these
+methods: a method overriding <code>defaultActions</code>,
+a method overriding <code>canPerformActionNamed</code>,
+and a method for each action defined in <code>defaultActions</code>.
+By overriding <code>defaultActions</code>,
+you are adding to the controller's actions, and by overriding <code>canPerformActionNamed</code>,
+you are authorizing the additional actions.</p>
+<p>To use this class in all form windows throughout the application,
+you need only write a simple rule:</p>
+<dl>
+<dt><b>Left-Hand Side:</b></dt>
+<dd><code>((task='form') and (controllerType='entityController'))</code></dd>
+<dt><b>Key:</b></dt>
+<dd><code>className</code></dd>
+<dt><b>Value:</b></dt>
+<dd><code>&quot;assetmanager.client.FormController&quot;</code></dd>
+<dt><b>Priority:</b></dt>
+<dd><code>50</code></dd></dl>
+<p>So, without needing to freeze XML, these customizations change
+the default form window to include new actions, as shown in  <a href="#CIHIHIJI">Figure 10-1</a>.</p>
+<br><a name = "CIHIHIJI"></a><a name="-647684"></a><p><b><font face="Geneva,Helvetica,Arial" size="2">Figure
+10-1 Image form window with new actions</font></b></p>
+ <img src = "../Art/imageform.gif" alt = "[image: ../Art/imageform.gif]">
+
+<p>The standard actions delete and insert are disabled by another
+rule:</p>
+<dl>
+<dt><b>Left-Hand Side:</b></dt>
+<dd><code>*true*</code></dd>
+<dt><b>Key:</b></dt>
+<dd><code>disabledActionNames</code></dd>
+<dt><b>Value:</b></dt>
+<dd><code>(insertWithTask, delete)</code></dd>
+<dt><b>Priority:</b></dt>
+<dd><code>50</code></dd></dl>
+<p>This rule is described in  <a href="../T1RestrictingAccess/iTask_Restri_htmlTP1.html" target="_top">"Task: Restricting Access to an Application"</a>.</p>
+
+<br>
+    <!-- insert Show/Hide frames -->
+<script type="text/javascript" language="JavaScript"><!--
+function loadFrames(){
+if (top == self || (parent.frames[1].name != content))
+    top.location.href = 'index.html?' + location.href;
+}
+
+if (self != top) {
+  // loaded in frames
+  document.write('<a href="'+self.location+'" target="_top"><img src="../images/hideframes.gif" border="0" alt="Hide Frames"></a>');
+  }
+else {
+  // not loaded frames
+	document.write('<a href="JavaScript:loadFrames()"><img src="../images/showframes.gif" border="0" alt="Show Frames"></a>');
+}
+//--></script>
+<!-- end Show/Hide frames -->
+<a href="Task_Adding_Controllers.html" target="content"><img src="../images/previous.gif" border="0"></a>&nbsp;<a href="Writing_Cus_ler_Classes.html" target="content"><img src="../images/next.gif" border="0"></a>&nbsp;<!-- apple_doc:infillMarkerBottom --> <br><br><p><hr><font face="Geneva,Helvetica,Arial" size="2">&#169; 2002 Apple Computer, Inc. (Last Updated May 1, 2002)</font></p><!-- start of footer -->
+<!--#include virtual="/includes/framesetfooter" -->
+<!-- end of footer -->
+</body>
+</html>

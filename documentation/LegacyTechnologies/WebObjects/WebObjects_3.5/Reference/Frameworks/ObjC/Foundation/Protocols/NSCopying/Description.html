@@ -1,0 +1,280 @@
+<html><head><title></title></head>
+
+<body bgcolor="#ffffff">
+
+ 
+
+ 
+
+<a name="49"></a>
+
+<h1>
+
+<FONT COLOR="#000066">
+
+ <a name="//apple_ref/occ/intf/NSCopying">NSCopying</a>
+
+</FONT>
+
+</h1>
+
+<p><B>Adopted By:	</B><BR>
+
+Various OpenStep classes
+
+
+
+<p><B>Declared In:	</B><BR>
+
+Foundation/NSObject.h
+
+
+
+<p><a name="79">
+
+<a name="description"></a>
+
+<H2>Protocol Description
+
+</H2>
+
+</a>The NSCopying protocol declares a method for providing functional copies of an object. The exact meaning of "copy" can vary from class to class, but a copy must be a functionally independent object with values identical to the original at the time the copy was made. A copy produced with NSCopying is implicitly retained by the sender, who is responsible for releasing it. <p>
+
+NSCopying declares one method, <code>copyWithZone:</code>, but copying is commonly invoked with the convenience method <code>copy</code>. The <code>copy</code> method is defined for all NSObjects and simply invokes <code>copyWithZone:</code> with the default zone.<p>
+
+<h3>
+
+<a name="82">
+
+ Using NSCopying
+
+</a>
+
+</h3>
+
+NSCopying is frequently used to copy <em>value</em> objects-objects that represent attributes. C-type variables can usually be substituted for value objects, but value objects have the advantage of encapsulating convenient utilities for common manipulations. For example, NSString objects are used instead of character pointers because they encapsulate encoding and storage. Despite NSString functionality, the role played by NSStrings parallels the role played by character pointers.<p>
+
+When value objects are passed as method arguments or returned from a method, it is common to use a copy instead of the object itself. For example, consider the following method for assigning a string to an object's <code>name</code> instance variable.<p>
+
+<blockquote><pre>- (void)setName:(NSString *)aName<br>{<br>    [name autorelease];<br>    name = [aName copy];<br>}
+
+</pre></blockquote><p>Storing a copy of <code>aName</code> has the effect of producing an object that's independent of the original, but has the same contents. Subsequent changes to the copy don't affect the original, and changes to the original don't affect the copy. Similarly, it is common to return a copy of an instance variable instead of the instance variable itself. For example, this method returns a copy of the <code>name</code> instance variable:<p>
+
+<blockquote><pre>- (NSString *)name<br>{<br>    return [[name copy] autorelease];<br>}
+
+</pre></blockquote><p><h3>
+
+<a name="88">
+
+ Implementing NSCopying
+
+</a>
+
+</h3>
+
+There are two basic approaches to creating copies. You can use <code>alloc</code> and <code>init...</code>, or you can use <code>NSCopyObject()</code>. To choose the one that's right for your class, you need to consider the following questions:<p>
+
+<ul><li><a href="#94">"What kind of copying-deep or shallow-does your class need?"</a><br>
+
+<li><a href="#108">"Does your class's superclass implement NSCopying?"</a><br>
+
+<li><a href="#110">"Are you familiar with the implementations of your class's superclasses?"</a><br>
+
+</ul>These areas are described in the following sections.<p>
+
+<h4>
+
+<a name="94">
+
+ What kind of copying-deep or shallow-does your class need?
+
+</a>
+
+</h4>
+
+Generally, copying an object involves creating a new instance and initializing it with the values in the original object. Copying the values for non-pointer instance variables, such as booleans, integers, and floating points, is straightforward. When copying pointer instance variables there are two approaches. One approach, called a <em>shallow copy</em>, copies the pointer value from the original object into the copy. Thus, the original and the copy share referenced data. The other approach, called a <em>deep copy</em>, duplicates the data referenced by the pointer and assigns it to the copy's instance variable.<p>
+
+The implementation of an instance variable's set method should reflect the kind of copying you need to use. You should deeply copy the instance variable if the corresponding set method copies the new value as in this method:<p>
+
+<blockquote><pre>- (void)setMyVariable:(id)newValue<br>{<br>    [myVariable autorelease];<br>    myVariable = [newValue copy];<br>}
+
+</pre></blockquote><p>You should shallowly copy the instance variable if the corresponding set method retains the new value as in this method:<p>
+
+<blockquote><pre>- (void)setMyVariable:(id)newValue<br>{<br>    [myVariable autorelease];<br>    myVariable = [newValue retain];<br>}
+
+</pre></blockquote><p>Similarly, you should shallowly copy the instance variable if its set method simply assigns the new value to the instance variable without copying or retaining it as in this method:<p>
+
+<blockquote><pre>- (void)setMyVariable:(id)newValue<br>{<br>    myVariable = newValue;<br>}
+
+</pre></blockquote><p>To produce a copy of an object that's truly independent of the original, the entire object must be deeply copied. Every instance variable must be duplicated. If the instance variables themselves have instance variables, those too must be duplicated, and so on. In many cases, a mixed approach is more useful. Pointer instance variables that can be thought of as data containers are generally deeply copied, while more sophisticated instance variables like delegates are shallowly copied.<p>
+
+For example, a Product class adopts NSCopying. Product instances have a name, a price, and a delegate as declared in this interface.<p>
+
+<blockquote><pre>@interface Product : NSObject &lt;NSCopying&gt;<br>{<br>    NSString *productName;<br>    float price;<br>    id delegate;<br>}<br>    <br>@end
+
+</pre></blockquote><p>Copying a Product instance produces a deep copy of <code>productName</code> because it represents a flat data value. On the other hand, the <code>delegate</code> instance variable is a more complex object capable of functioning properly for both Products. The copy and the original should therefore share the delegate. The following figure represents the images of a Product instance and a copy in memory.<p>
+
+ <p><img src="../NSCopying0.gif"><p><p>
+
+The different pointer values for <code>productName</code> illustrate that the original and the copy each have their own <code>productName</code> string object. The pointer values for <code>delegate</code> are the same, indicating that the two product objects share the same object as their delegate.<p>
+
+<h4>
+
+<a name="108">
+
+ Does your class's superclass implement NSCopying?
+
+</a>
+
+</h4>
+
+If the superclass does not implement NSCopying, your class's implementation will have to copy the instance variables it inherits as well as those declared in your class. Generally, the safest way to do this is by using <code>alloc</code>, <code>init...</code>, and set methods. On the other hand, if your class inherits NSCopying behavior, its implementation only has to copy instance variables declared in your class. It invokes the superclass's implementation to copy inherited instance variables.<p>
+
+<h4>
+
+<a name="110">
+
+ Are you familiar with the implementations of your class's superclasses?
+
+</a>
+
+</h4>
+
+If your class inherits NSCopying behavior, how you handle the new instance variables in <code>copyWithZone:</code> depends on your familiarity with the superclass's implementation. There are essentially two ways to make a copy of an object, using <code>alloc</code> and <code>init...</code> or using the function <code>NSCopyObject()</code>. If the superclass used or might have used <code>NSCopyObject()</code>, you must handle instance variables differently than you would otherwise.<p>
+
+<h3>
+
+<a name="112">
+
+ Using the alloc, init... Approach
+
+</a>
+
+</h3>
+
+If a class does not inherit NSCopying behavior, you should implement <code>copyWithZone:</code> using <code>alloc</code>, <code>init...</code>, and set methods. For example, an implementation of <code>copyWithZone:</code> for the Product class described above might be implemented in the following way:<p>
+
+<blockquote><pre>- (id)copyWithZone:(NSZone *)zone<br>{<br>    Product *copy = [[Product alloc] <br>            initWithProductName:[self productName]<br>            price:[self price]];<br>    [copy setDelegate:[self delegate]];<br>    <br>    return copy;<br>}
+
+</pre></blockquote><p>Because implementation details associated with inherited instance variables are encapsulated in the superclass, it is generally better to implement NSCopying with the <code>alloc</code>, <code>init...</code> approach. Doing so uses policy implemented in set methods to determine the kind of copying needed of instance variables.<p>
+
+<h3>
+
+<a name="116">
+
+ Using NSCopyObject()
+
+</a>
+
+</h3>
+
+When a class inherits NSCopying behavior, you must consider the possibility that the superclass's implementation uses <code>NSCopyObject()</code>. <code>NSCopyObject</code><code>()</code> creates an exact shallow copy of an object by copying instance variable values but not the data they point to. For example, NSCell's implementation of <code>copyWithZone:</code> could be defined in the following way.<p>
+
+<blockquote><pre>- (id)copyWithZone:(NSZone *)zone<br>{<br>    NSCell *cellCopy = NSCopyObject(self, 0, zone);<br>    /* Assume that other initialization takes place here. */<br>    <br>    cellCopy-&gt;image = nil;<br>    [cellCopy setImage:[self image]];<br>    <br>    return cellCopy;<br>}
+
+</pre></blockquote><p>In the implementation above, <code>NSCopyObject</code><code>()</code> creates an exact shallow copy of the original cell. This behavior is desirable for copying instance variables that aren't pointers or are pointers to non-retained data that is shallowly copied. Pointer instance variables for retained objects need additional treatment.<p>
+
+In the <code>copyWithZone:</code> example above, <code>image</code> is a pointer to a retained object. The policy to retain the image is reflected in the following implementation of the<code> setImage:</code> accessor method.<p>
+
+<blockquote><pre>- (void)setImage:(NSImage *)anImage<br>{<br>    [image autorelease];<br>    image = [anImage retain];<br>}
+
+</pre></blockquote><p>Notice that <code>setImage:</code> autoreleases <code>image</code> before it reassigns it. If the above implementation of <code>copyWithZone:</code> hadn't explicitly set the copy's <code>image</code> instance variable to <code>nil</code> before invoking <code>setImage:</code>, the image referenced by the copy and the original would be released without a corresponding retain.<p>
+
+Even though <code>image</code> points to the right object, it is conceptually uninitialized. Unlike the instance variables that are created with <code>alloc</code> and <code>init...</code>, these uninitialized variables aren't <code>nil</code>-valued. You should explicitly assign initial values to these variables before using them. In this case, <code>cellCopy</code>'s <code>image</code> instance variable is set to <code>nil</code>, then it is set using the <code>setImage:</code> method.<p>
+
+The effects of <code>NSCopyObject()</code> extend to a subclass's implementation. For example, an implementation of NSSliderCell could copy a new <code>titleCell</code> instance variable in the following way.<p>
+
+<blockquote><pre>- (id)copyWithZone:(NSZone *)zone<br>{<br>    NSSliderCell *cellCopy = [super copyWithZone:zone];<br>    /* Assume that other initialization takes place here. */<br>    <br>    cellCopy-&gt;titleCell = nil;<br>    [cellCopy setTitleCell:[self titleCell]];<br>    <br>    return cellCopy;<br>}
+
+</pre></blockquote><p>The superclass's <code>copyWithZone:</code> method is invoked to copy inherited instance variables. When you invoke a superclass's <code>copyWithZone:</code> method, assume that new object instance variables are uninitialized if there's any chance that the superclass implementation uses <code>NSCopyObject()</code>. Explicitly assign a value to them before using them. In this example, <code>titleCell</code> is explicitly set to <code>nil</code> before <code>setTitleCell:</code> is invoked.<p>
+
+The implementation of an object's retain count is another consideration when using <code>NSCopyObject()</code>. If an object stores its retain count in an instance variable, the implementation of <code>copyWithZone:</code> must correctly initialize the copy's retain count. The following figure illustrates the process.<p>
+
+<p><img src="../NSCopying1.gif"><p> <p>
+
+The first object represents a Product instance in memory. The value in <code>refCount</code> indicates that the instance has been retained three times. The second object is a copy of the Product instance produced with <code>NSCopyObject()</code>. Its <code>refCount</code> value matches the original. The third object represents the copy returned from <code>copyWithZone:</code> after <code>refCount</code> is correctly initialized. After <code>copyWithZone:</code> creates the copy with <code>NSCopyObject()</code>, it assigns the value 1 to the <code>refCount</code> instance variable. The sender of <code>copyWithZone:</code> implicitly retains the copy and is responsible for releasing it.<p>
+
+<h3>
+
+<a name="130">
+
+ NSCopying and Immutable Classes
+
+</a>
+
+</h3>
+
+Where the concept "immutable vs. mutable" applies to an object, NSCopying produces immutable copies whether the original is immutable or not. See the NSMutableCopying protocol for details on making mutable copies.<p>
+
+Immutable classes can implement NSCopying very efficiently. Since immutable objects don't change, there is no need to duplicate them. Instead, NSCopying can be implemented to <code>retain</code> the original. For example, <code>copyWithZone:</code> for an immutable string class can be implemented in the following way.<p>
+
+<blockquote><pre>- (id)copyWithZone:(NSZone *)zone<br>{<br>    return [self retain];<br>}
+
+</pre></blockquote><p><h3>
+
+<a name="134">
+
+ Summary
+
+</a>
+
+</h3>
+
+<ul><li>Implement NSCopying using <code>alloc</code> and <code>init...</code> in classes that don't inherit <code>copyWithZone:</code>.<p>
+
+<li>Implement NSCopying by invoking the superclass's <code>copyWithZone:</code> when NSCopying behavior is inherited. If the superclass implementation might use <code>NSCopyObject()</code>, make explicit assignments to pointer instance variables for retained objects.<p>
+
+<li>Implement NSCopying by retaining the original instead of creating a new copy when the class and its contents are immutable.<p>
+
+</ul><HR WIDTH="50%" ALIGN="LEFT">
+
+<a name="instm"></a>
+
+<h2>Instance Methods</h2>  
+
+
+
+
+
+<a name="139"></a>
+
+<h3>
+
+ <a name="//apple_ref/occ/intfm/NSCopying/copyWithZone:">copyWithZone:</a>
+
+</h3>
+
+- (id)<code>copyWithZone:</code>(NSZone *)<em>zone
+
+</em>
+
+<P>Returns a new instance that's a copy of the receiver. Memory for the new instance is allocated from <em>zone</em>, which may be NULL. If <em>zone</em> is NULL, the new instance is allocated from the default zone, which is returned from <code>NSDefaultMallocZone()</code>. The returned object is implicitly retained by the sender, who is responsible for releasing it. The copy returned is immutable if the consideration "immutable vs. mutable" applies to the receiving object; otherwise the exact nature of the copy is determined by the class. <p>
+
+<B>See also: </B>  
+
+<code><a href="../NSMutableCopying.html#//apple_ref/occ/intfm/NSMutableCopying/mutableCopyWithZone:" target="_top">- mutableCopyWithZone:</code> (NSMutableCopying protocol)</a>, <code><a href="../../Classes/NSObject/NSObject.html#//apple_ref/occ/instm/NSObject/copy" target="_top">- copy</code> (NSObject)</a>
+
+<p>
+
+ 
+
+ 
+
+
+
+
+
+<i>Copyright &#169; 1997, Apple Computer, Inc.   All rights
+
+reserved.</i>
+
+
+
+<!-- Last updated: 06/17/97 16:32:33 -->
+
+
+
+</body>
+
+</html>
+

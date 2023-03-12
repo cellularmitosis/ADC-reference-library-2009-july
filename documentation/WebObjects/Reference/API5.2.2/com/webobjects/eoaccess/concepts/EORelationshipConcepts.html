@@ -1,0 +1,140 @@
+  A relationship is directional: One entity is considered the source, and
+  the other is considered the destination. The relationship belongs to the
+  source entity, and may only be traversed from source to destination. To
+  simulate a two-way relationship you have to create an EORelationship for
+  each direction. Although the relationship is directional, no inverse is
+  implied (although an inverse relationship may exist).<p>
+  A relationship maintains an array of joins identifying attributes from the
+  related entities (see the EOJoin class specification for more information).
+  Most relationships simply relate the objects of one entity to those of
+  another by comparing attribute values between them. Such a relationship
+  must be defined as to-one or to-many based on how many objects of the
+  destination match each object of the source. This is called the <b>
+  cardinality</b> of the relationship. In a to-one relationship, there must
+  be exactly one destination object for each source object; in a to-many
+  relationship there can be any number of destination objects for each
+  source object.<p>
+  A chain of relationships across several entities can be flattened,
+  creating a single relationship that spans them all. For example, suppose
+  you have a relationship between movies and directors, and a relationship
+  between directors and talent. You can traverse these relationships to
+  create a flattened relationship going directly from movies to talent. A
+  flattened relationship is determined to be to-many or to-one based on the
+  relationships it spans; if all are to-one, then the flattened relationship
+  is to-one, but if any of them is to-many the flattened relationship is
+  to-many.<p>
+  Like the other major modeling classes, EORelationship provides a user
+  dictionary that the application can use to store application-specific
+  information related to the relationship.<p>
+  <h2>Specifying the Join Semantic</h2>
+  The relationship holds the join semantic; you can specify this semantic with
+  <em>setJoinSemantic</em> . There are four types of join semantic :
+  <em>InnerJoin , FullOuterJoin , LeftOuterJoin , and RightOuterJoin</em> . An
+  inner join produces results only for destinations of the join relationship
+  that have non-NULL values. A full outer join produces results for all
+  source records, regardless of the values of the relationships. A left
+  outer join preserves rows in the left (source) table, keeping them even if
+  there's no corresponding row in the right table, while a right outer join
+  preserves rows in the right (destination) table. Note that not all join
+  semantics are supported by all database servers.<p>
+  <h2>Creating a Simple Relationship</h2>
+  A simple relationship is defined by the attributes it compares in
+  connecting its source and destination entities. Each source-destination
+  pair of attributes is encapsulated in an EOJoin object. For example, to
+  create a relationship from the Movie entity to the Studio entity, a join
+  has to be created from the <em>studioId</em> attribute of the Movie entity
+  to the same attribute of the Studio entity. The values of these two
+  attributes must be equal for a match to result. Note that <em>studioId</em>
+  is the primary key attribute for the Studio entity, so there can only be
+  one studio per movie; this relationship is therefore to-one.<p>
+  This code excerpt creates an EORelationship for the relationship described
+  above and adds it to the EOEntity for the Movie entity:<p>
+  <code>
+  <blockcode><pre>
+  EOEntity movieEntity;//Assume this exists.
+  EOEntity studioEntity;//Assume this exists.
+  EOAttribute studioIDAttribute;
+  EOAttribute movieStudioIDAttribute;
+  EOJoin toStudioJoin;
+  EORelationship toStudioRelationship;
+  studioIDAttribute =studioEntity.attributeNamed("studioId ");
+  movieStudioIDAttribute =movieEntity.attributeNamed("studioId ");
+  toStudioJoin =new EOJoin(movieStudioIDAttribute,studioIDAttribute);
+  toStudioRelationship =new EORelationship();
+  toStudioRelationship.setName("studio ");
+  movieEntity.addRelationship(toStudioRelationship);
+  toStudioRelationship.addJoin(toStudioJoin);
+  toStudioRelationship.setToMany(false);
+  toStudioRelationship.setJoinSemantic(EORelationship.InnerJoin);
+  </pre></blockquote>
+  </code><p>
+  This code first gets the attributes from the source and destination
+  entities, and then creates an EOJoin with them. Next, a new EORelationship
+  is created, its name is set, and it's added to <em>movieEntity</em> . The
+  EOJoin is added to the relationship and the relationship is set to be
+  to-one. Finally, in the <em>setJoinSemantic</em> line, <em>InnerJoin</em>
+  indicates that only objects that actually have a matching destination
+  object will be included in the result when the relationship is traversed.
+  Creating a to-many relationship in the opposite direction merely swaps the
+  source and destination attributes, and assigns the relationship to the
+  EOEntity for the Studio entity:<p>
+  <code>
+  <blockcode><pre>
+  EOJoin toMoviesJoin;
+  EORelationship toMoviesRelationship;
+  toMoviesJoin =new EOJoin(studioIDAttribute,movieStudioIDAttribute);
+  toMoviesRelationship =new EORelationship();
+  toMoviesRelationship.setName("movies ");
+  studioEntity.addRelationship(toMoviesRelationship);
+  toMoviesRelationship.addJoin(toMoviesJoin);
+  toMoviesRelationship.setToMany(true);
+  toMoviesRelationship.setJoinSemantic(EORelationship.InnerJoin);
+  </pre></blockquote>
+  </code><p>
+  Note that this relationship is to-many precisely because the destination
+  attribute isn't the primary key for its entity (Movie), and therefore isn't
+  unique with regard to that entity.<p>
+  A relationship isn't restricted to only one EOJoin. It's entirely possible
+  for a relationship to be defined based on two or more attributes in the
+  source and destination entities. For example, consider an employees
+  database that contains a picture of each employee identified by first and
+  last name. you'd define the relationship by joining each of the first and
+  last names in the Employee entity to the same attribute in the
+  <em>EmpPhoto</em> attribute.
+  A simple relationship is considered to reference all of the attributes in
+  its joins. You can use the <em>referencesProperty</em> method to find out
+  if an EORelationship references a particular attribute.<p>
+  <h2>Creating a Flattened Relationship</h2>
+  A flattened relationship depends on several simple relationships already
+  existing. Assuming that several do exist, creating a flattened
+  relationship is straightforward. For example, suppose that the Movie
+  entity has a to-many relationship to the Director entity, called
+  <em>toDirectors</em> . The Director entity in turn has a relationship to the
+  Talent entity called <em>toTalent</em> . In the Movies database, the
+  Director table acts as an intermediate table between Movie and Talent. In
+  this situation, it make sense to flatten the relationship Movies has to
+  Director(<em>toDirectors</em>) to give Movie access to the Talent table
+  through Director's <em>toTalent</em> relationship. For more discussion of
+  when to use flattened relationships, refer to the chapters "Designing
+  Enterprise Objects" and "Advanced Enterprise Object Modeling" in the
+  <i><b>Enterprise Objects Framework Developer's Guide</b></i>.<p>
+  This code excerpt creates a flattened relationship from Movie to Talent:<p>
+  <code>
+  <blockcode><pre>
+  EOEntity movieEntity;//Assume this exists.
+  EORelationship toDirectorsRelationship =new EORelationship();
+  toDirectorsRelationship.setEntity(movieEntity);
+  toDirectorsRelationship.setName("directors ");
+  toDirectorsRelationship.setDefinition:("toDirector.toTalent ");
+  movieEntity.addRelationship(toDirectorsRelationship);
+  </pre></blockquote>
+  </code><p>
+  All that's needed to establish the relationship is a data path (also
+  called the definition) naming each component relationship connected, with
+  the names separated by periods. Note that because the cardinality of a
+  flattened relationship is determinable from its components, no
+  <em>setToMany</em> message is required here.<p>
+  A simple relationship is considered to reference all of the relationships
+  in its definition, plus every attribute referenced by the component
+  relationships. You can use the <em>referencesProperty</em> method to find
+  out if an EORelationship references another relationship or attribute.<p>

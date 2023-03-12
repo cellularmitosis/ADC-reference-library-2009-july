@@ -1,0 +1,102 @@
+<html><head><title>Answers to Common Design Questions</title></head>
+<body bgcolor="#ffffff">
+
+<!--start of banner -->
+<!--#include virtual="/includes/framesetheader" -->
+<!-- end of banner -->
+
+<!--start of path -->
+<font face="Geneva,Helvetica,Arial" size="1">
+<b>PATH<spacer type="horizontal" size="5">&nbsp;</b>
+ <a href="../../../../../webobjects.html" target="_top">WebObjects 4.0 Documentation</a> <b>&gt;</b>
+ <a href="GuideTOC.html" target="_top">EOF Developer's Guide</a>
+</font>
+<br><br>
+<!--end of path -->
+
+ 
+<a href="FAQ.html"><IMG SRC="ArrowUp.gif">Table of Contents</a> <a href="FAQ5.html"><IMG SRC="ArrowLeft.gif">Previous Section</a>
+ 
+<a name="3679">
+<h1> How Are Enterprise Objects Cleaned Up?</h1>
+</a><a name="7246">
+If you use an EODisplayGroup to fetch enterprise objects into your application, you might wonder:<p>
+</a><ul><a name="1080">
+<li>Who "owns" the objects?
+</a><a name="1081">
+<li>How do they get cleaned up?
+</a><a name="1082">
+<li>How are their snapshots cleaned up?
+</a><a name="1083">
+<li>What happens if you have reference cycles?
+</a></ul><a name="1084">
+In applications that fetch a lot of enterprise objects or are long-running, these are important questions. How they're answered depends on what language you're using. However, regardless of language, you don't typically have to worry about any of these issues. With Java's garbage collection, enterprise objects and their related resources are automatically cleaned up when they are no longer in use.<p>
+</a><a name="7244">
+In Objective-C, as long as you follow the object ownership conventions defined in the Foundation framework, enterprise objects and their related resources are similarly deallocated automatically. The following sections provide more information on how this happens in Objective-C Enterprise Objects Framework applications.<p>
+</a><a name="7245">
+For more general information on this automatic object disposal mechanism in Objective-C, see the introduction to the <em>Foundation Framework Reference.</em><p>
+</a><a name="1085">
+<h2> Who Owns an Enterprise Object?</h2>
+</a><a name="7221">
+In design terms, one object might own another; but in the Foundation Framework, no object really "owns" another. Rather, one or more objects may "retain" another object. If one object retains another, it has a responsibility to release it when it no longer needs the other object. In &#32;Enterprise Objects Framework applications, an enterprise object is retained by other enterprise objects that have a relationship to it. An enterprise object is also retained by an EODisplayGroup object that fetches and displays it.<p>
+</a><a name="1087">
+<h2> How Does an Enterprise Object Get Deallocated?</h2>
+</a><a name="1108">
+In a Enterprise Objects Framework applications, an enterprise object is retained by other enterprise objects that have a relationship to it and by any EODisplayGroup objects that fetch and display it. Typically, enterprise objects are deallocated automatically when they are no longer referenced by other objects. You don't ordinarily manage the deallocation of enterprise objects explicitly.<p>
+</a><a name="1112">
+Accessor methods that manage relationships to one or more enterprise objects also release objects when they no longer need to reference them. For example, the following method releases an employee's old manager before assigning a new one:<p>
+</a><pre><a name="1113">- (void)setManager:(Employee *)aManager<br>
+{<br>
+	[self willChange];<br>
+	[manager autorelease];<br>
+	manager = [aManager retain];<br>
+}
+</a></pre><a name="1110">
+If an enterprise object class doesn't implement accessor methods for a relationship, the Framework automatically releases and retains the destination objects. Similarly, an EODisplayGroup object releases its enterprise objects immediately before it fetches a new set of objects or immediately before it is deallocated itself. Unless you explicitly retain an enterprise object, it is automatically deallocated when its display group stops displaying it.<p>
+</a><a name="1088">
+If you <em>do</em> explicitly retain an enterprise object (either by sending it a retain message or by adding it to a collection), the enterprise object is not deallocated until you release it (either by sending it a <strong>release</strong> message or, if it's in a collection, by releasing its collection).<p>
+</a><a name="1111">
+Methods for getting enterprise objects without using an EODisplayGroup don't automatically retain objects. For example, the objects returned from EODataSource's <strong>fetchObjects</strong> method and EOEditingContext's <strong>objectsWithFetchSpecification:</strong> method are not retained by any object. Unless you retain them, they will be deallocated automatically.<p>
+</a><a name="1089">
+<h2> How Are an Object's Snapshots Deallocated?</h2>
+</a><a name="1090">
+Enterprise Objects Framework keeps two kinds of snapshots:<p>
+</a><ul><a name="1091">
+<li>Object snapshots that are maintained by EOEditingContexts
+</a><a name="1092">
+<li>Row snapshots that are maintained by EODatabaseContexts 
+</a></ul><a name="1093">
+An object snapshot is deallocated at the same time its enterprise object is deallocated. A row snapshot, however, is only invalidated when its EODatabaseContext is deallocated or when it receives an <strong>invalidateAllObjects</strong> message or <strong>invalidateObjectWithGlobalID:</strong> message. Multiple EOEditingContexts may use a single EODatabaseContext object and its row snapshots. As a result, it isn't practical to deallocate a row snapshot when a corresponding enterprise object is deallocated. An enterprise object in another EOEditingContext may still reference the snapshot. To deallocate row snapshots explicitly, use one of the <strong>invalidate...</strong> methods.<p>
+</a><a name="1094">
+<h2> What Happens If You Have Retain Cycles?</h2>
+</a><a name="1095">
+A retain cycle occurs when two objects retain one another. They may retain one another directly, or indirectly through a collection or another object. Retain cycles occur quite commonly in Enterprise Objects Framework applications. For example, if an Employee object has a relationship to a Department object, the Department object probably has a relationship to its employees as well. Normally an object retains the objects to which it has a relationship, so the reciprocal relationships between Employee and Department objects form a retain cycle.<p>
+</a><a name="1096">
+Objects in a cycle stay in memory until the cycle is broken. If the cycle is never broken, the objects stay in memory until the process exits. Too many unbroken retain cycles degrade an application's performance.<p>
+</a><a name="1097">
+One strategy for handling retain cycles is to ensure that none are created. If you don't need reciprocal relationships, don't create them. Reciprocal relationships, however, are very useful. You are more likely to use one of the following approaches for handling retain cycles.<p>
+</a><a name="1098">
+<h3> invalidateObjectsWhenFreed</h3>
+</a><a name="1099">
+Retain cycles between objects can be broken automatically when their EOEditingContext is deallocated. To break retain cycles automatically, set the EOEditingContext's <strong>invalidatesObjectsWhenFreed</strong> attribute to YES, which is the default. This approach works well in multi-document applications in which EOEditingContexts are deallocated when their windows close.<p>
+</a><a name="1100">
+<h3> invalidateAllObjects</h3>
+</a><a name="1101">
+In applications that aren't multi-document, you can break cycles by sending an <strong>invalidateAllObjects</strong> message to an EOEditingContext's root EOObjectStore. You typically invalidate enterprise objects after saving changes to the database or after reverting.<p>
+</a><a name="6484">
+<h3> invalidateAllObjects</h3>
+</a><a name="7234">
+This method replaces all the associated enterprise objects with EOFault objects, eliminating retain cycles in the process. It has the side-effect of invalidating all the enterprise objects in a peer editing context as well.<p>
+</a>
+<P>
+ 
+<a href="FAQ.html"><IMG SRC="ArrowUp.gif">Table of Contents</a> <a href="FAQ7.html"><IMG SRC="ArrowRight.gif">Next Section</a>
+<P>
+
+
+<!--start of footer -->
+<!--#include virtual="/includes/framesetfooter" -->
+<!-- end of footer -->
+
+</body>
+</html>

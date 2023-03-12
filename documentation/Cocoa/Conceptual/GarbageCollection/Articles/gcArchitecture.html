@@ -1,0 +1,134 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+<head>
+	<title>Garbage Collection Programming Guide: Architecture</title>
+	<meta id="Generator" name="Generator" content="Gutenberg"/>
+	<meta id="GeneratorVersion" name="GeneratorVersion" content="v132"/>
+	<meta http-equiv="content-type" content="text/html;charset=utf-8"/>
+	<meta id="Copyright" name="Copyright" content="Copyright 2009 Apple Inc. All Rights Reserved."/>
+	<meta id="IndexTitle" name="IndexTitle" content="Architecture"/>
+	<meta id="xcode-display" name="xcode-display" content="render"/>
+	<meta id="toc-file" name="toc-file" content="../toc.html"/>
+	<meta id="RESOURCES" content="../../../../Resources" />
+	
+	<link rel="stylesheet" type="text/css" href="../../../../Resources/CSS/frameset_styles.css"/>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/lib/prototype.js"></script>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/lib/scriptaculous.js"></script>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/page.js"></script>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/pedia.js"></script>
+	<!--[if lte IE 6]>
+		<style type="text/css">
+			/*<![CDATA[*/ 
+			html {overflow-x:auto; overflow-y:hidden;  }
+			/*]]>*/
+		</style>
+	<![endif]-->
+</head>
+<body bgcolor="#ffffff" onload="initialize_page();"><a name="//apple_ref/doc/uid/TP40002451" title="Architecture"></a>
+    <noscript>
+    <div id="tocMenu">
+        <iframe id="toc_content" name="toc_content" SRC="../toc.html" width="210" height="100%" align="left" frameborder="0">This document set is best viewed in a browser that supports iFrames.</iframe>
+    </div>
+    </noscript>
+    <div id="bodyText">
+        <a name="top"></a>
+        <div class="hideOnPrint hideInXcode">
+        <!-- start of header -->
+        <!--#include virtual="/includes/framesetheader" -->
+        <!-- end of header -->
+        </div>
+        
+        <!-- start of path -->
+<div class="breadcrumb hideOnPrint hideInXcode"><a href="http://developer.apple.com/" target="_top">ADC Home</a> &gt; <a href="../../../../../referencelibrary/index.html#//apple_ref/doc/uid/TP30000943" target="_top">Reference Library</a> &gt; <a href="../../../../index.html#//apple_ref/doc/uid/TP30000440" target="_top">Guides</a> &gt; <a href="../../../index.html#//apple_ref/doc/uid/TP30000440-TP30000416" target="_top">Cocoa</a> &gt; <a href="../../../ObjectiveCLanguage-date.html#//apple_ref/doc/uid/TP30000440-TP30000416-TP30000856" target="_top">Objective-C Language</a> &gt; <a href="../index.html" target="_top">Garbage Collection Programming Guide</a> &gt; </div><br class="hideInXcode"/><!-- end of path -->
+        
+        <div class="mini_nav_text" align="left">
+        <span class="navButtons">
+        <a href="gcAdoption.html">&lt; Previous Page</a><span style="margin-left: 8px"><a href="gcUsing.html">Next Page &gt;</a></span>
+        </span>
+        <span id="showHideTOCUpperSpan">
+        <a href="#" onclick="showHideTOC();"><img src="../../../../Resources/Images/show_toc_icon.gif" width="15" height="14" border="0" style="margin-bottom: -2px;" alt="" hideText="Hide TOC" showText="Show TOC" /></a> <a href="#" onclick="showHideTOC();">Hide TOC</a>
+        </span>
+        </div>
+        
+        
+        <a name="//apple_ref/doc/uid/TP40002451-SW1" title="Architecture"></a><hr /><H1>Architecture</H1><p>Garbage collection simplifies memory management and makes it easier to ensure thread and exception safety. It also avoids common problems such as retain cycles, and simplifies some code patterns (such as accessor methods in Cocoa). Together these make applications more robust.</p>
+<!-- This template is being used for both PDF and HTML. -->
+
+    
+    <!-- TopicBook.pm uses this template for its miniTOCs, but needs a different title. -->
+    <h4>Contents:</h4>
+    
+    
+    <p class="blockquote">
+    
+        
+			
+			
+				<a href="gcArchitecture.html#//apple_ref/doc/uid/TP40002451-SW6">Motivation and Design Goals</a>
+				
+			<br/>
+			
+        
+			
+			
+				<a href="gcArchitecture.html#//apple_ref/doc/uid/TP40002451-SW7">High-Level Architecture</a>
+				
+			<br/>
+			
+        
+			
+			
+				<a href="gcArchitecture.html#//apple_ref/doc/uid/TP40002451-SW4">Write Barriers</a>
+				
+			<br/>
+			
+        
+
+    </p><br/>
+
+<a name="//apple_ref/doc/uid/TP40002451-SW6" title="Motivation and Design Goals"></a><h2>Motivation and Design Goals</h2><p>Garbage collection systems were first developed around 1960 and have undergone much research and refinement since then. Most garbage collection systems restrict direct access to memory pointers. This has the benefit that you never have to be concerned about memory errors—either leaks due to cyclic data structures or due to the use of a dangling pointer. The Objective-C language, however, has no such restrictions on pointer use. Although a few garbage collection systems have been developed for use with the C language, their assumptions and performance make them unsuitable for use with Cocoa objects. Cocoa therefore uses a custom non-copying conservative garbage collection system that in normal use brings safety and a simplified programming model.</p><p>Restricted pointer access-languages allow for fully-automatic garbage collection. If you program purely in objects, then garbage collection in Cocoa can also be fully automatic. Beyond programming purely in objects, however, the collector also provides access to a new collection-based memory allocation system. Core Foundation objects are also garbage collected, but you must follow specific rules to allocate and dispose of them properly. In order to understand how you can take advantage of these features, you need to understand some of the architectural details described in this document.</p><p>The immediate benefits of garbage collection can be highlighted using a simple class definition and implementation. The Widget class is declared as follows:</p><div class="codesample"><table><tr><td scope="row"><pre>@interface Widget : NSObject<span></span></pre></td></tr><tr><td scope="row"><pre>{<span></span></pre></td></tr><tr><td scope="row"><pre>@private<span></span></pre></td></tr><tr><td scope="row"><pre>    Widget *nextWidget;<span></span></pre></td></tr><tr><td scope="row"><pre>}<span></span></pre></td></tr><tr><td scope="row"><pre>- (Widget *)nextWidget;<span></span></pre></td></tr><tr><td scope="row"><pre>- (void)setNextWidget:(Widget *)aWidget;<span></span></pre></td></tr><tr><td scope="row"><pre>@end<span></span></pre></td></tr></table></div><p><span class="content_text"><a href="gcArchitecture.html#//apple_ref/doc/uid/TP40002451-SW2">Listing 1</a></span> illustrates a full-featured, thread-safe, traditional Cocoa implementation of the Widget class. </p><a name="//apple_ref/doc/uid/TP40002451-SW2" title="Listing 1Full-featured implementation of the Widget class"></a><p class="codesample"><strong>Listing 1&nbsp;&nbsp;</strong>Full-featured implementation of the Widget class</p><div class="codesample"><table><tr><td scope="row"><pre>@implementation Widget<span></span></pre></td></tr><tr><td scope="row"><pre>- (Widget *)nextWidget<span></span></pre></td></tr><tr><td scope="row"><pre>{<span></span></pre></td></tr><tr><td scope="row"><pre>    @synchronized(self)<span></span></pre></td></tr><tr><td scope="row"><pre>    {<span></span></pre></td></tr><tr><td scope="row"><pre>        return [[nextWidget retain] autorelease];<span></span></pre></td></tr><tr><td scope="row"><pre>    }<span></span></pre></td></tr><tr><td scope="row"><pre>}<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>- (void)setNextWidget:(Widget *)aWidget<span></span></pre></td></tr><tr><td scope="row"><pre>{<span></span></pre></td></tr><tr><td scope="row"><pre>    @synchronized(self)<span></span></pre></td></tr><tr><td scope="row"><pre>    {<span></span></pre></td></tr><tr><td scope="row"><pre>        if (nextWidget != aWidget)<span></span></pre></td></tr><tr><td scope="row"><pre>        {<span></span></pre></td></tr><tr><td scope="row"><pre>            [nextWidget release];<span></span></pre></td></tr><tr><td scope="row"><pre>            nextWidget = [aWidget retain];<span></span></pre></td></tr><tr><td scope="row"><pre>         }<span></span></pre></td></tr><tr><td scope="row"><pre>    }<span></span></pre></td></tr><tr><td scope="row"><pre>}<span></span></pre></td></tr><tr><td scope="row"><pre>@end<span></span></pre></td></tr></table></div><p>There are many other permutations that trade increased speed for less safety (see <span class="content_text"><a href="../../ModelObjects/Articles/moAccessorMethods.html#//apple_ref/doc/uid/TP40002132" target="_top">Basic Accessor Methods</a></span>).</p><p>If you do not implement memory management correctly, your application will suffer from memory leaks that bloat its memory footprint, or even worse, from dangling pointers which lead to crashes. Retain cycles, or circular references, can cause significant problems in traditional Cocoa programming (see, for example, <span class="content_text"><a href="../../MemoryMgmt/Articles/mmObjectOwnership.html#//apple_ref/doc/uid/20000043" target="_top">Object Ownership and Disposal</a></span>). Consider the following trivial example.</p><div class="codesample"><table><tr><td scope="row"><pre>Widget *widget1 = [[Widget alloc] init];<span></span></pre></td></tr><tr><td scope="row"><pre>Widget *widget2 = [[Widget alloc] init];<span></span></pre></td></tr><tr><td scope="row"><pre>[widget1 setNextWidget:widget2];<span></span></pre></td></tr><tr><td scope="row"><pre>[widget2 setNextWidget:widget1];<span></span></pre></td></tr></table></div><p>If you use manual memory management and the accessor methods described earlier, this sets up a retain cycle between the two widgets and is likely to lead to a memory leak.</p><p>If you use a garbage collector, the implementation of the Widget class is much simpler.</p><div class="codesample"><table><tr><td scope="row"><pre>@implementation Widget<span></span></pre></td></tr><tr><td scope="row"><pre>- (Widget *)nextWidget<span></span></pre></td></tr><tr><td scope="row"><pre>{<span></span></pre></td></tr><tr><td scope="row"><pre>    return nextWidget;<span></span></pre></td></tr><tr><td scope="row"><pre>}<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>- (void)setNextWidget:(Widget *)aWidget<span></span></pre></td></tr><tr><td scope="row"><pre>{<span></span></pre></td></tr><tr><td scope="row"><pre>    nextWidget = aWidget;<span></span></pre></td></tr><tr><td scope="row"><pre>}<span></span></pre></td></tr><tr><td scope="row"><pre>@end<span></span></pre></td></tr></table></div><p>Retain cycles are not a problem if you use garbage collection: as soon as both objects become unreachable, they are marked for deletion.</p><a name="//apple_ref/doc/uid/TP40002451-SW7" title="High-Level Architecture"></a><h2>High-Level Architecture</h2><p>The garbage collector is implemented as a reusable library (called “auto”). The Objective-C runtime is a client of the library.</p><br/><div><img src = "../Art/gc_architecture.jpg" alt = "Representation of the system architecture." ></div><br/><p>The collector does not scan all areas of memory (see <span class="content_text"><a href="gcArchitecture.html#//apple_ref/doc/uid/TP40002451-SW5">Figure 1</a></span>). The stack and global variables are always scanned; the malloc zone is never scanned. The collector provides a special area of memory known as the auto zone from which all garbage-collected blocks of memory are dispensed. You can use the collector to allocate blocks of memory in the auto zone—these blocks are then managed by the collector. </p><a name="//apple_ref/doc/uid/TP40002451-SW8" title="How the Garbage Collector Works"></a><h3>How the Garbage Collector Works</h3><p>The mechanism of garbage collection is fairly simple to describe although the implementation is more complicated. The garbage collector's goal is to form a set of <strong>reachable</strong> objects that constitute the "valid" objects in your application. When a collection is initiated, the collector initializes the set with all known <strong>root</strong> objects such as stack-allocated and global variables (for example, the <code>NSApplication</code> shared instance). The collector then recursively follows <strong>strong</strong> references from these objects to other objects, and adds these to the set. All objects that are <em>not</em> reachable through a chain of strong references to objects in the root set are designated as “garbage”. At the end of the collection sequence, the garbage objects are finalized and immediately afterwards the memory they occupy is recovered.</p><br/><div><a name="//apple_ref/doc/uid/TP40002451-SW5" title="Figure 1Scanned and unscanned memory"></a><p><strong>Figure 1&nbsp;&nbsp;</strong>Scanned and unscanned memory</p><img src = "../Art/gc_reach.jpg" alt = "Illustration of the reach of the garbage collector." ></div><br/><p>There are several points of note regarding the collector:</p><ul class="spaceabove"><li class="li"><p>The collector is conservative—it never compacts the heap by moving blocks of memory and updating pointers. Once allocated, an object always stays at its original memory location.</p></li><li class="li"><p>The collector is both request and demand driven. The Cocoa implementation makes requests at appropriate times. You can also programmatically request consideration of a garbage collection cycle, and if a memory threshold has been exceeded a collection is run automatically. </p></li><li class="li"><p>The collector runs on its own thread in the application. At no time are all threads stopped for a collection cycle, and each thread is stopped for as short a time as is possible. It is possible for threads requesting collector actions to block during a critical section on the collector thread's part. Only threads that have directly or indirectly performed an <code>[NSThread self]</code> operation are subject to garbage collection. </p></li><li class="li"><p>The collector is generational (see <span class="content_text"><a href="gcArchitecture.html#//apple_ref/doc/uid/TP40002451-SW4">“Write Barriers”</a></span>)—most collections are very fast and recover significant amounts of recently-allocated memory, but not all possible memory. Full collections are also fast and do collect all possible memory, but are run less frequently, at times unlikely to impact user event processing, and may be aborted in the presence of new user events. </p></li></ul><a name="//apple_ref/doc/uid/TP40002451-SW3" title="Closed vs. Open Systems"></a><h3>Closed vs. Open Systems</h3><p>Most garbage collection systems are “closed”—that is, the language, compiler, and runtime collaborate to be able to identify the location of every pointer reference to a collectable block of memory. This allows such collectors to reallocate and copy blocks of memory and update each and every referring pointer to reflect the new address. The movement has the beneficial effect of compacting memory and eliminating memory wastage due to fragmentation. </p><p>In contrast to closed collection systems, “open” systems allow pointers to garbage collected blocks to reside anywhere, and in particular where pointers reside in stack frames as local variables. Such garbage collectors are deemed "conservative." Their design point is often that since programmers can spread pointers to any and all kinds of memory, then all memory must be scanned to determine unreachable (garbage) blocks. This leads to frequent long collection times to minimize memory use. Memory collection is instead often delayed, leading to large memory use which, if it induces paging, can lead to very long pauses. As a result, conservative garbage collection schemes are not widely used.</p><p>Cocoa's garbage collector strikes a balance between being “closed” and “open” by knowing exactly where pointers to scanned blocks are wherever it can, by easily tracking "external" references, and being "conservative" only where it must. By tracking the allocation age of blocks, and using write barriers, the Cocoa collector also implements partial (“incremental” or “generational”) collections which scan an even smaller amount of the heap. This eliminates the need for the collector to have to scan all of memory seeking global references and provides a significant performance advantage over traditional conservative collectors. </p><a name="//apple_ref/doc/uid/TP40002451-SW4" title="Write Barriers"></a><h2>Write Barriers</h2><p>In most applications, objects are typically short-lived—they are created on a temporary basis, consulted, and never used again. Cocoa's Garbage Collector is <strong>generational</strong>—it divides allocated memory into "generations" and prioritizes recovery of memory from the newest generations. This means that the memory from short-lived objects can often be reclaimed quickly and easily. </p><p>In order to recover these objects, the compiler introduces what is known as a write-barrier whenever it detects that an object pointer is stored (“assigned”) into another object, or more completely, whenever a pointer to a garbage collected block of memory is stored into either another garbage collected block (or into global memory).</p><a name="//apple_ref/doc/uid/TP40002451-SW9" title="What Does a Write-Barrier Do?"></a><h3>What Does a Write-Barrier Do?</h3><p>Within the collector, memory is split into several generations—old and newer. The write-barrier simply marks a "clump" of objects when a "newer" object is stored somewhere within an older. The number of "clumps" of older generation objects that get marked is usually very low. When an incremental garbage collection is requested, the stack and the objects within marked clumps are examined recursively for "newer" objects that have been attached and are now reachable. These "newer" objects are then marked "older" (promoted). All unreachable "newer" objects are reclaimed after any necessary finalization.</p><p>A generational collection does not discover any older generation objects that are no longer reachable and so, over time, the oldest generation needs to be examined with a "full" collection. In principle there can be many generations—a generational collection in the midst of work with a lot of temporary objects will promote the temporary objects to an older generation where they could be recovered without resorting to a full collection. The Cocoa collector runs with 2 to 8 generations.</p><a name="//apple_ref/doc/uid/TP40002451-SW10" title="Write-Barrier Implementation"></a><h3>Write-Barrier Implementation</h3><p>Consider the following example.</p><div class="codesample"><table><tr><td scope="row"><pre>static id LastLink;<span></span></pre></td></tr><tr><td scope="row"><pre>@interface Link2 : NSObject {<span></span></pre></td></tr><tr><td scope="row"><pre>    id theLink;<span></span></pre></td></tr><tr><td scope="row"><pre>}<span></span></pre></td></tr><tr><td scope="row"><pre>- link;<span></span></pre></td></tr><tr><td scope="row"><pre>- (void)setLink:newLink;<span></span></pre></td></tr><tr><td scope="row"><pre>@end<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>@implementation Link2<span></span></pre></td></tr><tr><td scope="row"><pre>- link {<span></span></pre></td></tr><tr><td scope="row"><pre>    return theLink;<span></span></pre></td></tr><tr><td scope="row"><pre>}<span></span></pre></td></tr><tr><td scope="row"><pre>- (void)setLink: newLink<span></span></pre></td></tr><tr><td scope="row"><pre>{<span></span></pre></td></tr><tr><td scope="row"><pre>    theLink = newLink;<span></span></pre></td></tr><tr><td scope="row"><pre>    LastLink = newLink;<span></span></pre></td></tr><tr><td scope="row"><pre>}<span></span></pre></td></tr><tr><td scope="row"><pre>@end<span></span></pre></td></tr></table></div><p>Behind the scenes the compiler calls an intrinsic helper function to deal with the assignment and when garbage collection is enabled the helper function calls into the collector to note the store of a pointer. Effectively the two assignments within <code>setLink:</code> are rewritten by the compiler to be: </p><div class="codesample"><table><tr><td scope="row"><pre>objc_assignIvar(newLink, self, offsetof(theLink));<span></span></pre></td></tr><tr><td scope="row"><pre>objc_assignGlobal(newlink, &amp;LastLink);<span></span></pre></td></tr></table></div><p>These helper functions are almost without cost when not running with garbage collection—there is only a two instruction penalty. At runtime, if garbage collection is enabled these routines are rewritten at startup to include the write-barrier logic. </p>
+
+        <br/><br/> 
+
+        <div class="mini_nav_text" align="left">
+        <span class="navButtons">
+        <a href="gcAdoption.html">&lt; Previous Page</a><span style="margin-left: 8px"><a href="gcUsing.html">Next Page &gt;</a></span>
+        </span>
+        <span id="showHideTOCLowerSpan">
+        <a href="#" onclick="showHideTOC();"><img src="../../../../Resources/Images/show_toc_icon.gif" width="15" height="14" border="0" style="margin-bottom: -2px;" alt="" /></a> <a href="#" onclick="showHideTOC();">Hide TOC</a>
+        </span>
+        </div>
+
+        <br/><hr /><div align="center"><p class="content_text" lang="en" dir="ltr"> <!--#if expr="0=1" -->&#x00a9; 2008 Apple Inc. All Rights Reserved. &#40;<!--#endif -->Last updated: 2008-11-19<!--#if expr="0=1" -->&#041;<!--#endif --></p></div>
+
+        
+        <div class="hideOnPrint hideInXcode">
+        <!-- start of footer -->
+        	<table width="100%" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/documentation/Cocoa/Conceptual/GarbageCollection/Articles/gcArchitecture.html%3Fid%3DTP40002431-1.6&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/documentation/Cocoa/Conceptual/GarbageCollection/Articles/gcArchitecture.html%3Fid%3DTP40002431-1.6&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/documentation/Cocoa/Conceptual/GarbageCollection/Articles/gcArchitecture.html%3Fid%3DTP40002431-1.6&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+
+        <!--#include virtual="/includes/framesetfooter" -->
+        <!-- end of footer -->
+        </div>
+    </div>
+</body>
+</html>

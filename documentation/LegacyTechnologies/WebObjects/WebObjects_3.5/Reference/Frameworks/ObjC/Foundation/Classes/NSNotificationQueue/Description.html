@@ -1,0 +1,254 @@
+<html><head><title></title></head>
+
+<body bgcolor="#ffffff">
+
+ 
+
+ 
+
+<h1>
+
+<FONT COLOR="#000066">
+
+<a name="81">
+
+ <a name="//apple_ref/occ/cl/NSNotificationQueue">NSNotificationQueue </a>
+
+</a>
+
+</FONT>
+
+</h1>
+
+<p><B>Inherits From:</B><BR>  
+
+NSObject
+
+
+
+<p><B>Conforms To:</B><BR>
+
+NSObject (NSObject)
+
+
+
+<p><B>Declared In:	</B><BR>
+
+Foundation/NSNotificationQueue.h
+
+
+
+<p><a name="112"></a>
+
+<a name="description"></a>
+
+<H2>Class Description
+
+</H2>
+
+NSNotificationQueue objects (or simply,<em> notification queues</em>) act as buffers for notification centers (instances of NSNotificationCenter). A notification queue maintains notifications (instances of NSNotification) generally in a First In First Out (FIFO) order. When a notification rises to the front of the queue, the queue posts it to the notification center, which in turn dispatches the notification to all objects registered as observers. <p>
+
+Every thread has a default notification queue, which is associated with the default notification center for the task. You can create your own notification queues and have multiple queues per center and thread. <p>
+
+<h3>
+
+<a name="115">
+
+ Coalescing Notifications
+
+</a>
+
+</h3>
+
+NSNotificationQueue contributes two important features to the Foundation Kit's notification mechanism: the coalescing of notifications and asynchronous posting. <em>Coalescing</em> is a process that removes notifications in the queue that are similar to the notification just queued. If the new item is similar to a notification already queued, the new one isn't queued, and all similar notifications (except the first one in the queue) are removed. However, you should not depend on this particular coalescing behavior.<p>
+
+You indicate the criteria for similarity by specifying NSNotificationCoalescing constants in the third argument of <code>enqueueNotification:postingStyle:coalesceMask:forModes:</code> <p>
+
+<ul><li><code>NSNotificationNoCoalescing</code>. Do not coalesce notifications in the queue.<p>
+
+<li><code>NSNotificationCoalescingOnName</code>. Coalesce notifications with the same name.<p>
+
+<li><code>NSNotificationCoalescingOnSender</code>. Coalesce notifications with the same object.<p>
+
+</ul>You can OR the constants together to specify more than one.<p>
+
+<h3>
+
+<a name="122">
+
+ Asynchronously Posting Notifications
+
+</a>
+
+</h3>
+
+With NSNotificationCenter's <code>postNotification:</code> and its variants, you can post a notification immediately to a notification center. However, the invocation of the method is synchronous: Before the posting object can resume its thread of execution, it must wait until the notification center dispatches the notification to all observers and returns. With NSNotificationQueue's <code>enqueueNotification:postingStyle: </code>and<code> enqueueNotification:postingStyle:coalesceMask:forModes</code>:, however, you can post a notification asynchronously by putting it on the queue. These methods immediately return to the invoking object after putting the notification in the queue.<p>
+
+Posting to a notification queue can occur in one of three different styles. The posting style is an argument to both <code>enqueueNotification:...</code> methods:<p>
+
+<ul><li><code>NSPostASAP</code>. The notification is posted at the end of the current notification callout or timer.<p>
+
+<li><code>NSPostWhenIdle</code>. The notification is posted when the run loop is idle.<p>
+
+<li><code>NSPostNow</code>. The notification is posted immediately after coalescing.<p>
+
+</ul><B><dt>Note:	</B>
+
+See "Enqueuing with Different Posting Styles," below, for details on and examples of enqueuing 
+
+notifications with the three <code>postingStyle:</code> constants.
+
+What is the difference between enqueuing notifications with NSPostNow and posting notifications (using NSNotificationCenter's <code>postNotification...</code> methods)? Both post notifications immediately (but synchronously) to the notification center. The difference is that <code>enqueueNotification:...</code> (with NSPostNow as the posting style) coalesces notifications in the queue before posting while <code>postNotification:</code> does not.<p>
+
+<code>enqueueNotification:postingStyle:coalesceMask:forModes:</code> also allows you to control the posting of a notification based on the run loop mode. For example, if you specify NSModalPanelRunLoopMode, the notification will not be posted unless the current run loop is in NSModalPanelRunLoopMode. See the NSRunLoop class specification for more information on run loop modes.<p>
+
+<h3>
+
+<a name="131">
+
+ Enqueuing with Different Posting Styles
+
+</a>
+
+</h3>
+
+Any notification queued with the NSPostASAP style is posted to the notification center when the code executing in the current run loop callout completes. Callouts can be Application Kit event messages, file descriptor changes, timers, or other asynchronous notifications. You typically use the NSPostASAP posting style for an expensive resource, such as the Display PostScript server. When many clients draw on the window buffer during a callout, it's expensive to flush the buffer to the Display PostScript server after every draw operation. So in this case, each <code>draw...</code> method enqueues some notification such as "FlushTheServer"<code> </code>with coalescing on name and object specified, and a posting style of NSPostASAP. As a result, only one of those notifications is dispatched at the end of the current callout, and the window buffer is flushed only once.<p>
+
+A notification queued with the NSPostWhenIdle style is posted only when the run loop is in a wait state. In this state, there's nothing in the run loop's input channels, be it timers or other asynchronous notifications. A typical example of queuing with the NSPostWhenIdle style occurs when the user types text, and the program displays the size of the text in bytes somewhere. It would be very expensive (and not very useful) to update the text field size after each character the user types, especially if the user types quickly. In this case, the program queues a notification, such as "ChangeTheDisplayedSize," with coalescing turned on and a posting style of NSPostWhenIdle after each character typed. When the user stops typing, the single "ChangeTheDisplayedSize" notification in the queue (due to coalescing) is posted when the run loop is in a wait state, and the display is updated. Note that a run loop that is about to exit (which occurs when all of the input channels have expired) is not in a wait state and thus will not post a notification. <p>
+
+A notification queued with NSPostNow is posted immediately after coalescing to the notification center. You queue a notification with NSPostNow (or post one with NSNotificationCenter's <code>postNotification:</code>) when you do not require asynchronous calling behavior. For many programming situations, synchronous behavior is not only allowable but desirable: You want the notification center to return after dispatching so you can be sure that observing objects have received the notification. Of course, you should use <code>enqueueNotification... </code>with NSPostNow rather than use <code>postNotification:</code> when there are similar notifications in the queue that you want to remove through coalescing.<p>
+
+<a name="135">
+
+<HR WIDTH=50% ALIGN=LEFT>
+
+<h2>Method Types
+
+</h2>
+
+</a><dl>
+
+<dt>Creating and Initializing Notification Queues<dd><dl><dd><dl><dd><dl><dd><dl>
+
+<dt><a href="#//apple_ref/occ/clm/NSNotificationQueue/defaultQueue">+ defaultQueue</a><dt><a href="#//apple_ref/occ/instm/NSNotificationQueue/init">- init</a><dt><a href="#//apple_ref/occ/instm/NSNotificationQueue/initWithNotificationCenter:">- initWithNotificationCenter:</a></dl></dd>
+
+</dl></dd></dl></dd></dl></dd><dt>Inserting and Removing Notifications From a Queue<dd><dl><dd><dl><dd><dl><dd><dl>
+
+<dt><a href="#//apple_ref/occ/instm/NSNotificationQueue/dequeueNotificationsMatching:coalesceMask:">- dequeueNotificationsMatching:coalesceMask:</a><dt><a href="#//apple_ref/occ/instm/NSNotificationQueue/enqueueNotification:postingStyle:">- enqueueNotification:postingStyle:</a><dt><a href="#//apple_ref/occ/instm/NSNotificationQueue/enqueueNotification:postingStyle:coalesceMask:forModes:">- enqueueNotification:postingStyle:coalesceMask:forModes:</a></dl></dd>
+
+</dl></dd></dl></dd></dl></dd></dl>
+
+<HR WIDTH=50% ALIGN=LEFT>
+
+<a name="143"></a>
+
+<a name="clm"></a>
+
+<h2>Class Methods</h2>  
+
+
+
+
+
+<a name="144"></a>
+
+<h3>
+
+ <a name="//apple_ref/occ/clm/NSNotificationQueue/defaultQueue">defaultQueue</a>
+
+</h3>
+
++ (NSNotificationQueue *)<code>defaultQueue</code>
+
+<P>Returns the default NSNotificationQueue object for the current thread. This object always uses the default notification center object for the same task.<p>
+
+<HR WIDTH=50% ALIGN=LEFT>
+
+<a name="instm"></a>
+
+<h2>Instance Methods</h2>  
+
+
+
+
+
+<a name="148"></a>
+
+<h3>
+
+ <a name="//apple_ref/occ/instm/NSNotificationQueue/dequeueNotificationsMatching:coalesceMask:">dequeueNotificationsMatching:coalesceMask:</a>
+
+</h3>
+
+- (void)<code>dequeueNotificationsMatching:</code>(NSNotification *)<em>notification<br></em><code>coalesceMask:</code>(unsigned)<em>coalesceMask</em><em>	</em>
+
+<P>Removes all notifications from the queue that match <em>notification</em>'s attributes as specified by <em>coalesceMask</em>. The mask (set using NSNotificationCoalescing constants) can specify notification name, notification object, or both.<p>
+
+<hr WIDTH=25% ALIGN=LEFT>
+
+<a name="151"></a>
+
+<h3> <a name="//apple_ref/occ/instm/NSNotificationQueue/enqueueNotification:postingStyle:">enqueueNotification:postingStyle:</a></h3>
+
+- (void)<code>enqueueNotification:</code>(NSNotification *)<em>notification<br></em><code>postingStyle:</code>(NSPostingStyle)<em>postingStyle</em><em>	</em>
+
+<P>Puts <em>notification</em> in the queue. The queue posts <em>notification</em> to the<em> </em>notification center at the time indicated by <em>postingStyle</em><em>. </em>The notification queue posts in all run loop modes, and it coalesces only notifications in the queue that match both the notification's name and object<em>.</em><p>
+
+This method invokes <code>enqueueNotification:postingStyle:coalesceMask:forModes:</code>.<p>
+
+<hr WIDTH=25% ALIGN=LEFT>
+
+<a name="155"></a>
+
+<h3> <a name="//apple_ref/occ/instm/NSNotificationQueue/enqueueNotification:postingStyle:coalesceMask:forModes:">enqueueNotification:postingStyle:coalesceMask:forModes:</a></h3>
+
+- (void)<code>enqueueNotification:</code>(NSNotification *)<em>notification<br></em><code>postingStyle:</code>(NSPostingStyle)<em>postingStyle<br></em><code>coalesceMask:</code>(unsigned)<em>coalesceMask<br></em><code>forModes:</code>(NSArray *)<em>modes</em>
+
+<P>Puts <em>notification</em> in the queue. The queue posts <em>notification</em> to the notification center at the time indicated by<em> </em><em>postingStyle</em><em>,</em> but only if the run loop is in a mode identified by one of the string objects in the <em>modes</em> array. The notification queue coalesces related notifications in the queue as specified by <em>coalesceMask</em> (set using NSNotificationCoalescing constants). If <em>modes</em> is <code>nil</code>, all run loop modes are valid for posting.<p>
+
+<hr WIDTH=25% ALIGN=LEFT>
+
+<a name="158"></a>
+
+<h3> <a name="//apple_ref/occ/instm/NSNotificationQueue/init">init</a></h3>
+
+- (id)<code>init</code>
+
+<P>Initializes and returns an NSNotificationQueue that uses the default notification center to post notifications. This method invokes <code>initWithNotificationCenter:</code> with the default notification center as the argument.<p>
+
+<hr WIDTH=25% ALIGN=LEFT>
+
+<a name="161"></a>
+
+<h3> <a name="//apple_ref/occ/instm/NSNotificationQueue/initWithNotificationCenter:">initWithNotificationCenter:</a></h3>
+
+- (id)<code>initWithNotificationCenter:</code>(NSNotificationCenter *)<em>notificationCenter</em>
+
+<P>Initializes and returns an NSNotificationQueue that uses the notification center specified in <em>notificationCenter</em> to post notifications. This method is the designated initializer.<p>
+
+<p>
+
+
+
+ 
+
+ 
+
+
+
+
+
+<i>Copyright &#169; 1997, Apple Computer, Inc.   All rights
+
+reserved.</i>
+
+
+
+<!-- Last updated: 06/17/97 16:50:51 -->
+
+
+
+</body>
+
+</html>
+

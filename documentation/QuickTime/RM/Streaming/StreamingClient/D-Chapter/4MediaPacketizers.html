@@ -1,0 +1,532 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+<head>
+	<title>QuickTime Streaming Guide: Media Packetizers</title>
+	<meta id="Generator" name="Generator" content="Gutenberg"/>
+	<meta id="GeneratorVersion" name="GeneratorVersion" content="v132"/>
+	<meta http-equiv="content-type" content="text/html;charset=utf-8"/>
+	<meta id="Copyright" name="Copyright" content="Copyright 2009 Apple Inc. All Rights Reserved."/>
+	<meta id="IndexTitle" name="IndexTitle" content="Media Packetizers"/>
+	<meta id="xcode-display" name="xcode-display" content="render"/>
+	<meta id="toc-file" name="toc-file" content="../toc.html"/>
+	<meta id="RESOURCES" content="../../../../../Resources" />
+	
+	<link rel="stylesheet" type="text/css" href="../../../../../Resources/CSS/frameset_styles.css"/>
+	<script language="JavaScript" type="text/javascript" src="../../../../../Resources/JavaScript/lib/prototype.js"></script>
+	<script language="JavaScript" type="text/javascript" src="../../../../../Resources/JavaScript/lib/scriptaculous.js"></script>
+	<script language="JavaScript" type="text/javascript" src="../../../../../Resources/JavaScript/page.js"></script>
+	<script language="JavaScript" type="text/javascript" src="../../../../../Resources/JavaScript/pedia.js"></script>
+	<!--[if lte IE 6]>
+		<style type="text/css">
+			/*<![CDATA[*/ 
+			html {overflow-x:auto; overflow-y:hidden;  }
+			/*]]>*/
+		</style>
+	<![endif]-->
+</head>    
+<body bgcolor="#ffffff" onload="initialize_page();"><a name="//apple_ref/doc/uid/TP30001145-MediaPacketizers" title="Media Packetizers"></a>
+    <noscript>
+    <div id="tocMenu">
+        <iframe id="toc_content" name="toc_content" SRC="../toc.html" width="210" height="100%" align="left" frameborder="0">This document set is best viewed in a browser that supports iFrames.</iframe>
+    </div>
+    </noscript>
+    <div id="bodyText">
+        <a name="top"></a>
+        <div class="hideOnPrint hideInXcode">
+        <!-- start of header -->
+        <!--#include virtual="/includes/framesetheader" -->
+        <!-- end of header -->
+        </div>
+        
+        <!-- start of path -->
+<div class="breadcrumb hideOnPrint hideInXcode"><a href="http://developer.apple.com/" target="_top">ADC Home</a> &gt; <a href="../../../../../../referencelibrary/index.html#//apple_ref/doc/uid/TP30000943" target="_top">Reference Library</a> &gt; <a href="../../../../../index.html#//apple_ref/doc/uid/TP30000440" target="_top">Guides</a> &gt; <a href="../../../../index.html#//apple_ref/doc/uid/TP30000440-TP30000433" target="_top">QuickTime</a> &gt; <a href="../../../../Streaming-date.html#//apple_ref/doc/uid/TP30000440-TP30000433-TP30000577" target="_top">Streaming</a> &gt; <a href="../A-Intro/1Introduction.html#//apple_ref/doc/uid/TP30001145-IntroductiontoQuickTimeStreamingGuide-DontLinkElementID_51">QuickTime Streaming Guide</a> &gt; </div><br class="hideInXcode"/><!-- end of path -->
+        
+        <div class="mini_nav_text" align="left">
+        <span class="navButtons">
+        <a href="../C-Chapter/3UsingQuickTimeStrea.html">&lt; Previous Page</a><span style="margin-left: 8px"><a href="../E-Chapter copy/5PacketReassemblers.html">Next Page &gt;</a></span>
+        </span>
+        <span id="showHideTOCUpperSpan">
+        <a href="#" onclick="showHideTOC();"><img src="../../../../../Resources/Images/show_toc_icon.gif" width="15" height="14" border="0" style="margin-bottom: -2px;" alt="" hideText="Hide TOC" showText="Show TOC" /></a> <a href="#" onclick="showHideTOC();">Hide TOC</a>
+        </span>
+        </div>
+
+        <hr />
+        
+        
+        <a name="//apple_ref/doc/uid/TP30001145-MediaPacketizers-SW1" title="Media Packetizers"></a>
+<h1>Media Packetizers</h1>
+
+<p>Media packetizers are components that understand how to break QuickTime media into packets for RTP transmission. Packet reassemblers are components that understand how to put those packets back together to reconstitute the media. Packetizers and reassemblers are written in pairs; one to packetize for transmission, the other to reassemble during reception. Media packetizers are used during live transmissions and during the creation of hint tracks. Packet reassemblers are used when receiving streaming content.</p>
+<p>RTP transmission is a best-effort delivery system. Over the Internet, it is inherently lossy. Packets may be dropped and not retransmitted; they may arrive out of order or after substantial delay. For streaming to work under these conditions, the sender and receiver must deal intelligently with unpredictable loss. In QuickTime, this intelligence resides primarily in the packetizers and reassemblers.</p>
+<p>For example, a packetizer may break a video frame into a grid of independently coherant rectangles. If a packet is lost, only one rectangle needs to be discarded; the rest of the video frame can be reconstructed. The reassembler in this case might substitute the old rectangle for that part of the grid when a packet is lost, or slowly fade that rectangle to black, or use some other recovery scheme.</p>
+<p>QuickTime includes a generic packetizer/reassembler pair that works with most QuickTime content. It also includes specialized packetizer/reassembler pairs optimized for specific media types and compression formats, such as Sorenson video, Qualcomm Purevoice audio, and QDesign music.</p>
+
+
+<a name="//apple_ref/doc/uid/TP30001145-MediaPacketizers-DontLinkElementID_29" title="Writing Media Packetizers"></a>
+<h2><a name="//apple_ref/doc/uid/TP30001145-MediaPacketizers-WritingMediaPacketizers" title="Writing Media Packetizers"></a>Writing Media Packetizers</h2>
+<p>You can write your own packetizer/reassembler pairs and add them to QuickTime. You might want to do this if you have written your own codec, for example, or if you have a particularly clever scheme for packing media or recovering from packet loss.</p>
+<a name="//apple_ref/doc/uid/TP30001145-MediaPacketizers-DontLinkElementID_30" title="Passing Non-Media Data"></a>
+<h3><a name="//apple_ref/doc/uid/TP30001145-MediaPacketizers-PassingNonMediaData" title="Passing Non-Media Data"></a>Passing Non-Media Data</h3>
+<p>Media packetizers and packet reassemblers are generally concerned with media sample data, such as video frames or audio samples. QuickTime movies commonly contain track-level information, such as a transformation matrix, or audio volume, that is applied to the sample data but is not embedded in it.</p>
+<p>Packetizers and reassemblers can optionally support the passing of this type of data. If your packetizer supports passing of a particular type of information, such as audio volume or transformation matrix, it should indicate this in its public resource (as described in <span class="content_text"><a href="4MediaPacketizers.html#//apple_ref/doc/uid/TP30001145-MediaPacketizers-ThepckiPublicResource">The 'pcki' Public Resource</a></span>).</p>
+<p>In the course of normal operations, a media packetizer may receive a <code>SetInfo</code> command that specifies this type of information. A packetizer that can send a transformation matrix, for example, could receive such a call whenever the matrix changes. It is up to the packetizer to package this information in a way that will be recognized by the reassembler and to send it along.</p>
+<p>When a reassembler receives this type of information, it signals the fact by calling <code><a href="../../../../Reference/QTRef_Streaming/Reference/reference.html#//apple_ref/c/func/RTPRssmSendStreamHandlerChanged" target="_top">RTPRssmSendStreamHandlerChanged</a></code>. It may then receive a series of <code>GetInfo</code> calls to determine what information it has. It passes the information in response to these calls, and QuickTime does the rest.</p>
+
+<a name="//apple_ref/doc/uid/TP30001145-MediaPacketizers-DontLinkElementID_31" title="The &#39;pcki&#39; Public Resource"></a>
+<h3><a name="//apple_ref/doc/uid/TP30001145-MediaPacketizers-ThepckiPublicResource" title="The &#39;pcki&#39; Public Resource"></a>The 'pcki' Public Resource</h3>
+<p>A packetizer must provide a public resource of type <code><!--a target="_top" -->'pcki'<!--/a--></code>. The public resource contains information about the capabilities of a given packetizer. This information lists the media types and compression formats the packetizer can work with. It also lists the track characteristics the packetizer can work with, such as layers or transformation matrices. In addition, it provides information about the packetizer&#8217;s performance characteristics, such as its speed or ability to recover from packet loss.</p>
+<p>QuickTime selects the packetizer best suited to the media, compression format, and track characteristics. If there are multiple packetizers that can work with a given track, performance is considered.</p>
+<p>For example, one packetizer might be able to pack H.261-compressed video, but be unable to handle any transformation matrix other than identity. Another packetizer might also do H.261 and be able to handle any kind of transformation matrix. If a matrix was being used to scale and translate the media, QuickTime would select the more versatile packetizer. If there were no matrix applied to the track, QuickTime might select the faster packetizer for a live transmission, and the packetizer that dealt best with loss when creating a hint track.</p>
+<p>A movie that contains streaming tracks can be played from a local disk or served via HTTP. You can create a client movie with a streaming track that contains the URL of a server movie, then embed the client movie in a website or distribute it on a CD-ROM. When the movie is played, the user&#8217;s computer will establish a network connection to the specified server for each streaming track.</p>
+<p>The format of the public resource is defined in <code>QTStreamingComponents</code>.<code>r</code>. It is shown in Listing 3-1.</p>
+<a name="//apple_ref/doc/uid/TP30001145-MediaPacketizers-DontLinkElementID_67" title="Listing 3-1Format of the &#39;pcki&#39; resource"></a>
+<p class="codesample"><strong>Listing 3-1&nbsp;&nbsp;</strong>Format of the 'pcki' resource</p>
+<div class="codesample"><table><tr><td scope="row"><pre>type 'pcki' {<span></span></pre></td></tr><tr><td scope="row"><pre>&#160;&#160;&#160;&#160;hex longintmediaType;<span></span></pre></td></tr><tr><td scope="row"><pre>&#160;&#160;&#160;&#160;hex longintdataFormat;<span></span></pre></td></tr><tr><td scope="row"><pre>&#160;&#160;&#160;&#160;hex longintvendor;<span></span></pre></td></tr><tr><td scope="row"><pre>&#160;&#160;&#160;&#160;hex longintcapabilityFlags;<span></span></pre></td></tr><tr><td scope="row"><pre>&#160;&#160;&#160;&#160;byte&#160;&#160;&#160;&#160;canPackMatrixType;<span></span></pre></td></tr><tr><td scope="row"><pre>&#160;&#160;&#160;&#160;byte = 0;<span></span></pre></td></tr><tr><td scope="row"><pre>&#160;&#160;&#160;&#160;byte = 0;<span></span></pre></td></tr><tr><td scope="row"><pre>&#160;&#160;&#160;&#160;byte = 0;<span></span></pre></td></tr><tr><td scope="row"><pre>&#160;&#160;&#160;&#160;longint = $$CountOf(characteristicArray); /* Array size*/<span></span></pre></td></tr><tr><td scope="row"><pre>&#160;&#160;&#160;&#160;array characteristicArray {<span></span></pre></td></tr><tr><td scope="row"><pre>&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;hex longinttag;<span></span></pre></td></tr><tr><td scope="row"><pre>&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;hex longint value;<span></span></pre></td></tr><tr><td scope="row"><pre>&#160;&#160;&#160;&#160;};&#160;&#160;<span></span></pre></td></tr><tr><td scope="row"><pre>&#160;&#160;&#160;&#160;hex longintpayloadFlags;<span></span></pre></td></tr><tr><td scope="row"><pre>&#160;&#160;&#160;&#160;byte&#160;&#160;&#160;&#160;payloadID;&#160;&#160;&#160;&#160;&#160;&#160;/* if static payload */<span></span></pre></td></tr><tr><td scope="row"><pre>&#160;&#160;&#160;&#160;byte = 0;<span></span></pre></td></tr><tr><td scope="row"><pre>&#160;&#160;&#160;&#160;byte = 0;<span></span></pre></td></tr><tr><td scope="row"><pre>&#160;&#160;&#160;&#160;byte = 0;<span></span></pre></td></tr><tr><td scope="row"><pre>&#160;&#160;&#160;&#160;cstring;<span></span></pre></td></tr><tr><td scope="row"><pre>};<span></span></pre></td></tr></table></div>
+
+<p>The first three fields describe the media type, data format (compression format), and the manufacturer. The media type and data format are matched against the given track and media information when deciding whether to use a given packetizer. If your packetizer supports multiple compression formats, set <code>dataFormat</code> to 0. If it supports multiple media types, set <code>mediaType</code> to 0. The vendor field is for informational purposes only.</p>
+<p>The <code>capabilityFlags</code> field can contain a combination of these flag constants:</p>
+
+<div class="codesample"><table><tr><td scope="row"><pre>enum {<span></span></pre></td></tr><tr><td scope="row"><pre>&#160;&#160;&#160;&#160;kMediaPacketizerCanPackEditRate = 1 &#60;&#60; 0,<span></span></pre></td></tr><tr><td scope="row"><pre>&#160;&#160;&#160;&#160;kMediaPacketizerCanPackLayer = 1 &#60;&#60; 1,<span></span></pre></td></tr><tr><td scope="row"><pre>&#160;&#160;&#160;&#160;kMediaPacketizerCanPackVolume = 1 &#60;&#60; 2,<span></span></pre></td></tr><tr><td scope="row"><pre>&#160;&#160;&#160;&#160;kMediaPacketizerCanPackBalance = 1 &#60;&#60; 3,<span></span></pre></td></tr><tr><td scope="row"><pre>&#160;&#160;&#160;&#160;kMediaPacketizerCanPackGraphicsMode = 1 &#60;&#60; 4,<span></span></pre></td></tr><tr><td scope="row"><pre>&#160;&#160;&#160;&#160;kMediaPacketizerCanPackEmptyEdit = 1 &#60;&#60; 5<span></span></pre></td></tr><tr><td scope="row"><pre>};<span></span></pre></td></tr></table></div>
+
+<p>These flags describe a packetizer&#8217;s ability to deal with track characteristics. By indicating a capability, a packetizer says that it can transmit track information (such as a matrix) to the reassembler on the client side, so that it can be used in the client movie. The specific flags have these meanings:</p>
+<div class="tableholder"><table class="graybox" border = "0" cellspacing="0" cellpadding="5">
+
+<tr>
+<th scope="col" align="left" style="font-weight: bold" bgcolor="#CCCCCC"><p>Flag</p></th>
+<th scope="col" align="left" style="font-weight: bold" bgcolor="#CCCCCC"><p>Description</p></th>
+</tr>
+
+
+<tr>
+<td  scope="row"><p><code>kMediaPacketizerCanPackEditRate</code></p></td>
+<td ><p>Changing edit rates. This is usually set for video, since each video frame typically has its own timestamp. Because of this, there isn't really a constant play rate. Sound, on the other hand, does have a play rate. If your packet format doesn't allow specification of non-standard rates, do not set this flag.</p></td>
+</tr>
+<tr>
+<td  scope="row"><p><code>kMediaPacketizerCanPackLayer</code></p></td>
+<td ><p>Only for visual formats. Indicates that you can communicate the layering information for this stream. If your packetizer supports this feature, the layering information from the QuickTime track structure may be passed to you in an <code>RTPMPSetInfo</code> call.</p></td>
+</tr>
+<tr>
+<td  scope="row"><p><code>kMediaPacketizerCanPackVolume</code></p></td>
+<td ><p>Sound only. Indicates you can communicate volume information from the QuickTime track structure.</p></td>
+</tr>
+<tr>
+<td  scope="row"><p><code>kMediaPacketizerCanPackBalance</code></p></td>
+<td ><p>Sound only. Indicates you can communicate sound balance information from the QuickTime track structure.</p></td>
+</tr>
+<tr>
+<td  scope="row"><p><code>kMediaPacketizerCanPackGraphicsMode</code></p></td>
+<td ><p>Video only. Indicates you can transmit the graphics mode and <code>opColor</code> for graphics modes other than <code>ditherCopy</code> and <code>srcCopy</code>.</p></td>
+</tr>
+<tr>
+<td  scope="row"><p><code>kMediaPacketizerCanPackEmptyEdit</code></p></td>
+<td ><p>Empty edits. For sound formats, this is generally set, since the Sound Stream Handler will synthesize silence for any missing packets, which is exactly the intended effect for an empty edit in a sound track. For visual tracks this requires either sending down a duration, so that the Video Stream Handler knows when the frame is supposed to end, or some other method of describing empty edits in the packet format.</p></td>
+</tr>
+<tr>
+<td  scope="row"><p><code>canPackMatrixType</code></p></td>
+<td ><p>Applies only to visual tracks.</p></td>
+</tr>
+
+</table></div>
+<p>The <code>canPackMatrixType</code> flag is one of:</p>
+
+<div class="codesample"><table><tr><td scope="row"><pre>canPackIdentityMatrixType 0x00<span></span></pre></td></tr><tr><td scope="row"><pre>canPackTranslateMatrixType 0x01<span></span></pre></td></tr><tr><td scope="row"><pre>canPackScaleMatrixType 0x02<span></span></pre></td></tr><tr><td scope="row"><pre>canPackScaleTranslateMatrixType 0x03<span></span></pre></td></tr><tr><td scope="row"><pre>canPackLinearMatrixType 0x04<span></span></pre></td></tr><tr><td scope="row"><pre>canPackLinearTranslateMatrixType 0x05<span></span></pre></td></tr><tr><td scope="row"><pre>canPackPerspectiveMatrixType 0x06<span></span></pre></td></tr></table></div>
+
+<p>Note that these are the same values as those defined in <code>ImageCompression.h</code> as return values for <code><a href="../../../../Reference/QTRef_CompDecomp/Reference/reference.html#//apple_ref/c/func/GetMatrixType" target="_top">GetMatrixType</a></code>. The value indicates you can communicate the specified matrix type.</p>
+<p>There are two performance characteristics currently defined:</p>
+
+<div class="codesample"><table><tr><td scope="row"><pre>#define kMediaPacketizerSpeedTag          'sped'    /* 0-255, 255 is fastest */<span></span></pre></td></tr><tr><td scope="row"><pre>#define kMediaPacketizerLossRecoveryTag   'loss'    /* 0-255, 0 can't handle<span></span></pre></td></tr><tr><td scope="row"><pre>&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;any loss, 128 can handle 50% packet loss */  <span></span></pre></td></tr></table></div>
+
+<p>The speed tag is relative to other packetizers for the same media type and compression format. A value of 128 is a reasonable default.</p>
+<p>The <code>payloadFlags</code> field is set to either <code>kRTPMPPayloadTypeDynamicFlag</code> for a dynamic payload type or <code>kRTPMPPayloadTypeStaticFlag</code> for a static payload type.</p>
+<p>The payload ID field of the <code><!--a target="_top" -->'pcki'<!--/a--></code> resource is set to the IETF-defined RTP payload value if a static payload type is used.</p>
+<p>The C string contains the RTP payload type text if a dynamic payload type is used.</p>
+<p>A code example of a resource for a packetizer that supports the <code>'OVAL'</code> video compression format is this:</p>
+
+<div class="codesample"><table><tr><td scope="row"><pre>resource 'thnr' (128) {<span></span></pre></td></tr><tr><td scope="row"><pre>&#160;&#160;&#160;&#160;{<span></span></pre></td></tr><tr><td scope="row"><pre>&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;'pcki', 1, 0,<span></span></pre></td></tr><tr><td scope="row"><pre>&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;'pcki', 128, cmpResourceNoFlags,<span></span></pre></td></tr><tr><td scope="row"><pre>&#160;&#160;&#160;&#160;};<span></span></pre></td></tr><tr><td scope="row"><pre>};&#160;&#160;&#160;&#160;&#160;&#160;<span></span></pre></td></tr><tr><td scope="row"><pre>resource 'pcki' (128) {<span></span></pre></td></tr><tr><td scope="row"><pre>&#160;&#160;&#160;&#160;'vide',&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;// media type<span></span></pre></td></tr><tr><td scope="row"><pre>&#160;&#160;&#160;&#160;'OVAL',&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;// data format type<span></span></pre></td></tr><tr><td scope="row"><pre>&#160;&#160;&#160;&#160;'ABCD',&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;// manufacturer type<span></span></pre></td></tr><tr><td scope="row"><pre>&#160;&#160;&#160;&#160;kMediaPacketizerCanPackEditRate,<span></span></pre></td></tr><tr><td scope="row"><pre>&#160;&#160;&#160;&#160;canPackIdentityMatrixType,<span></span></pre></td></tr><tr><td scope="row"><pre>&#160;&#160;&#160;&#160;{<span></span></pre></td></tr><tr><td scope="row"><pre>&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;kMediaPacketizerSpeedTag, 128,<span></span></pre></td></tr><tr><td scope="row"><pre>&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;kMediaPacketizerLossRecoveryTag, 50<span></span></pre></td></tr><tr><td scope="row"><pre>&#160;&#160;&#160;&#160;},<span></span></pre></td></tr><tr><td scope="row"><pre>&#160;&#160;&#160;&#160;kRTPMPPayloadTypeDynamicFlag,<span></span></pre></td></tr><tr><td scope="row"><pre>&#160;&#160;&#160;&#160;0,<span></span></pre></td></tr><tr><td scope="row"><pre>&#160;&#160;&#160;&#160;"OVAL-49545"<span></span></pre></td></tr><tr><td scope="row"><pre>};<span></span></pre></td></tr></table></div>
+
+<p>This packetizer is of medium speed, can handle some loss, can pack any arbitrary play rate, but can&#8217;t pack any non-identity matrix. Its RTP payload type is a dynamic identifier, identified by the string <code>OVAL-49545</code>.</p>
+
+<a name="//apple_ref/doc/uid/TP30001145-MediaPacketizers-DontLinkElementID_32" title="Media Packetizer Functions"></a>
+<h3><a name="//apple_ref/doc/uid/TP30001145-MediaPacketizers-MediaPacketizerFunctions" title="Media Packetizer Functions"></a>Media Packetizer Functions</h3>
+<p>QuickTime Streaming calls a media packetizer during the course of hinting a movie or during live transmission. The packetizer is passed sample data, which it breaks into packets and passes to a packet builder. The packet builder may then transmit the packets over RTP or use them to create a hint track. The media data is presented to the packetizer in the same format for a live transmission or for hinting, and the packetizer produces the same output in both cases.</p>
+<p>The packetizer component must implement several functions, and must also provide a public component resource that describes the type of media, compression, and track characteristics that the packetizer supports. This resource also provides information on the packetizer&#8217;s relative speed and the format&#8217;s ability to handle loss.</p>
+<p>The following functions can be implemented by media packetizer components. Most of these functions must be implemented in your component, but some are optional.</p>
+<ul class="spaceabove">
+<li class="li"><p><code><a href="../../../../Reference/QTRef_Streaming/Reference/reference.html#//apple_ref/c/func/RTPMPInitialize" target="_top">RTPMPInitialize</a></code></p></li>
+<li class="li"><p><code><a href="../../../../Reference/QTRef_Streaming/Reference/reference.html#//apple_ref/c/func/RTPMPPreflightMedia" target="_top">RTPMPPreflightMedia</a></code></p></li>
+<li class="li"><p><code><a href="../../../../Reference/QTRef_Streaming/Reference/reference.html#//apple_ref/c/func/RTPMPIdle" target="_top">RTPMPIdle</a></code></p></li>
+<li class="li"><p><code><a href="../../../../Reference/QTRef_Streaming/Reference/reference.html#//apple_ref/c/func/RTPMPSetSampleData" target="_top">RTPMPSetSampleData</a></code></p></li>
+<li class="li"><p><code><a href="../../../../Reference/QTRef_Streaming/Reference/reference.html#//apple_ref/c/func/RTPMPReset" target="_top">RTPMPReset</a></code></p></li>
+<li class="li"><p><code><a href="../../../../Reference/QTRef_Streaming/Reference/reference.html#//apple_ref/c/func/RTPMPSetInfo" target="_top">RTPMPSetInfo</a></code></p></li>
+<li class="li"><p><code><a href="../../../../Reference/QTRef_Streaming/Reference/reference.html#//apple_ref/c/func/RTPMPGetInfo" target="_top">RTPMPGetInfo</a></code></p></li>
+<li class="li"><p><code><a href="../../../../Reference/QTRef_Streaming/Reference/reference.html#//apple_ref/c/func/RTPMPSetTimeScale" target="_top">RTPMPSetTimeScale</a></code></p></li>
+<li class="li"><p><code><a href="../../../../Reference/QTRef_Streaming/Reference/reference.html#//apple_ref/c/func/RTPMPGetTimeScale" target="_top">RTPMPGetTimeScale</a></code></p></li>
+<li class="li"><p><code><a href="../../../../Reference/QTRef_Streaming/Reference/reference.html#//apple_ref/c/func/RTPMPSetTimeBase" target="_top">RTPMPSetTimeBase</a></code></p></li>
+<li class="li"><p><code><a href="../../../../Reference/QTRef_Streaming/Reference/reference.html#//apple_ref/c/func/RTPMPGetTimeBase" target="_top">RTPMPGetTimeBase</a></code></p></li>
+<li class="li"><p><code><a href="../../../../Reference/QTRef_Streaming/Reference/reference.html#//apple_ref/c/func/RTPMPHasCharacteristic" target="_top">RTPMPHasCharacteristic</a></code></p></li>
+<li class="li"><p><code><a href="../../../../Reference/QTRef_Streaming/Reference/reference.html#//apple_ref/c/func/RTPMPSetPacketBuilder" target="_top">RTPMPSetPacketBuilder</a></code></p></li>
+<li class="li"><p><code><a href="../../../../Reference/QTRef_Streaming/Reference/reference.html#//apple_ref/c/func/RTPMPGetPacketBuilder" target="_top">RTPMPGetPacketBuilder</a></code></p></li>
+<li class="li"><p><code><a href="../../../../Reference/QTRef_Streaming/Reference/reference.html#//apple_ref/c/func/RTPMPSetMediaType" target="_top">RTPMPSetMediaType</a></code></p></li>
+<li class="li"><p><code><a href="../../../../Reference/QTRef_Streaming/Reference/reference.html#//apple_ref/c/func/RTPMPGetMediaType" target="_top">RTPMPGetMediaType</a></code></p></li>
+<li class="li"><p><code><a href="../../../../Reference/QTRef_Streaming/Reference/reference.html#//apple_ref/c/func/RTPMPSetMaxPacketSize" target="_top">RTPMPSetMaxPacketSize</a></code></p></li>
+<li class="li"><p><code><a href="../../../../Reference/QTRef_Streaming/Reference/reference.html#//apple_ref/c/func/RTPMPGetMaxPacketSize" target="_top">RTPMPGetMaxPacketSize</a></code></p></li>
+<li class="li"><p><code><a href="../../../../Reference/QTRef_Streaming/Reference/reference.html#//apple_ref/c/func/RTPMPSetMaxPacketDuration" target="_top">RTPMPSetMaxPacketDuration</a></code></p></li>
+<li class="li"><p><code><a href="../../../../Reference/QTRef_Streaming/Reference/reference.html#//apple_ref/c/func/RTPMPGetMaxPacketDuration" target="_top">RTPMPGetMaxPacketDuration</a></code></p></li>
+<li class="li"><p><code><a href="../../../../Reference/QTRef_Streaming/Reference/reference.html#//apple_ref/c/func/RTPMPDoUserDialog" target="_top">RTPMPDoUserDialog</a></code></p></li>
+<li class="li"><p><code><a href="../../../../Reference/QTRef_Streaming/Reference/reference.html#//apple_ref/c/func/RTPMPSetSettingsFromAtomContainerAtAtom" target="_top">RTPMPSetSettingsFromAtomContainerAtAtom</a></code></p></li>
+<li class="li"><p><code><a href="../../../../Reference/QTRef_Streaming/Reference/reference.html#//apple_ref/c/func/RTPMPGetSettingsIntoAtomContainerAtAtom" target="_top">RTPMPGetSettingsIntoAtomContainerAtAtom</a></code></p></li>
+<li class="li"><p><code><a href="../../../../Reference/QTRef_Streaming/Reference/reference.html#//apple_ref/c/func/RTPMPGetSettingsAsText" target="_top">RTPMPGetSettingsAsText</a></code></p></li>
+</ul>
+
+<a name="//apple_ref/doc/uid/TP30001145-MediaPacketizers-DontLinkElementID_33" title="Sequence of Events"></a>
+<h3><a name="//apple_ref/doc/uid/TP30001145-MediaPacketizers-SequenceofEvents" title="Sequence of Events"></a>Sequence of Events</h3>
+<p>When QuickTime is asked to provide a packetizer, it selects the packetizer based on the media type, data format, and other characteristics, such as whether a matrix transformation is in use. It selects the packetizer best able to handle the media and track characteristics by examining the packetizer&#8217;s public resource.</p>
+<p>Once a packetizer has been selected, it is opened. It is then asked to preflight the media, to verify that it can actually packetize the desired media data. If the packetizer indicates that it can handle the media, it is initialized. The packetizer then receives a series of setup calls required to prepare it for operation. These calls deliver information such as the media time scale and the packet builder to use for output.</p>
+<p>Once setup is complete, the packetizer receives a series of calls with sample data. If the packetizer can process the data immediately, it does so; otherwise it returns a flag that indicates it is still processing the data. In the latter case, the packetizer&#8217;s <code>Idle</code> function is called perodically until the packetizer has completed its processing. When it is ready, the packetizer creates packets by making calls to a packet builder component.</p>
+<p>The packetizer is then called again with more sample data. This continues until all the media data has been packetized.</p>
+<p>At any time in this process, the packetizer can be asked to return information, or to flush its input buffer, or to reset itself and prepare for a new sequence.</p>
+
+<a name="//apple_ref/doc/uid/TP30001145-MediaPacketizers-DontLinkElementID_34" title="Packetizer Component Type and Subtype"></a>
+<h3><a name="//apple_ref/doc/uid/TP30001145-MediaPacketizers-PacketizerComponentTypeandSubtype" title="Packetizer Component Type and Subtype"></a>Packetizer Component Type and Subtype</h3>
+<p>Packetizers have a component type of <code>kRTPMediaPacketizerType</code> <code>('rtpm'</code>). The subtype can be any four-character combination. Note, however, that all-lowercase types are reserved by Apple.</p>
+
+<a name="//apple_ref/doc/uid/TP30001145-MediaPacketizers-DontLinkElementID_35" title="Media Preflight"></a>
+<h3><a name="//apple_ref/doc/uid/TP30001145-MediaPacketizers-MediaPreflight" title="Media Preflight"></a>Media Preflight</h3>
+<p>Once QuickTime has selected and opened a packetizer component, it will call the packetizer&#8217;s <code><a href="../../../../Reference/QTRef_Streaming/Reference/reference.html#//apple_ref/c/func/RTPMPPreflightMedia" target="_top">RTPMPPreflightMedia</a></code> function to verify that the packetizer can handle the specific media and sample description. A packetizer can reject media as a result of this call, even if the media fits the profile described in the packetizer&#8217;s public resource.</p>
+<p>For example, the <code><!--a target="_top" -->'pcki'<!--/a--></code> resource for the Qualcomm PureVoice audio packetizer indicates support for audio media and PureVoice compression, but the packetizer only supports 8 kHz sample rates over RTP. The <code><a href="../../../../Reference/QTRef_Streaming/Reference/reference.html#//apple_ref/c/func/RTPMPPreflightMedia" target="_top">RTPMPPreflightMedia</a></code> call to this packetizer returns <code>noErr</code> for 8 kHz audio, and an error for any other sample rate.</p>
+<p>The media preflight function is defined as follows:</p>
+
+<div class="codesample"><table><tr><td scope="row"><pre>pascal ComponentResult RTPMPPreflightMedia(RTPMediaPacketizer rtpm,<span></span></pre></td></tr><tr><td scope="row"><pre>&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;OSType inMediaType,<span></span></pre></td></tr><tr><td scope="row"><pre>&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;SampleDescriptionHandle inSampleDescription);<span></span></pre></td></tr></table></div>
+
+<p>This call is made to make sure your packetizer can handle a given media type and sample description. Return <code>noErr</code> if you can support it. Return <code>qtsUnsupportedFeatureErr</code> if you cannot.</p>
+
+<a name="//apple_ref/doc/uid/TP30001145-MediaPacketizers-DontLinkElementID_36" title="Initialization"></a>
+<h3><a name="//apple_ref/doc/uid/TP30001145-MediaPacketizers-Initialization" title="Initialization"></a>Initialization</h3>
+<p>If your packetizer returns <code>noErr</code> during the media preflight, it will be initialized before it is asked to handle any data. The initialization function is defined as follows:</p>
+
+<div class="codesample"><table><tr><td scope="row"><pre>pascal ComponentResult RTPMPInitialize(RTPMediaPacketizer rtpm,<span></span></pre></td></tr><tr><td scope="row"><pre>&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;SInt32 inFlags);<span></span></pre></td></tr></table></div>
+
+<p>The value of <code>inFlags</code> can be 0 or <code>kRTPMPRealtimeModeFlag</code> <code>=</code> <code><!--a target="_top" -->0x00000001<!--/a--></code>.</p>
+<p>The <code>kRTPMPRealtimeModeFlag</code> flag indicates that your packetizer is being used for live transmission, rather than for hinting. You might use this information if your packetizer has a tradeoff between speed and fidelity.</p>
+
+<a name="//apple_ref/doc/uid/TP30001145-MediaPacketizers-DontLinkElementID_37" title="Setup and Information Functions"></a>
+<h3><a name="//apple_ref/doc/uid/TP30001145-MediaPacketizers-SetupandInformationFunctions" title="Setup and Information Functions"></a>Setup and Information Functions</h3>
+<p>Once your packetizer is initialized, it will receive several calls to set the information it needs prior to packetizing data, such as the media timescale. It may also be called with requests to return the settings it has been given. The main setup functions are these:</p>
+<ul class="spaceabove">
+<li class="li"><p><code><a href="../../../../Reference/QTRef_Streaming/Reference/reference.html#//apple_ref/c/func/RTPMPSetTimeScale" target="_top">RTPMPSetTimeScale</a></code></p></li>
+<li class="li"><p><code><a href="../../../../Reference/QTRef_Streaming/Reference/reference.html#//apple_ref/c/func/RTPMPGetTimeScale" target="_top">RTPMPGetTimeScale</a></code></p></li>
+<li class="li"><p><code><a href="../../../../Reference/QTRef_Streaming/Reference/reference.html#//apple_ref/c/func/RTPMPSetPacketBuilder" target="_top">RTPMPSetPacketBuilder</a></code></p></li>
+<li class="li"><p><code><a href="../../../../Reference/QTRef_Streaming/Reference/reference.html#//apple_ref/c/func/RTPMPGetPacketBuilder" target="_top">RTPMPGetPacketBuilder</a></code></p></li>
+<li class="li"><p><code><a href="../../../../Reference/QTRef_Streaming/Reference/reference.html#//apple_ref/c/func/RTPMPSetMediaType" target="_top">RTPMPSetMediaType</a></code></p></li>
+<li class="li"><p><code><a href="../../../../Reference/QTRef_Streaming/Reference/reference.html#//apple_ref/c/func/RTPMPGetMediaType" target="_top">RTPMPGetMediaType</a></code></p></li>
+<li class="li"><p><code><a href="../../../../Reference/QTRef_Streaming/Reference/reference.html#//apple_ref/c/func/RTPMPSetMaxPacketSize" target="_top">RTPMPSetMaxPacketSize</a></code></p></li>
+<li class="li"><p><code><a href="../../../../Reference/QTRef_Streaming/Reference/reference.html#//apple_ref/c/func/RTPMPGetMaxPacketSize" target="_top">RTPMPGetMaxPacketSize</a></code></p></li>
+<li class="li"><p><code><a href="../../../../Reference/QTRef_Streaming/Reference/reference.html#//apple_ref/c/func/RTPMPSetMaxPacketDuration" target="_top">RTPMPSetMaxPacketDuration</a></code></p></li>
+<li class="li"><p><code><a href="../../../../Reference/QTRef_Streaming/Reference/reference.html#//apple_ref/c/func/RTPMPGetMaxPacketDuration" target="_top">RTPMPGetMaxPacketDuration</a></code></p></li>
+</ul>
+<p>The <code>Set</code> functions listed above are used to set the time scale, packet builder (which receives your output), media type, maximum packet size, and maximum packet duration. These functions will be called before you are asked to begin packetizing data, and will not be called after you have begun packetizing data.</p>
+<p>The <code>Get</code> functions listed above can be called at any time. When your packetizer is called with one of these <code>Get</code> functions, return the data that was passed to you in the corresponding <code>Set</code> function.</p>
+<ul class="spaceabove">
+<li class="li"><p><code><a href="../../../../Reference/QTRef_Streaming/Reference/reference.html#//apple_ref/c/func/RTPMPSetTimeBase" target="_top">RTPMPSetTimeBase</a></code></p></li>
+<li class="li"><p><code><a href="../../../../Reference/QTRef_Streaming/Reference/reference.html#//apple_ref/c/func/RTPMPGetTimeBase" target="_top">RTPMPGetTimeBase</a></code></p></li>
+</ul>
+<p>The time base functions may be called for live transmission. The <code>Set</code> function sets the QuickTime time base that is in use. Your packetizer can query this time base to find out what time it is in the live stream. Your packetizer should not rely on receiving this call.</p>
+<p><code><a href="../../../../Reference/QTRef_Streaming/Reference/reference.html#//apple_ref/c/func/RTPMPHasCharacteristic" target="_top">RTPMPHasCharacteristic</a></code> may be called to determine whether your media packetizer has a particular characteristic, such as whether it supports a user settings dialog. Return <code>qtsBadSelectorErr</code> if your packetizer does not have the given characteristic.</p>
+
+<div class="codesample"><table><tr><td scope="row"><pre>ComponentResult RTPMPHasCharacteristic (<span></span></pre></td></tr><tr><td scope="row"><pre>&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;RTPMediaPacketizer rtpm,<span></span></pre></td></tr><tr><td scope="row"><pre>&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;OSType inSelector,<span></span></pre></td></tr><tr><td scope="row"><pre>&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;Boolean *outHasIt);<span></span></pre></td></tr></table></div>
+
+<div class="tableholder"><table class="graybox" border = "0" cellspacing="0" cellpadding="5">
+
+<tr>
+<th scope="col" align="left" style="font-weight: bold" bgcolor="#CCCCCC"><p>Parameter</p></th>
+<th scope="col" align="left" style="font-weight: bold" bgcolor="#CCCCCC"><p>Definition</p></th>
+</tr>
+
+
+<tr>
+<td  scope="row"><p><code>rtpm</code></p></td>
+<td ><p>The component instance of your media packetizer</p></td>
+</tr>
+<tr>
+<td  scope="row"><p><code>inSelector</code></p></td>
+<td ><p>A selector for the characteristic</p></td>
+</tr>
+<tr>
+<td  scope="row"><p><code>outHasIt</code></p></td>
+<td ><p>Return a boolean which is <code>true</code> if your media packetizer has this characteristic, <code>false</code> otherwise.</p></td>
+</tr>
+
+</table></div>
+<p>The <code>inSelector</code> parameter may have these values:</p>
+<div class="tableholder"><table class="graybox" border = "0" cellspacing="0" cellpadding="5">
+
+<tr>
+<th scope="col" align="left" style="font-weight: bold" bgcolor="#CCCCCC"><p>Value</p></th>
+<th scope="col" align="left" style="font-weight: bold" bgcolor="#CCCCCC"><p>Definition</p></th>
+</tr>
+
+
+<tr>
+<td  scope="row"><p><code>kRTPMPNoSampleDataRequiredCharacteristic</code></p></td>
+<td ><p>If set, the media packetizer does not require the actual sample data to perform packetization. The caller can pass in <code>nil</code> data pointers instead of pointers to the actual media data (see <code>RTPMPSetSampleData).</code></p></td>
+</tr>
+<tr>
+<td  scope="row"><p><code>kRTPMPHasUserSettingsDialogCharacteristic</code></p></td>
+<td ><p>If set, the media packetizer supports the calls <code>RTPMPDoUserDialog</code>, <code>RTPMPGetSettingsIntoAtomContainerAtAtom</code>, and <code>RTPMPSetSettingsFromAtomContainerAtAtom</code>.</p></td>
+</tr>
+<tr>
+<td  scope="row"><p><code>kRTPMPPrefersReliableTransportCharacteristic</code></p></td>
+<td ><p>If set, the packetizer would prefer its data to be sent reliably (such as through text or music tracks).</p></td>
+</tr>
+<tr>
+<td  scope="row"><p><code>kRTPMPRequiresOutOfBandDimensionsCharacteristic</code></p></td>
+<td ><p>If set, the original visual dimensions of the media data cannot be determined simply by looking at the media packets, and must be transmitted via some other method.</p></td>
+</tr>
+
+</table></div>
+<p>If your packetizer supports a user dialog or additional settings, you may also receive these dialog or settings calls as part of the set up process:</p>
+
+<div class="codesample"><table><tr><td scope="row"><pre>RTPMPDoUserDialog<span></span></pre></td></tr><tr><td scope="row"><pre>RTPMPSetSettingsFromAtomContainerAtAtom<span></span></pre></td></tr><tr><td scope="row"><pre>RTPMPGetSettingsIntoAtomContainerAtAtom<span></span></pre></td></tr><tr><td scope="row"><pre>RTPMPGetSettingsAsText<span></span></pre></td></tr></table></div>
+
+<ul class="spaceabove">
+<li class="li"><p>The <code><a href="../../../../Reference/QTRef_Streaming/Reference/reference.html#//apple_ref/c/func/RTPMPDoUserDialog" target="_top">RTPMPDoUserDialog</a></code> function will invoke your packetizer&#8217;s modal dialog to obtain user settings.</p></li>
+<li class="li"><p>The <code><a href="../../../../Reference/QTRef_Streaming/Reference/reference.html#//apple_ref/c/func/RTPMPGetSettingsIntoAtomContainerAtAtom" target="_top">RTPMPGetSettingsIntoAtomContainerAtAtom</a></code> function expects you to return those settings into an atom container at the specified offset.</p></li>
+<li class="li"><p>The <code><a href="../../../../Reference/QTRef_Streaming/Reference/reference.html#//apple_ref/c/func/RTPMPSetSettingsFromAtomContainerAtAtom" target="_top">RTPMPSetSettingsFromAtomContainerAtAtom</a></code> function is used to set the user settings programmatically, bypassing the user dialog.</p></li>
+<li class="li"><p>The <code><a href="../../../../Reference/QTRef_Streaming/Reference/reference.html#//apple_ref/c/func/RTPMPGetSettingsAsText" target="_top">RTPMPGetSettingsAsText</a></code> function expects you to return your user settings as text.</p></li>
+</ul>
+<p>In addition to the set up calls listed above, you may receive <code><a href="../../../../Reference/QTRef_Streaming/Reference/reference.html#//apple_ref/c/func/RTPMPSetInfo" target="_top">RTPMPSetInfo</a></code> function calls. These are used to send a variety of information to your packetizer, as indicated by the selector. If you don&#8217;t support a given selector, return <code>qtsBadSelectorErr</code>.</p>
+<p>The <code><a href="../../../../Reference/QTRef_Streaming/Reference/reference.html#//apple_ref/c/func/RTPMPSetInfo" target="_top">RTPMPSetInfo</a></code> selectors can be:</p>
+
+<div class="codesample"><table><tr><td scope="row"><pre>kQTSSourceTrackIDInfo ('otid'),         /* UInt32* */<span></span></pre></td></tr><tr><td scope="row"><pre>kQTSSourceLayerInfo ('olyr'),           /* UInt16* */<span></span></pre></td></tr><tr><td scope="row"><pre>kQTSSourceLanguageInfo ('olng'),        /* UInt16* */<span></span></pre></td></tr><tr><td scope="row"><pre>kQTSSourceTrackFlagsInfo ('otfl'),      /* SInt32* */<span></span></pre></td></tr><tr><td scope="row"><pre>kQTSSourceDimensionsInfo ('odim'),      /* QTSDimensionParams* */<span></span></pre></td></tr><tr><td scope="row"><pre>kQTSSourceVolumesInfo ('ovol'),         /* QTSVolumesParams* */<span></span></pre></td></tr><tr><td scope="row"><pre>kQTSSourceMatrixInfo ('omat'),          /* MatrixRecord* */<span></span></pre></td></tr><tr><td scope="row"><pre>kQTSSourceClipRectInfo ('oclp'),        /* Rect* */<span></span></pre></td></tr><tr><td scope="row"><pre>kQTSSourceGraphicsModeInfo ('ogrm'),    /* QTSGraphicsModeParams* */<span></span></pre></td></tr><tr><td scope="row"><pre>kQTSSourceScaleInfo ('oscl'),           /* Point* */<span></span></pre></td></tr><tr><td scope="row"><pre>kQTSSourceBoundingRectInfo ('orct'),    /* Rect* */<span></span></pre></td></tr><tr><td scope="row"><pre>kQTSSourceUserDataInfo ('oudt'),        /* UserData */<span></span></pre></td></tr><tr><td scope="row"><pre>kQTSSourceInputMapInfo ('oimp'),        /* QTAtomContainer */<span></span></pre></td></tr></table></div>
+
+<p>Your packetizer can be called with these selectors even if it indicated that it couldn&#8217;t handle the given characteristic in its <code><!--a target="_top" -->'pcki'<!--/a--></code> resource. In that case, return <code>qtsBadSelectorErr</code>.</p>
+<p>Your packetizer may receive the related <code><a href="../../../../Reference/QTRef_Streaming/Reference/reference.html#//apple_ref/c/func/RTPMPGetInfo" target="_top">RTPMPGetInfo</a></code> function at any time:</p>
+
+<div class="codesample"><table><tr><td scope="row"><pre>pascal ComponentResult RTPMPGetInfo(RTPMediaPacketizer rtpm,<span></span></pre></td></tr><tr><td scope="row"><pre>&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;OSType inSelector, void *ioParams);<span></span></pre></td></tr></table></div>
+
+<p>Your packetizer is expected to return the requested information in <code>ioParams</code>. The type of <code>ioParams</code> is dependent on <code>inSelector</code>. If you don&#8217;t support the selector, return <code>qtsBadSelectorErr</code>. The selectors can be any of the selectors for <code><a href="../../../../Reference/QTRef_Streaming/Reference/reference.html#//apple_ref/c/func/RTPMPSetInfo" target="_top">RTPMPSetInfo</a></code> or any of the additional selectors listed below:</p>
+
+<div class="codesample"><table><tr><td scope="row"><pre>/* info selectors -- get only */<span></span></pre></td></tr><tr><td scope="row"><pre>kRTPMPPayloadTypeInfo ('rtpp'),                /* RTPMPPayloadTypeParams* */<span></span></pre></td></tr><tr><td scope="row"><pre>kRTPMPRTPTimeScaleInfo ('rtpt'),               /* TimeScale* */<span></span></pre></td></tr><tr><td scope="row"><pre>kRTPMPRequiredSampleDescriptionInfo  ('sdsc'), /* SampleDescriptionHandle* */<span></span></pre></td></tr><tr><td scope="row"><pre>kRTPMPMinPayloadSize ('mins'),                 /* UInt32*, doesn't include<span></span></pre></td></tr><tr><td scope="row"><pre>&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;rtp header; default 0 */ <span></span></pre></td></tr><tr><td scope="row"><pre>kRTPMPMinPacketDuration ('mind'),              /* UInt3* in milliseconds;<span></span></pre></td></tr><tr><td scope="row"><pre>&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;&#xA0;default is no min */ <span></span></pre></td></tr><tr><td scope="row"><pre>kRTPMPSuggestedRepeatPktCountInfo  ('srpc'),   /* UInt32* */<span></span></pre></td></tr><tr><td scope="row"><pre>kRTPMPSuggestedRepeatPktSpacingInfo ('srps'),  /* UInt32* in milliseconds */<span></span></pre></td></tr><tr><td scope="row"><pre>kRTPMPMaxPartialSampleSizeInfo  ('mpss'),      /* UInt32* in bytes */<span></span></pre></td></tr><tr><td scope="row"><pre>kRTPMPPreferredBufferDelayInfo  ('prbd')       /* UInt32* in milliseconds */<span></span></pre></td></tr></table></div>
+
+<p>The <code>kRTPMPPayloadTypeInfo</code> selector requires you to fill out an <code><!--a target="_top" -->RTPMPPayloadTypeParams<!--/a--></code> structure:</p>
+
+<div class="codesample"><table><tr><td scope="row"><pre>struct RTPMPPayloadTypeParams {<span></span></pre></td></tr><tr><td scope="row"><pre>&#160;&#160;&#160;&#160;UInt32 &#160;flags;<span></span></pre></td></tr><tr><td scope="row"><pre>&#160;&#160;&#160;&#160;UInt32 &#160;payloadNumber;<span></span></pre></td></tr><tr><td scope="row"><pre>&#160;&#160;&#160;&#160;short &#160;&#160;nameLength;<span></span></pre></td></tr><tr><td scope="row"><pre>/* in: size of payloadName buffer (counting null terminator);<span></span></pre></td></tr><tr><td scope="row"><pre>/* this will be reset to needed length and paramErr returned if too small */<span></span></pre></td></tr><tr><td scope="row"><pre>&#160;&#160;&#160;&#160;char *&#160;&#160;payloadName;&#160;&#160;&#160;&#160;/* caller must provide buffer */<span></span></pre></td></tr><tr><td scope="row"><pre>};<span></span></pre></td></tr><tr><td scope="row"><pre>typedef struct RTPMPPayloadTypeParams RTPMPPayloadTypeParams;<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>/* flags for RTPMPPayloadTypeParams */<span></span></pre></td></tr><tr><td scope="row"><pre>enum {<span></span></pre></td></tr><tr><td scope="row"><pre>&#160;&#160;&#160;&#160;kRTPMPPayloadTypeStaticFlag= 0x00000001,<span></span></pre></td></tr><tr><td scope="row"><pre>&#160;&#160;&#160;&#160;kRTPMPPayloadTypeDynamicFlag = 0x00000002<span></span></pre></td></tr><tr><td scope="row"><pre>};<span></span></pre></td></tr></table></div>
+
+<p>If you have a dynamic RTP payload type, you need to copy the payload type string to the buffer pointed to by <code>payloadName</code> (a null-terminated string). When <code><a href="../../../../Reference/QTRef_Streaming/Reference/reference.html#//apple_ref/c/func/RTPMPGetInfo" target="_top">RTPMPGetInfo</a></code> is called, <code><!--a target="_top" -->RTPMPPayloadTypeParams<!--/a--></code> will be the available size of the input buffer (specified by <code>payloadName</code>). If this size is too small for the payload identifier, set <code>nameLength</code> to the size of the buffer you need (including the null terminator) and return <code>paramErr</code>. This will cause QuickTime to reallocate the buffer and call your packetizer again.</p>
+<div class="tableholder"><table class="graybox" border = "0" cellspacing="0" cellpadding="5">
+
+<tr>
+<th scope="col" align="left" style="font-weight: bold" bgcolor="#CCCCCC"><p>Constant</p></th>
+<th scope="col" align="left" style="font-weight: bold" bgcolor="#CCCCCC"><p>Definition</p></th>
+</tr>
+
+
+<tr>
+<td  scope="row"><p><code>kRTPMPRTPTimeScaleInfo</code></p></td>
+<td ><p>Return the RTP timescale used by this packetizer if the time scale must be a specific value; otherwise, return an error for this selector.</p></td>
+</tr>
+<tr>
+<td  scope="row"><p><code>kRTPMPRequiredSampleDescriptionInfo</code></p></td>
+<td ><p>Return a handle to a sample description specifying that only data with the given sample description is supported; if no such sample description exists, return an error for this selector.</p></td>
+</tr>
+<tr>
+<td  scope="row"><p><code>kRTPMPMinPayloadSize</code></p></td>
+<td ><p>Return the minimum payload size, in bytes, of packets allowed by this packetizer (<code>UInt32</code>).</p></td>
+</tr>
+<tr>
+<td  scope="row"><p><code>kRTPMPMinPacketDuration</code></p></td>
+<td ><p>Return the minimum packet duration allowed by this packetizer (<code>UInt32</code>, in milliseconds).</p></td>
+</tr>
+<tr>
+<td  scope="row"><p><code>kRTPMPSuggestedRepeatPktCountInfo</code></p></td>
+<td ><p>Return the suggested number of repeat packets to send for this media (<code>UInt32</code>). This will typically be 0 for audio or video, nonzero for text or MIDI.</p></td>
+</tr>
+<tr>
+<td  scope="row"><p><code>kRTPMPSuggestedRepeatedPktSpacingInfo</code></p></td>
+<td ><p>Return the suggested temporal distance between repeat packets (<code>UInt32</code>, in milliseconds).</p></td>
+</tr>
+<tr>
+<td  scope="row"><p><code>kRTPMPMaxPartialSampleSizeInfo</code></p></td>
+<td ><p>Return the size of the largest partial sample your packetizer can accept (<code>UInt32</code>, in bytes). If your packetizer returns true for <code>HasCharacteristic</code> (<code>kRTPMPPartialSamplesRequiredCharacteristic</code>), this call will be made to ask what the largest size (in bytes) is that the packetizer can handle receiving in a <code>SetSampleData</code> call. Very few packetizers will need to set this; it is intended only for media formats where a single media sample can be huge. MPEG is an example; one media sample covers the entire span of the MPEG movie.</p></td>
+</tr>
+<tr>
+<td  scope="row"><p><code>kRTPMPPreferredBufferDelayInfo</code></p></td>
+<td ><p>Return the preferred buffer delay for your packetizer (<code>UInt32</code>, in milliseconds). Most packetizers will not need to set this. This would only be set if the packet duration was sufficiently long that you needed a longer buffer delay to work.</p></td>
+</tr>
+
+</table></div>
+
+<a name="//apple_ref/doc/uid/TP30001145-MediaPacketizers-DontLinkElementID_38" title="Sample Processing Functions"></a>
+<h3><a name="//apple_ref/doc/uid/TP30001145-MediaPacketizers-SampleProcessingFunctions" title="Sample Processing Functions"></a>Sample Processing Functions</h3>
+<p>Once setup is complete, QuickTime will begin calling your packetizer&#8217;s <code><a href="../../../../Reference/QTRef_Streaming/Reference/reference.html#//apple_ref/c/func/RTPMPSetSampleData" target="_top">RTPMPSetSampleData</a></code> function:</p>
+
+<div class="codesample"><table><tr><td scope="row"><pre>pascal ComponentResult RTPMPSetSampleData(RTPMediaPacketizer rtpm,<span></span></pre></td></tr><tr><td scope="row"><pre>&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;const RTPMPSampleDataParams *inSampleData, SInt32 *outFlags);<span></span></pre></td></tr></table></div>
+
+<p>This is where most of a typical packetizer&#8217;s work is done. Your packetizer is presented with a block of media sample data, you break it into packets according to your own algorithm, and you pass the results to the selected packet builder.</p>
+<ul class="spaceabove">
+<li class="li"><p>If your packetizer works synchronously, you packetize the data and return <code>0</code> in <code>outFlags</code>. If you need more sample data to complete a packet, return <code>kRTPMPWantsMoreDataFlag</code>.</p></li>
+<li class="li"><p>If your packetizer works asynchronously, you set <code>outFlags</code> to <code>kRTPMPStillProcessingData</code> <code>and</code> your packetizer continues its work in the <code><a href="../../../../Reference/QTRef_Streaming/Reference/reference.html#//apple_ref/c/func/RTPMPIdle" target="_top">RTPMPIdle</a></code> function, which will be called periodically. <code><a href="../../../../Reference/QTRef_Streaming/Reference/reference.html#//apple_ref/c/func/RTPMPIdle" target="_top">RTPMPIdle</a></code> should also set <code>outFlags</code> to <code>kRTPMPStillProcessingData</code> if it still has work to do. It sets <code>outFlags</code> to 0 if all the sample data has been processed.</p></li>
+<li class="li"><p>If your packetizer works synchronously, <code><a href="../../../../Reference/QTRef_Streaming/Reference/reference.html#//apple_ref/c/func/RTPMPIdle" target="_top">RTPMPIdle</a></code> always sets <code>outFlags</code> to 0.</p></li>
+</ul>
+<p>Your media packetizer must call the release procedure when done with the media data.</p>
+<p>Do the processing work in the <code><a href="../../../../Reference/QTRef_Streaming/Reference/reference.html#//apple_ref/c/func/RTPMPSetSampleData" target="_top">RTPMPSetSampleData</a></code> function if it does not take up too much CPU time; otherwise, do it in your idle function:</p>
+
+<div class="codesample"><table><tr><td scope="row"><pre>struct RTPMPSampleDataParams {<span></span></pre></td></tr><tr><td scope="row"><pre>&#160;&#160;&#160;&#160;UInt32 &#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;version;<span></span></pre></td></tr><tr><td scope="row"><pre>&#160;&#160;&#160;&#160;UInt32 &#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;timeStamp;<span></span></pre></td></tr><tr><td scope="row"><pre>&#160;&#160;&#160;&#160;UInt32 &#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;duration;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;/* 0 if not specified*/ <span></span></pre></td></tr><tr><td scope="row"><pre>&#160;&#160;&#160;&#160;UInt32 &#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;playOffset;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;/* 0 if not specified*/ <span></span></pre></td></tr><tr><td scope="row"><pre>&#160;&#160;&#160;&#160;Fixed &#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;playRate;<span></span></pre></td></tr><tr><td scope="row"><pre>&#160;&#160;&#160;&#160;SInt32 &#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;flags;<span></span></pre></td></tr><tr><td scope="row"><pre>&#160;&#160;&#160;&#160;UInt32 &#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;sampleDescSeed;<span></span></pre></td></tr><tr><td scope="row"><pre>&#160;&#160;&#160;&#160;Handle &#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;sampleDescription;<span></span></pre></td></tr><tr><td scope="row"><pre>&#160;&#160;&#160;&#160;RTPMPSampleRef &#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;sampleRef;<span></span></pre></td></tr><tr><td scope="row"><pre>&#160;&#160;&#160;&#160;UInt32 &#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;dataLength;<span></span></pre></td></tr><tr><td scope="row"><pre>&#160;&#160;&#160;&#160;const UInt8 *&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;data;<span></span></pre></td></tr><tr><td scope="row"><pre>&#160;&#160;&#160;&#160;RTPMPDataReleaseUPP &#160;&#160;&#160;&#160;releaseProc;<span></span></pre></td></tr><tr><td scope="row"><pre>&#160;&#160;&#160;&#160;void *&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;refCon;<span></span></pre></td></tr><tr><td scope="row"><pre>};<span></span></pre></td></tr><tr><td scope="row"><pre>typedef struct RTPMPSampleDataParamsRTPMPSampleDataParams;<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>/* flags for RTPMPSampleDataParams*/<span></span></pre></td></tr><tr><td scope="row"><pre>enum {<span></span></pre></td></tr><tr><td scope="row"><pre>&#160;&#160;&#160;&#160;kRTPMPSyncSampleFlag= 0x00000001<span></span></pre></td></tr><tr><td scope="row"><pre>};<span></span></pre></td></tr></table></div>
+
+<div class="tableholder"><table class="graybox" border = "0" cellspacing="0" cellpadding="5">
+
+<tr>
+<th scope="col" align="left" style="font-weight: bold" bgcolor="#CCCCCC"><p>Field</p></th>
+<th scope="col" align="left" style="font-weight: bold" bgcolor="#CCCCCC"><p>Definition</p></th>
+</tr>
+
+
+<tr>
+<td  scope="row"><p><code>version</code></p></td>
+<td ><p>Version of the data structure. Currently always 0.</p></td>
+</tr>
+<tr>
+<td  scope="row"><p><code>timeStamp</code></p></td>
+<td ><p>RTP time stamp for the presentation of the sample data. This time stamp has already been adjusted by edits, edit rates, etc.</p></td>
+</tr>
+<tr>
+<td  scope="row"><p><code>duration</code></p></td>
+<td ><p>Duration (in RTP time scale) of the sample.</p></td>
+</tr>
+<tr>
+<td  scope="row"><p><code>playOffset</code></p></td>
+<td ><p>Offset within the media sample itself. This is only used for media formats where a single media sample can span across multiple time units. QuickTime Music is an example of this, where a single sample spans the entire track. For most video and audio formats, this will be 0.</p></td>
+</tr>
+<tr>
+<td  scope="row"><p><code>playRate</code></p></td>
+<td ><p>1.0 (<code>0x00010000</code>) is normal. Higher numbers indicate faster play rates. Note that timeStamp is already adjusted by the rate. This field is generally of interest only to audio packetizers.</p></td>
+</tr>
+<tr>
+<td  scope="row"><p><code>flags</code></p></td>
+<td ><p><code>kRTPMPSyncSampleFlag</code> is set if the sample is a sync sample (key frame).</p></td>
+</tr>
+<tr>
+<td  scope="row"><p><code>sampleDescSeed</code></p></td>
+<td ><p>If the sample description changes, this number will change.</p></td>
+</tr>
+<tr>
+<td  scope="row"><p><code>sampleDescription</code></p></td>
+<td ><p>The sample description for the given media sample</p></td>
+</tr>
+<tr>
+<td  scope="row"><p><code>sampleRef</code></p></td>
+<td ><p>Private field.</p></td>
+</tr>
+<tr>
+<td  scope="row"><p><code>dataLength</code></p></td>
+<td ><p>Size of media data.</p></td>
+</tr>
+<tr>
+<td  scope="row"><p><code>data</code></p></td>
+<td ><p>Pointer to media data.</p></td>
+</tr>
+<tr>
+<td  scope="row"><p><code>releaseProc</code></p></td>
+<td ><p>If set, you need to call it when you are finished with the sample data.</p></td>
+</tr>
+<tr>
+<td  scope="row"><p><code>refCon</code></p></td>
+<td ><p>Pass to release procedure.</p></td>
+</tr>
+<tr>
+<td  scope="row"><p><code>outFlags</code></p></td>
+<td ><p>Set to <code>kRTPMPStillProcessingData</code> if you are not done with the sample. This will cause your idle routine to be called.</p></td>
+</tr>
+
+</table></div>
+<div class="notebox"><a name="//apple_ref/doc/uid/TP30001145-MediaPacketizers-DontLinkElementID_68" title="Note"></a>
+<p><strong>Note:</strong>&nbsp;
+The caller owns the <code><!--a target="_top" -->RTPMPSampleDataParams<!--/a--></code> struct. Your media packetizer must copy any fields of the struct it wants to keep. The caller will maintain only the media data in the struct until you call the release procedure. </p>
+</div>
+<p>If you can&#8217;t do all the processing of the sample data in response to the <code><a href="../../../../Reference/QTRef_Streaming/Reference/reference.html#//apple_ref/c/func/RTPMPSetSampleData" target="_top">RTPMPSetSampleData</a></code> function, sets <code>outFlags</code> to <code>kRTPMPStillProcessingData</code> and do the work in your <code><a href="../../../../Reference/QTRef_Streaming/Reference/reference.html#//apple_ref/c/func/RTPMPIdle" target="_top">RTPMPIdle</a></code> function:</p>
+
+<div class="codesample"><table><tr><td scope="row"><pre>// do work here if you need to -- give up time periodically<span></span></pre></td></tr><tr><td scope="row"><pre>// if you're doing time consuming operations<span></span></pre></td></tr><tr><td scope="row"><pre>pascal ComponentResult RTPMPIdle(RTPMediaPacketizer rtpm,<span></span></pre></td></tr><tr><td scope="row"><pre>&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;SInt32 inFlags, SInt32 *outFlags);<span></span></pre></td></tr></table></div>
+
+<p>This call is made periodically if you set <code>outFlags</code> to <code>kRTPMPStillProcessingData</code> in your <code><a href="../../../../Reference/QTRef_Streaming/Reference/reference.html#//apple_ref/c/func/RTPMPSetSampleData" target="_top">RTPMPSetSampleData</a></code> routine. If you need more time, sets <code>outFlags</code> to <code>kRTPMPStillProcessingData</code> in <code><a href="../../../../Reference/QTRef_Streaming/Reference/reference.html#//apple_ref/c/func/RTPMPIdle" target="_top">RTPMPIdle</a></code> as well. This will cause <code><a href="../../../../Reference/QTRef_Streaming/Reference/reference.html#//apple_ref/c/func/RTPMPIdle" target="_top">RTPMPIdle</a></code> to be called again. When you are finished packetizing the sample data you were passed in the last <code><a href="../../../../Reference/QTRef_Streaming/Reference/reference.html#//apple_ref/c/func/RTPMPSetSampleData" target="_top">RTPMPSetSampleData</a></code> call, sets <code>outFlags</code> to 0.</p>
+<p>If you do work in the <code><a href="../../../../Reference/QTRef_Streaming/Reference/reference.html#//apple_ref/c/func/RTPMPIdle" target="_top">RTPMPIdle</a></code> function, the idle function needs to call the release procedure when you are done with the sample data.</p>
+
+<a name="//apple_ref/doc/uid/TP30001145-MediaPacketizers-DontLinkElementID_39" title="Calling the Packet Builder"></a>
+<h3><a name="//apple_ref/doc/uid/TP30001145-MediaPacketizers-CallingthePacketBuilder" title="Calling the Packet Builder"></a>Calling the Packet Builder</h3>
+<p>The actual work your packetizer does in the <code><a href="../../../../Reference/QTRef_Streaming/Reference/reference.html#//apple_ref/c/func/RTPMPSetSampleData" target="_top">RTPMPSetSampleData</a></code> or <code><a href="../../../../Reference/QTRef_Streaming/Reference/reference.html#//apple_ref/c/func/RTPMPIdle" target="_top">RTPMPIdle</a></code> function consists of creating packets. This is done by making calls to a packet builder component. The packet builder functions are defined in <code>QTStreamingComponents</code>.<code>h</code>.</p>
+<p>The first thing you will need to do is to begin a new packet group. To start a new group of packets, call <code><a href="../../../../Reference/QTRef_Streaming/Reference/reference.html#//apple_ref/c/func/RTPPBBeginPacketGroup" target="_top">RTPPBBeginPacketGroup</a></code>. Packets in a single group have the same RTP time stamp (and go into the same hint sample, if the data is being used to create a hint track).</p>
+<p>Next, you will want to add one or more packets to the group.</p>
+<ul class="spaceabove">
+<li class="li"><p>Call <code><a href="../../../../Reference/QTRef_Streaming/Reference/reference.html#//apple_ref/c/func/RTPPBBeginPacket" target="_top">RTPPBBeginPacket</a></code> to begin a single network packet.</p></li>
+<li class="li"><p>Call <code><a href="../../../../Reference/QTRef_Streaming/Reference/reference.html#//apple_ref/c/func/RTPPBAddPacketLiteralData" target="_top">RTPPBAddPacketLiteralData</a></code> to add literal data to the packet, such as header information.</p></li>
+<li class="li"><p>Call <code><a href="../../../../Reference/QTRef_Streaming/Reference/reference.html#//apple_ref/c/func/RTPPBAddPacketSampleData" target="_top">RTPPBAddPacketSampleData</a></code> to add a sample reference to the packet, such as the sample data specified in <code>inSampleDataParams</code> in a call to your packetizer&#8217;s <code><a href="../../../../Reference/QTRef_Streaming/Reference/reference.html#//apple_ref/c/func/RTPMPSetSampleData" target="_top">RTPMPSetSampleData</a></code> function.</p></li>
+</ul>
+<p>You may want to packetize the same data repeatedly. There are utility functions to make this easier. Begin by passing in <code>RTPPacketRepeatedDataRef</code> to <code><a href="../../../../Reference/QTRef_Streaming/Reference/reference.html#//apple_ref/c/func/RTPPBAddPacketLiteralData" target="_top">RTPPBAddPacketLiteralData</a></code> or <code><a href="../../../../Reference/QTRef_Streaming/Reference/reference.html#//apple_ref/c/func/RTPPBAddPacketSampleData" target="_top">RTPPBAddPacketSampleData</a></code>, depending on whether you want to repeat literal data or sample data. The packet builder will store a copy of the data and return a data reference. You then call <code><a href="../../../../Reference/QTRef_Streaming/Reference/reference.html#//apple_ref/c/func/RTPPBAddPacketRepeatedData" target="_top">RTPPBAddPacketRepeatedData</a></code> with the data reference whenever you want to add copies of the data. Call <code><a href="../../../../Reference/QTRef_Streaming/Reference/reference.html#//apple_ref/c/func/RTPPBReleaseRepeatedData" target="_top">RTPPBReleaseRepeatedData</a></code> when you are done with the data. The packet builder will maintain a copy of the data until you release it.</p>
+<p>End a packet by calling <code><a href="../../../../Reference/QTRef_Streaming/Reference/reference.html#//apple_ref/c/func/RTPPBEndPacket" target="_top">RTPPBEndPacket</a></code>. End the group of packets by calling <code><a href="../../../../Reference/QTRef_Streaming/Reference/reference.html#//apple_ref/c/func/RTPPBEndPacketGroup" target="_top">RTPPBEndPacketGroup</a></code>.</p>
+<div class="notebox"><a name="//apple_ref/doc/uid/TP30001145-MediaPacketizers-DontLinkElementID_69" title="Note"></a>
+<p><strong>Note:</strong>&nbsp;
+It is legal to have more than one packet group open at a time, or to have more than one packet open at a time. Packet groups are sent in the order they are closed (<code>RTPPBEndPacketGroup</code>). Packets within a group are also sent in the order they are closed (<code>RTPPBEndPacket</code>). </p>
+</div>
+
+<a name="//apple_ref/doc/uid/TP30001145-MediaPacketizers-DontLinkElementID_40" title="Flush and Reset Routines"></a>
+<h3><a name="//apple_ref/doc/uid/TP30001145-MediaPacketizers-FlushandResetRoutines" title="Flush and Reset Routines"></a>Flush and Reset Routines</h3>
+<p>Your packetizer may be called with commands to flush its input buffer or reset for a new session at any time. This normally happens at the end of a sequence or when a transmission is interrupted.</p>
+<p>The flush command is given when your packetizer needs to finish any pending work:</p>
+
+<div class="codesample"><table><tr><td scope="row"><pre>pascal ComponentResult RTPMPFlush(RTPMediaPacketizer rtpm,<span></span></pre></td></tr><tr><td scope="row"><pre>&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;SInt32 inFlags, SInt32 *outFlags);<span></span></pre></td></tr></table></div>
+
+<p>If your packetizer has not yet written all the data from the last <code><a href="../../../../Reference/QTRef_Streaming/Reference/reference.html#//apple_ref/c/func/RTPMPSetSampleData" target="_top">RTPMPSetSampleData</a></code> call to the selected packet builder, upon receiving the flush command it should write any pending data, flush its input buffer and set <code>outFlags</code> to 0. The <code>inFlags</code> value is currently always 0.</p>
+<p>The reset command is given when your packetizer needs to stop packetizing, reset its state, and prepare for new orders:</p>
+
+<div class="codesample"><table><tr><td scope="row"><pre>pascal ComponentResult RTPMPReset(RTPMediaPacketizer rtpm,<span></span></pre></td></tr><tr><td scope="row"><pre>&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;SInt32 inFlags);<span></span></pre></td></tr></table></div>
+
+<p>The <code>inFlags</code> value is currently always 0.</p>
+<p>Flush your input buffer. Do not send any buffered data, because in all probability there is no connection for you to send on. Reset your packetizer&#8217;s state; it should be the same as if it had just been opened and initialized.</p>
+
+
+
+
+
+        <br /><br /> 
+        
+        <div class="mini_nav_text" align="left">
+        <span class="navButtons">
+        <a href="../C-Chapter/3UsingQuickTimeStrea.html">&lt; Previous Page</a><span style="margin-left: 8px"><a href="../E-Chapter copy/5PacketReassemblers.html">Next Page &gt;</a></span>
+        </span>
+        <span id="showHideTOCLowerSpan">
+        <a href="#" onclick="showHideTOC();"><img src="../../../../../Resources/Images/show_toc_icon.gif" width="15" height="14" border="0" style="margin-bottom: -2px;" alt="" /></a> <a href="#" onclick="showHideTOC();">Hide TOC</a>
+        </span>
+        </div>
+
+        <br/><hr /><div align="center"><p class="content_text" lang="en" dir="ltr"> <!--#if expr="0=1" -->&#x00a9; 2005, 2006 Apple Computer, Inc. All Rights Reserved. &#40;<!--#endif -->Last updated: 2006-01-10<!--#if expr="0=1" -->&#041;<!--#endif --></p></div>
+
+        
+        <div class="hideOnPrint hideInXcode">
+        <!-- start of footer -->
+        	<table width="100%" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/documentation/QuickTime/RM/Streaming/StreamingClient/D-Chapter/4MediaPacketizers.html%3Fid%3DTP30001145-3.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/documentation/QuickTime/RM/Streaming/StreamingClient/D-Chapter/4MediaPacketizers.html%3Fid%3DTP30001145-3.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/documentation/QuickTime/RM/Streaming/StreamingClient/D-Chapter/4MediaPacketizers.html%3Fid%3DTP30001145-3.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+
+        <!--#include virtual="/includes/framesetfooter" -->
+        <!-- end of footer -->
+        </div>
+    </div>
+</body>
+</html>

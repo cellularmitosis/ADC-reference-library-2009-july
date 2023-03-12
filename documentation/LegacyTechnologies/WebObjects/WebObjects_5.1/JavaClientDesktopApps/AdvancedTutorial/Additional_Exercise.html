@@ -1,0 +1,160 @@
+<HTML>
+	<HEAD>
+		<meta http-equiv="content-type" content="text/html;charset=iso-8859-1">
+		<meta name="generator" content="XML_Publisher">
+		<meta name="Copyright" content="Copyright 2001 Apple Computer, Inc. All Rights Reserved.">
+        <title>Additional
+Exercise</title>
+		</HEAD>
+	<BODY bgcolor="#ffffff">
+<!-- start of header -->
+<!--#include virtual="/includes/framesetheader" -->
+<!-- end of header --> <!-- insert Show/Hide frames -->
+<script type="text/javascript" language="JavaScript"><!--
+function loadFrames(){
+if (top == self || (parent.frames[1].name != content))
+    top.location.href = 'index.html?' + location.href;
+}
+
+if (self != top) {
+  // loaded in frames
+  document.write('<a href="'+self.location+'" target="_top"><img src="../images/hideframes.gif" border="0" alt="Hide Frames"></a>');
+  }
+else {
+  // not loaded frames
+	document.write('<a href="JavaScript:loadFrames()"><img src="../images/showframes.gif" border="0" alt="Show Frames"></a>');
+}
+//--></script>
+<!-- end Show/Hide frames -->
+<a href="Extend_a_Controller_Class.html" target="content"><img src="../images/previous.gif" border="0"></a>&nbsp;<a href="Debugging.html" target="content"><img src="../images/next.gif" border="0"></a>&nbsp;<!-- apple_doc:infillMarkerTop -->  
+<!-- apple_doc: pageHeadingStart --><a name = "TPXREF129"></a><a name="-690046"></a><h3><font face="Lucida Grande,Helvetica,Arial">Additional
+Exercise</font></h3><!-- apple_doc: pageHeadingEnd -->
+
+<p>For the custom action that sends a record via email, you may
+find that hard-coding the email recipients is not ideal. Rather,
+you might want the flexibility of choosing the recipients on a per-record
+basis. By using the controller factory programmatically, this is actually
+quite simple.</p>
+<p>First, in respect of the Model-View-Controller paradigm, you
+need to write a new class to display a dialog in which the user
+can select the email recipients. Although you could save a few lines
+of code by putting the controller factory invocation in the business
+logic class, this is bad design. Business logic classes (enterprise
+objects) are controller classes and should not include any user
+interface code. So, add a new client-side class to your project called
+SelectEmail:</p>
+<pre>package admissions.client;
+
+import com.webobjects.foundation.*;
+import com.webobjects.eocontrol.*;
+import com.webobjects.eogeneration.client.*;
+
+public class SelectEmail extends Object{
+
+    public SelectEmail() {
+        super();
+    }
+
+    public NSArray selectEmailAddresses() {
+        return
+           EOControllerFactory.sharedControllerFactory().selectWithEntityName
+           (&quot;Email&quot;, true, false);
+    }
+}</pre>
+<p>The class is rather simple and contains a single method that
+invokes a method on the controller factory. This displays a selection
+dialog for the Email entity as shown in  <a href="#BCIFDGAC">Figure 5-30</a>. </p>
+<p>The second argument in the <code>selectWithEntityName</code> method
+(<code>true</code>) allows multiple
+selection in the select dialog so you can choose multiple email
+addresses. The method returns the objects that are selected in the
+selection dialog.</p>
+<p>Before you see any email addresses in that dialog, however,
+you have to add an entity to your EOModel called "Email", generate
+SQL for it, and add entries to it. The Email entity is considered
+an Enumeration entity by the rule system, so you can add data to
+it by selecting Enumeration Window from the Tools menu in the client
+application.</p>
+<p>Next, you need to modify the <code>sendRecordViaEmail</code> action
+method in <code>CustomFormController.java</code> as
+shown:</p>
+<pre> public void sendRecordViaEmail() {
+        SelectEmail select = new SelectEmail();
+        NSArray globalIDs = select.selectEmailAddresses();
+
+        _distributedObjectStore().invokeRemoteMethodWithKeyPath(new
+        EOEditingContext(),&quot;session&quot;, &quot;clientSideRequestSendRecordViaEmail&quot;, new
+        Class[] {EOEnterpriseObject.class, NSArray.class}, new Object[]
+        {selectedObject(), globalIDs}, true);
+ }</pre>
+<p>These modifications to <code>CustomFormController.java</code> instantiate
+a new SelectEmail object and invoke the method to display the dialog
+that allows users to select the email addresses to send the current
+report to. </p>
+<p>The remote method invocation now sends the selected email
+address (represented by the <code>globalIDs</code> object)
+and the report from which the <code>sendRecordViaEmail</code> action
+was invoked (represented by the objects returned from the <code>selectedObject()</code> method
+in the remote method invocation) to the method <code>clientSideRequestSendRecordViaEmail</code> in
+the <code>Session.java</code> class
+on the server.</p>
+<p>Next, you need to modify the <code>clientSideRequestSendRecordViaEmail</code> method
+in the server-side <code>Session.java</code> class
+to accept the new <code>globalIDs</code> argument:</p>
+<pre>public void clientSideRequestSendRecordViaEmail(EOEnterpriseObject record, NSArray
+                                                                sendTo) {
+        String messageSubject, messageBody, message;
+        NSMutableArray recipients = new NSMutableArray();
+        //recipients.addObject(&quot;person@foo.com&quot;);
+        
+        java.util.Enumeration e = sendTo.objectEnumerator();
+        while (e.hasMoreElements()) {
+            EOEnterpriseObject email =
+            defaultEditingContext().objectForGlobalID((EOGlobalID)e.nextElement());
+            String emailAddress = (String)email.valueForKey(&quot;email&quot;);
+            recipients.addObject(emailAddress);
+        }
+        
+        Report report = new Report(context());
+        report.setStudent(record);
+        
+        messageSubject = &quot;Student report for &quot; + record.valueForKey(&quot;name&quot;);
+        message =
+            WOMailDelivery.sharedInstance().composeComponentEmail(&quot;sender@foo.com&quot;,
+            recipients, null, messageSubject, report, true);
+}</pre>
+<p>Instead of statically setting the array recipients, the array
+is set dynamically to the email addresses passed in by the <code>sendTo</code> array.</p>
+<p>Build and run the application. Open a student record and click
+Send Record Via Email. A dialog like the that shown in  <a href="#BCIFDGAC">Figure 5-30</a> should
+appear. Select some email addresses and click Ok. Check your email
+to see if you are successful.</p>
+<br><a name = "BCIFDGAC"></a><a name="-650247"></a><p><b><font face="Geneva,Helvetica,Arial" size="2">Figure
+5-30 Choose email recipients</font></b></p>
+ <img src = "../Art/chooseemails.gif" alt = "[image: ../Art/chooseemails.gif]">
+
+
+
+<br><br><br>
+    <!-- insert Show/Hide frames -->
+<script type="text/javascript" language="JavaScript"><!--
+function loadFrames(){
+if (top == self || (parent.frames[1].name != content))
+    top.location.href = 'index.html?' + location.href;
+}
+
+if (self != top) {
+  // loaded in frames
+  document.write('<a href="'+self.location+'" target="_top"><img src="../images/hideframes.gif" border="0" alt="Hide Frames"></a>');
+  }
+else {
+  // not loaded frames
+	document.write('<a href="JavaScript:loadFrames()"><img src="../images/showframes.gif" border="0" alt="Show Frames"></a>');
+}
+//--></script>
+<!-- end Show/Hide frames -->
+<a href="Extend_a_Controller_Class.html" target="content"><img src="../images/previous.gif" border="0"></a>&nbsp;<a href="Debugging.html" target="content"><img src="../images/next.gif" border="0"></a>&nbsp;<!-- apple_doc:infillMarkerBottom --> <br><br><p><hr><font face="Geneva,Helvetica,Arial" size="2">&#169; 2002 Apple Computer, Inc. (Last Updated May 1, 2002)</font></p><!-- start of footer -->
+<!--#include virtual="/includes/framesetfooter" -->
+<!-- end of footer -->
+</body>
+</html>

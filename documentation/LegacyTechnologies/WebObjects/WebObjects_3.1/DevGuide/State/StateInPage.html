@@ -1,0 +1,64 @@
+<BODY bgcolor=#FFFFFF>
+<P><A HREF="ManagingState.book.html"><IMG SRC="ArrowUp.gif" border=0>Table of Contents</A>
+<A HREF="StateInServer.html"><IMG SRC="ArrowLeft.gif" border=0>Previous Section</A>
+<!-- This file was created with the fm2html filter.
+The filter is copyright Norwegian Telecom Research and
+was programmed by Jon Stephenson von Tetzchner. -->
+
+
+<H1><A NAME="REF94376">State in the Page</A></H1>
+<P>The HTML specification defines an input element of type "hidden" that's commonly used to pass state information back and forth between the client and server. The hidden field simply contains text that is not displayed in the user's browser. For example using state in the page, the HTML source for the Guess page of the SessionStores example would look something like this:
+
+<PRE>&lt;FORM METHOD=Post ACTION=<I>someAction</I>&gt;
+    Can you guess my favorite digit?&lt;BR&gt;
+    &lt;SELECT NAME="guesses"&gt;
+      &lt;OPTION&gt;1
+      &lt;OPTION&gt;2
+      ...
+      &lt;OPTION&gt;9
+    &lt;/SELECT&gt;
+<B>  &lt;INPUT TYPE="hidden" NAME="hiddenState" VALUE=</B><I><B>"previousGuesses</B></I><B>"&gt;
+</B>  &lt;INPUT TYPE="submit" VALUE="Guess"&gt;
+&lt;/FORM&gt;</PRE>
+<P>The hidden field carries the record of the user's previous guesses back and forth between the client and server for the duration of the game. 
+<P>Through its page session store and WOStateStorage dynamic element, WebObjects makes it simple to use the page state storage mechanism, as you'll soon see. However, there are some limitations inherent in storing state in the page, as we can deduce from the code excerpt above:
+
+<UL>
+<P><LI>Since state is stored in an input element---which according to the HTML specification must exist within a form element---you must structure your application around forms. If you want session state to be available at any point in the application, each page of the application must have a form, and that form must contain a hidden field (or in the case of WebObjects, a WOStateStorage element, as discussed later).
+<BR>
+<P><LI>Each page carries a record of the state existing at the time of its creation, so backtracking can make the page state and the actual state disagree. For example, if the user make five guesses in the SessionStores example, backtracks two pages, and submits another guess, the application will claim that four guesses were made when the actual number is six. 
+<BR>
+
+<P><LI>Storing state in the page is a problem if the "pages" in question are frames. Your state can quickly get out of sync. For example, suppose you have a mail application with two frames. One of the frames shows a list of messages with one message selected, and the other frame shows the text of the selected message. If you delete the message in the top frame, the state of the bottom frame isn't updated (unless you implement your own solution).
+<BR>
+<P><LI>If a page has multiple forms, you must include the page state data in each form. If a form lacking this data is submitted, the application will no longer have the state information it needs.
+<BR></UL>
+
+
+<P>A WebObjects application can store state in the page by establishing the page session store as the application's state storage mechanism and by structuring its pages so that they each contain an HTML form and a WOStateStorage element.
+<P>You generally set the session storage type in the </CODE><B>init</B> method of the application script (<B>Application.wos</B>):
+<PRE>- init {
+    [super init];
+    [self setSessionStore:[WOSessionStore pageSessionStore]];
+    return self;
+}</PRE>
+<P>Next, you must add a form to each page of the application and place a WOStateStorage object within the form. For example, the HTML template of a page might look like this:
+
+<PRE>&lt;WEBOBJECT NAME="FORM"&gt;
+      <B>&lt;WEBOBJECT NAME = "STATE"&gt;&lt;/WEBOBJECT&gt;</B>
+      &lt;WEBOBJECT NAME = "NAME_FIELD"&gt;&lt;/WEBOBJECT&gt;&lt;BR&gt;
+      &lt;WEBOBJECT NAME = "SUBMIT_BUTTON"&gt;&lt;/WEBOBJECT&gt;&lt;BR&gt;
+&lt;/WEBOBJECT&gt;</PRE>
+    
+<P>The declarations file declares that the State element is a WOStateStorage dynamic element:
+<PRE>    STATE: WOStateStorage{ size = 500 };</PRE>
+<P>(With WebObjects Builder, you embed a WOStateStorage element in a page by dragging a Custom element from the Palettes panel into the component window and then using the Inspector panel to specify that the type of the element is "WOStateStorage".)
+
+<P>When you run the application, WebObjects stores session state in the HTML page at the location specified by the WOStateStorage element. What happens is this: When WebObjects generates a page to return to the user, it packages the session state by archiving the session object---and consequently, all the component objects that it contains---into an NSData object. The NSData object is then asked for its ASCII representation, which is written into the HTML page as hidden fields. 
+<P>WOStateStorage's </CODE><B>size</B> attributes specifies the maximum size of each of these hidden fields (500 bytes in the example above). WebObjects writes as many hidden fields as necessary to accommodate the state data. The <B>size</B> attribute is provided since browsers differ in the amount of text that they allow within a single hidden field. Most browsers have no problem with the default value of 1000 bytes.
+<P>When the user submits the HTML page to the server, the process is reversed. The application's page session store restores the session state by recombining the ASCII data it finds in the hidden fields into the original ASCII archive, converting the ASCII archive to its binary, NSData, representation, and then unarchiving the session object and its contents from the NSData object. (See the class specification for NSArchiver in the <I>Foundation Framework Reference</I> for more information on archiving.)
+<P>One consequence of storing state in the page is that only objects that know how to archive themselves can be stored. For scripted objects, WebObjects provides a default archiving implementation that will archive data stored in the object's instance variables. For compiled objects, on the other hand, you have to implement the archiving methods yourself, as described in "<A HREF="StateForCustomObjects.html">Storing State for Custom Objects</A>".
+
+<P><A HREF="ManagingState.book.html"><IMG SRC="ArrowUp.gif" border=0>Table of Contents</A>
+<A HREF="StateInCookies.html"><IMG SRC="ArrowRight.gif" border=0>Next Section</A>
+</BODY >

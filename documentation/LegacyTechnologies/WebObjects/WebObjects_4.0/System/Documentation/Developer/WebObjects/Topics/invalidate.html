@@ -1,0 +1,316 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML EXPERIMENTAL 970324//EN">
+<HTML>
+<HEAD>
+<META NAME="GENERATOR" CONTENT="Adobe FrameMaker 5.5/HTML Export Filter">
+<LINK REL="STYLESHEET" HREF="invalidate.css">
+<TITLE> </TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+<!--start of banner -->
+<!--#include virtual="/includes/framesetheader" -->
+<!-- end of banner -->
+<!--start of path -->
+<font face="Geneva,Helvetica,Arial" size="1">
+<b>PATH<spacer type="horizontal" size="5">&nbsp;</b>
+ <a href="../../../../../webobjects.html" target="_top">WebObjects 4.0 Documentation</a> <b>&gt;</b>
+ <a href="TopicsTOC.html" target="_top">WebObjects Programming Topics</a>
+</font>
+<br><br>
+<!--end of path -->
+
+
+<H1 CLASS="TopictTitleTOC">
+Invalidating Objects
+</H1>
+<DIV>
+<H2 CLASS="Synopsis">
+<A NAME="pgfId=606101">
+ </A>
+Synopsis<DIV>
+<IMG SRC="invalidate-1.gif">
+</DIV>
+</H2>
+<P CLASS="Body">
+<A NAME="pgfId=606102">
+ </A>
+Describes when and how to invalidate objects to clear up the caches used by the Enterprise Objects Framework (EOF).</P>
+</DIV>
+<DIV>
+<H2 CLASS="Heading1">
+<A NAME="pgfId=606103">
+ </A>
+Description<DIV>
+<IMG SRC="invalidate-1.gif">
+</DIV>
+</H2>
+<P CLASS="Body">
+<A NAME="pgfId=615470">
+ </A>
+Enterprise Objects Framework (EOF) automatically caches the raw dictionary of values and unique objects that are fetched from the database. The raw dictionary is cached in a set of snapshots based on a GlobalID derived from the primary keys of the database rows. All peer EOEditingContexts share this common cache of snapshots. Each EOEditingContext stores its own unique object instance for a given GlobalID. Whenever the common snapshots change, an EOObjectsChangedInStore notification is posted and all associated EOEditingContexts attempt to reconcile themselves with the new snapshot.</P>
+<P CLASS="Body">
+<A NAME="pgfId=612721">
+ </A>
+Sometimes you need to clear the snapshot caches to refresh the objects in your editing contexts. EOF provides object invalidation methods to clear the caches. These methods are also the only way to clear a database lock without saving your changes.</P>
+<P CLASS="Body">
+<A NAME="pgfId=606106">
+ </A>
+To understand how these methods work, consider the following objects subclassed from EOObjectStore: EODatabaseContext, EOObjectStoreCoordinator and EOEditingContext. EOObjectStores maintain collections of Enterprise Objects (EOs), and are organized in a multitiered tree with the EOObjectStores closest to the database at the bottom and those closest to the user interface at the top.  Starting from the bottom, an application's EOObjectStore tree consists of:</P>
+<UL>
+<P CLASS="Bulleted">
+<A NAME="pgfId=612632">
+ </A>
+&#183;	One or more EODatabaseContexts</P>
+<P CLASS="Bulleted">
+<A NAME="pgfId=606109">
+ </A>
+&#183;	One EOObjectStoreCoordinator</P>
+<P CLASS="Bulleted">
+<A NAME="pgfId=606110">
+ </A>
+&#183;	One or more EOEditingContexts</P>
+<P CLASS="Bulleted">
+<A NAME="pgfId=606111">
+ </A>
+&#183;	Potentially some nested EOEditingContexts</P>
+</UL>
+<P CLASS="Body">
+<A NAME="pgfId=606113">
+ </A>
+The invalidating methods will have a different effect on the EOObjectStores in the EOObjectStore tree.</P>
+<P CLASS="Body">
+<A NAME="pgfId=615526">
+ </A>
+If you send <EM CLASS="Code">
+invalidateAllObjects</EM>
+ to a nested EOEditingContext, it sends <EM CLASS="Code">
+invalidateObjectsWithGlobalIDs:</EM>
+ to its parent EOEditingContext with the global IDs of its registered objects. The parent EOEditingContext propagates this message to the EOObjectStoreCoordinator, which propagates it to the EODatabaseContext(s). The EODatabaseContext throws away the snapshots corresponding to the global IDs and sends an <EM CLASS="Code">
+ObjectChangedInStoreNotification</EM>
+, which changes all of those objects to faults throughout your whole tree. The next time you examine one of these objects, it will be refetched from the database.</P>
+<P CLASS="Body">
+<A NAME="pgfId=606117">
+ </A>
+If you send the message <EM CLASS="Code">
+invalidateAllObjects</EM>
+ directly to your EOObjectStoreCoordinator, it will send the <EM CLASS="Code">
+invalidateAllObjects</EM>
+ to all of its EODatabaseContexts. As a consequence, all the snapshots in your application will be discarded and every enterprise object in every EOEditingContext will become a fault.</P>
+<P CLASS="Body">
+<A NAME="pgfId=615357">
+ </A>
+The following code shows how to invalidate an object in the default editing context.</P>
+<DIV>
+<H5 CLASS="Code-Listing">
+<A NAME="pgfId=615360">
+ </A>
+Figure 1.  Java Code</H5>
+<DIV>
+<pre>// Invalidate the object, converting it back to a fault.</pre></DIV>
+<A NAME="pgfId=615362">
+ </A>
+<DIV>
+<pre>EOEditingContext ec=session().defaultEditingContext();</pre></DIV>
+<A NAME="pgfId=615364">
+ </A>
+<DIV>
+<pre>ec.invalidateObjectsWithGlobalIDs(new NSArray(</pre></DIV>
+<A NAME="pgfId=615366">
+ </A>
+<DIV>
+<pre>    ec.globalIDForObject(theObject)));</pre></DIV>
+<A NAME="pgfId=615453">
+ </A>
+</DIV>
+<DIV>
+<H5 CLASS="Code-Listing">
+<A NAME="pgfId=615369">
+ </A>
+Figure 2.  Objective-C Code</H5>
+<DIV>
+<pre>// Invalidate the object, converting it back to a fault.</pre></DIV>
+<A NAME="pgfId=615371">
+ </A>
+<DIV>
+<pre>EOEditingContext *ec=[[self session] defaultEditingContext];    </pre></DIV>
+<A NAME="pgfId=615373">
+ </A>
+<DIV>
+<pre>[ec invalidateObjectsWithGlobalIDs:[NSArray arrayWithObject:</pre></DIV>
+<A NAME="pgfId=615375">
+ </A>
+<DIV>
+<pre>    [ec globalIDForObject:theObject]]];</pre></DIV>
+<A NAME="pgfId=615452">
+ </A>
+<P CLASS="Body">
+<A NAME="pgfId=615424">
+ </A>
+&nbsp;</P>
+<P CLASS="Body">
+<A NAME="pgfId=615394">
+ </A>
+You can also invalidate all objects in an editing context using <EM CLASS="Code">
+invalidateAllObjects</EM>
+.</P>
+</DIV>
+<DIV>
+<H5 CLASS="Code-Listing">
+<A NAME="pgfId=615378">
+ </A>
+Figure 3.   Java Code</H5>
+<DIV>
+<pre>// Invalidate all objects in the editing context, converting them to faults.</pre></DIV>
+<A NAME="pgfId=615380">
+ </A>
+<DIV>
+<pre>EOEditingContext ec=session().defaultEditingContext();</pre></DIV>
+<A NAME="pgfId=615382">
+ </A>
+<DIV>
+<pre>ec.invalidateAllObjects;</pre></DIV>
+<A NAME="pgfId=615384">
+ </A>
+</DIV>
+<DIV>
+<H5 CLASS="Code-Listing">
+<A NAME="pgfId=615387">
+ </A>
+Figure 4.   Objective-C Code</H5>
+<DIV>
+<pre>// Invalidate all objects in an editing context, converting them to faults.</pre></DIV>
+<A NAME="pgfId=615389">
+ </A>
+<DIV>
+<pre>EOEditingContext *ec=[[self session] defaultEditingContext];    </pre></DIV>
+<A NAME="pgfId=615391">
+ </A>
+<DIV>
+<pre>[ec invalidateAllObjects];</pre></DIV>
+<A NAME="pgfId=615393">
+ </A>
+</DIV>
+<DIV>
+<H4 CLASS="Heading2">
+<A NAME="pgfId=615355">
+ </A>
+Gotchas</H4>
+<P CLASS="Body">
+<A NAME="pgfId=615528">
+ </A>
+The <EM CLASS="Code">
+setInvalidatesObjectsWhenFreed</EM>
+ method defined in the EOEditingContext class does not free the object snapshots, even when it is called with the default value of <EM CLASS="Code">
+true/YES</EM>
+. Consequently, to avoid the memory leaks when an EOEditingContext is deallocated, you need to free the snapshots explicitly using the invalidating methods.</P>
+<P CLASS="Body">
+<A NAME="pgfId=615529">
+ </A>
+The snapshots associated with an EOEditingContext is never automatically released, even when the EOEditingContext is deallocated. This means that as data is fetched from the database, the number of snapshots, and hence your memory usage, will grow until you pull the whole database into memory.</P>
+<P CLASS="Body">
+<A NAME="pgfId=615530">
+ </A>
+This is a known problem with EOF that will be addressed in future releases.</P>
+</DIV>
+</DIV>
+<DIV>
+<H2 CLASS="Heading1">
+<A NAME="pgfId=606151">
+ </A>
+See Also<DIV>
+<IMG SRC="invalidate-1.gif">
+</DIV>
+</H2>
+<UL>
+<P CLASS="Bulleted">
+<A NAME="pgfId=606152">
+ </A>
+&#183;	Refreshing Data by Refetching from the Database or Invalidating an Object</P>
+<P CLASS="Bulleted">
+<A NAME="pgfId=606155">
+ </A>
+&#183;	Detecting Memory Leaks</P>
+<P CLASS="Bulleted">
+<A NAME="pgfId=615592">
+ </A>
+&#183;	EOObjectStore</P>
+<P CLASS="Bulleted">
+<A NAME="pgfId=615593">
+ </A>
+&#183;	EOEditingContext</P>
+</UL>
+</DIV>
+<DIV>
+<H2 CLASS="Heading1">
+<A NAME="pgfId=606157">
+ </A>
+Questions<DIV>
+<IMG SRC="invalidate-1.gif">
+</DIV>
+</H2>
+<UL>
+<P CLASS="Bulleted">
+<A NAME="pgfId=606158">
+ </A>
+&#183;		How can I prevent the memory from growing constantly in my application?</P>
+<P CLASS="Bulleted">
+<A NAME="pgfId=606159">
+ </A>
+&#183;		When should I use <EM CLASS="Code">
+invalidateAllObjects</EM>
+?</P>
+</UL>
+</DIV>
+<DIV>
+<H2 CLASS="Heading1">
+<A NAME="pgfId=606160">
+ </A>
+Keywords<DIV>
+<IMG SRC="invalidate-1.gif">
+</DIV>
+</H2>
+<UL>
+<P CLASS="Bulleted">
+<A NAME="pgfId=606161">
+ </A>
+&#183;	<EM CLASS="Code">
+InvalidateAllObjects</EM>
+</P>
+<P CLASS="Bulleted">
+<A NAME="pgfId=606162">
+ </A>
+&#183;	<EM CLASS="Code">
+InvalidateObjectsWithGlobalIDs</EM>
+</P>
+<P CLASS="Bulleted">
+<A NAME="pgfId=606242">
+ </A>
+&#183;	<EM CLASS="Code">
+setInvalidatesObjectsWhenFreed</EM>
+</P>
+</UL>
+</DIV>
+<DIV>
+<H2 CLASS="Heading1">
+<A NAME="pgfId=606244">
+ </A>
+Revision History<DIV>
+<IMG SRC="invalidate-1.gif">
+</DIV>
+</H2>
+<P CLASS="Body">
+<A NAME="pgfId=606166">
+ </A>
+24 July, 1998. Mai Nguyen. First Draft.</P>
+<P CLASS="Body">
+<A NAME="pgfId=615540">
+ </A>
+19 November, 1998. Clif Liu. Second Draft.</P>
+</DIV>
+
+
+<!--start of footer -->
+<!--#include virtual="/includes/framesetfooter" -->
+<!-- end of footer -->
+
+</body>
+</HTML>

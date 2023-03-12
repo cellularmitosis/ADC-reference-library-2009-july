@@ -1,0 +1,1574 @@
+<html>
+
+<body bgcolor="#FFFFFF">
+
+<CENTER><H1>Class WODisplayGroup</H1></CENTER>
+
+<!-- inherits from:NSObject -->
+
+<DL>
+
+<DT><B>Inherits From:</B></DT><DD>NSObject</DD>
+
+<DT><B>Conforms To:</B></DT><DD>NSObject (NSObject)</DD>
+
+</DL>
+
+<P>
+
+<HR>
+
+<CENTER><A name="classAtAGlance"><h2>CLASS AT A GLANCE</h2></a></CENTER>
+
+<h4>Purpose</h4>
+
+<P>
+
+A WODisplayGroup collects an array of objects from an EODataSource and displays and edits properties of those objects.
+
+<H4>Principal Attributes</h4>
+
+<UL>
+
+<LI>Array of objects supplied by an EODataSource
+
+<LI>EOQualifier and EOSortOrderings to filter the objects for display
+
+<LI>Array of selection indexes
+
+<LI>Delegate
+
+</UL>
+
+<H4>Creation</H4>
+
+WebObjects Builder
+
+<br>
+
+init
+
+<H4>Commonly Used Methods</H4>
+
+<TABLE><TR>
+
+<TD>allObjects</td>
+
+<td>Returns all objects in the WODisplayGroup.</td>
+
+</TR><TR>
+
+<TD>displayedObjects</td><TD>Returns the subset of all objects made available for display.</td>
+
+</TR><TR>
+
+<td>selectedObjects</td><td>Returns the selected objects.</td>
+
+</TR><TR>
+
+<td>setQualifier:</td><td>Sets a filter that limits the objects displayed.</td>
+
+</TR><TR>
+
+<td>setSortOrdering:</td><td>Sets the ordering used to sort the objects.</td>
+
+</TR><TR>
+
+<td>updateDisplayedObjects</td><td>Filters, sorts, and redisplays the objects</td>
+
+</TR><TR>
+
+<td>insert</td><td>Creates a new object and inserts it into the EODataSource.</td>
+
+</tr></table>
+
+<HR>
+
+<a name="description"></a><CENTER><H2>CLASS DESCRIPTION</H2></CENTER>
+
+<P>
+
+A WODisplayGroup is the basic user interface manager for a WebObjects application that accesses a database. It collects objects from an EODataSource, filters and sorts them, and maintains a selection in the filtered subset. You bind WebObjects dynamic elements to WODisplayGroup attributes and methods to display information from the database on your web page. 
+
+<P>
+
+A WODisplayGroup manipulates its EODataSource by sending it <b>fetchObjects</b>, <b>insertObject:</b>, and other messages, and registers itself as an editor and message handler of the EODataSource's EOEditingContext. The EOEditingContext then monitors the WODisplayGroup for changes to objects.
+
+<P>
+
+Most of a DisplayGroup's interactions are with its EODataSource and its EOEditingContext. See the 
+
+<!--
+
+<A HREF="../../eo/DataSource/DataSource.html" target=_top>
+
+-->
+
+EODataSource,
+
+<!-- </a>
+
+-->
+
+ and 
+
+<!-- <A HREF="../../eo/EditingContext/EditingContext.html" target=_top>
+
+-->
+
+EOEditingContext
+
+<!-- </a>
+
+--> 
+
+class specifications in the <i>Enterprise Objects Frameworks Reference</i> for more information on these interactions.
+
+<P>
+
+<H3>Creating a DisplayGroup</H3>
+
+<P>
+
+You create most WODisplayGroups in WebObjects Builder in one of these ways:
+
+<UL>
+
+<P><LI>By using the Database Wizard to create the WODisplayGroup and the dynamic elements that are bound to it. 
+
+<P><LI>By dragging an entity icon from the EOModeler application to create a WODisplayGroup associated with the model's data source.
+
+<P><LI>By choosing the Tools->Script->Add Display Group menu item to create a WODisplayGroup not bound to a data source.
+
+</UL>
+
+<P>WODisplayGroups with EODataSources operate independent of other WODisplayGroups, while those without EODataSource s must be set up in a master-detail association with another WODisplayGroup. For more information on setting up WODisplayGroups in WebObjects Builder, see:
+
+<UL>
+
+<LI>
+
+"<A HREF="../../../../GettingStarted/Movies/Movies.book.html" target=_top>Creating a Web-Based Database Application With WebObjects Builder</a>" in <i>Getting Started</i>.
+
+<P><LI>
+
+"<A HREF="../../../../WOBuilder/Script/Script.book.html" target=_top>Writing WebScript in WebObjects Builder</a>" in <i>Using WebObjects Builder</i>.
+
+</UL>
+
+<P>
+
+To create a WODisplayGroup programmatically, simply initialize it and set its EODataSource:
+
+<P><PRE>EODataSource *myDataSource;    /* Assume this exists. */
+
+WODisplayGroup *myDisplayGroup;
+
+
+
+myDisplayGroup = [[[WODisplayGroup] alloc] init] autorelease];
+
+[myDisplayGroup.setDataSource:myDataSource];
+
+</PRE>
+
+<H3>Getting Objects</H3>
+
+<P>
+
+Since a WODisplayGroup isn't much use without objects to manage, the first thing you do with a WODisplayGroup is send it a <b>fetch</b> message. You can use the basic <b>fetch</b> method, or you can configure the WODisplayGroup in WebObjects Builder to fetch automatically when its component is loaded. The <b>fetch</b> method asks the WODisplayGroup's EODataSource to fetch from its persistent store with a <b>fetchObjects</b> message.
+
+
+
+<H4>Filtering and Sorting</H4>
+
+<P>
+
+A WODisplayGroup's fetched objects are available through its <b>allObjects</b> method. These objects are treated only as candidates for display, however. The array of objects actually displayed is filtered and sorted by the WODisplayGroup's delegate or by a qualifier and a sort ordering array. You set the qualifier and sort orderings using the <b>setQualifier:</b> and <b>setSortOrdering:</B> methods. The <b>displayedObjects</b> method returns this filtered and sorted array; index arguments to other WODisplayGroup methods are defined in terms of this array.
+
+<P>
+
+If the WODisplayGroup has a delegate that responds to <B>displayGroup:displayArrayForObjects:</B>, it invokes this method rather than using its own qualifier and sort ordering array. The delegate is then responsible for filtering the objects and returning a sorted array. If the delegate only needs to perform one of these steps, it can get the qualifier or sort orderings from the WODisplayGroup and apply either itself using the NSArray methods <b>filteredArrayUsingQualifier:</b> and <b>sortedArrayUsingKeyOrderingArray:</b>.
+
+<P>
+
+If you change the qualifier or sort ordering, or alter the delegate in a way that changes how it filters and sorts the WODisplayGroup's objects, you can send <B>updateDisplayedObjects</b> to the WODisplayGroup to get it to refilter and resort its objects. Note that this doesn't cause the WODisplayGroup to refetch.
+
+
+
+<H4>Batching the Output</H4>
+
+<P>
+
+Even after the output has been qualified and sorted, there might be too many objects to display on a single HTML page. For this reason and to improve your application's performance, WODisplayGroup supports batching the display. When batching is used, the HTML page shows only a certain number of objects at a time. If you create the WODisplayGroup using WebObjects Builder, the default batch size is 10. Thus if there are one hundred objects to display, <b>displayedObjects</b> returns only the first ten of those objects when the page is drawn. If <b>displayNextBatch</b> is invoked, <b>displayedObjects</b> is updated to contain the next ten objects, and the page is redrawn.
+
+<P>
+
+You use <b>displayNextBatch</b> and <b>displayPreviousBatch</b> to move back and forth through the displayed objects. The <b>setNumberOfObjectsPerBatch:</b> method changes the batch size. You can also change batch size using WebObjects Builder.  
+
+
+
+<H3>Changing and Examining the Selection</H3>
+
+<P>
+
+A WODisplayGroup keeps a selection in terms of indexes into the array of displayed objects. Components that display values for multiple objects are responsible for updating the selection in their WODisplayGroups according to user actions on their dynamic elements. This is typically done with the <b>setSelectionIndexes:</b> method. Other methods available for indirect manipulation of the selection are the action methods <b>selectNext</b> and <b>selectPrevious</b>.
+
+<P>
+
+To get the selection, you can use the <b>selectionIndexes</b> method, which returns an array of indexes (as NSNumber objects), or <b>selectedObjects</b>, which returns an array containing the selected objects themselves. Another method, <b>selectedObject</b>, returns the first selected object if there is one.
+
+<P>
+
+<B>Note:  </B>The selection is a programmatical selection only. The selected objects don't actually appear highlighted on the web page. 
+
+
+
+<H3>The Delegate</H3>
+
+<P>
+
+
+The WODisplayGroup delegate offers a number of methods, and WODisplayGroup invokes them as appropriate. Besides the aforementioned <b>displayGroup:displayArrayForObjects:</b>, there are methods that inform the delegate that the WODisplayGroup has fetched, created an object (or failed to create one), inserted or deleted an object, changed the selection, or set a value for a property. There are also methods that request permission from the delegate to perform most of these same actions. The delegate can return YES to permit the action or NO to deny it. See each method's description in the <A HREF="#delegate" >Methods Implemented by the Delegate</a> section for more information.
+
+
+
+<H3>Performing Queries</H3>
+
+<P>
+
+If you are building a component that allows users to perform database queries, you use a WODisplayGroup to construct a qualifier that reflects the query. 
+
+<P>
+
+Instead of performing the <b>fetch</b> method and then using <b>updateDisplayedObjects</b> to qualify and sort the objects returned by <b>fetch</b>, you use <b>executeQuery</b>. The <b>executeQuery</b> method builds a qualifier based on user input, performs a fetch using that qualifier, and then invokes the <b>setQualifier:</b> method to set the WODisplayGroup's qualifier to <b>nil</b>. In this way, subsequent <b>updateDisplayedObjects</b> messages apply only the sort ordering to the displayed objects array, as the qualifier has already been applied.
+
+<P>
+
+The method <b>inputObjectForQualifier</b> specifies the input values used to build the query. <b>inputObjectForQualifier</b> returns an NSMutableDictionary that you can modify to specify the query. Typically, you modify the dictionary through WebObjects Builder, by binding the dictionary's possible keys to dynamic elements in the component. When the user enters or chooses a value from the dynamic element, <b>inputObjectForQualifier</b>'s dictionary is updated to include the appropriate key/value pair.
+
+<P>
+
+If you want to support "from-to" queries, the dictionary returned by <b>inputObjectForQualifier</b> specifies only the values in the "from" part of the query. To specify the values for the "to" part of the query, use the dictionary returned by the <b>secondObjectForQualifier</b> method. You bind objects to the dictionary returned by <b>secondObjectForQualifier</b> in the same way that you bind objects to <b>inputObjectForQualifier</b>. Because you are specifying a "from-to" query, the keys in the <b>secondObjectForQualifier</b> dictionary must be identical to the keys in the <b>inputObjectForQualifier</b>. 
+
+<P>
+
+For example, you might use <b>secondObjectForQualifier</b> if you were trying to construct a query that returned all movies that were released between two dates. Both the <b>inputObjectForQualifier</b> and the <b>secondObjectForQualifier</b> dictionaries would have the "dateReleased" property. The <b>inputObjectForQualifier</b> value would be the starting date, and the <b>secondObjectForQualifier</b> value would be the ending date. 
+
+<P>
+
+The qualifier built by <b>executeQuery</b> differs from the qualifier associated with the WODisplayGroup (using <b>setQualifier:</b>) in when and where it is applied. The qualifier associated with the WODisplayGroup filters objects after they are fetched into memory. The qualifier built by <b>executeQuery</b> is associated with the EODataSource and thus is applied <i>before</i> the objects are fetched into memory. You can use both qualifiers on the same WODisplayGroup; however, after you perform an <b>executeQuery</b> the qualifier associated with the WODisplayGroup is set to <b>nil</b> so that subsequent <b>updateDisplayedObjects</b> messages apply only the sort ordering to update the displayed objects array. 
+
+<P>
+
+<hr>
+
+</body>
+
+</html><html>
+
+<body bgcolor="#FFFFFF"><!-- instance methods -->
+
+<a name="instance methods"><CENTER><H2>INSTANCE METHODS</H2></CENTER></a>
+
+<!-- key:allObjects(-WODisplayGroup) meth:allObjects descr:<TT>- (NSArray *)<B>allObjects</B> </TT> -->
+
+<H3><a name="allObjects(-WODisplayGroup)">allObjects</a></H3>
+
+   <TT>- (NSArray *)<B>allObjects</B> </TT>
+
+<P>
+
+Returns all of the objects collected by the receiver.
+
+<P>
+
+<B>See Also: </b>- <b>displayedObjects</b>, - <b>fetch
+</B>
+
+<hr>
+
+<!-- key:batchCount(-WODisplayGroup) meth:batchCount descr:<TT>- (unsigned)<B>batchCount</B> </TT> -->
+
+<H3><a name="batchCount(-WODisplayGroup)">batchCount</a></H3>
+
+   <TT>- (unsigned)<B>batchCount</B> </TT>
+
+<P>
+
+The number of batches to display. For example, if the displayed objects array contains two hundred records and the batch size is ten, <b>batchCount</b> returns twenty (twenty batches of ten records each). 
+
+<P>
+
+<B>See Also: </b>- <b>currentBatchIndex</b>, - <b>displayNextBatch</b>, - <b>displayPreviousBatch</b>, - <b>numberOfObjectsPerBatch</B>
+
+<hr>
+
+<!-- key:buildsQualifierFromInput(-WODisplayGroup) meth:buildsQualifierFromInput descr:<TT>- (BOOL)<B>buildsQualifierFromInput</B> </TT> -->
+
+<H3><a name="buildsQualifierFromInput(-WODisplayGroup)">buildsQualifierFromInput</a></H3>
+
+   <TT>- (BOOL)<B>buildsQualifierFromInput</B> </TT>
+
+<P>
+
+Returns whether the receiver should build a qualifier before fetching. If YES, the receiver performs database fetches using the <b>executeQuery</b> method, which first builds a qualifier using the method <b>qualifierFromInputValues</b> and then performs the fetch.
+
+<P>
+
+<B>See Also:</b> - <b>lastQualifierFromInputValues</b>, - <b>setBuildsQualifierFromInput: </B>
+
+<hr>
+
+<!-- key:clearSelection(-WODisplayGroup) meth:clearSelection descr:<TT>- (BOOL)<B>clearSelection</B> </TT> -->
+
+<H3><a name="clearSelection(-WODisplayGroup)">clearSelection</a></H3>
+
+   <TT>- (BOOL)<B>clearSelection</B> </TT>
+
+<P>
+
+Invokes <b>setSelectionIndexes:</b> to clear the selection, returning YES on success and NO on failure.
+
+<hr>
+
+<!-- key:currentBatchIndex(-WODisplayGroup) meth:currentBatchIndex descr:<TT>- (unsigned)<B>currentBatchIndex</B> </TT> -->
+
+<H3><a name="currentBatchIndex(-WODisplayGroup)">currentBatchIndex</a></H3>
+
+   <TT>- (unsigned)<B>currentBatchIndex</B> </TT>
+
+<P>
+
+Returns the index of the batch currently being displayed. The total batch count equals the number of displayed objects divided by the batch size. For example, if the WODisplayGroup has one hundred objects to display and the batch size is twenty, there are five batches. The first batch has a batch index of 1. 
+
+<P>
+
+<B>See Also:</b> - <b>batchCount</b>, - <b>numberOfObjectsPerBatch</b>, - <b>setCurrentBatchIndex:</B>
+
+<hr>
+
+<!-- key:dataSource(-WODisplayGroup) meth:dataSource descr:<TT>- (EODataSource *)<B>dataSource</B> </TT> -->
+
+<H3><a name="dataSource(-WODisplayGroup)">dataSource</a></H3>
+
+   <TT>- (EODataSource *)<B>dataSource</B> </TT>
+
+<P>
+
+Returns the receiver's EODataSource.
+
+<P>
+
+<B>See Also:</b> - <b>setDataSource:</B>
+
+<hr>
+
+<!-- key:delegate(-WODisplayGroup) meth:delegate descr:<TT>- (id)<B>delegate</B> </TT> -->
+
+<H3><a name="delegate(-WODisplayGroup)">delegate</a></H3>
+
+   <TT>- (id)<B>delegate</B> </TT>
+
+<P>
+
+Returns the receiver's delegate.
+
+<P>
+
+<B>See Also:</b> - <b>setDelegate:</b>
+
+<hr>
+
+<!-- key:delete(-WODisplayGroup) meth:delete descr:<TT>- (id)<B>delete</B> </TT> -->
+
+<H3><a name="delete(-WODisplayGroup)">delete</a></H3>
+
+   <TT>- (id)<B>delete</B> </TT>
+
+<P>
+
+Uses <b>deleteSelection</b> to attempt to delete the selected objects and then causes the page to be reloaded. Returns <b>nil</b> to force reloading of the web page.
+
+<P>
+
+<B>See Also:</b> - <b>deleteObjectAtIndex:</B>
+
+<hr>
+
+<!-- key:deleteObjectAtIndex:(-WODisplayGroup) meth:deleteObjectAtIndex: descr:<TT>- (BOOL)<B>deleteObjectAtIndex:</B>(unsigned)<I>index</I> </TT> -->
+
+<H3><a name="deleteObjectAtIndex:(-WODisplayGroup)">deleteObjectAtIndex:</a></H3>
+
+   <TT>- (BOOL)<B>deleteObjectAtIndex:</B>(unsigned)<I>anIndex</I> </TT>
+
+<P>
+
+Attempts to delete the object at <i>index</i>, returning YES if successful and NO if not. Checks with the delegate using the method <b>displayGroup:shouldDeleteObject:</b>. If the delegate returns NO, this method fails and returns NO. If successful, it sends the delegate a <b>displayGroup:didDeleteObject:</b> message.
+
+<P>
+
+This method performs the delete by sending <b>deleteObject</b> to the EODataSource. If that message raises an exception, this method fails and returns NO.
+
+<P>
+
+<B>See Also:</b> - <b>delete</b>, - <b>deleteSelection</B>
+
+<hr>
+
+<!-- key:deleteSelection(-WODisplayGroup) meth:deleteSelection descr:<TT>- (BOOL)<B>deleteSelection</B> </TT> -->
+
+<H3><a name="deleteSelection(-WODisplayGroup)">deleteSelection</a></H3>
+
+   <TT>- (BOOL)<B>deleteSelection</B> </TT>
+
+<P>
+
+Attempts to delete the selected objects, returning YES if successful and NO if not.
+
+<P>
+
+<B>See Also:</b> - <b>delete</b>, - <b>deleteObjectAtIndex:</B>
+
+<hr>
+
+<!-- key:displayBatchContainingSelectedObject(-WODisplayGroup) meth:displayBatchContainingSelectedObject descr:<TT>- (id)<B>displayBatchContainingSelectedObject</B> </TT> -->
+
+<H3><a name="displayBatchContainingSelectedObject(-WODisplayGroup)">displayBatchContainingSelectedObject</a></H3>
+
+   <TT>- (id)<B>displayBatchContainingSelectedObject</B> </TT>
+
+<P>
+
+Displays the batch containing the selection and sets the current batch index to that batch's index. Returns <b>nil</b> to force the page to be reloaded.
+
+<P>
+
+<B>See Also:</b> - <b>displayNextBatch</b>, - <b>displayPreviousBatch</b>, - <b>setCurrentBatchIndex:</B>
+
+<hr>
+
+<!-- key:displayNextBatch(-WODisplayGroup) meth:displayNextBatch descr:<TT>- (id)<B>displayNextBatch</B> </TT> -->
+
+<H3><a name="displayNextBatch(-WODisplayGroup)">displayNextBatch</a></H3>
+
+   <TT>- (id)<B>displayNextBatch</B> </TT>
+
+<P>
+
+Increments the current batch index, displays that batch of objects, and clears the selection. If the batch currently being displayed is the last batch, this method displays the first batch of objects.  Returns <b>nil</b> to force the page to be reloaded. 
+
+<P>
+
+<B>See Also:</b> - <b>batchCount</b>, - <b>currentBatchIndex</b>, - <b>displayBatchContainingSelectedObject</b>, - <b>displayPreviousBatch</B>
+
+<hr>
+
+<!-- key:displayPreviousBatch(-WODisplayGroup) meth:displayPreviousBatch descr:<TT>- (id)<B>displayPreviousBatch</B> </TT> -->
+
+<H3><a name="displayPreviousBatch(-WODisplayGroup)">displayPreviousBatch</a></H3>
+
+   <TT>- (id)<B>displayPreviousBatch</B> </TT>
+
+<P>
+
+Decrements the current batch index, displays that batch of objects, and clears the selection. If the batch currently being displayed is the first batch, this method displays the last batch of objects.   Returns <b>nil</b> to force the page to be reloaded.
+
+
+
+<P>
+
+<B>See Also:</b> - <b>batchCount</b>, - <b>currentBatchIndex</b>, - <b>displayBatchContainingSelectedObject</b>, - <b>displayNextBatch</B>
+
+<hr>
+
+<!-- key:displayedObjects(-WODisplayGroup) meth:displayedObjects descr:<TT>- (NSArray *)<B>displayedObjects</B> </TT> -->
+
+<H3><a name="displayedObjects(-WODisplayGroup)">displayedObjects</a></H3>
+
+   <TT>- (NSArray *)<B>displayedObjects</B> </TT>
+
+<P>
+
+Returns the objects that should be displayed or otherwise made available to the user, as filtered by the receiver's delegate, by the receiver's qualifier and sort ordering, or by a query built using <b>inputObjectForQualifier</b> and <b>secondObjectForQualifier</b>.
+
+<P>
+
+If batching is in effect, <b>displayedObjects</b> returns the current batch of objects.
+
+<P>
+
+<B>See Also:</b> - <b>allObjects</b>, - <b>updateDisplayedObjects</b>, - <b>qualifier</b>, - <b>qualifierFromInputValues</b>, - <b>sortOrdering</b>, - <b>displayGroup:displayArrayForObjects:</B> (delegate method)
+
+<hr>
+
+<!-- key:endEditing(-WODisplayGroup) meth:endEditing descr:<TT>- (BOOL)<B>endEditing</B> </TT> -->
+
+<H3><a name="endEditing(-WODisplayGroup)">endEditing</a></H3>
+
+   <TT>- (BOOL)<B>endEditing</B> </TT>
+
+<P>
+
+Ends any editing taking place and returns YES.
+
+<hr>
+
+<!-- key:executeQuery(-WODisplayGroup) meth:executeQuery descr:<TT>- (id)<B>executeQuery</B> </TT> -->
+
+<H3><a name="executeQuery(-WODisplayGroup)">executeQuery</a></H3>
+
+   <TT>- (id)<B>executeQuery</B> </TT>
+
+<P>
+
+Builds a qualifier using <b>qualifierFromInputValues</b> and then fetches the objects that match that qualifier. The WODisplayGroup's qualifier is set to <b>nil</b> at the end of this method so that subsequent <B>updateDisplayedObjects</b> messages only apply the sort ordering. Returns <b>nil</b> to force the page to be reloaded.
+
+<P>
+
+<b>qualifierFromInputValues</b> builds a qualifier using <b>inputObjectForQualifier</b> and <b>secondObjectForQualifier</b>. It does not use the WODisplayGroup's qualifier (the one returned by the <b>qualifier</b> method). 
+
+<P>
+
+<B>See Also:</b> - <b>buildsQualifierFromInput</b>, - <b>fetch</b>, - <b>lastQualifierFromInputValues</b>, - <b>setBuildsQualifierFromInput:</B>
+
+<hr>
+
+<!-- key:fetch(-WODisplayGroup) meth:fetch descr:<TT>- (id)<B>fetch</B> </TT> -->
+
+<H3><a name="fetch(-WODisplayGroup)">fetch</a></H3>
+
+   <TT>- (id)<B>fetch</B> </TT>
+
+<P>
+
+<P>
+
+Before fetching, invokes <b>endEditing</b> and sends <b>displayGroupShouldFetch:</b>  to the delegate. If both of those methods were successful, it then sends a <b>fetchObjects</b> message to the receiver's EODataSource to replace the object array, and if successful sends the delegate a <b>displayGroup:didFetchObjects:</b> message.
+
+<P>
+
+This method returns <b>nil</b> to force the page to be reloaded.
+
+<P>
+
+<B>See Also:  </b>- <b>allObjects</b>, - <b>executeQuery</b>, - <b>updateDisplayedObjects</b>
+
+<hr>
+
+<!-- key:fetchesOnLoad(-WODisplayGroup) meth:fetchesOnLoad descr:<TT>- (BOOL)<B>fetchesOnLoad</B> </TT> -->
+
+<H3><a name="fetchesOnLoad(-WODisplayGroup)">fetchesOnLoad</a></H3>
+
+   <TT>- (BOOL)<B>fetchesOnLoad</B> </TT>
+
+<P>
+
+Returns YES if the receiver fetches automatically after being loaded, NO if it must be told explicitly to fetch. The default is YES. You can set this behavior in WebObjects Builder using the Display Group Options panel.
+
+<P>
+
+<B>See Also:</b> - <b>fetch</b>, - <b>setFetchesOnLoad:</B>
+
+<hr>
+
+<!-- key:init(-WODisplayGroup) meth:- descr:<TT>- in<B></B> <B>init:</B> </TT> -->
+
+<H3><a name="init(-WODisplayGroup)">init</a></H3>
+
+   <TT>- <B>init</B> </TT>
+
+<P>
+
+Initializes the WODisplayGroup. The WODisplayGroup then needs to have an EODataSource set with <b>setDataSource:</b>.
+
+<hr>
+
+<!-- key:inputObjectForQualifier(-WODisplayGroup) meth:inputObjectForQualifier descr:<TT>- (NSMutableDictionary *)<B>inputObjectForQualifier</B> </TT> -->
+
+<H3><a name="inputObjectForQualifier(-WODisplayGroup)">inputObjectForQualifier</a></H3>
+
+   <TT>- (NSMutableDictionary *)<B>inputObjectForQualifier</B> </TT>
+
+<P>
+
+Returns an NSMutableDictionary that is used by <b>qualifierFromInputValues</b> to build a qualifier. The NSMutableDictionary contains keys and values that the user has entered as a query. For example, if the user wants a list of all movies released in 1995 that made over $100 million, the dictionary returned by <b>inputObjectForQualifier</b> would contain two key/value pairs: releaseDate = "1995" and gross = "$100,000,000.00". 
+
+<P>
+
+When the WODisplayGroup receives an <b>executeQuery</b> message, it uses <b>qualifierFromInputValues</b> to build a query from the key/value pairs in the dictionary returned by this method. 
+
+<P>
+
+To construct a "from-to" query, use the dictionary returned by this method to construct the "from" part of the query and the dictionary returned by <b>secondObjectForQualifier</b> to construct the "to" part of the query. 
+
+<P>
+
+<B>See Also:</b> - <b>buildsQualifierFromInput</b>, - <b>lastQualifierFromInputValues</b>, 
+
+-<b>setBuildsQualifierFromInput:</B>
+
+<hr>
+
+<!-- key:insert(-WODisplayGroup) meth:insert descr:<TT>- (id)<B>insert</B> </TT> -->
+
+<H3><a name="insert(-WODisplayGroup)">insert</a></H3>
+
+   <TT>- (id)<B>insert</B> </TT>
+
+<P>
+
+Invokes <b>insertObjectAtIndex:</b> with an index just past the first index in the selection, or 0 if there's no selection.
+<P>
+
+This method returns <b>nil</b> to force the page to be reloaded.
+
+<hr>
+
+<!-- key:insertObject:atIndex:(-WODisplayGroup) meth:insertObject:atIndex: descr:<TT>- (void)<B>insertObject:</B><i>newObject</i> <B>atIndex:(unsigned)<I>index</I></B> </TT> -->
+
+<H3><a name="insertObject:atIndex:(-WODisplayGroup)">insertObject:atIndex:</a></H3>
+
+   <TT>- (void)<B>insertObject:</B><i>anObject</i> <B>atIndex:</B>(unsigned)<I>index</I>  </TT>
+
+<P>
+
+Inserts <i>anObject</i> into the receiver's EODataSource and displayed objects at <i>index</i>, if possible. This method checks with the delegate before actually inserting, using <b>displayGroup:shouldInsertObject:atIndex:</b>. If the delegate refuses, <i>anObject</i> isn't inserted. After successfully inserting the object, this method informs the delegate with a <b>displayGroup:didInsertObject:</b> message, and selects the newly inserted object.
+<P>
+Raises an NSRangeException if index is out of bounds.
+<P>
+
+<B>See Also: </B>- <b>insertObjectAtIndex:</b>, - <b>insert</b>
+
+<hr>
+
+<!-- key:insertObjectAtIndex:(-WODisplayGroup) meth:insertObjectAtIndex: descr:<TT>- (id)<B>insertObjectAtIndex:</B>(unsigned)<I>anIndex</I> </TT> -->
+
+<H3><a name="insertObjectAtIndex:(-WODisplayGroup)">insertObjectAtIndex:</a></H3>
+
+   <TT>- (id)<B>insertObjectAtIndex:</B>(unsigned)<I>anIndex</I> </TT>
+
+<P>
+
+Asks the receiver's EODataSource to create a new object by sending it a <b>createObject</b> message, then inserts the new object using <b>insertObject:atIndex:</b>. If a new object can't be created, this method sends the delegate a <b>displayGroup:createObjectFailedForDataSource:</b> message.
+
+<P>
+
+If the object is successfully created, this method then sets the default values specified by <b>insertedObjectDefaultValues</b>.
+
+<p>
+<B>See Also: </B>- <b>insert</b>
+
+<hr>
+
+<!-- key:insertedObjectDefaultValues(-WODisplayGroup) meth:insertedObjectDefaultValues descr:<TT>- (NSDictionary *)<B>insertedObjectDefaultValues</B> </TT> -->
+
+<H3><a name="insertedObjectDefaultValues(-WODisplayGroup)">insertedObjectDefaultValues</a></H3>
+
+   <TT>- (NSDictionary *)<B>insertedObjectDefaultValues</B> </TT>
+
+<P>
+
+Returns the default values to be used for newly inserted objects. If the dictionary returned by this method is empty, the <b>insert</b> method adds an object that is initially empty. Because the object is empty, the display group has no value to display on the HTML page for that object, meaning that there is nothing for the user to select and modify. Use the <b>setInsertedObjectDefaultValues:</b> method to set up a default value so that there is something to display on the page.
+
+<hr>
+
+<!-- key:lastQualifierFromInputValues(-WODisplayGroup) meth:lastQualifierFromInputValues descr:<TT>- (EOQualifier *)<B>lastQualifierFromInputValues</B> </TT> -->
+
+<H3><a name="lastQualifierFromInputValues(-WODisplayGroup)">lastQualifierFromInputValues</a></H3>
+
+   <TT>- (EOQualifier *)<B>lastQualifierFromInputValues</B> </TT>
+
+<P>
+
+If <b>qualifierFromInputValues</b> has previously been invoked to construct a qualifier, this method returns the qualifier that that method built. If <b>qualifierFromInputValues</b> has not been used, this method return <b>nil</b>.
+
+<P>
+
+<B>Hint:  </B>You can use this qualifier after the <b>executeQuery</b> method to further qualify the displayed objects. Use <b>setQualifier:</b> to set the qualifier and then use <b>updateDisplayedObjects</b> to apply the qualifier and sort ordering. If you want to further restrict the displayed objects, you can join this qualifier with qualifier from previous queries. 
+
+<hr>
+
+<!-- key:localKeys(-WODisplayGroup) meth:localKeys descr:<TT>- (NSArray *)<B>localKeys</B> </TT> -->
+
+<H3><a name="localKeys(-WODisplayGroup)">localKeys</a></H3>
+
+   <TT>- (NSArray *)<B>localKeys</B> </TT>
+
+<P>
+
+Returns the additional keys that dynamic elements can be bound to. A WODisplayGroup's basic keys are typically those of the attributes and relationships of its objects, as defined by their class descriptions through an entity in the model. Local keys are typically used to form associations with key paths, with arbitrary methods of objects, or with properties of objects not associated with an entity. 
+
+<P>
+
+<B>See Also:</b> - <b>setLocalKeys:</B>
+
+<hr>
+
+<!-- key:numberOfObjectsPerBatch(-WODisplayGroup) meth:numberOfObjectsPerBatch descr:<TT>- (unsigned)<B>numberOfObjectsPerBatch</B> </TT> -->
+
+<H3><a name="numberOfObjectsPerBatch(-WODisplayGroup)">numberOfObjectsPerBatch</a></H3>
+
+   <TT>- (unsigned)<B>numberOfObjectsPerBatch</B> </TT>
+
+<P>
+
+Returns the batch size. You can set the batch size using <b>setNumberOfObjectsPerBatch:</b> or using WebObjects Builder's Display Group Options panel.
+
+<P>
+
+<B>See Also:</b> - <b>setNumberOfObjectsPerBatch:</B>
+
+<hr>
+
+<!-- key:qualifier(-WODisplayGroup) meth:qualifier descr:<TT>- (EOQualifier *)<B>qualifier</B> </TT> -->
+
+<H3><a name="qualifier(-WODisplayGroup)">qualifier</a></H3>
+
+   <TT>- (EOQualifier *)<B>qualifier</B> </TT>
+
+<P>
+
+Returns the receiver's qualifier, which it uses to filter its array of objects for display when the delegate doesn't do so itself.
+
+<P>
+
+This method returns the qualifier used by the <b>updateDisplayedObjects</b> method. If <b>executeQuery</b> has been used to construct a qualifier and fetch objects from the EODataSource, this method returns <b>nil</b> and the method <b>lastQualifierFromInputValues</b> returns the qualifier that <b>executeQuery</b> used.
+
+<P>
+
+<B>See Also:</b>  - <b>displayedObjects</b>, - <b>qualifierFromInputValues</b>, - <b>setQualifier:</b>, - <b>updateDisplayedObjects </B>
+
+<hr>
+
+<!-- key:qualifierFromInputValues(-WODisplayGroup) meth:qualifierFromInputValues descr:<TT>- (EOQualifier *)<B>qualifierFromInputValues</B> </TT> -->
+
+<H3><a name="qualifierFromInputValues(-WODisplayGroup)">qualifierFromInputValues</a></H3>
+
+   <TT>- (EOQualifier *)<B>qualifierFromInputValues</B> </TT>
+
+<P>
+
+Builds a qualifier from the dictionaries returned by <b>inputObjectForQualifier</b> and <b>secondObjectForQualifier</b>. This qualifier is used by the <b>executeQuery</b> method to fetch records from the database.
+
+<P>
+
+<B>See Also:</b> - <b>buildsQualifierFromInput</b>, - <b>lastQualifierFromInputValues</B>
+
+<hr>
+
+<!-- key:redisplay(-WODisplayGroup) meth:redisplay descr:<TT>- (void)<B>redisplay</B> </TT> -->
+
+<H3><a name="redisplay(-WODisplayGroup)">redisplay</a></H3>
+
+   <TT>- (void)<B>redisplay</B> </TT>
+
+<P>
+
+Sends out a contents changed notification.
+
+<hr>
+
+<!-- key:secondObjectForQualifier(-WODisplayGroup) meth:secondObjectForQualifier descr:<TT>- (NSMutableDictionary *)<B>secondObjectForQualifier</B> </TT> -->
+
+<H3><a name="secondObjectForQualifier(-WODisplayGroup)">secondObjectForQualifier</a></H3>
+
+   <TT>- (NSMutableDictionary *)<B>secondObjectForQualifier</B> </TT>
+
+<P>
+
+Returns a mutable dictionary that specifies the "to" value in from-to queries. For example, suppose the user has built a query to return all movies released between two dates: January 1, 1994 and December 31, 1994. The dictionary returned by <b>secondObjectForQualifier</b> would contain one key (such as "dateReleased") and the value for the key would be December 31, 1994. The dictionary returned by this method must always have the exactly the same keys as the dictionary returned by the <b>inputObjectForQualifier</b> method.
+
+<P>
+
+This method is used by the <b>qualifierFromInputValues</b> method to build a qualifier. 
+
+<P>
+
+<B>See Also:</b> - <b>buildsQualifierFromInput</b>, - <b>executeQuery, 
+
+-setBuildsQualifierFromInput:</B>
+
+<hr>
+
+<!-- key:selectNext(-WODisplayGroup) meth:selectNext descr:<TT>- (id)<B>selectNext</B> </TT> -->
+
+<H3><a name="selectNext(-WODisplayGroup)">selectNext</a></H3>
+
+   <TT>- (id)<B>selectNext</B> </TT>
+
+<P>
+
+Attempts to select the object just after the currently selected one. The selection is altered in this way:
+
+<UL><LI>If there are no objects, does nothing.
+
+<P><LI>If there's no selection, selects the object at index zero.
+
+<P><LI>If the first selected object is the last object in the displayed objects array, selects the first object.
+
+<P><LI>Otherwise selects the object after the first selected object.
+
+</UL>
+
+<P>
+
+This method  returns <b>nil</b> to force the page to be reloaded.
+
+<P>
+
+<B>See Also:</b> - <b>selectPrevious</b>, - <b>setSelectionIndexes:</B>
+
+<hr>
+
+<!-- key:selectObject:(-WODisplayGroup) meth:selectObject: descr:<TT>- (BOOL)<B>selectObject:</B>(id)<I>object</I> </TT> -->
+
+<H3><a name="selectObject:(-WODisplayGroup)">selectObject:</a></H3>
+
+   <TT>- (BOOL)<B>selectObject:</B>(id)<I>anObject</i> </TT>
+
+<P>
+
+Attempts to select the object equal to <i>anObject</i> in the receiver's displayed objects array, returning YES if successful and NO otherwise. <i>anObject</i> is equal to an object in the displayed objects array if its address is the same as the object in the array.
+
+<P>
+
+<B>See Also:</b> - <b>selectNext</b>, - <b>selectPrevious</B> 
+
+<hr>
+
+<!-- key:selectObjectsIdenticalTo:(-WODisplayGroup) meth:selectObjectsIdenticalTo: descr:<TT>- (BOOL)<B>selectObjectsIdenticalTo:</B>(NSArray *)<I>objectSelection</I> </TT> -->
+
+<H3><a name="selectObjectsIdenticalTo:(-WODisplayGroup)">selectObjectsIdenticalTo:</a></H3>
+
+   <TT>- (BOOL)<B>selectObjectsIdenticalTo:</B>(NSArray *)<i>objects</i> </TT>
+
+<P>
+
+Attempts to select the objects in the receiver's displayed objects array whose <b>id</b>s are equal to those of <i>objects</i>, returning YES if successful and NO otherwise.
+<P>
+
+<B>See Also: </B>-Ä<b>setSelectionIndexes:</b>, -Ä<b>selectObjectsIdenticalTo:selectFirstOnNoMatch:</b>
+<hr>
+
+<!-- key:selectObjectsIdenticalTo:selectFirstOnNoMatch:(-WODisplayGroup) meth:selectObjectsIdenticalTo:selectFirstOnNoMatch: descr:<TT>- (BOOL)<B>selectObjectsIdenticalTo:</B>(NSArray *)<I>objectSelection</I> <B>selectFirstOnNoMatch:</B>(BOOL)<I>selectFirstOnNoMatch</I> </TT> -->
+
+<H3><a name="selectObjectsIdenticalTo:selectFirstOnNoMatch:(-WODisplayGroup)">selectObjectsIdenticalTo:selectFirstOnNoMatch:</a></H3>
+
+   <TT>- (BOOL)<B>selectObjectsIdenticalTo:</B>(NSArray *)<I>objects</I> <B>selectFirstOnNoMatch:</B>(BOOL)<I>flag</I> </TT>
+
+<P>
+
+Selects the objects in the receiver's displayed objects array whose <b>id</b>s are equal to those of <i>objects</i>, returning YES if successful and NO otherwise. If no objects in the displayed objects array match objects and <i>flag</i> is YES, attempts to select the first object in the displayed objects array.
+<P>
+
+<B>See Also: </B>- <b>setSelectionIndexes:</b>, - <b>selectObjectsIdenticalTo:</b>
+<hr>
+
+<!-- key:selectPrevious(-WODisplayGroup) meth:selectPrevious descr:<TT>- (id)<B>selectPrevious</B> </TT> -->
+
+<H3><a name="selectPrevious(-WODisplayGroup)">selectPrevious</a></H3>
+
+   <TT>- (id)<B>selectPrevious</B> </TT>
+
+<P>
+
+Attempts to select the object just before the presently selected one. The selection is altered in this way:
+
+<UL><LI>If there are no objects, does nothing.
+
+<P><LI>If there's no selection, selects the object at index zero.
+
+<P><LI>If the first selected object is at index zero, selects the last object.
+
+<P><LI>Otherwise selects the object before the first selected object.
+
+</UL>
+
+<P>
+
+This method returns <b>nil</b> to force the page to be reloaded.
+
+<P>
+
+<B>See Also:</b> - <b>selectNext</b>, - <b>redisplay</B>
+
+<hr>
+
+<!-- key:selectedObject(-WODisplayGroup) meth:selectedObject descr:<TT>- (id)<B>selectedObject</B> </TT> -->
+
+<H3><a name="selectedObject(-WODisplayGroup)">selectedObject</a></H3>
+
+   <TT>- (id)<B>selectedObject</B> </TT>
+
+<P>
+
+Returns the first selected object in the displayed objects array, or <b>nil</b> if there's no such object.
+
+<P>
+
+<B>See Also:</b> - <b>displayedObjects</b>, - <b>selectionIndexes</b>, - <b>selectedObjects</B>
+
+<hr>
+
+<!-- key:selectedObjects(-WODisplayGroup) meth:selectedObjects descr:<TT>- (NSArray *)<B>selectedObjects</B> </TT> -->
+
+<H3><a name="selectedObjects(-WODisplayGroup)">selectedObjects</a></H3>
+
+   <TT>- (NSArray *)<B>selectedObjects</B> </TT>
+
+<P>
+
+Returns the objects selected in the receiver's displayed objects array.
+
+<P>
+
+<B>See Also:</b> - <b>displayedObjects</b>, 
+
+- <b>selectionIndexes</b>, 
+
+- <b>selectedObject</B>
+
+<hr>
+
+<!-- key:selectionIndexes(-WODisplayGroup) meth:selectionIndexes descr:<TT>- (NSArray *)<B>selectionIndexes</B> </TT> -->
+
+<H3><a name="selectionIndexes(-WODisplayGroup)">selectionIndexes</a></H3>
+
+   <TT>- (NSArray *)<B>selectionIndexes</B> </TT>
+
+<P>
+
+Returns the selection as an array of NSNumbers. The NSNumbers are indexes into the array returned by <b>displayedObjects</b>.
+
+<P>
+
+<B>See Also:</b> - <b>selectedObject</b>, 
+
+- <b>selectedObjects</b>, 
+
+- <b>setSelectionIndexes:</B>
+
+<hr>
+
+<!-- key:selectsFirstObjectAfterFetch(-WODisplayGroup) meth:selectsFirstObjectAfterFetch descr:<TT>- (BOOL)<B>selectsFirstObjectAfterFetch</B> </TT> -->
+
+<H3><a name="selectsFirstObjectAfterFetch(-WODisplayGroup)">selectsFirstObjectAfterFetch</a></H3>
+
+   <TT>- (BOOL)<B>selectsFirstObjectAfterFetch</B> </TT>
+
+<P>
+
+Returns YES if the receiver automatically selects its first displayed object after a fetch if there was no selection, NO if it leaves an empty selection as-is. 
+
+<P>
+
+WODisplayGroups by default do select the first object after a fetch when there was no previous selection.
+
+<P>
+
+<B>See Also:</b> - <b>displayedObjects</b>, 
+
+- <b>fetch</b>, - <b>setSelectsFirstObjectAfterFetch:</B>
+
+<hr>
+
+<!-- key:setBuildsQualifierFromInput:(-WODisplayGroup) meth:setBuildsQualifierFromInput: descr:<TT>- (void)<B>setBuildsQualifierFromInput:</B>(BOOL)<I>yn</I> </TT> -->
+
+<H3><a name="setBuildsQualifierFromInput:(-WODisplayGroup)">setBuildsQualifierFromInput:</a></H3>
+
+   <TT>- (void)<B>setBuildsQualifierFromInput:</B>(BOOL)<I>flag</i> </TT>
+
+<P>
+
+Sets whether the receiver should build a qualifier before fetching. If <I>flag</i> is YES, the receiver should perform database fetches using the <b>executeQuery</b> method, which first builds a qualifier using the method <b>qualifierFromInputValues</b> and then performs the fetch. 
+
+<P>
+
+<B>See Also:</b> - <b>buildsQualifierFromInput</b>, - <b>executeQuery</b>, - <b>inputObjectForQualifier</b>, - <b>secondObjectForQualifier</B>
+
+<hr>
+
+<!-- key:setCurrentBatchIndex:(-WODisplayGroup) meth:setCurrentBatchIndex: descr:<TT>- (void)<B>setCurrentBatchIndex:</B>(unsigned)<I>batchIndex</I> </TT> -->
+
+<H3><a name="setCurrentBatchIndex:(-WODisplayGroup)">setCurrentBatchIndex:</a></H3>
+
+   <TT>- (void)<B>setCurrentBatchIndex:</B>(unsigned)<I>anInt</i> </TT>
+
+<P>
+
+Displays the <i>anInt</i> batch of objects. The total batch count equals the number of displayed objects divided by the batch size. For example, if the WODisplayGroup has one hundred objects to display and the batch size is twenty, there are five batches. The first batch has a batch index of 1. <b>setCurrentBatchIndex:3</b> would display the third batch of objects (objects 41 to 60 in this example).
+
+<P>
+
+If <i>anInt</i> is greater than the number of batches, this method displays the first batch.
+
+<P>
+
+<B>See Also:</b> - <b>batchCount</b>, 
+
+- <b>currentBatchIndex</b>, 
+
+- <b>displayBatchContainingSelectedObject</b>, 
+
+- <b>displayNextBatch</b>, 
+
+- <b>displayPreviousBatch</b>, 
+
+- <b>numberOfObjectsPerBatch</B>
+
+
+<hr>
+
+<!-- key:setDataSource:(-WODisplayGroup) meth:setDataSource: descr:<TT>- (void)<B>setDataSource:</B>(EODataSource *)<I>dataSource</I> </TT> -->
+
+<H3><a name="setDataSource:(-WODisplayGroup)">setDataSource:</a></H3>
+
+   <TT>- (void)<B>setDataSource:</B>(EODataSource *)<I>aDataSource</i> </TT>
+
+<P>
+
+Sets the receiver's EODataSource to <i>aDataSource</i>. In the process, it performs these actions:
+
+<UL>
+
+<LI>Unregisters itself as an editor and message handler for the previous EODataSource's EOEditingContext, if necessary, and registers itself with <i>aDataSource</i>'s EOEditingContext. If the new EOEditingContext already has a message handler, however, the receiver doesn't assume that role.
+
+<P><LI>
+
+Clears the receiver's array of objects.
+
+<P><LI>
+
+Sends <b>displayGroupDidChangeDataSource:</B> to the delegate if there is one.
+
+</UL>
+
+<!-- ME!!! What about notifications? -->
+
+<P>
+
+<B>See Also:</b> - <b>dataSource</B>
+
+
+<hr>
+
+<!-- key:setDelegate:(-WODisplayGroup) meth:setDelegate: descr:<TT>- (void)<B>setDelegate:</B>(id)<I>aDelegate</I> </TT> -->
+
+<H3><a name="setDelegate:(-WODisplayGroup)">setDelegate:</a></H3>
+
+   <TT>- (void)<B>setDelegate:</B>(id)<I>anObject</i> </TT>
+
+<P>
+
+Sets the receiver's delegate to <i>anObject</i>, without retaining it. 
+
+<P>
+
+<B>See Also:</b> - <b>delegate</B>, <A HREF="#delegate">Methods Implemented by the Delegate</a>
+
+<hr>
+
+<!-- key:setFetchesOnLoad:(-WODisplayGroup) meth:setFetchesOnLoad: descr:<TT>- (void)<B>setFetchesOnLoad:</B>(BOOL)<I>yn</I> </TT> -->
+
+<H3><a name="setFetchesOnLoad:(-WODisplayGroup)">setFetchesOnLoad:</a></H3>
+
+   <TT>- (void)<B>setFetchesOnLoad:</B>(BOOL)<I>flag</i> </TT>
+
+<P>
+
+Controls whether the receiver automatically fetches its objects after being loaded. If <i>flag</i> is YES it does; if <i>flag</i> is NO the receiver must be told explicitly to fetch. The default is NO. You can also set this behavior in WebObjects Builder in the Display Group Options panel.
+
+<P>
+
+<B>See Also:</b> - <b>fetch</b>, 
+
+- <b>fetchesOnLoad
+</B>
+
+<hr>
+
+<!-- key:setInsertedObjectDefaultValues:(-WODisplayGroup) meth:setInsertedObjectDefaultValues: descr:<TT>- (void)<B>setInsertedObjectDefaultValues:</B>(NSDictionary *)<I>defaultValues</I> </TT> -->
+
+<H3><a name="setInsertedObjectDefaultValues:(-WODisplayGroup)">setInsertedObjectDefaultValues:</a></H3>
+
+   <TT>- (void)<B>setInsertedObjectDefaultValues:</B>(NSDictionary *)<I>defaultValues</I> </TT>
+
+<P>
+
+Sets default values to be used for newly inserted objects. When you use the <b>insert</b> method to add an object, that object is initially empty. Because the object is empty, there is no value to be displayed on the HTML page, meaning there is nothing for the user to select and modify. You use this method to provide at least one field that can be displayed for the newly inserted object. For example, a component that displays a list of movie titles and allows the user to insert new movie titles might contain these statements to ensure that all new objects have something to display as a movie title:
+
+<P><PRE>	[defaultValues setObject:@"New title" forKey:@"title"];
+
+	[movies setInsertedObjectDefaultValues:defaultValues];
+
+</PRE>
+
+<P>
+
+<B>See Also:</b> - <b>insertedObjectDefaultValues</B>
+
+<hr>
+
+<!-- key:setLocalKeys:(-WODisplayGroup) meth:setLocalKeys: descr:<TT>- (void)<B>setLocalKeys:</B>(NSArray *)<I>newKeySet</I> </TT> -->
+
+<H3><a name="setLocalKeys:(-WODisplayGroup)">setLocalKeys:</a></H3>
+
+   <TT>- (void)<B>setLocalKeys:</B>(NSArray *)<I>keys</i> </TT>
+
+<P>
+
+Sets the additional keys to which dynamic elements can be bound to <i>keys</i>.
+
+<P>
+
+<B>See Also:</b> - <b>localKeys</B>
+
+<hr>
+
+<!-- key:setNumberOfObjectsPerBatch:(-WODisplayGroup) meth:setNumberOfObjectsPerBatch: descr:<TT>- (void)<B>setNumberOfObjectsPerBatch:</B>(unsigned)<I>count</I> </TT> -->
+
+<H3><a name="setNumberOfObjectsPerBatch:(-WODisplayGroup)">setNumberOfObjectsPerBatch:</a></H3>
+
+   <TT>- (void)<B>setNumberOfObjectsPerBatch:</B>(unsigned)<I>count</I> </TT>
+
+<P>
+
+Sets the number of objects the receiver displays at a time. For example, suppose you are displaying one hundred records. Instead of displaying all of these at once, you can set the batch size so that the page displays a more manageable number (for example, 10). WebObjects Builder allows you to set the number of objects per batch on the Display Group Options panel. 
+
+<P>
+
+<B>See Also:</b> - <b>batchCount</b>, 
+
+- <b>displayNextBatch</b>, 
+
+- <b>displayPreviousBatch</b>, 
+
+- <b>numberOfObjectsPerBatch</B>
+
+<hr>
+
+<!-- key:setObjectArray:(-WODisplayGroup) meth:setObjectArray: descr:<TT>- (void)<B>setObjectArray:</B>(NSArray *)<I>array</I> </TT> -->
+
+<H3><a name="setObjectArray:(-WODisplayGroup)">setObjectArray:</a></H3>
+
+   <TT>- (void)<B>setObjectArray:</B>(NSArray *)<I>objects</i> </TT>
+
+<P>
+
+Sets the receiver's objects to <i>objects</i>, regardless of what its EODataSource provides. This method doesn't affect the EODataSource's objects at all; specifically, it results in neither inserts nor deletes of objects in the EODataSource. <i>objects</i> should contain objects with the same property names or methods as those accessed by the receiver. This method is used by <b>fetch</b> to set the array of fetched objects; you should rarely need to invoke it directly. 
+
+<P>
+
+After setting the object array, this method restores as much of the original selection as possible. If there's no match and the receiver selects after fetching, then the first object is selected.
+
+<P>
+
+<B>See Also:</b> - <b>allObjects</b>, - <b>displayedObjects</b>, 
+
+- <b>fetch</b>, 
+
+- <b>selectsFirstObjectAfterFetch
+</B>
+
+<hr>
+
+<!-- key:setQualifier:(-WODisplayGroup) meth:setQualifier: descr:<TT>- (void)<B>setQualifier:</B>(EOQualifier *)<I>qualifier</I> </TT> -->
+
+<H3><a name="setQualifier:(-WODisplayGroup)">setQualifier:</a></H3>
+
+   <TT>- (void)<B>setQualifier:</B>(EOQualifier *)<I>aQualifier</i> </TT>
+
+<P>
+
+Sets the receiver's qualifier to <i>aQualifier</i>. This qualifier is used to filter the receiver's array of objects for display. Use <b>updateDisplayedObjects</b> to apply the qualifier. 
+
+<P>
+
+If the receiver's delegate responds to <b>displayGroup:displayArrayForObjects:</b>, that method is used instead of the qualifier to filter the objects.
+
+<P>
+
+If you use <b>executeQuery</b> to perform a query based on use input, the qualifier set by this method is discarded. 
+
+<P>
+
+<B>See Also:</b> - <b>displayedObjects</b>, - <b>qualifier</B>
+
+<hr>
+
+<!-- key:setSelectionIndexes:(-WODisplayGroup) meth:setSelectionIndexes: descr:<TT>- (BOOL)<B>setSelectionIndexes:</B>(NSArray *)<I>selection</I> </TT> -->
+
+<H3><a name="setSelectionIndexes:(-WODisplayGroup)">setSelectionIndexes:</a></H3>
+
+   <TT>- (BOOL)<B>setSelectionIndexes:</B>(NSArray *)<I>selection</I> </TT>
+
+<P>
+
+Selects the objects at <i>selection</i> in the receiver's array if possible, returning YES if successful and NO if not (in which case the selection remains unaltered).
+
+This method is the primitive method for altering the selection; all other such methods invoke this one to make the change.
+
+<P>
+
+This method invokes <b>endEditing</b> to wrap up any changes being made by the user. If <b>endEditing</b> returns NO, this method fails and returns NO. This method then checks the delegate with a <b>displayGroup:shouldChangeSelectionToIndexes:</b> message. If the delegate returns NO, this method also fails and returns NO. If the receiver successfully changes the selection, its observers each receive a <b>displayGroupDidChangeSelection:</b> message.
+
+<P>
+
+<B>Note:  </b>The selection set here is only a programmatic selection; the objects on the screen are not highlighted in any way.
+
+<P>
+
+<B>See Also:</b> - <b>allObjects</B>
+
+<hr>
+
+<!-- key:setSelectsFirstObjectAfterFetch:(-WODisplayGroup) meth:setSelectsFirstObjectAfterFetch: descr:<TT>- (void)<B>setSelectsFirstObjectAfterFetch:</B>(BOOL)<I>yn</I> </TT> -->
+
+<H3><a name="setSelectsFirstObjectAfterFetch:(-WODisplayGroup)">setSelectsFirstObjectAfterFetch:</a></H3>
+
+   <TT>- (void)<B>setSelectsFirstObjectAfterFetch:</B>(BOOL)<I>flag</i> </TT>
+
+<P>
+
+Controls whether the receiver automatically selects its first displayed object after a fetch when there were no selected objects before the fetch. If <i>flag</i> is YES it does; if <i>flag</i> is NO then no objects are selected.
+
+<P>
+
+WODisplayGroups by default do select the first object after a fetch when there was no previous selection. 
+
+<P>
+
+<B>See Also:</b> - <b>displayedObjects</b>, 
+
+- <b>fetch</b>, 
+
+- <b>selectsFirstObjectAfterFetch</B>
+
+<hr>
+
+<!-- key:setSortOrdering:(-WODisplayGroup) meth:setSortOrdering: descr:<TT>- (void)<B>setSortOrdering:</B>(NSArray *)<I>keySortOrderArray</I> </TT> -->
+
+<H3><a name="setSortOrdering:(-WODisplayGroup)">setSortOrdering:</a></H3>
+
+   <TT>- (void)<B>setSortOrdering:</B>(NSArray *)<I>orderings</i> </TT>
+
+<P>
+
+Sets the EOSortOrdering objects that <b>updateDisplayedObjects</b> uses to sort the displayed objects to <i>orderings</i>. Use <b>updateDisplayedObjects</b> to apply the sort orderings.You can also set this value using the WebObjects Builder Display Group Options panel.
+
+<P>
+
+If the receiver's delegate responds to <b>displayGroup:displayArrayForObjects:</b>, that method is used instead of the sort orderings to order the objects.
+
+<P>
+
+<B>See Also:</b> - <b>displayedObjects</b>, 
+
+- <b>sortOrdering</b>, 
+
+- <b>updateDisplayedObjects
+</B>
+
+<hr>
+
+<!-- key:setValidatesChangesImmediately:(-WODisplayGroup) meth:setValidatesChangesImmediately: descr:<TT>- (void)<B>setValidatesChangesImmediately:</B>(BOOL)<I>yn</I> </TT> -->
+
+<H3><a name="setValidatesChangesImmediately:(-WODisplayGroup)">setValidatesChangesImmediately:</a></H3>
+
+   <TT>- (void)<B>setValidatesChangesImmediately:</B>(BOOL)<I>flag</I> </TT>
+
+<P>
+
+Controls the receiver's behavior on encountering a validation error. In the Web context, this method has no effect.
+
+<P>
+
+WODisplayGroups by default don't validate changes immediately.
+
+<P>
+
+<B>See Also: 
+</B>
+- <b>saveChanges</B> (in 
+
+<!-- <A HREF="../../eo/EditingContext/EditingContext.html" target=_top>
+
+-->
+
+EOEditingContext),
+
+<!-- 
+
+</a>
+
+-->
+
+- <b>validatesChangesImmediately</B>
+
+<hr>
+
+<!-- key:sortOrdering(-WODisplayGroup) meth:sortOrdering descr:<TT>- (NSArray *)<B>sortOrdering</B> </TT> -->
+
+<H3><a name="sortOrdering(-WODisplayGroup)">sortOrdering</a></H3>
+
+   <TT>- (NSArray *)<B>sortOrdering</B> </TT>
+
+<P>
+
+Returns an array of EOSortOrdering objects that <B>updateDisplayedObjects</B> uses to sort the displayed objects, as returned by the <B>displayedObjects</B> method.
+
+<P>
+
+<B>See Also: 
+</b>
+- <b>setSortOrdering:</B>
+
+<hr>
+
+<!-- key:updateDisplayedObjects(-WODisplayGroup) meth:updateDisplayedObjects descr:<TT>- (void)<B>updateDisplayedObjects</B> </TT> -->
+
+<H3><a name="updateDisplayedObjects(-WODisplayGroup)">updateDisplayedObjects</a></H3>
+
+   <TT>- (void)<B>updateDisplayedObjects</B> </TT>
+
+<P>
+
+Recalculates the receiver's displayed objects arrays and redisplays. If the delegate responds to <b>displayGroup:displayArrayForObjects:</b>, it's sent this message and the returned array is set as the WODisplayGroup's displayed object. Otherwise, the receiver applies its qualifier and sort ordering to its array of objects. In either case, any objects that were selected before remain selected in the new displayed object's array.
+
+<P>
+
+<B>See Also:</b> - <b>redisplay</b>, 
+
+- <b>allObjects</b>, 
+
+- <b>displayedObjects</b>, 
+
+- <b>qualifier</b>, 
+
+- <b>selectedObjects</b>, 
+
+- <b>sortOrdering</B>
+
+<hr>
+
+<!-- key:validatesChangesImmediately(-WODisplayGroup) meth:validatesChangesImmediately descr:<TT>- (BOOL)<B>validatesChangesImmediately</B> </TT> -->
+
+<H3><a name="validatesChangesImmediately(-WODisplayGroup)">validatesChangesImmediately</a></H3>
+
+   <TT>- (BOOL)<B>validatesChangesImmediately</B> </TT>
+
+<P>
+
+Returns YES if the receiver immediately handles validation errors, or leaves them for the EOEditingContext to handle when saving changes.
+
+<P>
+
+By default, WODisplayGroups don't validate changes immediately.
+
+<P>
+
+<B>See Also:</b> - <b>setValidatesChangesImmediately:</B>
+
+<hr>
+
+
+
+<a name="delegate"><CENTER><H2>METHODS IMPLEMENTED BY THE DELEGATE</H2></CENTER></a>
+
+
+
+<!-- methKey:displayGroup:createObjectFailedForDataSource(-WODisplayGroup) meth:displayGroup:createObjectFailedForDataSource: descr:<TT>- (void)<b>displayGroup:</b>(WODisplayGroup *)<i>displayGroup</i> <b>createObjectFailedForDataSource:</b><i>dataSource</i>)</TT> -->
+
+<H3><a name="displayGroup:createObjectFailedForDataSource:(-WODisplayGroup)">displayGroup:createObjectFailedForDataSource:</a></H3>
+
+<TT>- (void)<b>displayGroup:</b>(WODisplayGroup *)<I>aDisplayGroup</i> <b>createObjectFailedForDataSource:</b><I>aDataSource</i></TT>
+
+<P>
+
+Invoked from <b>insertObjectAtIndex:</b> to inform the delegate that <i>aDisplayGroup</i> has failed to create a new object for <i>aDataSource</i>. If the delegate doesn't implement this method, the WODisplayGroup instead fails silently. 
+
+<P>
+
+<hr>
+
+<!-- methKey:displayGroup:didDeleteObject(-WODisplayGroup) meth:displayGroup:didDeleteObject: descr:<TT>- (void)<b>displayGroup:</b>(WODisplayGroup *)<i>displayGroup</i> <b>didDeleteObject:</b><i>object</i></TT> -->
+
+<H3><a name="displayGroup:didDeleteObject:(-WODisplayGroup)">displayGroup:didDeleteObject:</a></H3>
+
+<TT>- (void)<b>displayGroup:</b>(WODisplayGroup *)<I>aDisplayGroup</i> <b>didDeleteObject:</b><i>anObject</i></TT>
+
+<P>
+
+Informs the delegate that <i>aDisplayGroup</i> has deleted <i>anObject</i>.
+
+<P>
+
+<hr>
+
+<!-- methKey:displayGroup:didFetchObjects:(-WODisplayGroup) meth:displayGroup:didFetchObjects: descr:<TT>- (void)<b>displayGroup:</b>(WODisplayGroup *)<i>aDisplayGroup</i> <b>didFetchObjects:</b>(NSArray *)<i>objects</i></TT> -->
+
+<H3><a name="displayGroup:didFetchObjects:(-WODisplayGroup)">displayGroup:didFetchObjects:</a></H3>
+
+<TT>- (void)<b>displayGroup:</b>(WODisplayGroup *)<i>aDisplayGroup</i> <b>didFetchObjects:</b>(NSArray *)<i>objects</i></TT>
+
+<P>
+
+Informs the delegate that <i>aDisplayGroup</i> has fetched <i>objects</i>.
+
+<P>
+
+<hr>
+
+<!-- methKey:displayGroup:didInsertObject:(-WODisplayGroup) meth:displayGroup:didInsertObject: descr:<TT>- (void)<b>displayGroup:</b>(WODisplayGroup *)<i>displayGroup</i> <b>didInsertObject:</b><i>object</i></TT> -->
+
+<H3><a name="displayGroup:didInsertObject:(-WODisplayGroup)">displayGroup:didInsertObject:</a></H3>
+
+<TT>- (void)<b>displayGroup:</b>(WODisplayGroup *)<i>aDisplayGroup</i> <b>didInsertObject:</b><i>anObject</i></TT>
+
+<P>
+
+Informs the delegate that <i>aDisplayGroup</i> has inserted <i>anObject</i>.
+
+<P>
+
+<hr>
+
+<!-- methKey:displayGroup:didSetValue:forObject:key:(-WODisplayGroup) meth:displayGroup:didSetValue:forObject:key: descr:<TT>- (void)<b>displayGroup:</b>(WODisplayGroup *)<i>displayGroup</i> <b>didSetValue:</b>(id)<i>value</i> <b>forObject:</b>(id)<i>eo</i> <b>key:</b>(NSString *)<i>key</i></TT> -->
+
+<H3><a name="displayGroup:didSetValue:forObject:key:(-WODisplayGroup)">displayGroup:didSetValue:forObject:key:</a></H3>
+
+<TT>- (void)<b>displayGroup:</b>(WODisplayGroup *)<i>aDisplayGroup</i> <b>didSetValue:</b>(id)<i>value</i> <b>forObject:</b>(id)<i>anObject</i> <b>key:</b>(NSString *)<i>key</i></TT>
+
+<P>
+
+Informs the delegate that <i>aDisplayGroup</i> has altered a property value of <i>anObject</i>. <i>key</i> identifies the property, and <i>value</i> is its new value.
+
+<P>
+
+<hr>
+
+<!-- methKey:displayGroup:displayArrayForObjects:(-WODisplayGroup) meth:displayGroup:displayArrayForObjects: descr:<TT>- (NSArray *)<b>displayGroup:</b>(WODisplayGroup *)<i>displayGroup</i> <b>displayArrayForObjects:</b>(NSArray *)<i>objects</i></TT> -->
+
+<H3><a name="displayGroup:displayArrayForObjects:(-WODisplayGroup)">displayGroup:displayArrayForObjects:</a></H3>
+
+<TT>- (NSArray *)<b>displayGroup:</b>(WODisplayGroup *)<i>aDisplayGroup</i> <b>displayArrayForObjects:</b>(NSArray *)<i>objects</i></TT>
+
+<P>
+
+Invoked from <B>updateDisplayedObjects</b>, this method allows the delegate to filter and sort <i>aDisplayGroup</i>'s array of objects to limit which ones get displayed. <i>objects</i> contains all of <i>aDisplayGroup</i>'s objects. The delegate should filter any objects that shouldn't be shown and sort the remainder, returning a new array containing this group of objects. You can use the NSArray methods <b>filteredArrayUsingQualifier:</b> and <b>sortedArrayUsingKeyOrderingArray:</b> to create the new array.
+
+<P>
+
+If the delegate doesn't implement this method, the WODisplayGroup uses its own qualifier and sort ordering to update the displayed objects array.
+
+<P>
+
+<B>See Also:</b> - <b>displayedObjects</b>, - <b>qualifier</b>, - <b>sortOrdering </B> 
+
+<hr>
+
+<!-- methKey:displayGroup:shouldChangeSelectionToIndexes:(-WODisplayGroup) meth:displayGroup:shouldChangeSelectionToIndexes: descr:<TT>- (BOOL)<b>displayGroup:</b>(WODisplayGroup *)<i>displayGroup</i> <b>shouldChangeSelectionToIndexes:</b>(NSArray *)<i>newIndexes</i></TT> -->
+
+<H3><a name="displayGroup:shouldChangeSelectionToIndexes:(-WODisplayGroup)">displayGroup:shouldChangeSelectionToIndexes:</a></H3>
+
+<TT>- (BOOL)<b>displayGroup:</b>(WODisplayGroup *)<i>aDisplayGroup</i> <b>shouldChangeSelectionToIndexes:</b>(NSArray *)<i>newIndexes</i></TT>
+
+<P>
+
+ Allows the delegate to prevent a change in selection by <i>aDisplayGroup</i>. <i>newIndexes</i> is the proposed new selection. If the delegate returns YES, the selection changes; if the delegate returns NO, the selection remains as it is.
+
+<P>
+
+<hr>
+
+<!-- methKey:displayGroup:shouldDeleteObject:(-WODisplayGroup) meth:displayGroup:shouldDeleteObject: descr:<TT>- (BOOL)<b>displayGroup:</b>(WODisplayGroup *)<i>displayGroup</i> <b>shouldDeleteObject:</b><i>object</i></TT> -->
+
+<H3><a name="displayGroup:shouldDeleteObject:(-WODisplayGroup)">displayGroup:shouldDeleteObject:</a></H3>
+
+<TT><b>displayGroup:</b>(WODisplayGroup *)<i>aDisplayGroup</i> <b>shouldDeleteObject:</b> <i>anObject</i> </TT>
+
+<P>
+
+Allows the delegate to prevent <i>aDisplayGroup</i> from deleting <i>anObject</i>. If the delegate returns YES, <i>anObject</i> is deleted; if the delegate returns NO, the deletion is abandoned.
+
+<P>
+
+<hr>
+
+<!-- methKey:displayGroup:shouldInsertObject:atIndex:(-WODisplayGroup) meth:displayGroup:shouldInsertObject:atIndex: descr:<TT>- (BOOL)<b>displayGroup:</b>(WODisplayGroup *)<i>displayGroup</i> <b>shouldInsertObject:</b><i>object</i> <b>atIndex:</b>(unsigned)<i>newIndex</i></TT> -->
+
+<H3><a name="displayGroup:shouldInsertObject:atIndex:(-WODisplayGroup)">displayGroup:shouldInsertObject:atIndex:</a></H3>
+
+<TT>- (BOOL)<b>displayGroup:</b>(WODisplayGroup *)<i>aDisplayGroup</i> <b>shouldInsertObject:</b><I>anObject</i> <b>atIndex:</b>(unsigned)<I>anIndex</i></TT>
+
+<P>
+
+Allows the delegate to prevent <i>aDisplayGroup</i> from inserting <i>anObject</i> at <i>anIndex</i>. If the delegate returns YES, <i>anObject</i> is inserted; if the delegate returns NO, the insertion is abandoned.
+
+<P>
+
+<hr>
+
+<!-- methKey:displayGroup:shouldRedisplayForChangesInEditingContext:(-WODisplayGroup) meth:displayGroup:shouldRedisplayForChangesInEditingContext: descr:<TT>- (BOOL)<b>displayGroup:</b>(WODisplayGroup *)<i>displayGroup</i> <b>shouldRedisplayForChangesInEditingContext:</b>(EOEditingContext *)<i>editingContext</i></TT> -->
+
+<H3><a name="displayGroup:shouldRedisplayForChangesInEditingContext:(-WODisplayGroup)">displayGroup:shouldRedisplayForChangesInEditingContext:</a></H3>
+
+<TT>- (BOOL)<b>displayGroup:</b>(WODisplayGroup *)<I>aDisplayGroup</i> <b>shouldRedisplayForChangesInEditingContext:</b>(EOEditingContext *)<I>editingContext</i></TT>
+
+<P>
+
+Invoked whenever <i>aDisplayGroup</i> receives a notification that objects in the EOEditingContext changed, this method allows the delegate to suppress redisplay based on the nature of the change that has occurred. If the delegate returns YES, <i>aDisplayGroup</i> redisplays; if it returns NO, <i>aDisplayGroup</i> doesn't. <i>editingContext</i> is the editing context that has changed.
+
+<P>
+
+<B>See Also:</b> - <b>redisplay </B> 
+
+<hr>
+
+<!-- methKey:displayGroupDidChangeDataSource:(-WODisplayGroup) meth:displayGroupDidChangeDataSource: descr:<TT>- (void)<b>displayGroupDidChangeDataSource:</b>(WODisplayGroup *)<i>displayGroup</i></TT> -->
+
+<H3><a name="displayGroupDidChangeDataSource:(-WODisplayGroup)">displayGroupDidChangeDataSource:</a></H3>
+
+<TT>- (void)<b>displayGroupDidChangeDataSource:</b>(WODisplayGroup *)<I>aDisplayGroup</i></TT>
+
+<P>
+
+Informs the delegate that <i>aDisplayGroup</i>'s EODataSource has changed.
+
+<P>
+
+<hr>
+
+<!-- methKey:displayGroupDidChangeSelection:(-WODisplayGroup) meth:displayGroupDidChangeSelection: descr:<TT>- (void)<b>displayGroupDidChangeSelection:</b>(WODisplayGroup *)<i>displayGroup</i></TT> -->
+
+<H3><a name="displayGroupDidChangeSelection:(-WODisplayGroup)">displayGroupDidChangeSelection:</a></H3>
+
+<TT>- (void)<b>displayGroupDidChangeSelection:</b>(WODisplayGroup *)<I>aDisplayGroup</i></TT>
+
+<P>
+
+Informs the delegate that <i>aDisplayGroup</i>'s selection has changed.
+
+<P>
+
+<hr>
+
+<!-- methKey:displayGroupShouldFetch:(-WODisplayGroup) meth:displayGroupShouldFetch: descr:<TT>- (BOOL)<b>displayGroupShouldFetch:</b>(WODisplayGroup *)<i>displayGroup</i></TT> -->
+
+<H3><a name="displayGroupShouldFetch:(-WODisplayGroup)">displayGroupShouldFetch:</a></H3>
+
+<TT>- (BOOL)<b>displayGroupShouldFetch:</b>(WODisplayGroup *)<I>aDisplayGroup</i></TT>
+
+<P>
+
+Allows the delegate to prevent <i>aDisplayGroup</i> from fetching. If the delegate returns YES, <i>aDisplayGroup</i> performs the fetch; if the delegate returns NO, <i>aDisplayGroup</i> abandons the fetch.
+
+<P>
+
+<hr>
+
+</body>
+
+</html>
+

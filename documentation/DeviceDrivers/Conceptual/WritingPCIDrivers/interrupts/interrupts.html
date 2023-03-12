@@ -1,0 +1,142 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+<head>
+	<title>Writing PCI Drivers: Taking Primary Interrupts</title>
+	<meta id="Generator" name="Generator" content="Gutenberg"/>
+	<meta id="GeneratorVersion" name="GeneratorVersion" content="v132"/>
+	<meta http-equiv="content-type" content="text/html;charset=utf-8"/>
+	<meta id="Copyright" name="Copyright" content="Copyright 2009 Apple Inc. All Rights Reserved."/>
+	<meta id="IndexTitle" name="IndexTitle" content="Taking Primary Interrupts"/>
+	<meta id="xcode-display" name="xcode-display" content="render"/>
+	<meta id="toc-file" name="toc-file" content="../toc.html"/>
+	<meta id="RESOURCES" content="../../../../Resources" />
+	
+	<link rel="stylesheet" type="text/css" href="../../../../Resources/CSS/frameset_styles.css"/>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/lib/prototype.js"></script>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/lib/scriptaculous.js"></script>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/page.js"></script>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/pedia.js"></script>
+	<!--[if lte IE 6]>
+		<style type="text/css">
+			/*<![CDATA[*/ 
+			html {overflow-x:auto; overflow-y:hidden;  }
+			/*]]>*/
+		</style>
+	<![endif]-->
+</head>    
+<body bgcolor="#ffffff" onload="initialize_page();"><a name="//apple_ref/doc/uid/TP30000850" title="Taking Primary Interrupts"></a>
+    <noscript>
+    <div id="tocMenu">
+        <iframe id="toc_content" name="toc_content" SRC="../toc.html" width="210" height="100%" align="left" frameborder="0">This document set is best viewed in a browser that supports iFrames.</iframe>
+    </div>
+    </noscript>
+    <div id="bodyText">
+        <a name="top"></a>
+        <div class="hideOnPrint hideInXcode">
+        <!-- start of header -->
+        <!--#include virtual="/includes/framesetheader" -->
+        <!-- end of header -->
+        </div>
+        
+        <!-- start of path -->
+<div class="breadcrumb hideOnPrint hideInXcode"><a href="http://developer.apple.com/" target="_top">ADC Home</a> &gt; <a href="../../../../../referencelibrary/index.html#//apple_ref/doc/uid/TP30000943" target="_top">Reference Library</a> &gt; <a href="../../../../index.html#//apple_ref/doc/uid/TP30000440" target="_top">Guides</a> &gt; <a href="../../../../HardwareDrivers/index.html#//apple_ref/doc/uid/TP30000440-TP40003576" target="_top">Hardware &amp; Drivers</a> &gt; <a href="../../../../HardwareDrivers/PCIandPCCard-date.html#//apple_ref/doc/uid/TP30000440-TP40003576-TP30000550" target="_top">PCI and PC Card</a> &gt; <a href="../about/about.html#//apple_ref/doc/uid/TP30000344-TP9">Writing PCI Drivers</a> &gt; </div><br class="hideInXcode"/><!-- end of path -->
+        
+        <div class="mini_nav_text" align="left">
+        <span class="navButtons">
+        <a href="../agp_device/agp_device.html">&lt; Previous Page</a><span style="margin-left: 8px"><a href="../endianness/endianness.html">Next Page &gt;</a></span>
+        </span>
+        <span id="showHideTOCUpperSpan">
+        <a href="#" onclick="showHideTOC();"><img src="../../../../Resources/Images/show_toc_icon.gif" width="15" height="14" border="0" style="margin-bottom: -2px;" alt="" hideText="Hide TOC" showText="Show TOC" /></a> <a href="#" onclick="showHideTOC();">Hide TOC</a>
+        </span>
+        </div>
+
+        <hr />
+        
+        
+        <a name="//apple_ref/doc/uid/TP30000850-TP9" title="Taking Primary Interrupts"></a><h1>Taking Primary Interrupts</h1><p>Most device drivers never need to take primary interrupts because their interrupt lines don’t cascade into the system’s interrupt controller. For example, FireWire and USB devices have a notion of interrupts, but are really just messages on a serial bus. These are commonly referred to as software interrupts because apart from the interrupt caused by the message itself, the interrupt is entirely simulated in software.</p><p>PCI devices, however, are supported by hardware interrupts. A physical line runs between the PCI slot and the PCI controller, which routes that line to an interrupt input on the interrupt controller, which presents the value of that line as a bit value in a register and raises the processor’s interrupt line.</p><p>You can take a hardware interrupt in two ways: directly via an interrupt handler (primary interrupt) and indirectly via an interrupt service thread (secondary interrupt). The second method is strongly preferred, as it avoids generating excessive interrupt latency for other devices on the system. However, the first method can be used to guarantee low latency operation when necessary.</p>
+<!-- This template is being used for both PDF and HTML. -->
+
+    
+    <h4>In this section:</h4>
+    
+    
+    <p class="blockquote">
+    
+        
+			
+			
+				<a href="interrupts.html#//apple_ref/doc/uid/TP30000850-TPXREF107">Interrupts and the Device Tree</a>
+				
+			<br/>
+			
+        
+			
+			
+				<a href="interrupts.html#//apple_ref/doc/uid/TP30000850-TPXREF108">What is Interrupt Latency?</a>
+				
+			<br/>
+			
+        
+			
+			
+				<a href="interrupts.html#//apple_ref/doc/uid/TP30000850-TPXREF109">Interrupts via Interrupt Service Threads</a>
+				
+			<br/>
+			
+        
+			
+			
+				<a href="interrupts.html#//apple_ref/doc/uid/TP30000850-CHDFIIBI">Taking Interrupts Directly</a>
+				
+			<br/>
+			
+        
+
+    </p><br/>
+
+<a name="//apple_ref/doc/uid/TP30000850-TPXREF107" title="Interrupts and the Device Tree"></a><h2>Interrupts and the Device Tree</h2><p>Open Firmware automatically assigns interrupts to PCI devices. Typically a PCI device has only a single interrupt, but it is possible to have PCI devices that generate more than one interrupt (for example, a device interrupt and a DMA interrupt).</p><p>In any case, all of the interrupts used by the device are listed in an array as part of the device’s I/O Registry entry. Like a C array, the first interrupt is at offset 0, the second at offset 1, and so on.</p><p>When registering to receive an interrupt, you must specify the offset into the interrupt list for the interrupt you want to receive. If you need to receive notification for multiple interrupts, you must enable them each individually.</p><p>In the unlikely event that Open Firmware should fail to allocate interrupts correctly for your device, you should contact Apple Developer Technical Support for assistance, as correcting problems with interrupt allocation is beyond the scope of this book.</p><a name="//apple_ref/doc/uid/TP30000850-TPXREF108" title="What is Interrupt Latency?"></a><h2>What is Interrupt Latency?</h2><p>Interrupt latency refers to the amount of time between when an interrupt is triggered and when the interrupt is seen by software. This can be caused by many factors. Some of these include:</p><ul class="ul"><li class="li"><p>other drivers keeping interrupts disabled for a long period</p></li><li class="li"><p>blocking in the interrupt service thread</p></li><li class="li"><p>scheduling latency (waiting for the interrupt service thread to be scheduled)</p></li><li class="li"><p>interrupt service thread priority (particularly for non-kernel drivers)</p></li></ul><p>If you are writing device drivers, it is your responsibility to avoid causing too much latency for other devices in the system. In extreme cases, it is possible to actually cause interrupts to be dropped by leaving interrupts turned off for too long. This can cause system instability, and in some machines, can actually cause the computer to spontaneously power down by causing a PMU synchronization failure.</p><p>The best way to avoid such problems is to use interrupt service threads. This is the preferred way to service interrupts. However, if your driver is well-behaved and doesn’t spend huge amounts of time copying data, it is also possible to write reasonable device drivers that operate directly in an interrupt context. This is briefly discussed in <span class="content_text"><a href="interrupts.html#//apple_ref/doc/uid/TP30000850-CHDFIIBI">“Taking Interrupts Directly.”</a></span></p><a name="//apple_ref/doc/uid/TP30000850-TPXREF109" title="Interrupts via Interrupt Service Threads"></a><h2>Interrupts via Interrupt Service Threads</h2><p>Interrupt service threads are the standard way of handling interrupts in Mac OS X device drivers, though they often go by another name, the work loop.</p><p>A work loop is a thread whose sole purpose is to wait for an event such as an interrupt to occur, then call an appropriate handler function to do the actual work of processing the interrupt—checking the result, copying data, and so on. This activity occurs in a kernel thread.</p><p>The kernel thread does not receive the actual interrupt, however. A low-level interrupt handler receives the primary interrupt. It then generates a software interrupt known as a secondary interrupt. The interrupt service thread receives that secondary software interrupt. Thus, routines running in an interrupt service thread do not have to obey the same rules as an actual interrupt handler; they can block, call <code><!--a-->IOLog<!--/a--></code>, and so on.</p><p>The following code is an example of registering to receive two (secondary) interrupts using a work loop:</p><div class="codesample"><table><tr><td scope="row"><pre>/* class variables */<span></span></pre></td></tr><tr><td scope="row"><pre>IOWorkLoop *myWorkLoop;<span></span></pre></td></tr><tr><td scope="row"><pre>IOFilterInterruptEventSource *interruptSource;<span></span></pre></td></tr><tr><td scope="row"><pre>IOFilterInterruptEventSource *DMAInterruptSource;<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>/* code in start() */<span></span></pre></td></tr><tr><td scope="row"><pre>myWorkLoop = IOWorkLoop::workLoop();<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>if( myWorkLoop == NULL) {<span></span></pre></td></tr><tr><td scope="row"><pre>    IOLog( "org_mklinux_iokit_swim3_driver::start: Couldn't "<span></span></pre></td></tr><tr><td scope="row"><pre>        allocate workloop event source\n");<span></span></pre></td></tr><tr><td scope="row"><pre>    return false;<span></span></pre></td></tr><tr><td scope="row"><pre>}<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>interruptSource = IOFilterInterruptEventSource::filterInterruptEventSource(<span></span></pre></td></tr><tr><td scope="row"><pre>    (OSObject*)this,<span></span></pre></td></tr><tr><td scope="row"><pre>    (IOInterruptEventAction)&amp;org_mklinux_iokit_swim3_driver::handleInterrupt,<span></span></pre></td></tr><tr><td scope="row"><pre>    (Filter)&amp;org_mklinux_iokit_swim3_driver::filterInterrupt,<span></span></pre></td></tr><tr><td scope="row"><pre>    (IOService*)provider,<span></span></pre></td></tr><tr><td scope="row"><pre>    (int)0 );<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>if ( interruptSource == NULL ) {<span></span></pre></td></tr><tr><td scope="row"><pre>    IOLog( "org_mklinux_iokit_swim3_driver::start: Couldn't"<span></span></pre></td></tr><tr><td scope="row"><pre>        "allocate Interrupt event source\n" );<span></span></pre></td></tr><tr><td scope="row"><pre>    return false;<span></span></pre></td></tr><tr><td scope="row"><pre>}<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>if ( myWorkLoop->addEventSource( interruptSource ) != kIOReturnSuccess ) {<span></span></pre></td></tr><tr><td scope="row"><pre>    IOLog( "org_mklinux_iokit_swim3_driver::start - Couldn't add Interrupt"<span></span></pre></td></tr><tr><td scope="row"><pre>        "event source\n" );    return false;}<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>DMAInterruptSource = IOFilterInterruptEventSource::<span></span></pre></td></tr><tr><td scope="row"><pre>    filterInterruptEventSource(<span></span></pre></td></tr><tr><td scope="row"><pre>        (OSObject*)this,<span></span></pre></td></tr><tr><td scope="row"><pre>        (IOInterruptEventAction)&amp;org_mklinux_iokit_swim3_driver::<span></span></pre></td></tr><tr><td scope="row"><pre>            handleDMAInterrupt,<span></span></pre></td></tr><tr><td scope="row"><pre>        (Filter)&amp;org_mklinux_iokit_swim3_driver::filterDMAInterrupt<span></span></pre></td></tr><tr><td scope="row"><pre>        (IOService*)provider,        (int)1 );<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>if ( DMAInterruptSource == NULL ) {<span></span></pre></td></tr><tr><td scope="row"><pre>    IOLog( "org_mklinux_iokit_swim3_driver::start: Couldn't"<span></span></pre></td></tr><tr><td scope="row"><pre>        "allocate Interrupt event source\n" );<span></span></pre></td></tr><tr><td scope="row"><pre>    return false;<span></span></pre></td></tr><tr><td scope="row"><pre>    }<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>if ( myWorkLoop->addEventSource( DMAInterruptSource ) != kIOReturnSuccess )<span></span></pre></td></tr><tr><td scope="row"><pre>    {<span></span></pre></td></tr><tr><td scope="row"><pre>    IOLog( "org_mklinux_iokit_swim3_driver::start - Couldn't add "<span></span></pre></td></tr><tr><td scope="row"><pre>        "Interrupt event source\n" );<span></span></pre></td></tr><tr><td scope="row"><pre>    return false;<span></span></pre></td></tr><tr><td scope="row"><pre>}<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>myWorkLoop->enableAllInterrupts();<span></span></pre></td></tr></table></div><p>The methods <code>handleInterrupt</code> and <code>handleDMAInterrupt</code> will now be called for the first and second device interrupts (offsets 0 and 1), respectively.</p><p>Notice the methods <code><!--a-->filterInterrupt<!--/a--></code> and <code><!--a-->filterDMAInterrupt<!--/a--></code>. These methods are called upon receipt of a hardware interrupt, and should do the minimum amount of work necessary to determine whether an interrupt belongs to your driver or not.</p><p>This use of interrupt filters is strongly recommended over <code>IOInterruptEventSource</code> to ensure that your driver performs as well as possible should your device end up sharing an interrupt with another device. If you do not write a filter function, the system will have to call each driver that registers for a given shared interrupt one-by-one, resulting in unpleasant latency for all drivers involved.</p><p>If the interrupt belongs to your device, the filter method should return <code>true</code>. Otherwise it should return <code>false</code>. Because the two interrupts (device and DMA) above could, in theory, be shared on the same interrupt line, additional care should be taken to determine the nature of the interrupt, and to return <code>true</code> only for the right kind of interrupt—that is, <code><!--a-->filterInterrupt<!--/a--></code> should return <code>true</code><em>only</em> for a device interrupt, and <code><!--a-->filterDMAInterrupt<!--/a--></code> should return <code>true</code><em>only</em> for a DMA interrupt.</p><div class="warningbox"><img src="../../../../Resources/Images/icon_warning.gif" alt="!" width="20" height="20" border="0" class="warningicon" /><a name="//apple_ref/doc/uid/TP30000850-DontLinkElementID_2" title="Warning:"></a><p><strong>Warning:</strong>&nbsp;Interrupt filter functions run in a primary (hardware) interrupt context. This means that they have additional restrictions on what they are allowed to do, and that they <em>must</em> be extremely efficient.</p><p>For more information on the restrictions that apply to filter functions, see <span class="content_text"><a href="interrupts.html#//apple_ref/doc/uid/TP30000850-CHDFIIBI">“Taking Interrupts Directly.”</a></span></p><p></p><div class="clear"></div></div><p>If your interrupt filter returns <code>true</code>, your interrupt handler routine will be started on your work loop automatically by the I/O Kit. The interrupt will remain disabled in hardware until your interrupt service routine completes.</p><p>In some cases, such as pseudo-DMA, this behavior may not be what you want. For this reason, you may elect to have your filter routine schedule the work on the work loop itself, then return <code>false</code>. If you do this, the interrupt will not be disabled in hardware, and thus, you could receive additional primary interrupts before your work-loop–level service routine completes. Because this method has implications on synchronization between your filter routine and interrupt service routine, you should generally avoid doing this unless your driver requires pseudo-DMA.</p><p>For additional information, consult the document <em><a href="../../IOKitFundamentals/index.html#//apple_ref/doc/uid/TP0000011" target="_top">I/O Kit Fundamentals</a></em> and the <code>IOFilterInterruptEventSource</code> class documentation in the device drivers API reference, available from the Apple Developer Documentation website.</p><a name="//apple_ref/doc/uid/TP30000850-CHDFIIBI" title="Taking Interrupts Directly"></a><h2>Taking Interrupts Directly</h2><p>This method is generally not advisable, as it can cause undesirable behavior including high interrupt latency for other drivers, audio stuttering, lost interrupts, and even erratic overall system behavior.</p><p>However, if you need exceptionally low latency for certain specialty devices, it may be necessary to take primary interrupts directly. You should remember that drivers that take primary interrupts must not block in their handler routines, which means that many calls are not allowed, including <code><!--a-->IOLog<!--/a--></code>.</p><p>You can register a handler for a raw interrupt in one of two ways: using an <code>IOFilterInterruptEventSource</code> or by using <code><!--a-->registerInterrupt<!--/a--></code>.</p><p>If you are sharing an interrupt between multiple devices, you should use an <code>IOFilterInterruptEventSource</code> handler.</p><p>If you are writing a driver whose interrupt handler must run partially in a raw interrupt context, you can use <code><!--a-->registerInterrupt<!--/a--></code>. You should <em>only</em> consider doing processing that is <em>extremely</em> fast in a primary interrupt context. In general, if the amount of work done takes less time than a context switch, it is acceptable to do it in a primary interrupt context.</p><p>Regardless, you should do<em> only</em> the low-latency portions in an interrupt context and defer any heavy lifting to an interrupt service thread.</p><a name="//apple_ref/doc/uid/TP30000850-TPXREF110" title="Taking a Primary Interrupt Using IOFilterInterruptEventSource"></a><h3>Taking a Primary Interrupt Using IOFilterInterruptEventSource</h3><p>For information on IOFilterInterruptEventSource, see <span class="content_text"><a href="interrupts.html#//apple_ref/doc/uid/TP30000850-TPXREF109">“Interrupts via Interrupt Service Threads.”</a></span></p><a name="//apple_ref/doc/uid/TP30000850-TPXREF111" title="Taking a Primary Interrupt Using registerInterrupt"></a><h3>Taking a Primary Interrupt Using registerInterrupt</h3><p>Taking a primary interrupt in this fashion is dangerous. You should not ever do this unless you have determined that it is impossible to get adequate latency using a secondary interrupt handler. Before proceeding, you should contact Apple Developer Technical Support for guidance.</p><p>When working in the primary interrupt context, nearly all calls are unsafe. Even things like <code><!--a-->IOLog<!--/a--></code> can block, and blocking in a primary interrupt context will result in a kernel panic (since it would otherwise result in an unexplained hang). Only Mach simple locks (spinlocks) are safe in this context, since they disappear in a uniprocessor environment.</p><p>You should be extremely careful to avoid keeping interrupts turned off for an extended period of time. For example, multi-millisecond polling, delays, and copying large amounts of data are not acceptable in a primary interrupt context. Such activity should always be deferred to an interrupt service thread.</p><p>With those caveats in mind, the sample code below shows how to register a handler for a primary (hardware) interrupt directly without using work loops. The first example shows how to register a C++ class member function. The second example shows how to register an ordinary C function.</p><div class="codesample"><table><tr><td scope="row"><pre>provider->registerInterrupt(0, this,<span></span></pre></td></tr><tr><td scope="row"><pre>        OSMemberFunctionCast(IOInterruptAction, this,<span></span></pre></td></tr><tr><td scope="row"><pre>            &amp;MyClass::handleInterrupt), 0);<span></span></pre></td></tr><tr><td scope="row"><pre>provider->enableInterrupt(0);<span></span></pre></td></tr><tr><td scope="row"><pre>provider->registerInterrupt(1, this,<span></span></pre></td></tr><tr><td scope="row"><pre>        (IOInterruptAction) &amp;handleDMAInterrupt, 0);<span></span></pre></td></tr><tr><td scope="row"><pre>provider->enableInterrupt(1);<span></span></pre></td></tr></table></div><p>As with the previous example, when the first interrupt (offset 0) occurs, the function <code><!--a-->handleInterrupt<!--/a--></code> will be called, and when the second interrupt (offset 1) occurs, the function <code><!--a-->handleDMAInterrupt<!--/a--></code> will be called.</p>
+
+        <br /><br /> 
+        
+        <div class="mini_nav_text" align="left">
+        <span class="navButtons">
+        <a href="../agp_device/agp_device.html">&lt; Previous Page</a><span style="margin-left: 8px"><a href="../endianness/endianness.html">Next Page &gt;</a></span>
+        </span>
+        <span id="showHideTOCLowerSpan">
+        <a href="#" onclick="showHideTOC();"><img src="../../../../Resources/Images/show_toc_icon.gif" width="15" height="14" border="0" style="margin-bottom: -2px;" alt="" /></a> <a href="#" onclick="showHideTOC();">Hide TOC</a>
+        </span>
+        </div>
+
+        <br/><hr /><div align="center"><p class="content_text" lang="en" dir="ltr"> <!--#if expr="0=1" -->&#x00a9; 1999, 2006 Apple Computer, Inc. All Rights Reserved. &#40;<!--#endif -->Last updated: 2006-04-04<!--#if expr="0=1" -->&#041;<!--#endif --></p></div>
+
+        
+        <div class="hideOnPrint hideInXcode">
+        <!-- start of footer -->
+        	<table width="100%" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/documentation/DeviceDrivers/Conceptual/WritingPCIDrivers/interrupts/interrupts.html%3Fid%3DTP40000975-4.1&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/documentation/DeviceDrivers/Conceptual/WritingPCIDrivers/interrupts/interrupts.html%3Fid%3DTP40000975-4.1&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/documentation/DeviceDrivers/Conceptual/WritingPCIDrivers/interrupts/interrupts.html%3Fid%3DTP40000975-4.1&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+
+        <!--#include virtual="/includes/framesetfooter" -->
+        <!-- end of footer -->
+        </div>
+    </div>
+</body>
+</html>

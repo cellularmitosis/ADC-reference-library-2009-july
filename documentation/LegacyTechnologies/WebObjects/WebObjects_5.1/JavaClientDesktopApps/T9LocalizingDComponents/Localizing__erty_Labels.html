@@ -1,0 +1,243 @@
+<HTML>
+	<HEAD>
+		<meta http-equiv="content-type" content="text/html;charset=iso-8859-1">
+		<meta name="generator" content="XML_Publisher">
+		<meta name="Copyright" content="Copyright 2001 Apple Computer, Inc. All Rights Reserved.">
+        <title>Localizing
+Property Labels</title>
+		</HEAD>
+	<BODY bgcolor="#ffffff">
+<!-- start of header -->
+<!--#include virtual="/includes/framesetheader" -->
+<!-- end of header --> <!-- insert Show/Hide frames -->
+<script type="text/javascript" language="JavaScript"><!--
+function loadFrames(){
+if (top == self || (parent.frames[1].name != content))
+    top.location.href = 'index.html?' + location.href;
+}
+
+if (self != top) {
+  // loaded in frames
+  document.write('<a href="'+self.location+'" target="_top"><img src="../images/hideframes.gif" border="0" alt="Hide Frames"></a>');
+  }
+else {
+  // not loaded frames
+	document.write('<a href="JavaScript:loadFrames()"><img src="../images/showframes.gif" border="0" alt="Show Frames"></a>');
+}
+//--></script>
+<!-- end Show/Hide frames -->
+<a href="Task_Locali__Components.html" target="content"><img src="../images/previous.gif" border="0"></a>&nbsp;<a href="Localizing___Components.html" target="content"><img src="../images/next.gif" border="0"></a>&nbsp;<!-- apple_doc:infillMarkerTop -->  
+<!-- apple_doc: pageHeadingStart --><a name = "CEGEDJJH"></a><a name="-632633"></a><h2><font face="Lucida Grande,Helvetica,Arial">Localizing
+Property Labels</font></h2><!-- apple_doc: pageHeadingEnd -->
+
+<p><b>Problem:</b> You want to localize the labels
+of properties in your application.</p>
+<p><b>Solution:</b> Write a Java class to perform
+the localized string lookup, get the user's preferred languages,
+and write a rule to get the localized strings.</p>
+<p>Most of the rules you write and use in the rule system have
+a right-hand side class of type Assignment as shown in  <a href="#CEGGJDHC">Figure 16-1</a>.</p>
+<br><a name = "CEGGJDHC"></a><a name="-634102"></a><p><b><font face="Geneva,Helvetica,Arial" size="2">Figure
+16-1 Right-hand side class of type Assignment</font></b></p>
+ <img src = "../Art/rhsassignment.gif" alt = "[image: ../Art/rhsassignment.gif]">
+
+<p>The rule you'll write to localize dynamic components uses
+the type Custom. By specifying a class name in the Custom field
+and a method name in the Value field, the key specified in the Key
+field is assigned to the return value of the specified method in
+the specified class. In  <a href="#CEGHCCIF">Figure 16-2</a>, the key <code>label</code> is
+resolved to the result of the method named <code>localizedPropertyValue</code> in
+the class LocalizedStringLookup.</p>
+<br><a name = "CEGHCCIF"></a><a name="-634132"></a><p><b><font face="Geneva,Helvetica,Arial" size="2">Figure
+16-2 Right-hand class of type Custom</font></b></p>
+ <img src = "../Art/rhscustom.gif" alt = "[image: ../Art/rhscustom.gif]">
+
+<p>Before writing the rule, however, write the class that does
+the localized string lookup.</p>
+<p>Add a class to your project called "LocalizedStringLookup."
+Add it to the Application Server target. Copy and paste this code
+into it:</p>
+<a name = "CEGHBJIB"></a><a name="-643306"></a><p><b><font face="Geneva,Helvetica,Arial" size="2">Listing 16-1 LocalizedStringLookup
+class</font></b></p>
+<pre>import com.webobjects.foundation.*;
+import com.webobjects.appserver.*;
+import com.webobjects.eocontrol.*;
+import com.webobjects.directtoweb.*;
+
+public class LocalizedStringLookup extends DefaultAssignment {
+    
+    D2WContext d2wcontext;
+    
+    public LocalizedStringLookup(EOKeyValueUnarchiver unarchiver) {
+        super(unarchiver); 
+    }
+    public LocalizedStringLookup(String key, String value) { super(key,value); }
+    
+    public static Object decodeWithKeyValueUnarchiver(EOKeyValueUnarchiver
+            eokeyvalueunarchiver)  {
+        return new LocalizedStringLookup(eokeyvalueunarchiver);
+    }
+    
+    public synchronized Object fire(D2WContext context) {
+        d2wcontext = context;
+        Object result = KeyValuePath.valueForKeyOnObject((String) value(), this);
+        return result;
+    }
+
+    public String localizedPropertyValue() {
+        String displayName = (String) d2wcontext.valueForKey(D2WModel.PropertyKeyKey); 		//1
+        
+       NSArray languages = (NSArray)d2wcontext.valueForKey(&quot;languages&quot;);
+        
+       String returnstr =
+        WOApplication.application().resourceManager().stringForKey(displayName,                  &quot;
+        Localizable&quot;, displayName, null, languages);		//2
+        
+        return returnstr;
+        
+    }
+
+}</pre>
+<p>Remember to change the package statement to the package your
+server-side (Application Server target) classes are in.</p>
+<p>The most interesting part of the class is the <code>localizedPropertyValue</code> method.
+The rule you'll write invokes this method to get the localized
+string for a particular property. First, the method gets the display
+name for the receiver's property (code line 1). That is, if the property
+name is "date" (which corresponds to an attribute named "date"
+in an entity in one of the application's EOModels) the display
+name is the label that appears next to the widget representing the
+"date" property in the application.</p>
+<p>Code line 2 is the most important part of the method. It looks
+for a localized string in a string table called "Localizable"
+for the display name specified by <em>displayName</em>.
+Since a localized application usually contains <code>Localizable.strings</code> files
+for multiple languages, the <code>stringForKey</code> method
+looks first for a <code>Localizable.strings</code> file
+for the user's first preferred language. If it finds a <code>Localizable.strings</code> file
+for that language, it returns the localized strings. If it does
+not, however, it continues through the user's preferred languages
+(returned by <code>d2wcontext.valueForKey(&quot;languages&quot;)</code> ),
+defaulting to nonlocalized strings if it can't find a <code>Localizable.strings</code> file
+matching one of the user's preferred languages.</p>
+<p>Now that you have the method to look up localized strings,
+you need to add localized string tables to your project.</p>
+<p>First, add a new file to the Resources group of your project
+called "Localizable.strings." Add it to the Application Server
+target. The syntax of a <code>Localizable.strings</code> file
+is rather simple:</p>
+<pre>{
+    &quot;&lt;propertyName&gt;&quot; = &quot;&lt;localizedString&gt;&quot;;
+}</pre>
+<p>A <code>Localizable.strings</code> table
+for the property name "date" for Spanish would be</p>
+<pre>{
+    &quot;date&quot; = &quot;Fecha&quot;;
+}</pre>
+<p>In the <code>Localizable.strings</code> table
+you just added to the project, add string pairs for the property
+keys in your application in English. You can find the names of the
+property keys in a few ways: in the Direct to Java Client Assistant's
+Properties pane; the output of the LocalizedStringLookup (which
+contains the log statement "<code>NSLog.out.appendln(&quot;displayName:
+&quot; + displayName);</code>"); or by invoking <code>attributeKeys</code> on
+an enterprise object's class description and printing the result.</p>
+<p>When you're done adding English-localized strings, you can
+add localized variants of the file to your project. Select the <code>Localizable.strings</code> file
+and choose Show Info from Project Builder's Project menu. From
+the Localization and Platforms pop-up menu, choose "Add Localized
+Variant" as shown in  <a href="#CEGCCGEE">Figure 16-3</a>.</p>
+<br><a name = "CEGCCGEE"></a><a name="-634554"></a><p><b><font face="Geneva,Helvetica,Arial" size="2">Figure
+16-3 Add localized variant of <code>Localizable.strings</code> file</font></b></p>
+ <img src = "../Art/addlocalvariant.gif" alt = "[image: ../Art/addlocalvariant.gif]">
+
+<p>Add a localized variant for the language of your choice as
+shown in  <a href="#CEGECEFH">Figure 16-4</a>. If the language is not listed, you can type
+it in the field underneath "Enter the name of the new locale."</p>
+<br><a name = "CEGECEFH"></a><a name="-634588"></a><p><b><font face="Geneva,Helvetica,Arial" size="2">Figure
+16-4 Add localized variant for German</font></b></p>
+ <img src = "../Art/addgermanvariant.gif" alt = "[image: ../Art/addgermanvariant.gif]">
+
+<p>This action creates a directory called <code>German.lproj</code> (or
+whatever language you chose) in your project and puts a copy of
+the <code>Localizable.strings</code> file
+in it.  <a href="#CEGBDICI">Figure 16-5</a> shows German and Spanish localized variants
+in the Groups &amp; Files list.</p>
+<br><a name = "CEGBDICI"></a><a name="-634620"></a><p><b><font face="Geneva,Helvetica,Arial" size="2">Figure
+16-5 Localized resources in project</font></b></p>
+ <img src = "../Art/localizedvarsinproject.gif" alt = "[image: ../Art/localizedvarsinproject.gif]">
+
+<p>Now that you've created localized variants, you need to
+edit the variant to provide the language-specific strings for each
+property key. The German-localized variant might look like  <a href="#CEGHIIAC">Listing 16-2</a>.</p>
+<a name = "CEGHIIAC"></a><a name="-635353"></a><p><b><font face="Geneva,Helvetica,Arial" size="2">Listing 16-2 German-localized
+variants of strings file</font></b></p>
+<pre>{
+    &quot;modified&quot; = &quot;Ge&#228;ndert&quot;;
+    &quot;documents&quot; = &quot;Dokumente&quot;;
+    &quot;release&quot; = &quot;Freigeben&quot;;
+    &quot;keywords&quot; = &quot;Schl&#252;sselw&#246;rter&quot;;
+    &quot;date&quot; = &quot;Datum&quot;;
+    &quot;notes&quot; = &quot;Anmerkungen&quot;;
+    &quot;illustrator&quot; = &quot;Illustrator&quot;;
+}</pre>
+<br><table border = "0" BGCOLOR="#E6E6E6">
+
+<tr>
+<td scope="row"><b>Note: </b>Make
+sure that the encoding for all <code>Localizable.strings</code> files
+in your project is Unicode. You can change the encoding of a file
+by choosing an encoding from the File Encodings submenu of Project
+Builder's Format menu.</td>
+</tr>
+
+</table><br>
+<p>There is just one more thing you need to do to complete localization.
+Although the current process may seem tedious, think of the time
+it will save you: It saves you from needing to build localized variants
+of Interface Builder files by hand, or worse yet, from building localized
+versions of raw Swing components.</p>
+<p>The final step is to write a rule to use everything you've
+just added to the application.</p>
+<dl>
+<dt><b>Left-Hand Side:</b></dt>
+<dd><code>*true*</code></dd>
+<dt><b>Key:</b></dt>
+<dd><code>label</code></dd>
+<dt><b>Class:</b></dt>
+<dd><code>Custom</code></dd>
+<dt><b>Custom:</b></dt>
+<dd><code>LocalizedStringLookup</code></dd>
+<dt><b>Value:</b></dt>
+<dd><code>&quot;localizedPropertyValue&quot;</code></dd>
+<dt><b>Priority:</b></dt>
+<dd><code>50</code></dd></dl>
+<p>The key <code>label</code> is
+assigned to the return value of the method <code>localizedPropertyValue</code> in
+the class LocalizedStringLookup. In Rule Editor, this rule appears
+as in 
+ <a href="#CEGHCCIF">Figure 16-2</a>.</p>
+
+<br>
+    <!-- insert Show/Hide frames -->
+<script type="text/javascript" language="JavaScript"><!--
+function loadFrames(){
+if (top == self || (parent.frames[1].name != content))
+    top.location.href = 'index.html?' + location.href;
+}
+
+if (self != top) {
+  // loaded in frames
+  document.write('<a href="'+self.location+'" target="_top"><img src="../images/hideframes.gif" border="0" alt="Hide Frames"></a>');
+  }
+else {
+  // not loaded frames
+	document.write('<a href="JavaScript:loadFrames()"><img src="../images/showframes.gif" border="0" alt="Show Frames"></a>');
+}
+//--></script>
+<!-- end Show/Hide frames -->
+<a href="Task_Locali__Components.html" target="content"><img src="../images/previous.gif" border="0"></a>&nbsp;<a href="Localizing___Components.html" target="content"><img src="../images/next.gif" border="0"></a>&nbsp;<!-- apple_doc:infillMarkerBottom --> <br><br><p><hr><font face="Geneva,Helvetica,Arial" size="2">&#169; 2002 Apple Computer, Inc. (Last Updated May 1, 2002)</font></p><!-- start of footer -->
+<!--#include virtual="/includes/framesetfooter" -->
+<!-- end of footer -->
+</body>
+</html>

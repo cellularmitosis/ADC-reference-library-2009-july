@@ -1,0 +1,277 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML EXPERIMENTAL 970324//EN">
+<HTML>
+<HEAD>
+<META NAME="GENERATOR" CONTENT="Adobe FrameMaker 5.5/HTML Export Filter">
+<LINK REL="STYLESHEET" HREF="RefreshingData.css">
+<TITLE> </TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+<!--start of banner -->
+<!--#include virtual="/includes/framesetheader" -->
+<!-- end of banner -->
+<!--start of path -->
+<font face="Geneva,Helvetica,Arial" size="1">
+<b>PATH<spacer type="horizontal" size="5">&nbsp;</b>
+ <a href="../../../../../webobjects.html" target="_top">WebObjects 4.0 Documentation</a> <b>&gt;</b>
+ <a href="TopicsTOC.html" target="_top">WebObjects Programming Topics</a>
+</font>
+<br><br>
+<!--end of path -->
+
+
+<H1 CLASS="TopictTitleTOC">
+Refreshing Data by Refetching from the Database or Invalidating an Object
+</H1>
+<DIV>
+<H2 CLASS="Synopsis">
+<A NAME="pgfId=606101">
+ </A>
+Synopsis<DIV>
+<IMG SRC="RefreshingData-1.gif">
+</DIV>
+</H2>
+<P CLASS="Body">
+<A NAME="pgfId=606102">
+ </A>
+Describes how to get the most current values for an object by either refreshing during a fetch or invalidating an object.</P>
+</DIV>
+<DIV>
+<H2 CLASS="Heading1">
+<A NAME="pgfId=606103">
+ </A>
+Discussion<DIV>
+<IMG SRC="RefreshingData-1.gif">
+</DIV>
+</H2>
+<P CLASS="Body">
+<A NAME="pgfId=606104">
+ </A>
+Enterprise Objects Framework (EOF) automatically caches the raw dictionary of values and unique objects that are fetched from the database. The raw dictionary is cached in a set of snapshots based on a GlobalID derived from the primary keys of the database rows. All peer EOEditingContexts share this common cache of snapshots. Each EOEditingContext stores its own unique object instance for a given GlobalID. Whenever the common snapshots change, an EOObjectsChangedInStore notification is posted and all associated EOEditingContexts attempt to reconcile themselves with the new snapshot.</P>
+<P CLASS="Body">
+<A NAME="pgfId=606105">
+ </A>
+When an EOEditingContext fetches a row, it creates one unique object within the EditingContext based on the GlobalID. This &quot;uniquing&quot; process enables EOF to return the same object during a future fetch. Uniquing is an important part of EOF, because having multiple instances of the same object in the same editing context is not desirable.</P>
+<P CLASS="Body">
+<A NAME="pgfId=606106">
+ </A>
+When a peer editing context such as another session's <EM CLASS="Code">
+defaultEditingContext</EM>
+ fires a fault to a GlobalID that has already been fetched, the last fetched data (in the snapshot cache) is used as the source instead of a real database fetch. A new object is then instantiated and uniqued in this peer editing context. </P>
+<P CLASS="Body">
+<A NAME="pgfId=606107">
+ </A>
+The default behavior for fetching and uniquing an object involves comparing a newly fetched row's primary keys to the previously fetched snapshot. If a snapshot already exists with the same primary keys, EOF will completely ignore the fetched row and just use the previous snapshot. </P>
+<P CLASS="Body">
+<A NAME="pgfId=606108">
+ </A>
+This appears to be undesirable since the new fetch might have updated data. However, if the default was to always update the objects to the latest fetched data, your objects might be updated at unknown and invalid times. </P>
+<P CLASS="Body">
+<A NAME="pgfId=606109">
+ </A>
+The following are two ways that an instantiated object can be refreshed with the latest database values:</P>
+<UL>
+<P CLASS="Bulleted">
+<A NAME="pgfId=606110">
+ </A>
+&#183;		The object (row) is returned from a new fetch that specifically requests refreshing.</P>
+<P CLASS="Bulleted">
+<A NAME="pgfId=606111">
+ </A>
+&#183;		The editing context for the object is asked to invalidate the object, which releases the snapshot for this object and turns all instances back to a faults.</P>
+</UL>
+<P CLASS="Warning">
+<A NAME="pgfId=611754">
+ </A>
+<DIV>
+<IMG SRC="RefreshingData-1.gif">
+</DIV>
+Warning	Refreshing an object will not refresh its relationships. Only its data and flattened<BR>
+	attributes will be refreshed. <DIV>
+<IMG SRC="RefreshingData-1.gif">
+</DIV>
+</P>
+<DIV>
+<H4 CLASS="Heading2">
+<A NAME="pgfId=611755">
+ </A>
+Refreshing Data with a FetchSpecification</H4>
+<P CLASS="Body">
+<A NAME="pgfId=606114">
+ </A>
+EOFetchSpecification's <EM CLASS="Code">
+setRefreshesRefetchedObjects</EM>
+ method can be used to override the default behavior and force an update to the snapshot and, consequently, an update to all previously fetched objects.</P>
+<P CLASS="Body">
+<A NAME="pgfId=613902">
+ </A>
+The following code shows how to set up an EOFetchSpecification to refresh the objects it fetches.</P>
+<DIV>
+<H5 CLASS="Code-Listing">
+<A NAME="pgfId=613905">
+ </A>
+Figure 1.  Java Code</H5>
+<DIV>
+<pre>EOEditingContext ec=session().defaultEditingContext();</pre></DIV>
+<A NAME="pgfId=613907">
+ </A>
+<DIV>
+<pre>EOFetchSpecification fs=new EOFetchSpecification</pre></DIV>
+<A NAME="pgfId=613909">
+ </A>
+<DIV>
+<pre>    ("Movie", qual, null);</pre></DIV>
+<A NAME="pgfId=613957">
+ </A>
+<DIV>
+<pre>fs.setRefreshesRefetchedObjects(true);</pre></DIV>
+<A NAME="pgfId=613911">
+ </A>
+<DIV>
+<pre>movies=ec.objectsWithFetchSpecification(fs);</pre></DIV>
+<A NAME="pgfId=613913">
+ </A>
+</DIV>
+<DIV>
+<H5 CLASS="Code-Listing">
+<A NAME="pgfId=613916">
+ </A>
+Figure 2.  Objective-C Code</H5>
+<DIV>
+<pre>EOEditingContext *ec=[[self session] defaultEditingContext];</pre></DIV>
+<A NAME="pgfId=613918">
+ </A>
+<DIV>
+<pre>EOFetchSpecification *fs=[EOFetchSpecification</pre></DIV>
+<A NAME="pgfId=613920">
+ </A>
+<DIV>
+<pre>    fetchSpecificationWithEntityName: @"Movie" </pre></DIV>
+<A NAME="pgfId=613958">
+ </A>
+<DIV>
+<pre>    qualifier:nil sortOrderings: nil];</pre></DIV>
+<A NAME="pgfId=613959">
+ </A>
+<DIV>
+<pre>[fs setRefreshesRefetchedObjects:YES];</pre></DIV>
+<A NAME="pgfId=613922">
+ </A>
+<DIV>
+<pre>movies =[ec objectsWithFetchSpecification: fs];</pre></DIV>
+<A NAME="pgfId=613924">
+ </A>
+<P CLASS="Body">
+<A NAME="pgfId=613956">
+ </A>
+&nbsp;</P>
+</DIV>
+</DIV>
+<DIV>
+<H4 CLASS="Heading2">
+<A NAME="pgfId=613925">
+ </A>
+Refreshing Data by Invalidating the Object</H4>
+<P CLASS="Body">
+<A NAME="pgfId=613926">
+ </A>
+EOF can be forced to invalidate an object, which removes the object's snapshot from the cache and converts the object back into a fault. As soon as a message is sent to the fault, the most recent data will be refetched from the database and the fault will be converted back into the appropriate object with the data. See the programming topic &quot;Invalidating Objects&quot; for a discussion on how to invalidate objects.</P>
+</DIV>
+</DIV>
+<DIV>
+<H2 CLASS="Heading1">
+<A NAME="pgfId=613935">
+ </A>
+See Also<DIV>
+<IMG SRC="RefreshingData-1.gif">
+</DIV>
+</H2>
+<UL>
+<P CLASS="Bulleted">
+<A NAME="pgfId=606146">
+ </A>
+&#183;	Invalidating Objects</P>
+<P CLASS="Bulleted">
+<A NAME="pgfId=606147">
+ </A>
+&#183;	EOEditingContext</P>
+<P CLASS="Bulleted">
+<A NAME="pgfId=606148">
+ </A>
+&#183;	EOFetchSpecification</P>
+</UL>
+</DIV>
+<DIV>
+<H2 CLASS="Heading1">
+<A NAME="pgfId=606150">
+ </A>
+Questions<DIV>
+<IMG SRC="RefreshingData-1.gif">
+</DIV>
+</H2>
+<UL>
+<P CLASS="Bulleted">
+<A NAME="pgfId=606151">
+ </A>
+&#183;		How do I force a fetch and update my existing objects?</P>
+<P CLASS="Bulleted">
+<A NAME="pgfId=606152">
+ </A>
+&#183;		Why does my object still have old values even after a refetch?</P>
+<P CLASS="Bulleted">
+<A NAME="pgfId=606153">
+ </A>
+&#183;		How can I force an object to update its values?</P>
+</UL>
+</DIV>
+<DIV>
+<H2 CLASS="Heading1">
+<A NAME="pgfId=606154">
+ </A>
+Keywords<DIV>
+<IMG SRC="RefreshingData-1.gif">
+</DIV>
+</H2>
+<UL>
+<P CLASS="Bulleted">
+<A NAME="pgfId=606155">
+ </A>
+&#183;	Refetch</P>
+<P CLASS="Bulleted">
+<A NAME="pgfId=606156">
+ </A>
+&#183;	Invalidate</P>
+<P CLASS="Bulleted">
+<A NAME="pgfId=606157">
+ </A>
+&#183;	Update Record</P>
+<P CLASS="Bulleted">
+<A NAME="pgfId=606158">
+ </A>
+&#183;	Snapshot</P>
+</UL>
+</DIV>
+<DIV>
+<H2 CLASS="Heading1">
+<A NAME="pgfId=606159">
+ </A>
+Revision History<DIV>
+<IMG SRC="RefreshingData-1.gif">
+</DIV>
+</H2>
+<P CLASS="Body">
+<A NAME="pgfId=606160">
+ </A>
+23 July, 1998. David Scheck. First Draft.</P>
+<P CLASS="Body">
+<A NAME="pgfId=613839">
+ </A>
+19 November, 1998. Clif Liu. Second Draft.</P>
+</DIV>
+
+
+<!--start of footer -->
+<!--#include virtual="/includes/framesetfooter" -->
+<!-- end of footer -->
+
+</body>
+</HTML>

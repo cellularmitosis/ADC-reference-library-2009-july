@@ -1,0 +1,188 @@
+<html><head><title></title></head>
+
+<body bgcolor="#ffffff">
+
+ 
+
+ 
+
+<h1>
+
+<FONT COLOR="#000066">
+
+<a name="81">
+
+ <a name="//apple_ref/occ/cl/NSLocking">NSLocking </a>
+
+</a>
+
+</FONT>
+
+</h1>
+
+<p><B>Adopted By:	</B><BR>
+
+NSConditionLock<br>
+
+NSLock<br>
+
+NSRecursiveLock 
+
+
+
+<p><B>Declared In:	</B><BR>
+
+Foundation/NSLock.h 
+
+
+
+<p><a name="111">
+
+<a name="description"></a>
+
+<H2>Protocol Description
+
+</H2>
+
+</a>The NSLocking protocol declares the elementary methods adopted by classes that define lock objects. A lock object is used to coordinate the actions of multiple threads of execution within a single application. By using a lock object, an application can protect critical sections of code from being executed simultaneously by separate threads, thus protecting shared data and other shared resources from corruption.<p>
+
+For example, consider a multithreaded application in which each thread updates a shared counter. If two threads simultaneously fetch the current value into local storage, increment it, and then write the value back, the counter will be incremented only once, losing one thread's contribution. However, if the code that manipulates the shared data (the <em>critical section</em> of code) must be locked before being executed, only one thread at a time can perform the updating operation, and collisions are prevented.<p>
+
+A lock object is either locked or unlocked. You <em>acquire</em> a lock by sending the object a <code>lock</code> message, thus putting the object in the locked state. You <em>relinquish</em> a lock by sending an <code>unlock</code> message, and thus putting the object in the unlocked state. (The NEXTSTEP classes that adopt this protocol define additional ways to acquire and relinquish locks.)<p>
+
+The <code>lock</code> method as declared in this protocol is <em>blocking</em>. That is, the thread that sends a <code>lock</code> message is blocked from further execution until the lock is acquired (presumably because some other thread relinquishes its lock). Classes that adopt this protocol typically add methods that offer nonblocking alternatives.<p>
+
+These NEXTSTEP classes conform to the NSLocking protocol: <p>
+
+<Table Border="3">
+
+<caption></caption>
+
+<tr><th><b>Class</b>
+
+</th><th><b>Adds these features to the basic protocol</b>
+
+</th></tr>
+
+<tr><td scope="row">NSLock
+
+</td><td>A nonblocking lock method; the ability to limit the duration of a locking 
+
+attempt.
+
+</td></tr>
+
+<tr><td scope="row">NSConditionLock
+
+</td><td>The ability to postpone entry to a critical section until a condition is met.
+
+</td></tr>
+
+<tr><td scope="row">NSRecursiveLock
+
+</td><td>The ability for a single thread to acquire a lock more than once without 
+
+deadlocking.
+
+</td></tr>
+
+
+
+</Table>
+
+
+
+<Table>
+
+<tr><td>
+
+</Table>
+
+<p>
+
+The locking mechanism that these classes use causes a thread to sleep while waiting to acquire a lock rather than to poll the system constantly. Thus, lock objects can be used to lock time-consuming operations without causing system performance to degrade. See the class specifications for these classes for further information on their behavior and usage.<p>
+
+There is some performance cost in acquiring a lock, so it's best to avoid the overhead if possible. An application developer has control over whether the application will execute with multiple threads, so it's clear when locking is appropriate. A library developer doesn't necessarily know whether library code will execute in a multithreaded environment. In this case, it's best to test whether the code is executing in a multithreaded environment before attempting to acquire a lock. The following example illustrates how this is done.<p>
+
+Assume your application uses a Counter object to record various operations. Here's one design that lets the Counter know whether it is multithreaded:<p>
+
+<blockquote><pre>+ (void)initialize <br>{<br>    if ([NSThread isMultiThreaded]) {<br>        [self taskNowMultiThreaded:nil];<br>    } else {<br>        [[NSNotificationCenter defaultCenter] addObserver:self<br>            selector:@selector(taskNowMultiThreaded:)<br>            name:NSBecomingMultiThreaded object:nil];<br>    }<br>}
+
+</pre></blockquote><p>In the initialize method (which, by definition, is invoked before any Counter objects are created), the Counter class object first checks whether the application has already become multithreaded and if so invokes its own <code>taskNowMultiThreaded:</code> method. Otherwise, it registers as an observer of the NSBecomingMultiThreaded notification so that <code>taskNowMultiThreaded:</code> will be invoked when the application becomes multithreaded. <p>
+
+Counter's <code>taskNowMultiThreaded:</code> method creates a lock object that the threads use to coordinate their activities:<p>
+
+<blockquote><pre>+ (void)taskNowMultiThreaded:(NSNotification *)event <br>{<br>    if (!theLock)<br>        theLock = [[NSLock alloc] init];<br>}
+
+</pre></blockquote><p><code>theLock</code>, a static variable declared in the class implementation file, is assigned a value of <code>nil</code> until <code>taskNowMultiThreaded:</code> is invoked. Since messages sent to <code>nil</code> are permitted and have no effect, code within Counter that acts on shared data can be written like this:<p>
+
+<blockquote><pre>[theLock lock];<br>/* Operate on shared data */<br>[theLock unlock];
+
+</pre></blockquote><p>With this approach, the overhead associated with lock operations is only incurred if the application is multithreaded. This code, however, raises another issue. What happens if one of the statements between the <code>lock</code> and <code>unlock</code> messages cause the application to become multithreaded? Then the <code>unlock</code> message wouldn't be paired with the preceding <code>lock</code>.<p>
+
+In normal usage, locking and unlocking messages are paired. However, as in the example above, it might be convenient to unlock a lock object that hasn't yet been locked. This is permitted with two restrictions. First, you can send an unpaired unlocking message to a lock object as long as the object has never before been locked. Second, of the NEXTSTEP classes that conform to the NSLocking protocol, only NSConditionLock and NSLock allow an unpaired unlocking message. NSRecursiveLock requires locking and unlocking messages to be paired.<p>
+
+NEXTSTEP's locking classes are designed to work in a well-behaved, multithreaded environment: The protection they offer can be subverted by the use of signal handlers. A signal handler can interrupt a thread, execute code that affects shared data, and then let the thread resume without alerting the thread that the application has, in effect, become multithreaded. For this reason, it's recommended that you don't use signal handlers in multithreaded NEXTSTEP applications.<p>
+
+<HR WIDTH=50% ALIGN=LEFT>
+
+<a name="instm"></a>
+
+<h2>Instance Methods</h2>  
+
+
+
+
+
+<a name="130"></a>
+
+<h3>
+
+ <a name="//apple_ref/occ/intfm/NSLocking/lock">lock</a>
+
+</h3>
+
+- (void)<code>lock</code>	
+
+
+
+<P>Attempts to acquire a lock. This method blocks a thread's execution until the lock can be acquired.<p>
+
+An application protects a critical section of code by requiring a thread to acquire a lock before executing the code. Once the critical section is past, the thread relinquishes the lock by invoking <code>unlock</code>.<p>
+
+<hr WIDTH=25% ALIGN=LEFT>
+
+<a name="134"></a>
+
+<h3> <a name="//apple_ref/occ/intfm/NSLocking/unlock">unlock</a></h3>
+
+- (void)<code>unlock</code>	
+
+
+
+<P>Relinquishes a previously acquired lock. <p>
+
+
+
+ 
+
+ 
+
+
+
+
+
+<i>Copyright &#169; 1997, Apple Computer, Inc.   All rights
+
+reserved.</i>
+
+
+
+<!-- Last updated: 06/17/97 16:32:57 -->
+
+
+
+</body>
+
+</html>
+

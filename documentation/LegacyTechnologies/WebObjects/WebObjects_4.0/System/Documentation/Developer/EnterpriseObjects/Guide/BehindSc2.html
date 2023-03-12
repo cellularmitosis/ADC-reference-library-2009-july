@@ -1,0 +1,139 @@
+<html><head><title>Behind the Scenes</title></head>
+<body bgcolor="#ffffff">
+
+<!--start of banner -->
+<!--#include virtual="/includes/framesetheader" -->
+<!-- end of banner -->
+
+<!--start of path -->
+<font face="Geneva,Helvetica,Arial" size="1">
+<b>PATH<spacer type="horizontal" size="5">&nbsp;</b>
+ <a href="../../../../../webobjects.html" target="_top">WebObjects 4.0 Documentation</a> <b>&gt;</b>
+ <a href="GuideTOC.html" target="_top">EOF Developer's Guide</a>
+</font>
+<br><br>
+<!--end of path -->
+
+ 
+<a href="BehindSc.html"><IMG SRC="ArrowUp.gif">Table of Contents</a> <a href="BehindSc1.html"><IMG SRC="ArrowLeft.gif">Previous Section</a>
+ 
+<a name="6317">
+<h1> How Changes are Distributed and Applied</h1>
+</a><a name="7732">
+An EOEditingContext is responsible for managing the changes that occur to the objects in its object graph. For example, suppose the user edits a value in the user interface in an Application Kit application. This &#32;causes the sequence of events illustrated in <a href="BehindSc2.html#4022">Figure &#32;51</a>.<p>
+</a><a name="4022">
+<p><img src="BehindSc5.gif"><p>
+</a><a name="4329">
+<p>Figure 51.	  Flow of Events When a User Edits Data<p>
+</a><a name="724">
+When a user edits data in the user interface:<p>
+</a><ol>
+<a name="249">
+<P><li>The EOAssociation passes the new value to its EODisplayGroup.
+</a><a name="531">
+<P><li>The display group applies the changes to the affected enterprise object.
+</a><a name="619">
+<P><li>The enterprise object notifies the EOEditingContext that it has changed. Specifically, the enterprise object invokes its <strong>willChange</strong> method, which in turn invokes the editing context's <strong>objectWillChange</strong> method (<strong>objectWillChange:</strong> in Objective-C).
+</a><a name="720">
+<P><li>The editing context records the object in its list of unprocessed changes. (How the editing context manages these changes is described in<a href="BehindSc2.html#723"> "How an EOEditingContext Manages Changes to Its Objects"</a>.)
+</a></ol>
+<a name="722">
+Then, at the end of the event loop:<p>
+</a><ol>
+<a name="739">
+<P><li>The editing context records undos.
+</a><a name="740">
+<P><li>The editing context broadcasts an ObjectsChangedInStoreNotification and an ObjectsChangedInEditingContextNotification (EOObjectsChangedInStoreNotification and EOObjectsChangedInEditingContextNotification in Objective-C).
+</a><a name="741">
+<P><li>The display group, which is registered to observe the ObjectsChangedInEditingContextNotification, receives the notification and updates the user interface.
+</a><a name="6884">
+<P><li>All views of the data in the application refresh themselves to reflect the change.
+</a></ol>
+<a name="6908">
+<h3> Customizing Framework Behavior</h3>
+</a><a name="6886">
+During this process, you can customize the behavior of the EOEditingContext by registering for the following notifications and &#32;taking the appropriate action. 
+<Table Border="3">
+<caption></caption>
+<tr><th colspan=2 rowspan=1><a name="8535">
+EOEditingContext Notifications
+</a></th></tr>
+<tr><th><a name="8539">
+Notification
+</a></th><th><a name="8541">
+Description
+</a></th></tr>
+<tr><td scope="row"><a name="8543">
+ObjectsChangedInStoreNotification (EOObjectsChangedInStoreNotification in &#32;Objective-C)
+</a></td><td><a name="8545">
+This notification is broadcast whenever objectWillChange observer notifications are processed, which is usually at the end of the event in which the changes occurred.
+</a></td></tr>
+<tr><td scope="row"><a name="8547">
+ObjectsChangedInEditingContextNotification (EOObjectsChangedInEditingContextNotification in &#32;Objective-C)
+</a></td><td><a name="8549">
+This notification is broadcast whenever changes are made in an EOEditingContext. It's similar to EOObjectsChangedInStoreNotification, except that it contains objects rather than globalIDs. EODisplayGroups listen for this notification to redisplay their contents.
+</a></td></tr>
+
+</Table>
+
+<Table>
+<tr><td>
+</Table>
+<p>
+</a><a name="723">
+<h2> How an EOEditingContext Manages Changes to Its Objects</h2>
+</a><a name="760">
+From the standpoint of an EOEditingContext, the changes you make to &#32;objects in an application fall into one of three categories:<p>
+</a><ul><a name="761">
+<li>Insertion of a new object
+</a><a name="762">
+<li>Deletion of an existing object
+</a><a name="763">
+<li>Modification (updating) of an existing object
+</a></ul><a name="764">
+Normally, when an editing context's objects change (for example, when they're deleted or their data is modified), the processing of changes is deferred until the end of the current event. In the meantime, the editing context buffers pending insertions, deletions, and updates as unprocessed changes.<p>
+</a><a name="4477">
+<B>Note: </B> When a source (master) object has an owning relationship to a destination object (as determined from the EOClassDescription) and the destination object is removed from the master, the destination object is marked for deletion from the EOEditingContext. For example, if a purchase order owns a line item and the line item is removed from the purchase order, the line item is marked for deletion from the editing context since the owning relationship implies that a line item can't exist without a purchase order.<p>
+</a><a name="765">
+When an EOEditingContext processes changes, typically at the end of an event, it does the following to the objects in its unprocessed changes list:<p>
+</a><ol>
+<a name="782">
+<P><li>Processes deleted objects.
+</a><a name="783">
+<p>For a more detailed description of what this entails, see the following section, "<a href="BehindSc2.html#794">How Deleted Objects are Processed</a>."<p>
+</a><a name="784">
+<P><li>Moves each object to the context's inserted, deleted, or updated list, as appropriate.
+</a><a name="791">
+<P><li>Snapshots the objects for undo.
+</a><a name="792">
+<P><li>Posts ObjectsChangedInStoreNotification and ObjectsChangedInEditingContextNotification.
+</a></ol>
+<a name="794">
+<h3> How Deleted Objects are Processed</h3>
+</a><a name="795">
+Just like inserted and updated objects, deleted objects are normally processed at the end of the event in which the change was made. However, you can use the method <strong>setPropagatesDeletesAtEndOfEvent</strong> (<strong>setPropagatesDeletesAtEndOfEvent:</strong> in Objective-C) to change this behavior so that the editing context only processes deletions right before you save to the database.<p>
+</a><a name="796">
+The processing of deleted objects entails these steps:<p>
+</a><ol>
+<a name="8490">
+<P><li>Deletions are propagated by sending each object a &#32;<strong>propagateDeleteWithEditingContext </strong>message<strong> </strong>(<strong>propagateDeleteWithEditingContext:</strong> in Objective-C), which &#32;then &#32;invokes the EOClassDescription method <strong>propagateDeleteForObject</strong> (<strong>propagateDeleteForObject:editingContext:</strong> in Objective-C). By &#32;default, this method applies the delete rule of every relationship (Deny, Nullify, Cascade) to the source object's child &#32;objects.
+</a><a name="799">
+<P><li>The deletion is validated by sending each object the message <strong>validateForDelete</strong>.
+</a><a name="800">
+<p>By default, each object forwards this message to its EOClassDescription. Based on the result, the operation is either allowed or refused. For example, referential integrity constraints in your model might state that you can't delete a Department object that still has employees. If a user attempts to delete a department that has employees, the deletion is refused. An enterprise object class can also implement its own version of <strong>validateForDelete</strong> to do some additional processing before passing the check on to its EOClassDescription. For more discussion of validation, see the chapter<a href="EOsI.html#14081"> "Designing Enterprise Objects"</a>.<p>
+</a></ol>
+<a name="787">
+Instead of waiting until the end of the event, you can force the processing &#32;of inserted, updated, and deleted objects by invoking the EOEditingContext method <strong>processRecentChanges</strong>. EOEditingContext invokes this method on itself before performing certain operations such as <strong>saveChanges</strong>. The sequence of events that occurs when an editing context receives the message <strong>saveChanges</strong> is described in the next section.<p>
+</a>
+<P>
+ 
+<a href="BehindSc.html"><IMG SRC="ArrowUp.gif">Table of Contents</a> <a href="BehindSc3.html"><IMG SRC="ArrowRight.gif">Next Section</a>
+<P>
+
+
+<!--start of footer -->
+<!--#include virtual="/includes/framesetfooter" -->
+<!-- end of footer -->
+
+</body>
+</html>

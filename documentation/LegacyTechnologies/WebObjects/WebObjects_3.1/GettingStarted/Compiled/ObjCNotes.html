@@ -1,0 +1,121 @@
+<html><head><title>Creating a Compiled Application</title></head>
+<body bgcolor=#ffffff>
+ 
+<a href="compiled.book.html"><IMG SRC="ArrowUp.gif" border=0>Table of Contents</a> <a href="Deploy.html"><IMG SRC="ArrowLeft.gif" border=0>Previous Section</a>
+<P>
+ 
+<a name="935">
+<h1> Notes for Objective-C Developers</h1>
+</a><a name="936">
+As explained at the beginning of the tutorial, you can write your application's logic using Java, Objective-C, WebScript, or a combination of WebScript and Objective-C. If you choose Java, you must write the entire application in Java. If you choose Objective-C, you can write part of the application in WebScript. Often, you would choose to write custom business logic in Objective-C and write component logic in WebScript. <p>
+</a><a name="937">
+The following sections describe the differences between developing applications in Objective-C and developing applications in Java.<p>
+</a><a name="7947">
+<h2> Creating an Objective-C project</h2>
+</a><a name="7948">
+To create an Objective-C application, simply create a new project in Project Builder of type WebObjectsApplication. Project Builder creates the directory with the <strong>.woa</strong> extension and adds <strong>Application.wos</strong>, <strong>Session.wos</strong>, and <strong>Main.wo</strong> to it as well as the makefiles and other supporting files. After you create the Project Builder project, you can open the <strong>.woa</strong> directory in WebObjects Builder-it's not necessary to create the project in both WebObjects Builder and Project Builder.<p>
+</a><a name="7991">
+<h2> Objective-C main function</h2>
+</a><a name="7967">
+If you create an Objective-C project in Project Builder, <strong>main</strong> is provided as a C function in the file <strong>main.m</strong>:<p>
+</a><pre><a name="7968">void main (int argc, const char *argv[])
+</a><a name="7969">{
+</a><a name="7970">	NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+</a><a name="7971">	WOApplication *application = [[[WOApplication alloc] init] 
+</a><a name="7972">		autorelease];
+</a><a name="7973">
+</a><a name="7974">	[application run];
+</a><a name="7975">
+</a><a name="7976">	[pool release];
+</a><a name="7977">	exit(0);
+</a><a name="7978">}
+</a><a name="7979">#ifdef WIN32
+</a><a name="7980">#import &lt;EOAccess/EOAccess.h&gt;
+</a><a name="7981">
+</a><a name="7982">void _referenceEOFrameworks()
+</a><a name="7983">{
+</a><a name="7984">	static id a;
+</a><a name="7985">	a = [EOEntity new];          // EOAccess
+</a><a name="7986">}
+</a><a name="7987">#endif
+</a></pre><a name="7989">
+The <strong>main()</strong> function begins by creating an autorelease pool that's used for the automatic deallocation of objects that receive the <strong>autorelease</strong> message. Next, it creates the WebObjects application object and starts the request-response loop. The last statement releases the autorelease pool, which sends a <strong>release</strong> message to any object that has been added to the pool since the application began.<p>
+</a><a name="7990">
+If you're setting up a project by hand and you intend to run the application on the Windows NT platform, you must include the <strong>_referenceEOFrameworks()</strong> function as well. This function makes sure the Enterprise Objects DLLs are loaded at the appropriate time. <p>
+</a><a name="8105">
+<B>Note: </B> If you're setting up a project by hand, you'll need to add the link line to the makefile youself. For example: <p>
+</a><pre><a name="8106">/bin/cc -o <em>executableName</em>  -L<em>objectFiles</em> -framework WebObjects <br>
+-framework Foundation
+</a></pre><a name="8108">
+Be sure to link to the WebObjects framework before the Foundation framework. <p>
+</a><a name="8109">
+On the Solaris platform, you also need to link to the framework <strong>NextLibrary/PrivateFrameworks/MultiScript.framework</strong>. If you use the provided makefiles, this is set up for you. <p>
+</a><a name="189">
+<h2> Subclassing WebObjects classes</h2>
+</a><a name="161">
+If you subclass WOApplication or WOSession, name the subclass Application or Session, respectively. If you follow this naming convention, you are able to add further functionality to your object in <strong>Application.wos</strong> or <strong>Session.wos</strong>. If you name your subclass something else, you shouldn't implement <strong>Application.wos</strong> or <strong>Session.wos</strong>. <p>
+</a><a name="1024">
+<h2> Accessing compiled code from a script</h2>
+</a><a name="1034">
+Accessing compiled code from a script is simply a matter of getting an object of the compiled class and sending it a message. For example, if you implemented Registration's Main component in WebScript, you'd write the following line to instantiate a Person object:<p>
+</a><pre><a name="1031">/* Return a Person object by invoking Person's 
+</a><a name="8588"> &#32; &#32; &#32;personWithDictionary: method */
+</a><a name="1037">aPerson = [Person personWithDictionary:newPerson]; 
+</a></pre><a name="803">
+<h2> Accessing script methods from compiled code</h2>
+</a><a name="1177">
+To access a scripted object's methods from compiled code, you simply get the object that implements the method and send it a message. If you're accessing a method in the application or session script, you can use WOApplication methods to access the object:<p>
+</a><pre><a name="1179">[[WOApplication application] <em>applicationScriptMethod</em>];
+</a><a name="1180">[[[WOApplication application] session] <em>sessionScriptMethod</em>];
+</a></pre><a name="1178">
+To access a component's methods, you must store the component in the session and then access it through the session. <p>
+</a><a name="1200">
+For example, suppose you wanted to rewrite the Registration application so that Person's <strong>validate</strong> method directly sets the value of the <strong>message</strong> variable in the Main component. You'd add the following statement to the <strong>init</strong> method <strong>Main.wos</strong>:<p>
+</a><pre><a name="839">/* Store the component in the session. */<br>
+[self.session setObject:self forKey:@"Main"];
+</a></pre><a name="1175">
+and then you can access it in Person's <strong>validate</strong> method this way:<p>
+</a><pre><a name="812">/* Get the component from the session: */
+</a><a name="884">WOComponent *mainPage = [[[WOApplication application] session] <br>
+		objectForKey:@"Main"];
+</a><a name="1041">
+</a><a name="1096">/* Send it a message */
+</a><a name="1097">[mainPage setMessage:@"You must supply a name and address"];
+</a></pre><a name="221">
+(<strong>Main.wos</strong> implicitly implements the <strong>setMessage: </strong>method because it declares a variable named <strong>message</strong>.)<p>
+</a><a name="190">
+To avoid compiler warnings, you should declare the scripted method you want to invoke in your code. This is because scripted objects don't declare methods-their methods are parsed from the script at run time. If you don't declare their methods in your code, the compiler issues a warning that the methods aren't part of the receiver's interface. <p>
+</a><a name="900">
+<B>Note: </B> This step isn't strictly required-your code will still build, you'll just get warnings.<p>
+</a><a name="895">
+For the example above, you'd add the following declaration to the <strong>Person.m</strong> file:<p>
+</a><pre><a name="887">@interface WOComponent (RegistrationMainComponent)
+</a><a name="888">- (void)setMessage:(NSString *)aMessage;
+</a><a name="889">@end
+</a></pre><a name="1006">
+While it's certainly straightforward to access a scripted object's methods from compiled code, you may not want to have that degree of interdependence between your scripts and your compiled code. You may want to minimize the interdependence to facilitate reusability.<p>
+</a><a name="855">
+<h2> Using C and C++ in WebObjects applications</h2>
+</a><a name="1054">
+In addition to using compiled Objective-C in WebObjects applications, you can also use compiled C or C++. The interface you provide to WebObjects must be in Objective-C because WebObjects can't invoke C or C++ functions. However, you can directly invoke C and C++ functions from Objective-C.<p>
+</a><a name="780">
+Some of the options for integrating C or C++ code into your application are as follows:<p>
+</a><ul><a name="932">
+<p><li>Putting the C or C++ functions into the same file as your Objective-C code
+</a><a name="939">
+<p><li>Putting the C or C++ functions in separate files and importing their headers into your Objective-C code
+</a><a name="8598">
+<p><li>Adding a third-party library to your project and importing its headers into your Objective-C code
+</a></ul>
+
+
+
+<!-- This file was created with Quadralay WebWorks Publisher 3.0.9 -->
+<!-- -->
+<!-- For more information on how this document, and how the rest of -->
+<!-- this server was created, email yourEmail@xyzcorp.com -->
+<!-- -->
+<!-- Last updated: 02/07/97 16:57:04 -->
+
+</body>
+</html>

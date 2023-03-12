@@ -1,0 +1,150 @@
+<html><head><title></title></head>
+
+<body bgcolor="#ffffff">
+
+ 
+
+ 
+
+<a name="66"></a>
+
+<h1>
+
+<FONT COLOR="#000066">
+
+ <a name="//apple_ref/occ/intf/NSObjCTypeSerializationCallBack">NSObjCTypeSerializationCallBack</a>
+
+</FONT>
+
+</h1>
+
+<p><B>Adopted By:	</B><BR>
+
+No OpenStep classes
+
+
+
+<p><B>Declared In:	</B><BR>
+
+Foundation/NSSerialization.h
+
+
+
+<p><a name="96">
+
+<a name="description"></a>
+
+<H2>Protocol Description 
+
+</H2>
+
+</a>An object conforms to the NSObjCTypeSerializationCallBack protocol so that it can intervene in the serialization and deserialization process. The primary purpose of this protocol is to allow for the serialization of objects and other data types that aren't directly supported by OpenStep's serialization facility. (See the NSSerializer class specification for information on serialization.) <p>
+
+NSMutableData declares the method that's used to begin the serialization process:<p>
+
+<blockquote><pre>- (void)serializeDataAt:(const void *)data<br>        ofObjCType:(const char *)type<br>        context:(id &lt;NSObjCTypeSerializationCallBack&gt;)callback
+
+</pre></blockquote><p>This method can serialize all standard Objective C types (<code>int</code>, <code>float</code>, character strings, and so on) except for objects, <code>union</code>, and <code>void *</code>. If, during the serialization process, an object is encountered, the object passed as the callback argument above is asked to provide the serialization.<p>
+
+Suppose that the type being serialized is a structure of this description:<p>
+
+<blockquote><pre>struct stockRecord {<br>    NSString *stockName;<br>    float value;<br>};
+
+</pre></blockquote><p>The Objective C type code for this structure is {@f}, so the serialization process begins with this message: (Assume that <code>theData</code> is the NSMutableData object that's doing the serialization and <code>helper</code> is an object that conforms to the NSObjCTypeSerializationCallBack protocol.)<p>
+
+<blockquote><pre>struct stockRecord aRecord = {@"aCompany", 34.7};<br>    <br>[theData serializeDataAt:&amp;aRecord ofObjCType:"{@f}" context:helper];
+
+</pre></blockquote><p>Since the first field of the structure is an unsupported type, the helper object is sent a <code>serializeObjectAt:ofObjCType:intoData:</code> message, letting it serialize the object. <code>helper</code> might implement the method in this way:<p>
+
+<blockquote><pre>- (void)serializeObjectAt:(id *)objectPtr<br>        ofObjCType:(const char *)type<br>        intoData:(NSMutableData *)theMutableData<br>{<br>    NSString *nameObject;<br>    char *companyName<br>    <br>    nameObject = *objectPtr;<br>    companyName = [nameObject cString];<br>    <br>    [theData serializeDataAt:&amp;companyName ofObjCType:@encode(typeof(companyName))<br>            context:nil];<br>}
+
+</pre></blockquote><p>The callback object is free to serialize the target object as it wishes. In this case, <code>helper</code> simply extracts the company name from the NSString object and then has that character string serialized. Once this callback method finishes executing, the original method (<code>serializeDataAt:ofObjCType:context:</code>) resumes execution and serializes the second field of the structure. Since this second field contains a supported type (<code>float</code>), the callback method is not invoked again.<p>
+
+Deserialization follows a similar pattern, except in this case NSData declares the central method <code>deserializeDataAt:ofObjCType:atCursor:context:</code>. The deserialization of the example structure starts with a message to the NSData object that contains the serialized data:<p>
+
+<blockquote><pre>(unsigned *)cursor = 0;<br>    <br>[theData deserializeDataAt:&amp;aRecord ofObjCType:"{@f}" cursor:&amp;cursor<br>        context:helper];
+
+</pre></blockquote><p>(The cursor argument is a pointer to zero since we're starting at the beginning of the data in the NSData object.) <p>
+
+When this method is invoked, the callback object receives a <code>deserializeObjectAt:ofObjCType:fromData:atCursor:</code> message, as declared in this protocol. The callback object can then reestablish the first field of the structure. For example, <code>helper</code> might implement the method in this way:<p>
+
+<blockquote><pre>- (void) deserializeObjectAt:(id *)objectPtr<br>        ofObjCType:(const char *)type<br>        fromData:(NSData *)data<br>        atCursor:(unsigned *)cursor<br>{<br>    char *companyName;<br><br>    [theData deserializeDataAt:&amp;companyName ofObjCType:"*" atCursor:cursor<br>            context:nil];<br>    *objectPtr = [[NSString stringWithCString:companyName] retain];<br>}
+
+</pre></blockquote><p><HR WIDTH="50%" ALIGN="LEFT">
+
+<a name="instm"></a>
+
+<h2>Instance Methods</h2>  
+
+
+
+
+
+<a name="114"></a>
+
+<h3>
+
+ <a name="//apple_ref/occ/intfm/NSObjCTypeSerializationCallBack/deserializeObjectAt:ofObjCType:fromData:atCursor:">deserializeObjectAt:ofObjCType:fromData:atCursor:</a>
+
+</h3>
+
+- (void)<code>deserializeObjectAt:</code>(id *)<em>object<br>
+
+</em><code>ofObjCType:</code>(const char *)<em>type<br>
+
+</em><code>fromData:</code>(NSData *)<em>data<br>
+
+</em><code>atCursor:</code>(unsigned *)<em>cursor</em> 
+
+
+
+<P>The implementor of this method decodes the referenced <em>object</em> (which should always be of <em>type</em> "@") located at the <em>cursor</em> position in the <em>data</em> object. The decoded object is not autoreleased.<p>
+
+<B>See also: </B>  
+
+ <code><a href="../../Classes/NSDataClassCluster/NSDataClassCluster.html#//apple_ref/occ/instm/NSData/deserializeDataAt:ofObjCType:atCursor:context:" target="_top">deserializeDataAt:ofObjCType:atCursor:context:</code> (NSData)</a>
+
+<p><hr WIDTH="25%" ALIGN="LEFT">
+
+<a name="118"></a>
+
+<h3> <a name="//apple_ref/occ/intfm/NSObjCTypeSerializationCallBack/serializeObjectAt:ofObjCType:intoData:">serializeObjectAt:ofObjCType:intoData:</a></h3>
+
+- (void)<code>serializeObjectAt:</code>(id *)<em>object<br>
+
+</em><code>ofObjCType:</code>(const char *)<em>type<br>
+
+</em><code>intoData:</code>(NSMutableData *)<em>data</em> 
+
+
+
+<P>The implementor of this method encodes the referenced <em>object</em> (which should always be of <em>type</em> "@") in the <em>data</em> object. <p>
+
+<B>See also: </B>  
+
+<em> </em><code><a href="../../Classes/NSDataClassCluster/NSDataClassCluster.html#//apple_ref/occ/instm/NSMutableData/serializeDataAt:ofObjCType:context:" target="_top">serializeDataAt:ofObjCType:context:</code><em> </em>(NSMutableData)</a>
+
+<p>
+
+ 
+
+ 
+
+
+
+
+
+<i>Copyright &#169; 1997, Apple Computer, Inc.   All rights
+
+reserved.</i>
+
+
+
+<!-- Last updated: 06/17/97 16:33:01 -->
+
+
+
+</body>
+
+</html>
+

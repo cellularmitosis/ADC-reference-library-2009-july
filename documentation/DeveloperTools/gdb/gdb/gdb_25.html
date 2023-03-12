@@ -1,0 +1,5552 @@
+<HTML>
+<HEAD>
+<!-- This HTML file has been created by texi2html 1.51
+     from /SourceCache/gdb/gdb-960/src/gdb/doc/gdb.texinfo on 18 May 2008 -->
+
+<TITLE>Debugging with gdb - The gdb/mi Interface</TITLE>
+</HEAD>
+<BODY>
+Go to the <A HREF="gdb_1.html">first</A>, <A HREF="gdb_24.html">previous</A>, <A HREF="gdb_26.html">next</A>, <A HREF="gdb_36.html">last</A> section, <A HREF="gdb_toc.html">table of contents</A>.
+<P><HR><P>
+
+
+<H1><A NAME="SEC236" HREF="gdb_toc.html#TOC236">The GDB/MI Interface</A></H1>
+
+
+
+<H2><A NAME="SEC237" HREF="gdb_toc.html#TOC237">Function and Purpose</A></H2>
+
+<P>
+<A NAME="IDX1378"></A>
+GDB/MI is a line based machine oriented text interface to
+GDB and is activated by specifying using the
+@option{--interpreter} command line option (see section <A HREF="gdb_3.html#SEC9">Choosing modes</A>).  It
+is specifically intended to support the development of systems which
+use the debugger as just one small component of a larger system.
+
+</P>
+<P>
+This chapter is a specification of the GDB/MI interface.  It is written
+in the form of a reference manual.
+
+</P>
+<P>
+Note that GDB/MI is still under construction, so some of the
+features described below are incomplete and subject to change.
+
+</P>
+
+
+<H2><A NAME="SEC238" HREF="gdb_toc.html#TOC238">Notation and Terminology</A></H2>
+
+<P>
+<A NAME="IDX1379"></A>
+This chapter uses the following notation:
+
+</P>
+
+<UL>
+<LI>
+
+<CODE>|</CODE> separates two alternatives.
+
+<LI>
+
+<CODE>[ <VAR>something</VAR> ]</CODE> indicates that <VAR>something</VAR> is optional:
+it may or may not be given.
+
+<LI>
+
+<CODE>( <VAR>group</VAR> )*</CODE> means that <VAR>group</VAR> inside the parentheses
+may repeat zero or more times.
+
+<LI>
+
+<CODE>( <VAR>group</VAR> )+</CODE> means that <VAR>group</VAR> inside the parentheses
+may repeat one or more times.
+
+<LI>
+
+<CODE>"<VAR>string</VAR>"</CODE> means a literal <VAR>string</VAR>.
+</UL>
+
+
+<H2>Acknowledgments</H2>
+
+<P>
+In alphabetic order: Andrew Cagney, Fernando Nasser, Stan Shebs and
+Elena Zannoni.
+
+</P>
+
+
+
+<H2><A NAME="SEC239" HREF="gdb_toc.html#TOC239">GDB/MI Command Syntax</A></H2>
+
+
+
+<H3><A NAME="SEC240" HREF="gdb_toc.html#TOC240">GDB/MI Input Syntax</A></H3>
+
+<P>
+<A NAME="IDX1380"></A>
+<A NAME="IDX1381"></A>
+<DL COMPACT>
+
+<DT><CODE><VAR>command</VAR> ==></CODE>
+<DD>
+<CODE><VAR>cli-command</VAR> | <VAR>mi-command</VAR></CODE>
+
+<DT><CODE><VAR>cli-command</VAR> ==></CODE>
+<DD>
+<CODE>[ <VAR>token</VAR> ] <VAR>cli-command</VAR> <VAR>nl</VAR></CODE>, where
+<VAR>cli-command</VAR> is any existing GDB CLI command.
+
+<DT><CODE><VAR>mi-command</VAR> ==></CODE>
+<DD>
+<CODE>[ <VAR>token</VAR> ] "-" <VAR>operation</VAR> ( " " <VAR>option</VAR> )*
+<CODE>[</CODE> " --" <CODE>]</CODE> ( " " <VAR>parameter</VAR> )* <VAR>nl</VAR></CODE>
+
+<DT><CODE><VAR>token</VAR> ==></CODE>
+<DD>
+"any sequence of digits"
+
+<DT><CODE><VAR>option</VAR> ==></CODE>
+<DD>
+<CODE>"-" <VAR>parameter</VAR> [ " " <VAR>parameter</VAR> ]</CODE>
+
+<DT><CODE><VAR>parameter</VAR> ==></CODE>
+<DD>
+<CODE><VAR>non-blank-sequence</VAR> | <VAR>c-string</VAR></CODE>
+
+<DT><CODE><VAR>operation</VAR> ==></CODE>
+<DD>
+<EM>any of the operations described in this chapter</EM>
+
+<DT><CODE><VAR>non-blank-sequence</VAR> ==></CODE>
+<DD>
+<EM>anything, provided it doesn't contain special characters such as
+"-", <VAR>nl</VAR>, """ and of course " "</EM>
+
+<DT><CODE><VAR>c-string</VAR> ==></CODE>
+<DD>
+<CODE>""" <VAR>seven-bit-iso-c-string-content</VAR> """</CODE>
+
+<DT><CODE><VAR>nl</VAR> ==></CODE>
+<DD>
+<CODE>CR | CR-LF</CODE>
+</DL>
+
+<P>
+Notes:
+
+</P>
+
+<UL>
+<LI>
+
+The CLI commands are still handled by the MI interpreter; their
+output is described below.
+
+<LI>
+
+The <CODE><VAR>token</VAR></CODE>, when present, is passed back when the command
+finishes.
+
+<LI>
+
+Some MI commands accept optional arguments as part of the parameter
+list.  Each option is identified by a leading <SAMP>`-'</SAMP> (dash) and may be
+followed by an optional argument parameter.  Options occur first in the
+parameter list and can be delimited from normal parameters using
+<SAMP>`--'</SAMP> (this is useful when some parameters begin with a dash).
+</UL>
+
+<P>
+Pragmatics:
+
+</P>
+
+<UL>
+<LI>
+
+We want easy access to the existing CLI syntax (for debugging).
+
+<LI>
+
+We want it to be easy to spot a MI operation.
+</UL>
+
+
+
+<H3><A NAME="SEC241" HREF="gdb_toc.html#TOC241">GDB/MI Output Syntax</A></H3>
+
+<P>
+<A NAME="IDX1382"></A>
+<A NAME="IDX1383"></A>
+The output from GDB/MI consists of zero or more out-of-band records
+followed, optionally, by a single result record.  This result record
+is for the most recent command.  The sequence of output records is
+terminated by <SAMP>`(gdb)'</SAMP>.
+
+</P>
+<P>
+If an input command was prefixed with a <CODE><VAR>token</VAR></CODE> then the
+corresponding output for that command will also be prefixed by that same
+<VAR>token</VAR>.
+
+</P>
+<DL COMPACT>
+
+<DT><CODE><VAR>output</VAR> ==></CODE>
+<DD>
+<CODE>( <VAR>out-of-band-record</VAR> )* [ <VAR>result-record</VAR> ] "(gdb)" <VAR>nl</VAR></CODE>
+
+<DT><CODE><VAR>result-record</VAR> ==></CODE>
+<DD>
+<CODE> [ <VAR>token</VAR> ] "^" <VAR>result-class</VAR> ( "," <VAR>result</VAR> )* <VAR>nl</VAR></CODE>
+
+<DT><CODE><VAR>out-of-band-record</VAR> ==></CODE>
+<DD>
+<CODE><VAR>async-record</VAR> | <VAR>stream-record</VAR></CODE>
+
+<DT><CODE><VAR>async-record</VAR> ==></CODE>
+<DD>
+<CODE><VAR>exec-async-output</VAR> | <VAR>status-async-output</VAR> | <VAR>notify-async-output</VAR></CODE>
+
+<DT><CODE><VAR>exec-async-output</VAR> ==></CODE>
+<DD>
+<CODE>[ <VAR>token</VAR> ] "*" <VAR>async-output</VAR></CODE>
+
+<DT><CODE><VAR>status-async-output</VAR> ==></CODE>
+<DD>
+<CODE>[ <VAR>token</VAR> ] "+" <VAR>async-output</VAR></CODE>
+
+<DT><CODE><VAR>notify-async-output</VAR> ==></CODE>
+<DD>
+<CODE>[ <VAR>token</VAR> ] "=" <VAR>async-output</VAR></CODE>
+
+<DT><CODE><VAR>async-output</VAR> ==></CODE>
+<DD>
+<CODE><VAR>async-class</VAR> ( "," <VAR>result</VAR> )* <VAR>nl</VAR></CODE>
+
+<DT><CODE><VAR>result-class</VAR> ==></CODE>
+<DD>
+<CODE>"done" | "running" | "connected" | "error" | "exit"</CODE>
+
+<DT><CODE><VAR>async-class</VAR> ==></CODE>
+<DD>
+<CODE>"stopped" | <VAR>others</VAR></CODE> (where <VAR>others</VAR> will be added
+depending on the needs--this is still in development).
+
+<DT><CODE><VAR>result</VAR> ==></CODE>
+<DD>
+<CODE> <VAR>variable</VAR> "=" <VAR>value</VAR></CODE>
+
+<DT><CODE><VAR>variable</VAR> ==></CODE>
+<DD>
+<CODE> <VAR>string</VAR> </CODE>
+
+<DT><CODE><VAR>value</VAR> ==></CODE>
+<DD>
+<CODE> <VAR>const</VAR> | <VAR>tuple</VAR> | <VAR>list</VAR> </CODE>
+
+<DT><CODE><VAR>const</VAR> ==></CODE>
+<DD>
+<CODE><VAR>c-string</VAR></CODE>
+
+<DT><CODE><VAR>tuple</VAR> ==></CODE>
+<DD>
+<CODE> "{}" | "{" <VAR>result</VAR> ( "," <VAR>result</VAR> )* "}" </CODE>
+
+<DT><CODE><VAR>list</VAR> ==></CODE>
+<DD>
+<CODE> "[]" | "[" <VAR>value</VAR> ( "," <VAR>value</VAR> )* "]" | "["
+<VAR>result</VAR> ( "," <VAR>result</VAR> )* "]" </CODE>
+
+<DT><CODE><VAR>stream-record</VAR> ==></CODE>
+<DD>
+<CODE><VAR>console-stream-output</VAR> | <VAR>target-stream-output</VAR> | <VAR>log-stream-output</VAR></CODE>
+
+<DT><CODE><VAR>console-stream-output</VAR> ==></CODE>
+<DD>
+<CODE>"~" <VAR>c-string</VAR></CODE>
+
+<DT><CODE><VAR>target-stream-output</VAR> ==></CODE>
+<DD>
+<CODE>"@" <VAR>c-string</VAR></CODE>
+
+<DT><CODE><VAR>log-stream-output</VAR> ==></CODE>
+<DD>
+<CODE>"&#38;" <VAR>c-string</VAR></CODE>
+
+<DT><CODE><VAR>nl</VAR> ==></CODE>
+<DD>
+<CODE>CR | CR-LF</CODE>
+
+<DT><CODE><VAR>token</VAR> ==></CODE>
+<DD>
+<EM>any sequence of digits</EM>.
+</DL>
+
+<P>
+Notes:
+
+</P>
+
+<UL>
+<LI>
+
+All output sequences end in a single line containing a period.
+
+<LI>
+
+The <CODE><VAR>token</VAR></CODE> is from the corresponding request.  If an execution
+command is interrupted by the <SAMP>`-exec-interrupt'</SAMP> command, the
+<VAR>token</VAR> associated with the <SAMP>`*stopped'</SAMP> message is the one of the
+original execution command, not the one of the interrupt command.
+
+<LI>
+
+<A NAME="IDX1384"></A>
+<VAR>status-async-output</VAR> contains on-going status information about the
+progress of a slow operation.  It can be discarded.  All status output is
+prefixed by <SAMP>`+'</SAMP>.
+
+<LI>
+
+<A NAME="IDX1385"></A>
+<VAR>exec-async-output</VAR> contains asynchronous state change on the target
+(stopped, started, disappeared).  All async output is prefixed by
+<SAMP>`*'</SAMP>.
+
+<LI>
+
+<A NAME="IDX1386"></A>
+<VAR>notify-async-output</VAR> contains supplementary information that the
+client should handle (e.g., a new breakpoint information).  All notify
+output is prefixed by <SAMP>`='</SAMP>.
+
+<LI>
+
+<A NAME="IDX1387"></A>
+<VAR>console-stream-output</VAR> is output that should be displayed as is in the
+console.  It is the textual response to a CLI command.  All the console
+output is prefixed by <SAMP>`~'</SAMP>.
+
+<LI>
+
+<A NAME="IDX1388"></A>
+<VAR>target-stream-output</VAR> is the output produced by the target program.
+All the target output is prefixed by <SAMP>`@'</SAMP>.
+
+<LI>
+
+<A NAME="IDX1389"></A>
+<VAR>log-stream-output</VAR> is output text coming from GDB's internals, for
+instance messages that should be displayed as part of an error log.  All
+the log output is prefixed by <SAMP>`&#38;'</SAMP>.
+
+<LI>
+
+<A NAME="IDX1390"></A>
+New GDB/MI commands should only output <VAR>lists</VAR> containing
+<VAR>values</VAR>.
+
+</UL>
+
+<P>
+See section <A HREF="gdb_25.html#SEC246">GDB/MI Stream Records</A>, for more
+details about the various output records.
+
+</P>
+
+
+<H3><A NAME="SEC242" HREF="gdb_toc.html#TOC242">Simple Examples of GDB/MI Interaction</A></H3>
+<P>
+<A NAME="IDX1391"></A>
+
+</P>
+<P>
+This subsection presents several simple examples of interaction using
+the GDB/MI interface.  In these examples, <SAMP>`-&#62;'</SAMP> means that the
+following line is passed to GDB/MI as input, while <SAMP>`&#60;-'</SAMP> means
+the output received from GDB/MI.
+
+</P>
+
+<H4>Target Stop</H4>
+<P>
+Here's an example of stopping the inferior process:
+
+</P>
+
+<PRE>
+-&#62; -stop
+&#60;- (gdb)
+</PRE>
+
+<P>
+and later:
+
+</P>
+
+<PRE>
+&#60;- *stop,reason="stop",address="0x123",source="a.c:123"
+&#60;- (gdb)
+</PRE>
+
+
+<H4>Simple CLI Command</H4>
+
+<P>
+Here's an example of a simple CLI command being passed through
+GDB/MI and on to the CLI.
+
+</P>
+
+<PRE>
+-&#62; print 1+2
+&#60;- &#38;"print 1+2\n"
+&#60;- ~"$1 = 3\n"
+&#60;- ^done
+&#60;- (gdb)
+</PRE>
+
+
+<H4>Command With Side Effects</H4>
+
+
+<PRE>
+-&#62; -symbol-file xyz.exe
+&#60;- *breakpoint,nr="3",address="0x123",source="a.c:123"
+&#60;- (gdb)
+</PRE>
+
+
+<H4>A Bad Command</H4>
+
+<P>
+Here's what happens if you pass a non-existent command:
+
+</P>
+
+<PRE>
+-&#62; -rubbish
+&#60;- ^error,msg="Undefined MI command: rubbish"
+&#60;- (gdb)
+</PRE>
+
+
+
+<H2><A NAME="SEC243" HREF="gdb_toc.html#TOC243">GDB/MI Compatibility with CLI</A></H2>
+
+<P>
+<A NAME="IDX1392"></A>
+<A NAME="IDX1393"></A>
+To help users familiar with GDB's existing CLI interface, GDB/MI
+accepts existing CLI commands.  As specified by the syntax, such
+commands can be directly entered into the GDB/MI interface and GDB will
+respond.
+
+</P>
+<P>
+This mechanism is provided as an aid to developers of GDB/MI
+clients and not as a reliable interface into the CLI.  Since the command
+is being interpreteted in an environment that assumes GDB/MI
+behaviour, the exact output of such commands is likely to end up being
+an un-supported hybrid of GDB/MI and CLI output.
+
+</P>
+
+
+<H2><A NAME="SEC244" HREF="gdb_toc.html#TOC244">GDB/MI Output Records</A></H2>
+
+
+
+<H3><A NAME="SEC245" HREF="gdb_toc.html#TOC245">GDB/MI Result Records</A></H3>
+
+<P>
+<A NAME="IDX1394"></A>
+<A NAME="IDX1395"></A>
+In addition to a number of out-of-band notifications, the response to a
+GDB/MI command includes one of the following result indications:
+
+</P>
+<DL COMPACT>
+
+<DT><CODE>"^done" [ "," <VAR>results</VAR> ]</CODE>
+<DD>
+<A NAME="IDX1396"></A>
+ 
+The synchronous operation was successful, <CODE><VAR>results</VAR></CODE> are the return
+values.
+
+<DT><CODE>"^running"</CODE>
+<DD>
+<A NAME="IDX1397"></A>
+The asynchronous operation was successfully started.  The target is
+running.
+
+<DT><CODE>"^error" "," <VAR>c-string</VAR></CODE>
+<DD>
+<A NAME="IDX1398"></A>
+The operation failed.  The <CODE><VAR>c-string</VAR></CODE> contains the corresponding
+error message.
+</DL>
+
+
+
+<H3><A NAME="SEC246" HREF="gdb_toc.html#TOC246">GDB/MI Stream Records</A></H3>
+
+<P>
+<A NAME="IDX1399"></A>
+<A NAME="IDX1400"></A>
+GDB internally maintains a number of output streams: the console, the
+target, and the log.  The output intended for each of these streams is
+funneled through the GDB/MI interface using <STRONG>stream records</STRONG>.
+
+</P>
+<P>
+Each stream record begins with a unique <STRONG>prefix character</STRONG> which
+identifies its stream (see section <A HREF="gdb_25.html#SEC241">GDB/MI Output Syntax</A>).  In addition to the prefix, each stream record contains a
+<CODE><VAR>string-output</VAR></CODE>.  This is either raw text (with an implicit new
+line) or a quoted C string (which does not contain an implicit newline).
+
+</P>
+<DL COMPACT>
+
+<DT><CODE>"~" <VAR>string-output</VAR></CODE>
+<DD>
+The console output stream contains text that should be displayed in the
+CLI console window.  It contains the textual responses to CLI commands.
+
+<DT><CODE>"@" <VAR>string-output</VAR></CODE>
+<DD>
+The target output stream contains any textual output from the running
+target.
+
+<DT><CODE>"&#38;" <VAR>string-output</VAR></CODE>
+<DD>
+The log stream contains debugging messages being produced by GDB's
+internals.
+</DL>
+
+
+
+<H3><A NAME="SEC247" HREF="gdb_toc.html#TOC247">GDB/MI Out-of-band Records</A></H3>
+
+<P>
+<A NAME="IDX1401"></A>
+<A NAME="IDX1402"></A>
+<STRONG>Out-of-band</STRONG> records are used to notify the GDB/MI client of
+additional changes that have occurred.  Those changes can either be a
+consequence of GDB/MI (e.g., a breakpoint modified) or a result of
+target activity (e.g., target stopped).
+
+</P>
+<P>
+The following is a preliminary list of possible out-of-band records.
+In particular, the <VAR>exec-async-output</VAR> records.
+
+</P>
+<DL COMPACT>
+
+<DT><CODE>*stopped,reason="<VAR>reason</VAR>"</CODE>
+<DD>
+</DL>
+
+<P>
+<VAR>reason</VAR> can be one of the following:
+
+</P>
+<DL COMPACT>
+
+<DT><CODE>breakpoint-hit</CODE>
+<DD>
+A breakpoint was reached.
+<DT><CODE>watchpoint-trigger</CODE>
+<DD>
+A watchpoint was triggered.
+<DT><CODE>read-watchpoint-trigger</CODE>
+<DD>
+A read watchpoint was triggered.
+<DT><CODE>access-watchpoint-trigger</CODE>
+<DD>
+An access watchpoint was triggered.
+<DT><CODE>function-finished</CODE>
+<DD>
+An -exec-finish or similar CLI command was accomplished.
+<DT><CODE>location-reached</CODE>
+<DD>
+An -exec-until or similar CLI command was accomplished.
+<DT><CODE>watchpoint-scope</CODE>
+<DD>
+A watchpoint has gone out of scope.
+<DT><CODE>end-stepping-range</CODE>
+<DD>
+An -exec-next, -exec-next-instruction, -exec-step, -exec-step-instruction or 
+similar CLI command was accomplished.
+<DT><CODE>exited-signalled</CODE>
+<DD>
+The inferior exited because of a signal.
+<DT><CODE>exited</CODE>
+<DD>
+The inferior exited.
+<DT><CODE>exited-normally</CODE>
+<DD>
+The inferior exited normally.
+<DT><CODE>signal-received</CODE>
+<DD>
+A signal was received by the inferior.
+</DL>
+
+
+
+<H2><A NAME="SEC248" HREF="gdb_toc.html#TOC248">GDB/MI Command Description Format</A></H2>
+
+<P>
+The remaining sections describe blocks of commands.  Each block of
+commands is laid out in a fashion similar to this section.
+
+</P>
+<P>
+Note the the line breaks shown in the examples are here only for
+readability.  They don't appear in the real output.
+Also note that the commands with a non-available example (N.A.) are
+not yet implemented.
+
+</P>
+
+<H3>Motivation</H3>
+
+<P>
+The motivation for this collection of commands.
+
+</P>
+
+<H3>Introduction</H3>
+
+<P>
+A brief introduction to this collection of commands as a whole.
+
+</P>
+
+<H3>Commands</H3>
+
+<P>
+For each command in the block, the following is described:
+
+</P>
+
+<H4>Synopsis</H4>
+
+
+<PRE>
+ -command <VAR>args</VAR>...
+</PRE>
+
+
+<H4>Result</H4>
+
+
+<H4>GDB Command</H4>
+
+<P>
+The corresponding GDB CLI command(s), if any.
+
+</P>
+
+<H4>Example</H4>
+
+
+
+<H2><A NAME="SEC249" HREF="gdb_toc.html#TOC249">GDB/MI Breakpoint table commands</A></H2>
+
+<P>
+<A NAME="IDX1403"></A>
+<A NAME="IDX1404"></A>
+This section documents GDB/MI commands for manipulating
+breakpoints.
+
+</P>
+
+<H3>The <CODE>-break-after</CODE> Command</H3>
+<P>
+<A NAME="IDX1405"></A>
+
+</P>
+
+<H4>Synopsis</H4>
+
+
+<PRE>
+ -break-after <VAR>number</VAR> <VAR>count</VAR>
+</PRE>
+
+<P>
+The breakpoint number <VAR>number</VAR> is not in effect until it has been
+hit <VAR>count</VAR> times.  To see how this is reflected in the output of
+the <SAMP>`-break-list'</SAMP> command, see the description of the
+<SAMP>`-break-list'</SAMP> command below.
+
+</P>
+
+<H4>GDB Command</H4>
+
+<P>
+The corresponding GDB command is <SAMP>`ignore'</SAMP>.
+
+</P>
+
+<H4>Example</H4>
+
+
+<PRE>
+(gdb)
+-break-insert main
+^done,bkpt={number="1",addr="0x000100d0",file="hello.c",line="5"}
+(gdb)
+-break-after 1 3
+~
+^done
+(gdb)
+-break-list
+^done,BreakpointTable={nr_rows="1",nr_cols="6",
+hdr=[{width="3",alignment="-1",col_name="number",colhdr="Num"},
+{width="14",alignment="-1",col_name="type",colhdr="Type"},
+{width="4",alignment="-1",col_name="disp",colhdr="Disp"},
+{width="3",alignment="-1",col_name="enabled",colhdr="Enb"},
+{width="10",alignment="-1",col_name="addr",colhdr="Address"},
+{width="40",alignment="2",col_name="what",colhdr="What"}],
+body=[bkpt={number="1",type="breakpoint",disp="keep",enabled="y",
+addr="0x000100d0",func="main",file="hello.c",line="5",times="0",
+ignore="3"}]}
+(gdb)
+</PRE>
+
+
+<H3>The <CODE>-break-condition</CODE> Command</H3>
+<P>
+<A NAME="IDX1406"></A>
+
+</P>
+
+<H4>Synopsis</H4>
+
+
+<PRE>
+ -break-condition <VAR>number</VAR> <VAR>expr</VAR>
+</PRE>
+
+<P>
+Breakpoint <VAR>number</VAR> will stop the program only if the condition in
+<VAR>expr</VAR> is true.  The condition becomes part of the
+<SAMP>`-break-list'</SAMP> output (see the description of the <SAMP>`-break-list'</SAMP>
+command below).
+
+</P>
+
+<H4>GDB Command</H4>
+
+<P>
+The corresponding GDB command is <SAMP>`condition'</SAMP>.
+
+</P>
+
+<H4>Example</H4>
+
+
+<PRE>
+(gdb)
+-break-condition 1 1
+^done
+(gdb)
+-break-list
+^done,BreakpointTable={nr_rows="1",nr_cols="6",
+hdr=[{width="3",alignment="-1",col_name="number",colhdr="Num"},
+{width="14",alignment="-1",col_name="type",colhdr="Type"},
+{width="4",alignment="-1",col_name="disp",colhdr="Disp"},
+{width="3",alignment="-1",col_name="enabled",colhdr="Enb"},
+{width="10",alignment="-1",col_name="addr",colhdr="Address"},
+{width="40",alignment="2",col_name="what",colhdr="What"}],
+body=[bkpt={number="1",type="breakpoint",disp="keep",enabled="y",
+addr="0x000100d0",func="main",file="hello.c",line="5",cond="1",
+times="0",ignore="3"}]}
+(gdb)
+</PRE>
+
+
+<H3>The <CODE>-break-delete</CODE> Command</H3>
+<P>
+<A NAME="IDX1407"></A>
+
+</P>
+
+<H4>Synopsis</H4>
+
+
+<PRE>
+ -break-delete ( <VAR>breakpoint</VAR> )+
+</PRE>
+
+<P>
+Delete the breakpoint(s) whose number(s) are specified in the argument
+list.  This is obviously reflected in the breakpoint list.
+
+</P>
+
+<H4>GDB command</H4>
+
+<P>
+The corresponding GDB command is <SAMP>`delete'</SAMP>.
+
+</P>
+
+<H4>Example</H4>
+
+
+<PRE>
+(gdb)
+-break-delete 1
+^done
+(gdb)
+-break-list
+^done,BreakpointTable={nr_rows="0",nr_cols="6",
+hdr=[{width="3",alignment="-1",col_name="number",colhdr="Num"},
+{width="14",alignment="-1",col_name="type",colhdr="Type"},
+{width="4",alignment="-1",col_name="disp",colhdr="Disp"},
+{width="3",alignment="-1",col_name="enabled",colhdr="Enb"},
+{width="10",alignment="-1",col_name="addr",colhdr="Address"},
+{width="40",alignment="2",col_name="what",colhdr="What"}],
+body=[]}
+(gdb)
+</PRE>
+
+
+<H3>The <CODE>-break-disable</CODE> Command</H3>
+<P>
+<A NAME="IDX1408"></A>
+
+</P>
+
+<H4>Synopsis</H4>
+
+
+<PRE>
+ -break-disable ( <VAR>breakpoint</VAR> )+
+</PRE>
+
+<P>
+Disable the named <VAR>breakpoint</VAR>(s).  The field <SAMP>`enabled'</SAMP> in the
+break list is now set to <SAMP>`n'</SAMP> for the named <VAR>breakpoint</VAR>(s).
+
+</P>
+
+<H4>GDB Command</H4>
+
+<P>
+The corresponding GDB command is <SAMP>`disable'</SAMP>.
+
+</P>
+
+<H4>Example</H4>
+
+
+<PRE>
+(gdb)
+-break-disable 2
+^done
+(gdb)
+-break-list
+^done,BreakpointTable={nr_rows="1",nr_cols="6",
+hdr=[{width="3",alignment="-1",col_name="number",colhdr="Num"},
+{width="14",alignment="-1",col_name="type",colhdr="Type"},
+{width="4",alignment="-1",col_name="disp",colhdr="Disp"},
+{width="3",alignment="-1",col_name="enabled",colhdr="Enb"},
+{width="10",alignment="-1",col_name="addr",colhdr="Address"},
+{width="40",alignment="2",col_name="what",colhdr="What"}],
+body=[bkpt={number="2",type="breakpoint",disp="keep",enabled="n",
+addr="0x000100d0",func="main",file="hello.c",line="5",times="0"}]}
+(gdb)
+</PRE>
+
+
+<H3>The <CODE>-break-enable</CODE> Command</H3>
+<P>
+<A NAME="IDX1409"></A>
+
+</P>
+
+<H4>Synopsis</H4>
+
+
+<PRE>
+ -break-enable ( <VAR>breakpoint</VAR> )+
+</PRE>
+
+<P>
+Enable (previously disabled) <VAR>breakpoint</VAR>(s).
+
+</P>
+
+<H4>GDB Command</H4>
+
+<P>
+The corresponding GDB command is <SAMP>`enable'</SAMP>.
+
+</P>
+
+<H4>Example</H4>
+
+
+<PRE>
+(gdb)
+-break-enable 2
+^done
+(gdb)
+-break-list
+^done,BreakpointTable={nr_rows="1",nr_cols="6",
+hdr=[{width="3",alignment="-1",col_name="number",colhdr="Num"},
+{width="14",alignment="-1",col_name="type",colhdr="Type"},
+{width="4",alignment="-1",col_name="disp",colhdr="Disp"},
+{width="3",alignment="-1",col_name="enabled",colhdr="Enb"},
+{width="10",alignment="-1",col_name="addr",colhdr="Address"},
+{width="40",alignment="2",col_name="what",colhdr="What"}],
+body=[bkpt={number="2",type="breakpoint",disp="keep",enabled="y",
+addr="0x000100d0",func="main",file="hello.c",line="5",times="0"}]}
+(gdb)
+</PRE>
+
+
+<H3>The <CODE>-break-info</CODE> Command</H3>
+<P>
+<A NAME="IDX1410"></A>
+
+</P>
+
+<H4>Synopsis</H4>
+
+
+<PRE>
+ -break-info <VAR>breakpoint</VAR>
+</PRE>
+
+<P>
+Get information about a single breakpoint.
+
+</P>
+
+<H4>GDB command</H4>
+
+<P>
+The corresponding GDB command is <SAMP>`info break <VAR>breakpoint</VAR>'</SAMP>.
+
+</P>
+
+<H4>Example</H4>
+<P>
+N.A.
+
+</P>
+
+<H3>The <CODE>-break-insert</CODE> Command</H3>
+<P>
+<A NAME="IDX1411"></A>
+
+</P>
+
+<H4>Synopsis</H4>
+
+
+<PRE>
+ -break-insert [ -t ] [ -h ] [ -r ]
+    [ -c <VAR>condition</VAR> ] [ -i <VAR>ignore-count</VAR> ]
+    [ -p <VAR>thread</VAR> ] [ <VAR>line</VAR> | <VAR>addr</VAR> ]
+    [-l [ &#60;NUM&#62; &#60;NUM&#62;...] ]
+</PRE>
+
+<P>
+If specified, <VAR>line</VAR>, can be one of:
+
+</P>
+
+<UL>
+<LI>function
+
+<LI>filename:linenum
+
+<LI>filename:function
+
+<LI>*address
+
+</UL>
+
+<P>
+The possible optional parameters of this command are:
+
+</P>
+<DL COMPACT>
+
+<DT><SAMP>`-t'</SAMP>
+<DD>
+Insert a tempoary breakpoint.
+<DT><SAMP>`-h'</SAMP>
+<DD>
+Insert a hardware breakpoint.
+<DT><SAMP>`-c <VAR>condition</VAR>'</SAMP>
+<DD>
+Make the breakpoint conditional on <VAR>condition</VAR>.
+<DT><SAMP>`-i <VAR>ignore-count</VAR>'</SAMP>
+<DD>
+Initialize the <VAR>ignore-count</VAR>.
+<DT><SAMP>`-r'</SAMP>
+<DD>
+Insert a regular breakpoint in all the functions whose names match the
+given regular expression.  Other flags are not applicable to regular
+expresson.
+<DT><SAMP>`-l [&#60;NUM&#62; &#60;NUM&#62;...]'</SAMP>
+<DD>
+This list of indices will be used to select from the list of matches
+if there are multiple breakpoint hits.  Passing -1 will cause all
+matches to be selected.
+</DL>
+
+
+<H4>Result</H4>
+
+<P>
+The result is in the form:
+
+</P>
+
+<PRE>
+ ^done,bkptno="<VAR>number</VAR>",func="<VAR>funcname</VAR>",
+  file="<VAR>filename</VAR>",line="<VAR>lineno</VAR>",shlib="<VAR>shlib</VAR>"
+</PRE>
+
+<P>
+or, if there are multiple breakpoints, and the -l option is not selected:
+
+</P>
+
+<PRE>
+ ^done,matches=[b=[index="<VAR>index</VAR>",number="<VAR>number</VAR>",func="<VAR>funcname</VAR>",
+  file="<VAR>filename</VAR>",line="<VAR>lineno</VAR>"], b=[]...]
+</PRE>
+
+<P>
+where <VAR>number</VAR> is the GDB number for this breakpoint, <VAR>funcname</VAR>
+is the name of the function where the breakpoint was inserted,
+<VAR>filename</VAR> is the name of the source file which contains this
+function, and <VAR>lineno</VAR> is the source line number within that file, and <VAR>shlib</VAR>
+is the shared library in which the breakpoint was set.  
+
+</P>
+<P>
+If there are multiple matches, the second form is sent including the
+<VAR>index</VAR> element, and no breakpoints are set.  This will allow the
+UI to put up some kind of picker.  Then it can re-issue the command
+with the -l option, using the <VAR>index</VAR> values provided by the first
+result.  If you just want multiple matches to be always selected, then send a selection
+list of -1 always.
+
+</P>
+<P>
+Note: this format is open to change.
+
+</P>
+
+<H4>GDB Command</H4>
+
+<P>
+The corresponding GDB commands are <SAMP>`break'</SAMP>, <SAMP>`tbreak'</SAMP>,
+<SAMP>`hbreak'</SAMP>, <SAMP>`thbreak'</SAMP>, and <SAMP>`rbreak'</SAMP>.
+
+</P>
+
+<H4>Example</H4>
+
+
+<PRE>
+(gdb)
+-break-insert main
+^done,bkpt={number="1",addr="0x0001072c",file="recursive2.c",line="4"}
+(gdb)
+-break-insert -t foo
+^done,bkpt={number="2",addr="0x00010774",file="recursive2.c",line="11"}
+(gdb)
+-break-list
+^done,BreakpointTable={nr_rows="2",nr_cols="6",
+hdr=[{width="3",alignment="-1",col_name="number",colhdr="Num"},
+{width="14",alignment="-1",col_name="type",colhdr="Type"},
+{width="4",alignment="-1",col_name="disp",colhdr="Disp"},
+{width="3",alignment="-1",col_name="enabled",colhdr="Enb"},
+{width="10",alignment="-1",col_name="addr",colhdr="Address"},
+{width="40",alignment="2",col_name="what",colhdr="What"}],
+body=[bkpt={number="1",type="breakpoint",disp="keep",enabled="y",
+addr="0x0001072c", func="main",file="recursive2.c",line="4",times="0"},
+bkpt={number="2",type="breakpoint",disp="del",enabled="y",
+addr="0x00010774",func="foo",file="recursive2.c",line="11",times="0"}]}
+(gdb)
+-break-insert -r foo.*
+~int foo(int, int);
+^done,bkpt={number="3",addr="0x00010774",file="recursive2.c",line="11"}
+(gdb)
+</PRE>
+
+
+<H3>The <CODE>-break-list</CODE> Command</H3>
+<P>
+<A NAME="IDX1412"></A>
+
+</P>
+
+<H4>Synopsis</H4>
+
+
+<PRE>
+ -break-list
+</PRE>
+
+<P>
+Displays the list of inserted breakpoints, showing the following fields:
+
+</P>
+<DL COMPACT>
+
+<DT><SAMP>`Number'</SAMP>
+<DD>
+number of the breakpoint
+<DT><SAMP>`Type'</SAMP>
+<DD>
+type of the breakpoint: <SAMP>`breakpoint'</SAMP> or <SAMP>`watchpoint'</SAMP>
+<DT><SAMP>`Disposition'</SAMP>
+<DD>
+should the breakpoint be deleted or disabled when it is hit: <SAMP>`keep'</SAMP>
+or <SAMP>`nokeep'</SAMP>
+<DT><SAMP>`Enabled'</SAMP>
+<DD>
+is the breakpoint enabled or no: <SAMP>`y'</SAMP> or <SAMP>`n'</SAMP>
+<DT><SAMP>`Address'</SAMP>
+<DD>
+memory location at which the breakpoint is set
+<DT><SAMP>`What'</SAMP>
+<DD>
+logical location of the breakpoint, expressed by function name, file
+name, line number
+<DT><SAMP>`Times'</SAMP>
+<DD>
+number of times the breakpoint has been hit
+</DL>
+
+<P>
+If there are no breakpoints or watchpoints, the <CODE>BreakpointTable</CODE>
+<CODE>body</CODE> field is an empty list.
+
+</P>
+
+<H4>GDB Command</H4>
+
+<P>
+The corresponding GDB command is <SAMP>`info break'</SAMP>.
+
+</P>
+
+<H4>Example</H4>
+
+
+<PRE>
+(gdb)
+-break-list
+^done,BreakpointTable={nr_rows="2",nr_cols="6",
+hdr=[{width="3",alignment="-1",col_name="number",colhdr="Num"},
+{width="14",alignment="-1",col_name="type",colhdr="Type"},
+{width="4",alignment="-1",col_name="disp",colhdr="Disp"},
+{width="3",alignment="-1",col_name="enabled",colhdr="Enb"},
+{width="10",alignment="-1",col_name="addr",colhdr="Address"},
+{width="40",alignment="2",col_name="what",colhdr="What"}],
+body=[bkpt={number="1",type="breakpoint",disp="keep",enabled="y",
+addr="0x000100d0",func="main",file="hello.c",line="5",times="0"},
+bkpt={number="2",type="breakpoint",disp="keep",enabled="y",
+addr="0x00010114",func="foo",file="hello.c",line="13",times="0"}]}
+(gdb)
+</PRE>
+
+<P>
+Here's an example of the result when there are no breakpoints:
+
+</P>
+
+<PRE>
+(gdb)
+-break-list
+^done,BreakpointTable={nr_rows="0",nr_cols="6",
+hdr=[{width="3",alignment="-1",col_name="number",colhdr="Num"},
+{width="14",alignment="-1",col_name="type",colhdr="Type"},
+{width="4",alignment="-1",col_name="disp",colhdr="Disp"},
+{width="3",alignment="-1",col_name="enabled",colhdr="Enb"},
+{width="10",alignment="-1",col_name="addr",colhdr="Address"},
+{width="40",alignment="2",col_name="what",colhdr="What"}],
+body=[]}
+(gdb)
+</PRE>
+
+
+<H3>The <CODE>-break-watch</CODE> Command</H3>
+<P>
+<A NAME="IDX1413"></A>
+
+</P>
+
+<H4>Synopsis</H4>
+
+
+<PRE>
+ -break-watch [ -a | -r ]
+</PRE>
+
+<P>
+Create a watchpoint.  With the <SAMP>`-a'</SAMP> option it will create an
+<STRONG>access</STRONG> watchpoint, i.e. a watchpoint that triggers either on a
+read from or on a write to the memory location.  With the <SAMP>`-r'</SAMP>
+option, the watchpoint created is a <STRONG>read</STRONG> watchpoint, i.e. it will
+trigger only when the memory location is accessed for reading.  Without
+either of the options, the watchpoint created is a regular watchpoint,
+i.e. it will trigger when the memory location is accessed for writing.
+See section <A HREF="gdb_6.html#SEC32">Setting watchpoints</A>.
+
+</P>
+<P>
+Note that <SAMP>`-break-list'</SAMP> will report a single list of watchpoints and
+breakpoints inserted.
+
+</P>
+
+<H4>GDB Command</H4>
+
+<P>
+The corresponding GDB commands are <SAMP>`watch'</SAMP>, <SAMP>`awatch'</SAMP>, and
+<SAMP>`rwatch'</SAMP>.
+
+</P>
+
+<H4>Example</H4>
+
+<P>
+Setting a watchpoint on a variable in the <CODE>main</CODE> function:
+
+</P>
+
+<PRE>
+(gdb)
+-break-watch x
+^done,wpt={number="2",exp="x"}
+(gdb)
+-exec-continue
+^running
+^done,reason="watchpoint-trigger",wpt={number="2",exp="x"},
+value={old="-268439212",new="55"},
+frame={func="main",args=[],file="recursive2.c",
+fullname="/home/foo/bar/devo/myproject/recursive2.c",line="5"}
+(gdb)
+</PRE>
+
+<P>
+Setting a watchpoint on a variable local to a function.  GDB will stop
+the program execution twice: first for the variable changing value, then
+for the watchpoint going out of scope.
+
+</P>
+
+<PRE>
+(gdb)
+-break-watch C
+^done,wpt={number="5",exp="C"}
+(gdb)
+-exec-continue
+^running
+^done,reason="watchpoint-trigger",
+wpt={number="5",exp="C"},value={old="-276895068",new="3"},
+frame={func="callee4",args=[],
+file="../../../devo/gdb/testsuite/gdb.mi/basics.c",
+fullname="/home/foo/bar/devo/gdb/testsuite/gdb.mi/basics.c",line="13"}
+(gdb)
+-exec-continue
+^running
+^done,reason="watchpoint-scope",wpnum="5",
+frame={func="callee3",args=[{name="strarg",
+value="0x11940 \"A string argument.\""}],
+file="../../../devo/gdb/testsuite/gdb.mi/basics.c",
+fullname="/home/foo/bar/devo/gdb/testsuite/gdb.mi/basics.c",line="18"}
+(gdb)
+</PRE>
+
+<P>
+Listing breakpoints and watchpoints, at different points in the program
+execution.  Note that once the watchpoint goes out of scope, it is
+deleted.
+
+</P>
+
+<PRE>
+(gdb)
+-break-watch C
+^done,wpt={number="2",exp="C"}
+(gdb)
+-break-list
+^done,BreakpointTable={nr_rows="2",nr_cols="6",
+hdr=[{width="3",alignment="-1",col_name="number",colhdr="Num"},
+{width="14",alignment="-1",col_name="type",colhdr="Type"},
+{width="4",alignment="-1",col_name="disp",colhdr="Disp"},
+{width="3",alignment="-1",col_name="enabled",colhdr="Enb"},
+{width="10",alignment="-1",col_name="addr",colhdr="Address"},
+{width="40",alignment="2",col_name="what",colhdr="What"}],
+body=[bkpt={number="1",type="breakpoint",disp="keep",enabled="y",
+addr="0x00010734",func="callee4",
+file="../../../devo/gdb/testsuite/gdb.mi/basics.c",line="8",times="1"},
+bkpt={number="2",type="watchpoint",disp="keep",
+enabled="y",addr="",what="C",times="0"}]}
+(gdb)
+-exec-continue
+^running
+^done,reason="watchpoint-trigger",wpt={number="2",exp="C"},
+value={old="-276895068",new="3"},
+frame={func="callee4",args=[],
+file="../../../devo/gdb/testsuite/gdb.mi/basics.c",
+fullname="/home/foo/bar/devo/gdb/testsuite/gdb.mi/basics.c",line="13"}
+(gdb)
+-break-list
+^done,BreakpointTable={nr_rows="2",nr_cols="6",
+hdr=[{width="3",alignment="-1",col_name="number",colhdr="Num"},
+{width="14",alignment="-1",col_name="type",colhdr="Type"},
+{width="4",alignment="-1",col_name="disp",colhdr="Disp"},
+{width="3",alignment="-1",col_name="enabled",colhdr="Enb"},
+{width="10",alignment="-1",col_name="addr",colhdr="Address"},
+{width="40",alignment="2",col_name="what",colhdr="What"}],
+body=[bkpt={number="1",type="breakpoint",disp="keep",enabled="y",
+addr="0x00010734",func="callee4",
+file="../../../devo/gdb/testsuite/gdb.mi/basics.c",line="8",times="1"},
+bkpt={number="2",type="watchpoint",disp="keep",
+enabled="y",addr="",what="C",times="-5"}]}
+(gdb)
+-exec-continue
+^running
+^done,reason="watchpoint-scope",wpnum="2",
+frame={func="callee3",args=[{name="strarg",
+value="0x11940 \"A string argument.\""}],
+file="../../../devo/gdb/testsuite/gdb.mi/basics.c",
+fullname="/home/foo/bar/devo/gdb/testsuite/gdb.mi/basics.c",line="18"}
+(gdb)
+-break-list
+^done,BreakpointTable={nr_rows="1",nr_cols="6",
+hdr=[{width="3",alignment="-1",col_name="number",colhdr="Num"},
+{width="14",alignment="-1",col_name="type",colhdr="Type"},
+{width="4",alignment="-1",col_name="disp",colhdr="Disp"},
+{width="3",alignment="-1",col_name="enabled",colhdr="Enb"},
+{width="10",alignment="-1",col_name="addr",colhdr="Address"},
+{width="40",alignment="2",col_name="what",colhdr="What"}],
+body=[bkpt={number="1",type="breakpoint",disp="keep",enabled="y",
+addr="0x00010734",func="callee4",
+file="../../../devo/gdb/testsuite/gdb.mi/basics.c",line="8",times="1"}]}
+(gdb)
+</PRE>
+
+
+
+<H2><A NAME="SEC250" HREF="gdb_toc.html#TOC250">GDB/MI Data Manipulation</A></H2>
+
+<P>
+<A NAME="IDX1414"></A>
+<A NAME="IDX1415"></A>
+This section describes the GDB/MI commands that manipulate data:
+examine memory and registers, evaluate expressions, etc.
+
+</P>
+
+
+<H3>The <CODE>-data-disassemble</CODE> Command</H3>
+<P>
+<A NAME="IDX1416"></A>
+
+</P>
+
+<H4>Synopsis</H4>
+
+
+<PRE>
+ -data-disassemble
+    [ -s <VAR>start-addr</VAR> -e <VAR>end-addr</VAR> ]
+  | [ -f <VAR>filename</VAR> -l <VAR>linenum</VAR> [ -n <VAR>lines</VAR> ] ]
+  -- <VAR>mode</VAR>
+</PRE>
+
+<P>
+Where:
+
+</P>
+<DL COMPACT>
+
+<DT><SAMP>`<VAR>start-addr</VAR>'</SAMP>
+<DD>
+is the beginning address (or <CODE>$pc</CODE>)
+<DT><SAMP>`<VAR>end-addr</VAR>'</SAMP>
+<DD>
+is the end address
+<DT><SAMP>`<VAR>filename</VAR>'</SAMP>
+<DD>
+is the name of the file to disassemble
+<DT><SAMP>`<VAR>linenum</VAR>'</SAMP>
+<DD>
+is the line number to disassemble around
+<DT><SAMP>`<VAR>lines</VAR>'</SAMP>
+<DD>
+is the the number of disassembly lines to be produced.  If it is -1,
+the whole function will be disassembled, in case no <VAR>end-addr</VAR> is
+specified.  If <VAR>end-addr</VAR> is specified as a non-zero value, and
+<VAR>lines</VAR> is lower than the number of disassembly lines between
+<VAR>start-addr</VAR> and <VAR>end-addr</VAR>, only <VAR>lines</VAR> lines are
+displayed; if <VAR>lines</VAR> is higher than the number of lines between
+<VAR>start-addr</VAR> and <VAR>end-addr</VAR>, only the lines up to <VAR>end-addr</VAR>
+are displayed.
+<DT><SAMP>`<VAR>mode</VAR>'</SAMP>
+<DD>
+is either 0 (meaning only disassembly) or 1 (meaning mixed source and
+disassembly).
+</DL>
+
+
+<H4>Result</H4>
+
+<P>
+The output for each instruction is composed of four fields:
+
+</P>
+
+<UL>
+<LI>Address
+
+<LI>Func-name
+
+<LI>Offset
+
+<LI>Instruction
+
+</UL>
+
+<P>
+Note that whatever included in the instruction field, is not manipulated
+directely by GDB/MI, i.e. it is not possible to adjust its format.
+
+</P>
+
+<H4>GDB Command</H4>
+
+<P>
+There's no direct mapping from this command to the CLI.
+
+</P>
+
+<H4>Example</H4>
+
+<P>
+Disassemble from the current value of <CODE>$pc</CODE> to <CODE>$pc + 20</CODE>:
+
+</P>
+
+<PRE>
+(gdb)
+-data-disassemble -s $pc -e "$pc + 20" -- 0
+^done,
+asm_insns=[
+{address="0x000107c0",func-name="main",offset="4",
+inst="mov  2, %o0"},
+{address="0x000107c4",func-name="main",offset="8",
+inst="sethi  %hi(0x11800), %o2"},
+{address="0x000107c8",func-name="main",offset="12",
+inst="or  %o2, 0x140, %o1\t! 0x11940 &#60;_lib_version+8&#62;"},
+{address="0x000107cc",func-name="main",offset="16",
+inst="sethi  %hi(0x11800), %o2"},
+{address="0x000107d0",func-name="main",offset="20",
+inst="or  %o2, 0x168, %o4\t! 0x11968 &#60;_lib_version+48&#62;"}]
+(gdb)
+</PRE>
+
+<P>
+Disassemble the whole <CODE>main</CODE> function.  Line 32 is part of
+<CODE>main</CODE>.
+
+</P>
+
+<PRE>
+-data-disassemble -f basics.c -l 32 -- 0
+^done,asm_insns=[
+{address="0x000107bc",func-name="main",offset="0",
+inst="save  %sp, -112, %sp"},
+{address="0x000107c0",func-name="main",offset="4",
+inst="mov   2, %o0"},
+{address="0x000107c4",func-name="main",offset="8",
+inst="sethi %hi(0x11800), %o2"},
+[...]
+{address="0x0001081c",func-name="main",offset="96",inst="ret "},
+{address="0x00010820",func-name="main",offset="100",inst="restore "}]
+(gdb)
+</PRE>
+
+<P>
+Disassemble 3 instructions from the start of <CODE>main</CODE>:
+
+</P>
+
+<PRE>
+(gdb)
+-data-disassemble -f basics.c -l 32 -n 3 -- 0
+^done,asm_insns=[
+{address="0x000107bc",func-name="main",offset="0",
+inst="save  %sp, -112, %sp"},
+{address="0x000107c0",func-name="main",offset="4",
+inst="mov  2, %o0"},
+{address="0x000107c4",func-name="main",offset="8",
+inst="sethi  %hi(0x11800), %o2"}]
+(gdb)
+</PRE>
+
+<P>
+Disassemble 3 instructions from the start of <CODE>main</CODE> in mixed mode:
+
+</P>
+
+<PRE>
+(gdb)
+-data-disassemble -f basics.c -l 32 -n 3 -- 1
+^done,asm_insns=[
+src_and_asm_line={line="31",
+file="/kwikemart/marge/ezannoni/flathead-dev/devo/gdb/ \
+  testsuite/gdb.mi/basics.c",line_asm_insn=[
+{address="0x000107bc",func-name="main",offset="0",
+inst="save  %sp, -112, %sp"}]},
+src_and_asm_line={line="32",
+file="/kwikemart/marge/ezannoni/flathead-dev/devo/gdb/ \
+  testsuite/gdb.mi/basics.c",line_asm_insn=[
+{address="0x000107c0",func-name="main",offset="4",
+inst="mov  2, %o0"},
+{address="0x000107c4",func-name="main",offset="8",
+inst="sethi  %hi(0x11800), %o2"}]}]
+(gdb)
+</PRE>
+
+
+<H3>The <CODE>-data-evaluate-expression</CODE> Command</H3>
+<P>
+<A NAME="IDX1417"></A>
+
+</P>
+
+<H4>Synopsis</H4>
+
+
+<PRE>
+ -data-evaluate-expression <VAR>expr</VAR>
+</PRE>
+
+<P>
+Evaluate <VAR>expr</VAR> as an expression.  The expression could contain an
+inferior function call.  The function call will execute synchronously.
+If the expression contains spaces, it must be enclosed in double quotes.
+
+</P>
+
+<H4>GDB Command</H4>
+
+<P>
+The corresponding GDB commands are <SAMP>`print'</SAMP>, <SAMP>`output'</SAMP>, and
+<SAMP>`call'</SAMP>.  In <CODE>gdbtk</CODE> only, there's a corresponding
+<SAMP>`gdb_eval'</SAMP> command.
+
+</P>
+
+<H4>Example</H4>
+
+<P>
+In the following example, the numbers that precede the commands are the
+<STRONG>tokens</STRONG> described in section <A HREF="gdb_25.html#SEC239">GDB/MI Command Syntax</A>.  Notice how GDB/MI returns the same tokens in its
+output.
+
+</P>
+
+<PRE>
+211-data-evaluate-expression A
+211^done,value="1"
+(gdb)
+311-data-evaluate-expression &#38;A
+311^done,value="0xefffeb7c"
+(gdb)
+411-data-evaluate-expression A+3
+411^done,value="4"
+(gdb)
+511-data-evaluate-expression "A + 3"
+511^done,value="4"
+(gdb)
+</PRE>
+
+
+<H3>The <CODE>-data-list-changed-registers</CODE> Command</H3>
+<P>
+<A NAME="IDX1418"></A>
+
+</P>
+
+<H4>Synopsis</H4>
+
+
+<PRE>
+ -data-list-changed-registers
+</PRE>
+
+<P>
+Display a list of the registers that have changed.
+
+</P>
+
+<H4>GDB Command</H4>
+
+<P>
+GDB doesn't have a direct analog for this command; <CODE>gdbtk</CODE>
+has the corresponding command <SAMP>`gdb_changed_register_list'</SAMP>.
+
+</P>
+
+<H4>Example</H4>
+
+<P>
+On a PPC MBX board:
+
+</P>
+
+<PRE>
+(gdb)
+-exec-continue
+^running
+
+(gdb)
+*stopped,reason="breakpoint-hit",bkptno="1",frame={func="main",
+args=[],file="try.c",fullname="/home/foo/bar/devo/myproject/try.c",line="5"}
+(gdb)
+-data-list-changed-registers
+^done,changed-registers=["0","1","2","4","5","6","7","8","9",
+"10","11","13","14","15","16","17","18","19","20","21","22","23",
+"24","25","26","27","28","30","31","64","65","66","67","69"]
+(gdb)
+</PRE>
+
+
+<H3>The <CODE>-data-list-register-names</CODE> Command</H3>
+<P>
+<A NAME="IDX1419"></A>
+
+</P>
+
+<H4>Synopsis</H4>
+
+
+<PRE>
+ -data-list-register-names [ ( <VAR>regno</VAR> )+ ]
+</PRE>
+
+<P>
+Show a list of register names for the current target.  If no arguments
+are given, it shows a list of the names of all the registers.  If
+integer numbers are given as arguments, it will print a list of the
+names of the registers corresponding to the arguments.  To ensure
+consistency between a register name and its number, the output list may
+include empty register names.
+
+</P>
+
+<H4>GDB Command</H4>
+
+<P>
+GDB does not have a command which corresponds to
+<SAMP>`-data-list-register-names'</SAMP>.  In <CODE>gdbtk</CODE> there is a
+corresponding command <SAMP>`gdb_regnames'</SAMP>.
+
+</P>
+
+<H4>Example</H4>
+
+<P>
+For the PPC MBX board:
+
+<PRE>
+(gdb)
+-data-list-register-names
+^done,register-names=["r0","r1","r2","r3","r4","r5","r6","r7",
+"r8","r9","r10","r11","r12","r13","r14","r15","r16","r17","r18",
+"r19","r20","r21","r22","r23","r24","r25","r26","r27","r28","r29",
+"r30","r31","f0","f1","f2","f3","f4","f5","f6","f7","f8","f9",
+"f10","f11","f12","f13","f14","f15","f16","f17","f18","f19","f20",
+"f21","f22","f23","f24","f25","f26","f27","f28","f29","f30","f31",
+"", "pc","ps","cr","lr","ctr","xer"]
+(gdb)
+-data-list-register-names 1 2 3
+^done,register-names=["r1","r2","r3"]
+(gdb)
+</PRE>
+
+
+<H3>The <CODE>-data-list-register-values</CODE> Command</H3>
+<P>
+<A NAME="IDX1420"></A>
+
+</P>
+
+<H4>Synopsis</H4>
+
+
+<PRE>
+ -data-list-register-values <VAR>fmt</VAR> [ ( <VAR>regno</VAR> )*]
+</PRE>
+
+<P>
+Display the registers' contents.  <VAR>fmt</VAR> is the format according to
+which the registers' contents are to be returned, followed by an optional
+list of numbers specifying the registers to display.  A missing list of
+numbers indicates that the contents of all the registers must be returned.
+
+</P>
+<P>
+Allowed formats for <VAR>fmt</VAR> are:
+
+</P>
+<DL COMPACT>
+
+<DT><CODE>x</CODE>
+<DD>
+Hexadecimal
+<DT><CODE>o</CODE>
+<DD>
+Octal
+<DT><CODE>t</CODE>
+<DD>
+Binary
+<DT><CODE>d</CODE>
+<DD>
+Decimal
+<DT><CODE>r</CODE>
+<DD>
+Raw
+<DT><CODE>N</CODE>
+<DD>
+Natural
+</DL>
+
+
+<H4>GDB Command</H4>
+
+<P>
+The corresponding GDB commands are <SAMP>`info reg'</SAMP>, <SAMP>`info
+all-reg'</SAMP>, and (in <CODE>gdbtk</CODE>) <SAMP>`gdb_fetch_registers'</SAMP>.
+
+</P>
+
+<H4>Example</H4>
+
+<P>
+For a PPC MBX board (note: line breaks are for readability only, they
+don't appear in the actual output):
+
+</P>
+
+<PRE>
+(gdb)
+-data-list-register-values r 64 65
+^done,register-values=[{number="64",value="0xfe00a300"},
+{number="65",value="0x00029002"}]
+(gdb)
+-data-list-register-values x
+^done,register-values=[{number="0",value="0xfe0043c8"},
+{number="1",value="0x3fff88"},{number="2",value="0xfffffffe"},
+{number="3",value="0x0"},{number="4",value="0xa"},
+{number="5",value="0x3fff68"},{number="6",value="0x3fff58"},
+{number="7",value="0xfe011e98"},{number="8",value="0x2"},
+{number="9",value="0xfa202820"},{number="10",value="0xfa202808"},
+{number="11",value="0x1"},{number="12",value="0x0"},
+{number="13",value="0x4544"},{number="14",value="0xffdfffff"},
+{number="15",value="0xffffffff"},{number="16",value="0xfffffeff"},
+{number="17",value="0xefffffed"},{number="18",value="0xfffffffe"},
+{number="19",value="0xffffffff"},{number="20",value="0xffffffff"},
+{number="21",value="0xffffffff"},{number="22",value="0xfffffff7"},
+{number="23",value="0xffffffff"},{number="24",value="0xffffffff"},
+{number="25",value="0xffffffff"},{number="26",value="0xfffffffb"},
+{number="27",value="0xffffffff"},{number="28",value="0xf7bfffff"},
+{number="29",value="0x0"},{number="30",value="0xfe010000"},
+{number="31",value="0x0"},{number="32",value="0x0"},
+{number="33",value="0x0"},{number="34",value="0x0"},
+{number="35",value="0x0"},{number="36",value="0x0"},
+{number="37",value="0x0"},{number="38",value="0x0"},
+{number="39",value="0x0"},{number="40",value="0x0"},
+{number="41",value="0x0"},{number="42",value="0x0"},
+{number="43",value="0x0"},{number="44",value="0x0"},
+{number="45",value="0x0"},{number="46",value="0x0"},
+{number="47",value="0x0"},{number="48",value="0x0"},
+{number="49",value="0x0"},{number="50",value="0x0"},
+{number="51",value="0x0"},{number="52",value="0x0"},
+{number="53",value="0x0"},{number="54",value="0x0"},
+{number="55",value="0x0"},{number="56",value="0x0"},
+{number="57",value="0x0"},{number="58",value="0x0"},
+{number="59",value="0x0"},{number="60",value="0x0"},
+{number="61",value="0x0"},{number="62",value="0x0"},
+{number="63",value="0x0"},{number="64",value="0xfe00a300"},
+{number="65",value="0x29002"},{number="66",value="0x202f04b5"},
+{number="67",value="0xfe0043b0"},{number="68",value="0xfe00b3e4"},
+{number="69",value="0x20002b03"}]
+(gdb)
+</PRE>
+
+
+<H3>The <CODE>-data-read-memory</CODE> Command</H3>
+<P>
+<A NAME="IDX1421"></A>
+
+</P>
+
+<H4>Synopsis</H4>
+
+
+<PRE>
+ -data-read-memory [ -o <VAR>byte-offset</VAR> ]
+   <VAR>address</VAR> <VAR>word-format</VAR> <VAR>word-size</VAR>
+   <VAR>nr-rows</VAR> <VAR>nr-cols</VAR> [ <VAR>aschar</VAR> ]
+</PRE>
+
+<P>
+where:
+
+</P>
+<DL COMPACT>
+
+<DT><SAMP>`<VAR>address</VAR>'</SAMP>
+<DD>
+An expression specifying the address of the first memory word to be
+read.  Complex expressions containing embedded white space should be
+quoted using the C convention.
+
+<DT><SAMP>`<VAR>word-format</VAR>'</SAMP>
+<DD>
+The format to be used to print the memory words.  The notation is the
+same as for GDB's <CODE>print</CODE> command (see section <A HREF="gdb_9.html#SEC60">Output formats</A>).
+
+<DT><SAMP>`<VAR>word-size</VAR>'</SAMP>
+<DD>
+The size of each memory word in bytes.
+
+<DT><SAMP>`<VAR>nr-rows</VAR>'</SAMP>
+<DD>
+The number of rows in the output table.
+
+<DT><SAMP>`<VAR>nr-cols</VAR>'</SAMP>
+<DD>
+The number of columns in the output table.
+
+<DT><SAMP>`<VAR>aschar</VAR>'</SAMP>
+<DD>
+If present, indicates that each row should include an ASCII dump.  The
+value of <VAR>aschar</VAR> is used as a padding character when a byte is not a
+member of the printable ASCII character set (printable ASCII
+characters are those whose code is between 32 and 126, inclusively).
+
+<DT><SAMP>`<VAR>byte-offset</VAR>'</SAMP>
+<DD>
+An offset to add to the <VAR>address</VAR> before fetching memory.
+</DL>
+
+<P>
+This command displays memory contents as a table of <VAR>nr-rows</VAR> by
+<VAR>nr-cols</VAR> words, each word being <VAR>word-size</VAR> bytes.  In total,
+<CODE><VAR>nr-rows</VAR> * <VAR>nr-cols</VAR> * <VAR>word-size</VAR></CODE> bytes are read
+(returned as <SAMP>`total-bytes'</SAMP>).  Should less than the requested number
+of bytes be returned by the target, the missing words are identified
+using <SAMP>`N/A'</SAMP>.  The number of bytes read from the target is returned
+in <SAMP>`nr-bytes'</SAMP> and the starting address used to read memory in
+<SAMP>`addr'</SAMP>.
+
+</P>
+<P>
+The address of the next/previous row or page is available in
+<SAMP>`next-row'</SAMP> and <SAMP>`prev-row'</SAMP>, <SAMP>`next-page'</SAMP> and
+<SAMP>`prev-page'</SAMP>.
+
+</P>
+
+<H4>GDB Command</H4>
+
+<P>
+The corresponding GDB command is <SAMP>`x'</SAMP>.  <CODE>gdbtk</CODE> has
+<SAMP>`gdb_get_mem'</SAMP> memory read command.
+
+</P>
+
+<H4>Example</H4>
+
+<P>
+Read six bytes of memory starting at <CODE>bytes+6</CODE> but then offset by
+<CODE>-6</CODE> bytes.  Format as three rows of two columns.  One byte per
+word.  Display each word in hex.
+
+</P>
+
+<PRE>
+(gdb)
+9-data-read-memory -o -6 -- bytes+6 x 1 3 2
+9^done,addr="0x00001390",nr-bytes="6",total-bytes="6",
+next-row="0x00001396",prev-row="0x0000138e",next-page="0x00001396",
+prev-page="0x0000138a",memory=[
+{addr="0x00001390",data=["0x00","0x01"]},
+{addr="0x00001392",data=["0x02","0x03"]},
+{addr="0x00001394",data=["0x04","0x05"]}]
+(gdb)
+</PRE>
+
+<P>
+Read two bytes of memory starting at address <CODE>shorts + 64</CODE> and
+display as a single word formatted in decimal.
+
+</P>
+
+<PRE>
+(gdb)
+5-data-read-memory shorts+64 d 2 1 1
+5^done,addr="0x00001510",nr-bytes="2",total-bytes="2",
+next-row="0x00001512",prev-row="0x0000150e",
+next-page="0x00001512",prev-page="0x0000150e",memory=[
+{addr="0x00001510",data=["128"]}]
+(gdb)
+</PRE>
+
+<P>
+Read thirty two bytes of memory starting at <CODE>bytes+16</CODE> and format
+as eight rows of four columns.  Include a string encoding with <SAMP>`x'</SAMP>
+used as the non-printable character.
+
+</P>
+
+<PRE>
+(gdb)
+4-data-read-memory bytes+16 x 1 8 4 x
+4^done,addr="0x000013a0",nr-bytes="32",total-bytes="32",
+next-row="0x000013c0",prev-row="0x0000139c",
+next-page="0x000013c0",prev-page="0x00001380",memory=[
+{addr="0x000013a0",data=["0x10","0x11","0x12","0x13"],ascii="xxxx"},
+{addr="0x000013a4",data=["0x14","0x15","0x16","0x17"],ascii="xxxx"},
+{addr="0x000013a8",data=["0x18","0x19","0x1a","0x1b"],ascii="xxxx"},
+{addr="0x000013ac",data=["0x1c","0x1d","0x1e","0x1f"],ascii="xxxx"},
+{addr="0x000013b0",data=["0x20","0x21","0x22","0x23"],ascii=" !\"#"},
+{addr="0x000013b4",data=["0x24","0x25","0x26","0x27"],ascii="$%&#38;'"},
+{addr="0x000013b8",data=["0x28","0x29","0x2a","0x2b"],ascii="()*+"},
+{addr="0x000013bc",data=["0x2c","0x2d","0x2e","0x2f"],ascii=",-./"}]
+(gdb)
+</PRE>
+
+
+<H3>The <CODE>-display-delete</CODE> Command</H3>
+<P>
+<A NAME="IDX1422"></A>
+
+</P>
+
+<H4>Synopsis</H4>
+
+
+<PRE>
+ -display-delete <VAR>number</VAR>
+</PRE>
+
+<P>
+Delete the display <VAR>number</VAR>.
+
+</P>
+
+<H4>GDB Command</H4>
+
+<P>
+The corresponding GDB command is <SAMP>`delete display'</SAMP>.
+
+</P>
+
+<H4>Example</H4>
+<P>
+N.A.
+
+</P>
+
+
+<H3>The <CODE>-display-disable</CODE> Command</H3>
+<P>
+<A NAME="IDX1423"></A>
+
+</P>
+
+<H4>Synopsis</H4>
+
+
+<PRE>
+ -display-disable <VAR>number</VAR>
+</PRE>
+
+<P>
+Disable display <VAR>number</VAR>.
+
+</P>
+
+<H4>GDB Command</H4>
+
+<P>
+The corresponding GDB command is <SAMP>`disable display'</SAMP>.
+
+</P>
+
+<H4>Example</H4>
+<P>
+N.A.
+
+</P>
+
+
+<H3>The <CODE>-display-enable</CODE> Command</H3>
+<P>
+<A NAME="IDX1424"></A>
+
+</P>
+
+<H4>Synopsis</H4>
+
+
+<PRE>
+ -display-enable <VAR>number</VAR>
+</PRE>
+
+<P>
+Enable display <VAR>number</VAR>.
+
+</P>
+
+<H4>GDB Command</H4>
+
+<P>
+The corresponding GDB command is <SAMP>`enable display'</SAMP>.
+
+</P>
+
+<H4>Example</H4>
+<P>
+N.A.
+
+</P>
+
+
+<H3>The <CODE>-display-insert</CODE> Command</H3>
+<P>
+<A NAME="IDX1425"></A>
+
+</P>
+
+<H4>Synopsis</H4>
+
+
+<PRE>
+ -display-insert <VAR>expression</VAR>
+</PRE>
+
+<P>
+Display <VAR>expression</VAR> every time the program stops.
+
+</P>
+
+<H4>GDB Command</H4>
+
+<P>
+The corresponding GDB command is <SAMP>`display'</SAMP>.
+
+</P>
+
+<H4>Example</H4>
+<P>
+N.A.
+
+</P>
+
+
+<H3>The <CODE>-display-list</CODE> Command</H3>
+<P>
+<A NAME="IDX1426"></A>
+
+</P>
+
+<H4>Synopsis</H4>
+
+
+<PRE>
+ -display-list
+</PRE>
+
+<P>
+List the displays.  Do not show the current values.
+
+</P>
+
+<H4>GDB Command</H4>
+
+<P>
+The corresponding GDB command is <SAMP>`info display'</SAMP>.
+
+</P>
+
+<H4>Example</H4>
+<P>
+N.A.
+
+</P>
+
+
+<H3>The <CODE>-environment-cd</CODE> Command</H3>
+<P>
+<A NAME="IDX1427"></A>
+
+</P>
+
+<H4>Synopsis</H4>
+
+
+<PRE>
+ -environment-cd <VAR>pathdir</VAR>
+</PRE>
+
+<P>
+Set GDB's working directory.
+
+</P>
+
+<H4>GDB Command</H4>
+
+<P>
+The corresponding GDB command is <SAMP>`cd'</SAMP>.
+
+</P>
+
+<H4>Example</H4>
+
+
+<PRE>
+(gdb)
+-environment-cd /kwikemart/marge/ezannoni/flathead-dev/devo/gdb
+^done
+(gdb)
+</PRE>
+
+
+<H3>The <CODE>-environment-directory</CODE> Command</H3>
+<P>
+<A NAME="IDX1428"></A>
+
+</P>
+
+<H4>Synopsis</H4>
+
+
+<PRE>
+ -environment-directory [ -r ] [ <VAR>pathdir</VAR> ]+
+</PRE>
+
+<P>
+Add directories <VAR>pathdir</VAR> to beginning of search path for source files.
+If the <SAMP>`-r'</SAMP> option is used, the search path is reset to the default
+search path.  If directories <VAR>pathdir</VAR> are supplied in addition to the
+<SAMP>`-r'</SAMP> option, the search path is first reset and then addition
+occurs as normal.
+Multiple directories may be specified, separated by blanks.  Specifying
+multiple directories in a single command
+results in the directories added to the beginning of the
+search path in the same order they were presented in the command.
+If blanks are needed as
+part of a directory name, double-quotes should be used around
+the name.  In the command output, the path will show up separated
+by the system directory-separator character.  The directory-seperator
+character must not be used
+in any directory name.
+If no directories are specified, the current search path is displayed.
+
+</P>
+
+<H4>GDB Command</H4>
+
+<P>
+The corresponding GDB command is <SAMP>`dir'</SAMP>.
+
+</P>
+
+<H4>Example</H4>
+
+
+<PRE>
+(gdb)
+-environment-directory /kwikemart/marge/ezannoni/flathead-dev/devo/gdb
+^done,source-path="/kwikemart/marge/ezannoni/flathead-dev/devo/gdb:$cdir:$cwd"
+(gdb)
+-environment-directory ""
+^done,source-path="/kwikemart/marge/ezannoni/flathead-dev/devo/gdb:$cdir:$cwd"
+(gdb)
+-environment-directory -r /home/jjohnstn/src/gdb /usr/src
+^done,source-path="/home/jjohnstn/src/gdb:/usr/src:$cdir:$cwd"
+(gdb)
+-environment-directory -r
+^done,source-path="$cdir:$cwd"
+(gdb)
+</PRE>
+
+
+<H3>The <CODE>-environment-path</CODE> Command</H3>
+<P>
+<A NAME="IDX1429"></A>
+
+</P>
+
+<H4>Synopsis</H4>
+
+
+<PRE>
+ -environment-path [ -r ] [ <VAR>pathdir</VAR> ]+
+</PRE>
+
+<P>
+Add directories <VAR>pathdir</VAR> to beginning of search path for object files.
+If the <SAMP>`-r'</SAMP> option is used, the search path is reset to the original
+search path that existed at gdb start-up.  If directories <VAR>pathdir</VAR> are
+supplied in addition to the
+<SAMP>`-r'</SAMP> option, the search path is first reset and then addition
+occurs as normal.
+Multiple directories may be specified, separated by blanks.  Specifying
+multiple directories in a single command
+results in the directories added to the beginning of the
+search path in the same order they were presented in the command.
+If blanks are needed as
+part of a directory name, double-quotes should be used around
+the name.  In the command output, the path will show up separated
+by the system directory-separator character.  The directory-seperator
+character must not be used
+in any directory name.
+If no directories are specified, the current path is displayed.
+
+</P>
+
+
+<H4>GDB Command</H4>
+
+<P>
+The corresponding GDB command is <SAMP>`path'</SAMP>.
+
+</P>
+
+<H4>Example</H4>
+
+
+<PRE>
+(gdb)
+-environment-path
+^done,path="/usr/bin"
+(gdb)
+-environment-path /kwikemart/marge/ezannoni/flathead-dev/ppc-eabi/gdb /bin
+^done,path="/kwikemart/marge/ezannoni/flathead-dev/ppc-eabi/gdb:/bin:/usr/bin"
+(gdb)
+-environment-path -r /usr/local/bin
+^done,path="/usr/local/bin:/usr/bin"
+(gdb)
+</PRE>
+
+
+<H3>The <CODE>-environment-pwd</CODE> Command</H3>
+<P>
+<A NAME="IDX1430"></A>
+
+</P>
+
+<H4>Synopsis</H4>
+
+
+<PRE>
+ -environment-pwd
+</PRE>
+
+<P>
+Show the current working directory.
+
+</P>
+
+<H4>GDB command</H4>
+
+<P>
+The corresponding GDB command is <SAMP>`pwd'</SAMP>.
+
+</P>
+
+<H4>Example</H4>
+
+
+<PRE>
+(gdb)
+-environment-pwd
+^done,cwd="/kwikemart/marge/ezannoni/flathead-dev/devo/gdb"
+(gdb)
+</PRE>
+
+
+
+<H2><A NAME="SEC251" HREF="gdb_toc.html#TOC251">GDB/MI Program control</A></H2>
+
+
+<H4>Program termination</H4>
+
+<P>
+As a result of execution, the inferior program can run to completion, if
+it doesn't encounter any breakpoints.  In this case the output will
+include an exit code, if the program has exited exceptionally.
+
+</P>
+
+<H4>Examples</H4>
+
+<P>
+Program exited normally:
+
+</P>
+
+<PRE>
+(gdb)
+-exec-run
+^running
+(gdb)
+x = 55
+*stopped,reason="exited-normally"
+(gdb)
+</PRE>
+
+<P>
+Program exited exceptionally:
+
+</P>
+
+<PRE>
+(gdb)
+-exec-run
+^running
+(gdb)
+x = 55
+*stopped,reason="exited",exit-code="01"
+(gdb)
+</PRE>
+
+<P>
+Another way the program can terminate is if it receives a signal such as
+<CODE>SIGINT</CODE>.  In this case, GDB/MI displays this:
+
+</P>
+
+<PRE>
+(gdb)
+*stopped,reason="exited-signalled",signal-name="SIGINT",
+signal-meaning="Interrupt"
+</PRE>
+
+
+<H3>The <CODE>-exec-abort</CODE> Command</H3>
+<P>
+<A NAME="IDX1431"></A>
+
+</P>
+
+<H4>Synopsis</H4>
+
+
+<PRE>
+ -exec-abort
+</PRE>
+
+<P>
+Kill the inferior running program.
+
+</P>
+
+<H4>GDB Command</H4>
+
+<P>
+The corresponding GDB command is <SAMP>`kill'</SAMP>.
+
+</P>
+
+<H4>Example</H4>
+<P>
+N.A.
+
+</P>
+
+
+<H3>The <CODE>-exec-arguments</CODE> Command</H3>
+<P>
+<A NAME="IDX1432"></A>
+
+</P>
+
+<H4>Synopsis</H4>
+
+
+<PRE>
+ -exec-arguments <VAR>args</VAR>
+</PRE>
+
+<P>
+Set the inferior program arguments, to be used in the next
+<SAMP>`-exec-run'</SAMP>.
+
+</P>
+
+<H4>GDB Command</H4>
+
+<P>
+The corresponding GDB command is <SAMP>`set args'</SAMP>.
+
+</P>
+
+<H4>Example</H4>
+
+<P>
+Don't have one around.
+
+</P>
+
+
+<H3>The <CODE>-exec-continue</CODE> Command</H3>
+<P>
+<A NAME="IDX1433"></A>
+
+</P>
+
+<H4>Synopsis</H4>
+
+
+<PRE>
+ -exec-continue
+</PRE>
+
+<P>
+Asynchronous command.  Resumes the execution of the inferior program
+until a breakpoint is encountered, or until the inferior exits.
+
+</P>
+
+<H4>GDB Command</H4>
+
+<P>
+The corresponding GDB corresponding is <SAMP>`continue'</SAMP>.
+
+</P>
+
+<H4>Example</H4>
+
+
+<PRE>
+-exec-continue
+^running
+(gdb)
+@Hello world
+*stopped,reason="breakpoint-hit",bkptno="2",frame={func="foo",args=[],
+file="hello.c",fullname="/home/foo/bar/devo/myproject/hello.c",line="13"}
+(gdb)
+</PRE>
+
+
+<H3>The <CODE>-exec-finish</CODE> Command</H3>
+<P>
+<A NAME="IDX1434"></A>
+
+</P>
+
+<H4>Synopsis</H4>
+
+
+<PRE>
+ -exec-finish
+</PRE>
+
+<P>
+Asynchronous command.  Resumes the execution of the inferior program
+until the current function is exited.  Displays the results returned by
+the function.
+
+</P>
+
+<H4>GDB Command</H4>
+
+<P>
+The corresponding GDB command is <SAMP>`finish'</SAMP>.
+
+</P>
+
+<H4>Example</H4>
+
+<P>
+Function returning <CODE>void</CODE>.
+
+</P>
+
+<PRE>
+-exec-finish
+^running
+(gdb)
+@hello from foo
+*stopped,reason="function-finished",frame={func="main",args=[],
+file="hello.c",fullname="/home/foo/bar/devo/myproject/hello.c",line="7"}
+(gdb)
+</PRE>
+
+<P>
+Function returning other than <CODE>void</CODE>.  The name of the internal
+GDB variable storing the result is printed, together with the
+value itself.
+
+</P>
+
+<PRE>
+-exec-finish
+^running
+(gdb)
+*stopped,reason="function-finished",frame={addr="0x000107b0",func="foo",
+args=[{name="a",value="1"],{name="b",value="9"}},
+file="recursive2.c",fullname="/home/foo/bar/devo/myproject/recursive2.c",line="14"},
+gdb-result-var="$1",return-value="0"
+(gdb)
+</PRE>
+
+
+<H3>The <CODE>-exec-interrupt</CODE> Command</H3>
+<P>
+<A NAME="IDX1435"></A>
+
+</P>
+
+<H4>Synopsis</H4>
+
+
+<PRE>
+ -exec-interrupt
+</PRE>
+
+<P>
+Asynchronous command.  Interrupts the background execution of the target.
+Note how the token associated with the stop message is the one for the
+execution command that has been interrupted.  The token for the interrupt
+itself only appears in the <SAMP>`^done'</SAMP> output.  If the user is trying to
+interrupt a non-running program, an error message will be printed.
+
+</P>
+
+<H4>GDB Command</H4>
+
+<P>
+The corresponding GDB command is <SAMP>`interrupt'</SAMP>.
+
+</P>
+
+<H4>Example</H4>
+
+
+<PRE>
+(gdb)
+111-exec-continue
+111^running
+
+(gdb)
+222-exec-interrupt
+222^done
+(gdb)
+111*stopped,signal-name="SIGINT",signal-meaning="Interrupt",
+frame={addr="0x00010140",func="foo",args=[],file="try.c",
+fullname="/home/foo/bar/devo/myproject/try.c",line="13"}
+(gdb)
+
+(gdb)
+-exec-interrupt
+^error,msg="mi_cmd_exec_interrupt: Inferior not executing."
+(gdb)
+</PRE>
+
+
+<H3>The <CODE>-exec-next</CODE> Command</H3>
+<P>
+<A NAME="IDX1436"></A>
+
+</P>
+
+<H4>Synopsis</H4>
+
+
+<PRE>
+ -exec-next
+</PRE>
+
+<P>
+Asynchronous command.  Resumes execution of the inferior program, stopping
+when the beginning of the next source line is reached.
+
+</P>
+
+<H4>GDB Command</H4>
+
+<P>
+The corresponding GDB command is <SAMP>`next'</SAMP>.
+
+</P>
+
+<H4>Example</H4>
+
+
+<PRE>
+-exec-next
+^running
+(gdb)
+*stopped,reason="end-stepping-range",line="8",file="hello.c"
+(gdb)
+</PRE>
+
+
+<H3>The <CODE>-exec-next-instruction</CODE> Command</H3>
+<P>
+<A NAME="IDX1437"></A>
+
+</P>
+
+<H4>Synopsis</H4>
+
+
+<PRE>
+ -exec-next-instruction
+</PRE>
+
+<P>
+Asynchronous command.  Executes one machine instruction.  If the
+instruction is a function call continues until the function returns.  If
+the program stops at an instruction in the middle of a source line, the
+address will be printed as well.
+
+</P>
+
+<H4>GDB Command</H4>
+
+<P>
+The corresponding GDB command is <SAMP>`nexti'</SAMP>.
+
+</P>
+
+<H4>Example</H4>
+
+
+<PRE>
+(gdb)
+-exec-next-instruction
+^running
+
+(gdb)
+*stopped,reason="end-stepping-range",
+addr="0x000100d4",line="5",file="hello.c"
+(gdb)
+</PRE>
+
+
+<H3>The <CODE>-exec-return</CODE> Command</H3>
+<P>
+<A NAME="IDX1438"></A>
+
+</P>
+
+<H4>Synopsis</H4>
+
+
+<PRE>
+ -exec-return
+</PRE>
+
+<P>
+Makes current function return immediately.  Doesn't execute the inferior.
+Displays the new current frame.
+
+</P>
+
+<H4>GDB Command</H4>
+
+<P>
+The corresponding GDB command is <SAMP>`return'</SAMP>.
+
+</P>
+
+<H4>Example</H4>
+
+
+<PRE>
+(gdb)
+200-break-insert callee4
+200^done,bkpt={number="1",addr="0x00010734",
+file="../../../devo/gdb/testsuite/gdb.mi/basics.c",line="8"}
+(gdb)
+000-exec-run
+000^running
+(gdb)
+000*stopped,reason="breakpoint-hit",bkptno="1",
+frame={func="callee4",args=[],
+file="../../../devo/gdb/testsuite/gdb.mi/basics.c",
+fullname="/home/foo/bar/devo/gdb/testsuite/gdb.mi/basics.c",line="8"}
+(gdb)
+205-break-delete
+205^done
+(gdb)
+111-exec-return
+111^done,frame={level="0",func="callee3",
+args=[{name="strarg",
+value="0x11940 \"A string argument.\""}],
+file="../../../devo/gdb/testsuite/gdb.mi/basics.c",
+fullname="/home/foo/bar/devo/gdb/testsuite/gdb.mi/basics.c",line="18"}
+(gdb)
+</PRE>
+
+
+<H3>The <CODE>-exec-run</CODE> Command</H3>
+<P>
+<A NAME="IDX1439"></A>
+
+</P>
+
+<H4>Synopsis</H4>
+
+
+<PRE>
+ -exec-run
+</PRE>
+
+<P>
+Asynchronous command.  Starts execution of the inferior from the
+beginning.  The inferior executes until either a breakpoint is
+encountered or the program exits.
+
+</P>
+
+<H4>GDB Command</H4>
+
+<P>
+The corresponding GDB command is <SAMP>`run'</SAMP>.
+
+</P>
+
+<H4>Example</H4>
+
+
+<PRE>
+(gdb)
+-break-insert main
+^done,bkpt={number="1",addr="0x0001072c",file="recursive2.c",line="4"}
+(gdb)
+-exec-run
+^running
+(gdb)
+*stopped,reason="breakpoint-hit",bkptno="1",
+frame={func="main",args=[],file="recursive2.c",
+fullname="/home/foo/bar/devo/myproject/recursive2.c",line="4"}
+(gdb)
+</PRE>
+
+
+<H3>The <CODE>-exec-show-arguments</CODE> Command</H3>
+<P>
+<A NAME="IDX1440"></A>
+
+</P>
+
+<H4>Synopsis</H4>
+
+
+<PRE>
+ -exec-show-arguments
+</PRE>
+
+<P>
+Print the arguments of the program.
+
+</P>
+
+<H4>GDB Command</H4>
+
+<P>
+The corresponding GDB command is <SAMP>`show args'</SAMP>.
+
+</P>
+
+<H4>Example</H4>
+<P>
+N.A.
+
+</P>
+
+
+<H3>The <CODE>-exec-step</CODE> Command</H3>
+<P>
+<A NAME="IDX1441"></A>
+
+</P>
+
+<H4>Synopsis</H4>
+
+
+<PRE>
+ -exec-step
+</PRE>
+
+<P>
+Asynchronous command.  Resumes execution of the inferior program, stopping
+when the beginning of the next source line is reached, if the next
+source line is not a function call.  If it is, stop at the first
+instruction of the called function.
+
+</P>
+
+<H4>GDB Command</H4>
+
+<P>
+The corresponding GDB command is <SAMP>`step'</SAMP>.
+
+</P>
+
+<H4>Example</H4>
+
+<P>
+Stepping into a function:
+
+</P>
+
+<PRE>
+-exec-step
+^running
+(gdb)
+*stopped,reason="end-stepping-range",
+frame={func="foo",args=[{name="a",value="10"},
+{name="b",value="0"}],file="recursive2.c",
+fullname="/home/foo/bar/devo/myproject/recursive2.c",line="11"}
+(gdb)
+</PRE>
+
+<P>
+Regular stepping:
+
+</P>
+
+<PRE>
+-exec-step
+^running
+(gdb)
+*stopped,reason="end-stepping-range",line="14",file="recursive2.c"
+(gdb)
+</PRE>
+
+
+<H3>The <CODE>-exec-step-instruction</CODE> Command</H3>
+<P>
+<A NAME="IDX1442"></A>
+
+</P>
+
+<H4>Synopsis</H4>
+
+
+<PRE>
+ -exec-step-instruction
+</PRE>
+
+<P>
+Asynchronous command.  Resumes the inferior which executes one machine
+instruction.  The output, once GDB has stopped, will vary depending on
+whether we have stopped in the middle of a source line or not.  In the
+former case, the address at which the program stopped will be printed as
+well.
+
+</P>
+
+<H4>GDB Command</H4>
+
+<P>
+The corresponding GDB command is <SAMP>`stepi'</SAMP>.
+
+</P>
+
+<H4>Example</H4>
+
+
+<PRE>
+(gdb)
+-exec-step-instruction
+^running
+
+(gdb)
+*stopped,reason="end-stepping-range",
+frame={func="foo",args=[],file="try.c",
+fullname="/home/foo/bar/devo/myproject/try.c",line="10"}
+(gdb)
+-exec-step-instruction
+^running
+
+(gdb)
+*stopped,reason="end-stepping-range",
+frame={addr="0x000100f4",func="foo",args=[],file="try.c",
+fullname="/home/foo/bar/devo/myproject/try.c",line="10"}
+(gdb)
+</PRE>
+
+
+<H3>The <CODE>-exec-until</CODE> Command</H3>
+<P>
+<A NAME="IDX1443"></A>
+
+</P>
+
+<H4>Synopsis</H4>
+
+
+<PRE>
+ -exec-until [ <VAR>location</VAR> ]
+</PRE>
+
+<P>
+Asynchronous command.  Executes the inferior until the <VAR>location</VAR>
+specified in the argument is reached.  If there is no argument, the inferior
+executes until a source line greater than the current one is reached.
+The reason for stopping in this case will be <SAMP>`location-reached'</SAMP>.
+
+</P>
+
+<H4>GDB Command</H4>
+
+<P>
+The corresponding GDB command is <SAMP>`until'</SAMP>.
+
+</P>
+
+<H4>Example</H4>
+
+
+<PRE>
+(gdb)
+-exec-until recursive2.c:6
+^running
+(gdb)
+x = 55
+*stopped,reason="location-reached",frame={func="main",args=[],
+file="recursive2.c",fullname="/home/foo/bar/devo/myproject/recursive2.c",line="6"}
+(gdb)
+</PRE>
+
+
+<H3>The <CODE>-file-core-file</CODE> Command</H3>
+<P>
+<A NAME="IDX1444"></A>
+
+</P>
+
+<H4>Synopsis</H4>
+
+
+<PRE>
+ -file-core-file <VAR>corefile</VAR>
+</PRE>
+
+<P>
+Specify the core file to be debugger.
+
+</P>
+
+<H3>The <CODE>-file-exec-and-symbols</CODE> Command</H3>
+<P>
+<A NAME="IDX1445"></A>
+
+</P>
+
+<H4>Synopsis</H4>
+
+
+<PRE>
+ -file-exec-and-symbols <VAR>file</VAR>
+</PRE>
+
+<P>
+Specify the executable file to be debugged.  This file is the one from
+which the symbol table is also read.  If no file is specified, the
+command clears the executable and symbol information.  If breakpoints
+are set when using this command with no arguments, GDB will produce
+error messages.  Otherwise, no output is produced, except a completion
+notification.
+
+</P>
+
+<H4>GDB Command</H4>
+
+<P>
+The corresponding GDB command is <SAMP>`file'</SAMP>.
+
+</P>
+
+<H4>Example</H4>
+
+
+<PRE>
+(gdb)
+-file-exec-and-symbols /kwikemart/marge/ezannoni/TRUNK/mbx/hello.mbx
+^done
+(gdb)
+</PRE>
+
+
+<H3>The <CODE>-file-exec-file</CODE> Command</H3>
+<P>
+<A NAME="IDX1446"></A>
+
+</P>
+
+<H4>Synopsis</H4>
+
+
+<PRE>
+ -file-exec-file <VAR>file</VAR>
+</PRE>
+
+<P>
+Specify the executable file to be debugged.  Unlike
+<SAMP>`-file-exec-and-symbols'</SAMP>, the symbol table is <EM>not</EM> read
+from this file.  If used without argument, GDB clears the information
+about the executable file.  No output is produced, except a completion
+notification.
+
+</P>
+
+<H4>GDB Command</H4>
+
+<P>
+The corresponding GDB command is <SAMP>`exec-file'</SAMP>.
+
+</P>
+
+<H4>Example</H4>
+
+
+<PRE>
+(gdb)
+-file-exec-file /kwikemart/marge/ezannoni/TRUNK/mbx/hello.mbx
+^done
+(gdb)
+</PRE>
+
+
+<H3>The <CODE>-file-list-exec-sections</CODE> Command</H3>
+<P>
+<A NAME="IDX1447"></A>
+
+</P>
+
+<H4>Synopsis</H4>
+
+
+<PRE>
+ -file-list-exec-sections
+</PRE>
+
+<P>
+List the sections of the current executable file.
+
+</P>
+
+<H4>GDB Command</H4>
+
+<P>
+The GDB command <SAMP>`info file'</SAMP> shows, among the rest, the same
+information as this command.  <CODE>gdbtk</CODE> has a corresponding command
+<SAMP>`gdb_load_info'</SAMP>.
+
+</P>
+
+<H4>Example</H4>
+<P>
+N.A.
+
+</P>
+
+
+<H3>The <CODE>-file-list-exec-source-file</CODE> Command</H3>
+<P>
+<A NAME="IDX1448"></A>
+
+</P>
+
+<H4>Synopsis</H4>
+
+
+<PRE>
+ -file-list-exec-source-file
+</PRE>
+
+<P>
+List the line number, the current source file, and the absolute path
+to the current source file for the current executable.
+
+</P>
+
+<H4>GDB Command</H4>
+
+<P>
+There's no GDB command which directly corresponds to this one.
+
+</P>
+
+<H4>Example</H4>
+
+
+<PRE>
+(gdb)
+123-file-list-exec-source-file
+123^done,line="1",file="foo.c",fullname="/home/bar/foo.c"
+(gdb)
+</PRE>
+
+
+<H3>The <CODE>-file-list-exec-source-files</CODE> Command</H3>
+<P>
+<A NAME="IDX1449"></A>
+
+</P>
+
+<H4>Synopsis</H4>
+
+
+<PRE>
+ -file-list-exec-source-files
+</PRE>
+
+<P>
+List the source files for the current executable.
+
+</P>
+
+<H4>GDB Command</H4>
+
+<P>
+There's no GDB command which directly corresponds to this one.
+<CODE>gdbtk</CODE> has an analogous command <SAMP>`gdb_listfiles'</SAMP>.
+
+</P>
+
+<H4>Example</H4>
+<P>
+N.A.
+
+</P>
+
+
+<H3>The <CODE>-file-list-globals</CODE> Command</H3>
+<P>
+<A NAME="IDX1450"></A>
+
+</P>
+
+<H4>Synopsis</H4>
+
+
+<PRE>
+-file-list-globals -file <VAR>file</VAR> -shlib <VAR>image</VAR> <VAR>print-values</VAR> -filter <VAR>filter_regex</VAR> -constants <VAR>constants</VAR>
+</PRE>
+
+<P>
+List the globals defined in file <VAR>file</VAR> and image <VAR>image</VAR>.  If
+<VAR>file</VAR> is the empty string, then all globals in <VAR>image</VAR> are
+listed, and if both <VAR>file</VAR> and <VAR>image</VAR> are the empty string,
+then all globals are listed.
+
+</P>
+<P>
+<VAR>print-values</VAR> has the same meaning as for <SAMP>`-stack-list-locals'</SAMP>.
+
+</P>
+<P>
+<VAR>filter_regex</VAR> is optional.  If provided, then all statics whose names match
+the regex will be filtered out.
+
+</P>
+<P>
+<VAR>constants</VAR> is also optional. If provided, and set to 1, then no const statics will be printed
+with the exception of const pointers.
+
+</P>
+
+<H4>GDB Command</H4>
+
+<P>
+There's no GDB command which directly corresponds to this one.
+
+</P>
+
+<H4>Example</H4>
+
+<PRE>
+(gdb)
+-file-list-exec-source-files
+^done,files=[
+{file=foo.c,fullname=/home/foo.c},
+{file=/home/bar.c,fullname=/home/bar.c},
+{file=gdb_could_not_find_fullpath.c}]
+(gdb)
+</PRE>
+
+<P>
+If there is more than one file, then the output will be a list of files
+with the file and the globals as the elements of the list, as in:
+
+</P>
+
+<PRE>
+(gdb)
+-file-list-globals -file "" -shlib gdb --no-values
+^done,file=[filename="../../gdb/src/mmalloc/keys.c",globals=[]],file=[filename="../../gdb/src/mmalloc/mmap-sup.c",globals=[]],...]
+(gdb)
+</PRE>
+
+<P>
+And if there are more than one shared library, the output will contain a list of images, which will contain a list of files as above, for instance:
+
+</P>
+
+<PRE>
+(gdb)
+-file-list-globals --file "" --shlib "" --no-values
+^done,image=[imagename="/usr/lib/dyld"],image=[imagename="/usr/lib/libncurses.5.dylib"],image=[imagename="/usr/lib,image=[imagename="/build/gdb/gdb",file=[filename="../../gdb/src/mmalloc/keys.c",globals=[]],...]]
+(gdb)
+</PRE>
+
+
+<H3>The <CODE>-file-list-shared-libraries</CODE> Command</H3>
+<P>
+<A NAME="IDX1451"></A>
+
+</P>
+
+<H4>Synopsis</H4>
+
+
+<PRE>
+ -file-list-shared-libraries
+</PRE>
+
+<P>
+List the shared libraries in the program.
+
+</P>
+
+<H4>GDB Command</H4>
+
+<P>
+The corresponding GDB command is <SAMP>`info shared'</SAMP>.
+
+</P>
+
+<H4>Example</H4>
+<P>
+N.A.
+
+</P>
+
+
+<H3>The <CODE>-file-list-statics</CODE> Command</H3>
+<P>
+<A NAME="IDX1452"></A>
+
+</P>
+
+<H4>Synopsis</H4>
+
+
+<PRE>
+ -file-list-statics -file <VAR>file</VAR> -shlib <VAR>image</VAR> <VAR>print-values</VAR> -filter <VAR>filter_regex</VAR> -constants <VAR>constants</VAR>
+</PRE>
+
+<P>
+List the globals defined in file <VAR>file</VAR> and image <VAR>image</VAR>.  If
+<VAR>image</VAR> is the empty string, then the first occurance of the file
+<VAR>file</VAR> is used.
+
+</P>
+<P>
+<VAR>file</VAR> also accepts the special cookie <CODE>*CURRENT FRAME*</CODE> in which 
+case the currently selected frame is used.  You still have to provide an some
+value for <VAR>image</VAR>, but it is ignored.
+
+</P>
+<P>
+<VAR>print-values</VAR> has the same meaning as for <SAMP>`-stack-list-locals'</SAMP>.
+
+</P>
+<P>
+<VAR>filter_regex</VAR> is optional.  If provided, then all statics whose names match
+the regex will be filtered out.
+
+</P>
+<P>
+<VAR>constants</VAR> is also optional. If provided and set to 1, then no const statics will be printed
+with the exception of const pointers.
+
+</P>
+
+<H4>GDB Command</H4>
+
+<P>
+There's no GDB command which directly corresponds to this one.
+
+</P>
+
+<H4>Example</H4>
+
+
+<PRE>
+(gdb)
+-file-list-statics -file breakpoint.c -shlib gdb --no-values
+^done,statics=[{name="overlay_events_enabled"},{name="exception_catchpoint_throw_enabled"},...]
+(gdb)
+</PRE>
+
+
+<H3>The <CODE>-file-list-symbol-files</CODE> Command</H3>
+<P>
+<A NAME="IDX1453"></A>
+
+</P>
+
+<H4>Synopsis</H4>
+
+
+<PRE>
+ -file-list-symbol-files
+</PRE>
+
+<P>
+List symbol files.
+
+</P>
+
+<H4>GDB Command</H4>
+
+<P>
+The corresponding GDB command is <SAMP>`info file'</SAMP> (part of it).
+
+</P>
+
+<H4>Example</H4>
+<P>
+N.A.
+
+</P>
+
+
+<H3>The <CODE>-file-symbol-file</CODE> Command</H3>
+<P>
+<A NAME="IDX1454"></A>
+
+</P>
+
+<H4>Synopsis</H4>
+
+
+<PRE>
+ -file-symbol-file <VAR>file</VAR>
+</PRE>
+
+<P>
+Read symbol table info from the specified <VAR>file</VAR> argument.  When
+used without arguments, clears GDB's symbol table info.  No output is
+produced, except for a completion notification.
+
+</P>
+
+<H4>GDB Command</H4>
+
+<P>
+The corresponding GDB command is <SAMP>`symbol-file'</SAMP>.
+
+</P>
+
+<H4>Example</H4>
+
+
+<PRE>
+(gdb)
+-file-symbol-file /kwikemart/marge/ezannoni/TRUNK/mbx/hello.mbx
+^done
+(gdb)
+</PRE>
+
+
+
+<H2><A NAME="SEC252" HREF="gdb_toc.html#TOC252">Miscellaneous GDB commands in GDB/MI</A></H2>
+
+
+<H3>The <CODE>-gdb-exit</CODE> Command</H3>
+<P>
+<A NAME="IDX1455"></A>
+
+</P>
+
+<H4>Synopsis</H4>
+
+
+<PRE>
+ -gdb-exit
+</PRE>
+
+<P>
+Exit GDB immediately.
+
+</P>
+
+<H4>GDB Command</H4>
+
+<P>
+Approximately corresponds to <SAMP>`quit'</SAMP>.
+
+</P>
+
+<H4>Example</H4>
+
+
+<PRE>
+(gdb)
+-gdb-exit
+</PRE>
+
+
+<H3>The <CODE>-gdb-set</CODE> Command</H3>
+<P>
+<A NAME="IDX1456"></A>
+
+</P>
+
+<H4>Synopsis</H4>
+
+
+<PRE>
+ -gdb-set
+</PRE>
+
+<P>
+Set an internal GDB variable.
+
+</P>
+
+<H4>GDB Command</H4>
+
+<P>
+The corresponding GDB command is <SAMP>`set'</SAMP>.
+
+</P>
+
+<H4>Example</H4>
+
+
+<PRE>
+(gdb)
+-gdb-set $foo=3
+^done
+(gdb)
+</PRE>
+
+
+<H3>The <CODE>-gdb-show</CODE> Command</H3>
+<P>
+<A NAME="IDX1457"></A>
+
+</P>
+
+<H4>Synopsis</H4>
+
+
+<PRE>
+ -gdb-show
+</PRE>
+
+<P>
+Show the current value of a GDB variable.
+
+</P>
+
+<H4>GDB command</H4>
+
+<P>
+The corresponding GDB command is <SAMP>`show'</SAMP>.
+
+</P>
+
+<H4>Example</H4>
+
+
+<PRE>
+(gdb)
+-gdb-show annotate
+^done,value="0"
+(gdb)
+</PRE>
+
+
+<H3>The <CODE>-gdb-version</CODE> Command</H3>
+<P>
+<A NAME="IDX1458"></A>
+
+</P>
+
+<H4>Synopsis</H4>
+
+
+<PRE>
+ -gdb-version
+</PRE>
+
+<P>
+Show version information for GDB.  Used mostly in testing.
+
+</P>
+
+<H4>GDB Command</H4>
+
+<P>
+There's no equivalent GDB command.  GDB by default shows this
+information when you start an interactive session.
+
+</P>
+
+<H4>Example</H4>
+
+
+<PRE>
+(gdb)
+-gdb-version
+~GNU gdb 5.2.1
+~Copyright 2000 Free Software Foundation, Inc.
+~GDB is free software, covered by the GNU General Public License, and
+~you are welcome to change it and/or distribute copies of it under
+~ certain conditions.
+~Type "show copying" to see the conditions.
+~There is absolutely no warranty for GDB.  Type "show warranty" for
+~ details.
+~This GDB was configured as
+ "--host=sparc-sun-solaris2.5.1 --target=ppc-eabi".
+^done
+(gdb)
+</PRE>
+
+
+<H3>The <CODE>-interpreter-exec</CODE> Command</H3>
+<P>
+<A NAME="IDX1459"></A>
+
+</P>
+
+<H3>Synopsis</H3>
+
+
+<PRE>
+-interpreter-exec <VAR>interpreter</VAR> <VAR>command</VAR>
+</PRE>
+
+<P>
+Execute the specified <VAR>command</VAR> in the given <VAR>interpreter</VAR>.
+
+</P>
+
+<H3>GDB Command</H3>
+
+<P>
+The corresponding GDB command is <SAMP>`interpreter-exec'</SAMP>.
+
+</P>
+
+<H3>Example</H3>
+
+
+<PRE>
+(gdb)
+-interpreter-exec console "break main"
+&#38;"During symbol reading, couldn't parse type; debugger out of date?.\n"
+&#38;"During symbol reading, bad structure-type format.\n"
+~"Breakpoint 1 at 0x8074fc6: file ../../src/gdb/main.c, line 743.\n"
+^done
+(gdb)
+</PRE>
+
+
+<H3>The <CODE>-inferior-tty-set</CODE> Command</H3>
+<P>
+<A NAME="IDX1460"></A>
+
+</P>
+
+<H3>Synopsis</H3>
+
+
+<PRE>
+-inferior-tty-set /dev/pts/1
+</PRE>
+
+<P>
+Set terminal for future runs of the program being debugged.
+
+</P>
+
+<H3>GDB Command</H3>
+
+<P>
+The corresponding GDB command is <SAMP>`set inferior-tty /dev/pts/1'</SAMP>.
+
+</P>
+
+<H3>Example</H3>
+
+
+<PRE>
+(gdb)
+-inferior-tty-set /dev/pts/1
+^done
+(gdb)
+</PRE>
+
+
+<H3>The <CODE>-inferior-tty-show</CODE> Command</H3>
+<P>
+<A NAME="IDX1461"></A>
+
+</P>
+
+<H3>Synopsis</H3>
+
+
+<PRE>
+-inferior-tty-show
+</PRE>
+
+<P>
+Show terminal for future runs of program being debugged.
+
+</P>
+
+<H3>GDB Command</H3>
+
+<P>
+The corresponding GDB command is <SAMP>`show inferior-tty'</SAMP>.
+
+</P>
+
+<H3>Example</H3>
+
+
+<PRE>
+(gdb)
+-inferior-tty-set /dev/pts/1
+^done
+(gdb)
+-inferior-tty-show
+^done,inferior_tty_terminal="/dev/pts/1"
+(gdb)
+</PRE>
+
+
+
+<H2><A NAME="SEC253" HREF="gdb_toc.html#TOC253">GDB/MI Stack Manipulation Commands</A></H2>
+
+
+<H3>The <CODE>-stack-info-frame</CODE> Command</H3>
+<P>
+<A NAME="IDX1462"></A>
+
+</P>
+
+<H4>Synopsis</H4>
+
+
+<PRE>
+ -stack-info-frame
+</PRE>
+
+<P>
+Get info on the selected frame.
+
+</P>
+
+<H4>GDB Command</H4>
+
+<P>
+The corresponding GDB command is <SAMP>`info frame'</SAMP> or <SAMP>`frame'</SAMP>
+(without arguments).
+
+</P>
+
+<H4>Example</H4>
+
+
+<PRE>
+(gdb)
+-stack-info-frame
+^done,frame={level="1",addr="0x0001076c",func="callee3",
+file="../../../devo/gdb/testsuite/gdb.mi/basics.c",
+fullname="/home/foo/bar/devo/gdb/testsuite/gdb.mi/basics.c",line="17"}
+(gdb)
+</PRE>
+
+
+<H3>The <CODE>-stack-info-depth</CODE> Command</H3>
+<P>
+<A NAME="IDX1463"></A>
+
+</P>
+
+<H4>Synopsis</H4>
+
+
+<PRE>
+ -stack-info-depth [ <VAR>max-depth</VAR> ]
+</PRE>
+
+<P>
+Return the depth of the stack.  If the integer argument <VAR>max-depth</VAR>
+is specified, do not count beyond <VAR>max-depth</VAR> frames.
+
+</P>
+
+<H4>GDB Command</H4>
+
+<P>
+There's no equivalent GDB command.
+
+</P>
+
+<H4>Example</H4>
+
+<P>
+For a stack with frame levels 0 through 11:
+
+</P>
+
+<PRE>
+(gdb)
+-stack-info-depth
+^done,depth="12"
+(gdb)
+-stack-info-depth 4
+^done,depth="4"
+(gdb)
+-stack-info-depth 12
+^done,depth="12"
+(gdb)
+-stack-info-depth 11
+^done,depth="11"
+(gdb)
+-stack-info-depth 13
+^done,depth="12"
+(gdb)
+</PRE>
+
+
+<H3>The <CODE>-stack-list-arguments</CODE> Command</H3>
+<P>
+<A NAME="IDX1464"></A>
+
+</P>
+
+<H4>Synopsis</H4>
+
+
+<PRE>
+ -stack-list-arguments <VAR>show-values</VAR>
+    [ <VAR>low-frame</VAR> <VAR>high-frame</VAR> ]
+</PRE>
+
+<P>
+Display a list of the arguments for the frames between <VAR>low-frame</VAR>
+and <VAR>high-frame</VAR> (inclusive).  If <VAR>low-frame</VAR> and
+<VAR>high-frame</VAR> are not provided, list the arguments for the whole call
+stack.
+
+</P>
+<P>
+The <VAR>show-values</VAR> argument must have a value of 0 or 1.  A value of
+0 means that only the names of the arguments are listed, a value of 1
+means that both names and values of the arguments are printed.
+
+</P>
+
+<H4>GDB Command</H4>
+
+<P>
+GDB does not have an equivalent command.  <CODE>gdbtk</CODE> has a
+<SAMP>`gdb_get_args'</SAMP> command which partially overlaps with the
+functionality of <SAMP>`-stack-list-arguments'</SAMP>.
+
+</P>
+
+<H4>Example</H4>
+
+
+<PRE>
+(gdb)
+-stack-list-frames
+^done,
+stack=[
+frame={level="0",addr="0x00010734",func="callee4",
+file="../../../devo/gdb/testsuite/gdb.mi/basics.c",
+fullname="/home/foo/bar/devo/gdb/testsuite/gdb.mi/basics.c",line="8"},
+frame={level="1",addr="0x0001076c",func="callee3",
+file="../../../devo/gdb/testsuite/gdb.mi/basics.c",
+fullname="/home/foo/bar/devo/gdb/testsuite/gdb.mi/basics.c",line="17"},
+frame={level="2",addr="0x0001078c",func="callee2",
+file="../../../devo/gdb/testsuite/gdb.mi/basics.c",
+fullname="/home/foo/bar/devo/gdb/testsuite/gdb.mi/basics.c",line="22"},
+frame={level="3",addr="0x000107b4",func="callee1",
+file="../../../devo/gdb/testsuite/gdb.mi/basics.c",
+fullname="/home/foo/bar/devo/gdb/testsuite/gdb.mi/basics.c",line="27"},
+frame={level="4",addr="0x000107e0",func="main",
+file="../../../devo/gdb/testsuite/gdb.mi/basics.c",
+fullname="/home/foo/bar/devo/gdb/testsuite/gdb.mi/basics.c",line="32"}]
+(gdb)
+-stack-list-arguments 0
+^done,
+stack-args=[
+frame={level="0",args=[]},
+frame={level="1",args=[name="strarg"]},
+frame={level="2",args=[name="intarg",name="strarg"]},
+frame={level="3",args=[name="intarg",name="strarg",name="fltarg"]},
+frame={level="4",args=[]}]
+(gdb)
+-stack-list-arguments 1
+^done,
+stack-args=[
+frame={level="0",args=[]},
+frame={level="1",
+ args=[{name="strarg",value="0x11940 \"A string argument.\""}]},
+frame={level="2",args=[
+{name="intarg",value="2"},
+{name="strarg",value="0x11940 \"A string argument.\""}]},
+{frame={level="3",args=[
+{name="intarg",value="2"},
+{name="strarg",value="0x11940 \"A string argument.\""},
+{name="fltarg",value="3.5"}]},
+frame={level="4",args=[]}]
+(gdb)
+-stack-list-arguments 0 2 2
+^done,stack-args=[frame={level="2",args=[name="intarg",name="strarg"]}]
+(gdb)
+-stack-list-arguments 1 2 2
+^done,stack-args=[frame={level="2",
+args=[{name="intarg",value="2"},
+{name="strarg",value="0x11940 \"A string argument.\""}]}]
+(gdb)
+</PRE>
+
+
+<H3>The <CODE>-stack-list-frames</CODE> Command</H3>
+<P>
+<A NAME="IDX1465"></A>
+
+</P>
+
+<H4>Synopsis</H4>
+
+
+<PRE>
+ -stack-list-frames [ <VAR>low-frame</VAR> <VAR>high-frame</VAR> ]
+</PRE>
+
+<P>
+List the frames currently on the stack.  For each frame it displays the
+following info:
+
+</P>
+<DL COMPACT>
+
+<DT><SAMP>`<VAR>level</VAR>'</SAMP>
+<DD>
+The frame number, 0 being the topmost frame, i.e. the innermost function.
+<DT><SAMP>`<VAR>addr</VAR>'</SAMP>
+<DD>
+The <CODE>$pc</CODE> value for that frame.
+<DT><SAMP>`<VAR>func</VAR>'</SAMP>
+<DD>
+Function name.
+<DT><SAMP>`<VAR>file</VAR>'</SAMP>
+<DD>
+File name of the source file where the function lives.
+<DT><SAMP>`<VAR>line</VAR>'</SAMP>
+<DD>
+Line number corresponding to the <CODE>$pc</CODE>.
+</DL>
+
+<P>
+If invoked without arguments, this command prints a backtrace for the
+whole stack.  If given two integer arguments, it shows the frames whose
+levels are between the two arguments (inclusive).  If the two arguments
+are equal, it shows the single frame at the corresponding level.
+
+</P>
+
+<H4>GDB Command</H4>
+
+<P>
+The corresponding GDB commands are <SAMP>`backtrace'</SAMP> and <SAMP>`where'</SAMP>.
+
+</P>
+
+<H4>Example</H4>
+
+<P>
+Full stack backtrace:
+
+</P>
+
+<PRE>
+(gdb)
+-stack-list-frames
+^done,stack=
+[frame={level="0",addr="0x0001076c",func="foo",
+  file="recursive2.c",fullname="/home/foo/bar/devo/myproject/recursive2.c",line="11"},
+frame={level="1",addr="0x000107a4",func="foo",
+  file="recursive2.c",fullname="/home/foo/bar/devo/myproject/recursive2.c",line="14"},
+frame={level="2",addr="0x000107a4",func="foo",
+  file="recursive2.c",fullname="/home/foo/bar/devo/myproject/recursive2.c",line="14"},
+frame={level="3",addr="0x000107a4",func="foo",
+  file="recursive2.c",fullname="/home/foo/bar/devo/myproject/recursive2.c",line="14"},
+frame={level="4",addr="0x000107a4",func="foo",
+  file="recursive2.c",fullname="/home/foo/bar/devo/myproject/recursive2.c",line="14"},
+frame={level="5",addr="0x000107a4",func="foo",
+  file="recursive2.c",fullname="/home/foo/bar/devo/myproject/recursive2.c",line="14"},
+frame={level="6",addr="0x000107a4",func="foo",
+  file="recursive2.c",fullname="/home/foo/bar/devo/myproject/recursive2.c",line="14"},
+frame={level="7",addr="0x000107a4",func="foo",
+  file="recursive2.c",fullname="/home/foo/bar/devo/myproject/recursive2.c",line="14"},
+frame={level="8",addr="0x000107a4",func="foo",
+  file="recursive2.c",fullname="/home/foo/bar/devo/myproject/recursive2.c",line="14"},
+frame={level="9",addr="0x000107a4",func="foo",
+  file="recursive2.c",fullname="/home/foo/bar/devo/myproject/recursive2.c",line="14"},
+frame={level="10",addr="0x000107a4",func="foo",
+  file="recursive2.c",fullname="/home/foo/bar/devo/myproject/recursive2.c",line="14"},
+frame={level="11",addr="0x00010738",func="main",
+  file="recursive2.c",fullname="/home/foo/bar/devo/myproject/recursive2.c",line="4"}]
+(gdb)
+</PRE>
+
+<P>
+Show frames between <VAR>low_frame</VAR> and <VAR>high_frame</VAR>:
+
+</P>
+
+<PRE>
+(gdb)
+-stack-list-frames 3 5
+^done,stack=
+[frame={level="3",addr="0x000107a4",func="foo",
+  file="recursive2.c",fullname="/home/foo/bar/devo/myproject/recursive2.c",line="14"},
+frame={level="4",addr="0x000107a4",func="foo",
+  file="recursive2.c",fullname="/home/foo/bar/devo/myproject/recursive2.c",line="14"},
+frame={level="5",addr="0x000107a4",func="foo",
+  file="recursive2.c",fullname="/home/foo/bar/devo/myproject/recursive2.c",line="14"}]
+(gdb)
+</PRE>
+
+<P>
+Show a single frame:
+
+</P>
+
+<PRE>
+(gdb)
+-stack-list-frames 3 3
+^done,stack=
+[frame={level="3",addr="0x000107a4",func="foo",
+  file="recursive2.c",fullname="/home/foo/bar/devo/myproject/recursive2.c",line="14"}]
+(gdb)
+</PRE>
+
+
+<H3>The <CODE>-stack-list-locals</CODE> Command</H3>
+<P>
+<A NAME="IDX1466"></A>
+
+</P>
+
+<H4>Synopsis</H4>
+
+
+<PRE>
+ -stack-list-locals <VAR>print-values</VAR>
+</PRE>
+
+<P>
+Display the local variable names for the selected frame.  If
+<VAR>print-values</VAR> is 0 or <CODE>--no-values</CODE>, print only the names of
+the variables; if it is 1 or <CODE>--all-values</CODE>, print also their
+values; and if it is 2 or <CODE>--simple-values</CODE>, print the name,
+type and value for simple data types and the name and type for arrays,
+structures and unions.  In this last case, a frontend can immediately
+display the value of simple data types and create variable objects for
+other data types when the the user wishes to explore their values in
+more detail. With an argument of 2, 3, or <CODE>--create-varobjs</CODE>,
+the command makes variable objects for all the variables.
+
+</P>
+
+<H4>GDB Command</H4>
+
+<P>
+<SAMP>`info locals'</SAMP> in GDB, <SAMP>`gdb_get_locals'</SAMP> in <CODE>gdbtk</CODE>.
+
+</P>
+
+<H4>Example</H4>
+
+
+<PRE>
+(gdb)
+-stack-list-locals 0
+^done,locals=[name="A",name="B",name="C"]
+(gdb)
+-stack-list-locals --all-values
+^done,locals=[{name="A",value="1"},{name="B",value="2"},
+  {name="C",value="{1, 2, 3}"}]
+-stack-list-locals --simple-values
+^done,locals=[{name="A",type="int",value="1"},
+  {name="B",type="int",value="2"},{name="C",type="int [3]"}]
+(gdb)
+</PRE>
+
+
+<H3>The <CODE>-stack-select-frame</CODE> Command</H3>
+<P>
+<A NAME="IDX1467"></A>
+
+</P>
+
+<H4>Synopsis</H4>
+
+
+<PRE>
+ -stack-select-frame <VAR>framenum</VAR>
+</PRE>
+
+<P>
+Change the selected frame.  Select a different frame <VAR>framenum</VAR> on
+the stack.
+
+</P>
+
+<H4>GDB Command</H4>
+
+<P>
+The corresponding GDB commands are <SAMP>`frame'</SAMP>, <SAMP>`up'</SAMP>,
+<SAMP>`down'</SAMP>, <SAMP>`select-frame'</SAMP>, <SAMP>`up-silent'</SAMP>, and <SAMP>`down-silent'</SAMP>.
+
+</P>
+
+<H4>Example</H4>
+
+
+<PRE>
+(gdb)
+-stack-select-frame 2
+^done
+(gdb)
+</PRE>
+
+
+
+<H2><A NAME="SEC254" HREF="gdb_toc.html#TOC254">GDB/MI Symbol Query Commands</A></H2>
+
+
+<H3>The <CODE>-symbol-info-address</CODE> Command</H3>
+<P>
+<A NAME="IDX1468"></A>
+
+</P>
+
+<H4>Synopsis</H4>
+
+
+<PRE>
+ -symbol-info-address <VAR>symbol</VAR>
+</PRE>
+
+<P>
+Describe where <VAR>symbol</VAR> is stored.
+
+</P>
+
+<H4>GDB Command</H4>
+
+<P>
+The corresponding GDB command is <SAMP>`info address'</SAMP>.
+
+</P>
+
+<H4>Example</H4>
+<P>
+N.A.
+
+</P>
+
+
+<H3>The <CODE>-symbol-info-file</CODE> Command</H3>
+<P>
+<A NAME="IDX1469"></A>
+
+</P>
+
+<H4>Synopsis</H4>
+
+
+<PRE>
+ -symbol-info-file
+</PRE>
+
+<P>
+Show the file for the symbol.
+
+</P>
+
+<H4>GDB Command</H4>
+
+<P>
+There's no equivalent GDB command.  <CODE>gdbtk</CODE> has
+<SAMP>`gdb_find_file'</SAMP>.
+
+</P>
+
+<H4>Example</H4>
+<P>
+N.A.
+
+</P>
+
+
+<H3>The <CODE>-symbol-info-function</CODE> Command</H3>
+<P>
+<A NAME="IDX1470"></A>
+
+</P>
+
+<H4>Synopsis</H4>
+
+
+<PRE>
+ -symbol-info-function
+</PRE>
+
+<P>
+Show which function the symbol lives in.
+
+</P>
+
+<H4>GDB Command</H4>
+
+<P>
+<SAMP>`gdb_get_function'</SAMP> in <CODE>gdbtk</CODE>.
+
+</P>
+
+<H4>Example</H4>
+<P>
+N.A.
+
+</P>
+
+
+<H3>The <CODE>-symbol-info-line</CODE> Command</H3>
+<P>
+<A NAME="IDX1471"></A>
+
+</P>
+
+<H4>Synopsis</H4>
+
+
+<PRE>
+ -symbol-info-line
+</PRE>
+
+<P>
+Show the core addresses of the code for a source line.
+
+</P>
+
+<H4>GDB Command</H4>
+
+<P>
+The corresponding GDB command is <SAMP>`info line'</SAMP>.
+<CODE>gdbtk</CODE> has the <SAMP>`gdb_get_line'</SAMP> and <SAMP>`gdb_get_file'</SAMP> commands.
+
+</P>
+
+<H4>Example</H4>
+<P>
+N.A.
+
+</P>
+
+
+<H3>The <CODE>-symbol-info-symbol</CODE> Command</H3>
+<P>
+<A NAME="IDX1472"></A>
+
+</P>
+
+<H4>Synopsis</H4>
+
+
+<PRE>
+ -symbol-info-symbol <VAR>addr</VAR>
+</PRE>
+
+<P>
+Describe what symbol is at location <VAR>addr</VAR>.
+
+</P>
+
+<H4>GDB Command</H4>
+
+<P>
+The corresponding GDB command is <SAMP>`info symbol'</SAMP>.
+
+</P>
+
+<H4>Example</H4>
+<P>
+N.A.
+
+</P>
+
+
+<H3>The <CODE>-symbol-list-functions</CODE> Command</H3>
+<P>
+<A NAME="IDX1473"></A>
+
+</P>
+
+<H4>Synopsis</H4>
+
+
+<PRE>
+ -symbol-list-functions
+</PRE>
+
+<P>
+List the functions in the executable.
+
+</P>
+
+<H4>GDB Command</H4>
+
+<P>
+<SAMP>`info functions'</SAMP> in GDB, <SAMP>`gdb_listfunc'</SAMP> and
+<SAMP>`gdb_search'</SAMP> in <CODE>gdbtk</CODE>.
+
+</P>
+
+<H4>Example</H4>
+<P>
+N.A.
+
+</P>
+
+
+<H3>The <CODE>-symbol-list-lines</CODE> Command</H3>
+<P>
+<A NAME="IDX1474"></A>
+
+</P>
+
+<H4>Synopsis</H4>
+
+
+<PRE>
+ -symbol-list-lines <VAR>filename</VAR>
+</PRE>
+
+<P>
+Print the list of lines that contain code and their associated program
+addresses for the given source filename.  The entries are sorted in
+ascending PC order.
+
+</P>
+
+<H4>GDB Command</H4>
+
+<P>
+There is no corresponding GDB command.
+
+</P>
+
+<H4>Example</H4>
+
+<PRE>
+(gdb)
+-symbol-list-lines basics.c
+^done,lines=[{pc="0x08048554",line="7"},{pc="0x0804855a",line="8"}]
+(gdb)
+</PRE>
+
+
+<H3>The <CODE>-symbol-list-types</CODE> Command</H3>
+<P>
+<A NAME="IDX1475"></A>
+
+</P>
+
+<H4>Synopsis</H4>
+
+
+<PRE>
+ -symbol-list-types
+</PRE>
+
+<P>
+List all the type names.
+
+</P>
+
+<H4>GDB Command</H4>
+
+<P>
+The corresponding commands are <SAMP>`info types'</SAMP> in GDB,
+<SAMP>`gdb_search'</SAMP> in <CODE>gdbtk</CODE>.
+
+</P>
+
+<H4>Example</H4>
+<P>
+N.A.
+
+</P>
+
+
+<H3>The <CODE>-symbol-list-variables</CODE> Command</H3>
+<P>
+<A NAME="IDX1476"></A>
+
+</P>
+
+<H4>Synopsis</H4>
+
+
+<PRE>
+ -symbol-list-variables
+</PRE>
+
+<P>
+List all the global and static variable names.
+
+</P>
+
+<H4>GDB Command</H4>
+
+<P>
+<SAMP>`info variables'</SAMP> in GDB, <SAMP>`gdb_search'</SAMP> in <CODE>gdbtk</CODE>.
+
+</P>
+
+<H4>Example</H4>
+<P>
+N.A.
+
+</P>
+
+
+<H3>The <CODE>-symbol-locate</CODE> Command</H3>
+<P>
+<A NAME="IDX1477"></A>
+
+</P>
+
+<H4>Synopsis</H4>
+
+
+<PRE>
+ -symbol-locate
+</PRE>
+
+
+<H4>GDB Command</H4>
+
+<P>
+<SAMP>`gdb_loc'</SAMP> in <CODE>gdbtk</CODE>.
+
+</P>
+
+<H4>Example</H4>
+<P>
+N.A.
+
+</P>
+
+
+<H3>The <CODE>-symbol-type</CODE> Command</H3>
+<P>
+<A NAME="IDX1478"></A>
+
+</P>
+
+<H4>Synopsis</H4>
+
+
+<PRE>
+ -symbol-type <VAR>variable</VAR>
+</PRE>
+
+<P>
+Show type of <VAR>variable</VAR>.
+
+</P>
+
+<H4>GDB Command</H4>
+
+<P>
+The corresponding GDB command is <SAMP>`ptype'</SAMP>, <CODE>gdbtk</CODE> has
+<SAMP>`gdb_obj_variable'</SAMP>.
+
+</P>
+
+<H4>Example</H4>
+<P>
+N.A.
+
+</P>
+
+
+
+<H2><A NAME="SEC255" HREF="gdb_toc.html#TOC255">GDB/MI Target Manipulation Commands</A></H2>
+
+
+<H3>The <CODE>-target-attach</CODE> Command</H3>
+<P>
+<A NAME="IDX1479"></A>
+
+</P>
+
+<H4>Synopsis</H4>
+
+
+<PRE>
+ -target-attach <VAR>pid</VAR> | <VAR>file</VAR>
+</PRE>
+
+<P>
+Attach to a process <VAR>pid</VAR> or a file <VAR>file</VAR> outside of GDB.
+
+</P>
+
+<H4>GDB command</H4>
+
+<P>
+The corresponding GDB command is <SAMP>`attach'</SAMP>.
+
+</P>
+
+<H4>Example</H4>
+<P>
+N.A.
+
+</P>
+
+
+<H3>The <CODE>-target-compare-sections</CODE> Command</H3>
+<P>
+<A NAME="IDX1480"></A>
+
+</P>
+
+<H4>Synopsis</H4>
+
+
+<PRE>
+ -target-compare-sections [ <VAR>section</VAR> ]
+</PRE>
+
+<P>
+Compare data of section <VAR>section</VAR> on target to the exec file.
+Without the argument, all sections are compared.
+
+</P>
+
+<H4>GDB Command</H4>
+
+<P>
+The GDB equivalent is <SAMP>`compare-sections'</SAMP>.
+
+</P>
+
+<H4>Example</H4>
+<P>
+N.A.
+
+</P>
+
+
+<H3>The <CODE>-target-detach</CODE> Command</H3>
+<P>
+<A NAME="IDX1481"></A>
+
+</P>
+
+<H4>Synopsis</H4>
+
+
+<PRE>
+ -target-detach
+</PRE>
+
+<P>
+Disconnect from the remote target.  There's no output.
+
+</P>
+
+<H4>GDB command</H4>
+
+<P>
+The corresponding GDB command is <SAMP>`detach'</SAMP>.
+
+</P>
+
+<H4>Example</H4>
+
+
+<PRE>
+(gdb)
+-target-detach
+^done
+(gdb)
+</PRE>
+
+
+<H3>The <CODE>-target-disconnect</CODE> Command</H3>
+<P>
+<A NAME="IDX1482"></A>
+
+</P>
+
+<H4>Synopsis</H4>
+
+
+<PRE>
+ -target-disconnect
+</PRE>
+
+<P>
+Disconnect from the remote target.  There's no output.
+
+</P>
+
+<H4>GDB command</H4>
+
+<P>
+The corresponding GDB command is <SAMP>`disconnect'</SAMP>.
+
+</P>
+
+<H4>Example</H4>
+
+
+<PRE>
+(gdb)
+-target-disconnect
+^done
+(gdb)
+</PRE>
+
+
+<H3>The <CODE>-target-download</CODE> Command</H3>
+<P>
+<A NAME="IDX1483"></A>
+
+</P>
+
+<H4>Synopsis</H4>
+
+
+<PRE>
+ -target-download
+</PRE>
+
+<P>
+Loads the executable onto the remote target.
+It prints out an update message every half second, which includes the fields:
+
+</P>
+<DL COMPACT>
+
+<DT><SAMP>`section'</SAMP>
+<DD>
+The name of the section.
+<DT><SAMP>`section-sent'</SAMP>
+<DD>
+The size of what has been sent so far for that section.
+<DT><SAMP>`section-size'</SAMP>
+<DD>
+The size of the section.
+<DT><SAMP>`total-sent'</SAMP>
+<DD>
+The total size of what was sent so far (the current and the previous sections).
+<DT><SAMP>`total-size'</SAMP>
+<DD>
+The size of the overall executable to download.
+</DL>
+
+<P>
+Each message is sent as status record (see section <A HREF="gdb_25.html#SEC241">GDB/MI Output Syntax</A>).
+
+</P>
+<P>
+In addition, it prints the name and size of the sections, as they are
+downloaded.  These messages include the following fields:
+
+</P>
+<DL COMPACT>
+
+<DT><SAMP>`section'</SAMP>
+<DD>
+The name of the section.
+<DT><SAMP>`section-size'</SAMP>
+<DD>
+The size of the section.
+<DT><SAMP>`total-size'</SAMP>
+<DD>
+The size of the overall executable to download.
+</DL>
+
+<P>
+At the end, a summary is printed.
+
+</P>
+
+<H4>GDB Command</H4>
+
+<P>
+The corresponding GDB command is <SAMP>`load'</SAMP>.
+
+</P>
+
+<H4>Example</H4>
+
+<P>
+Note: each status message appears on a single line.  Here the messages
+have been broken down so that they can fit onto a page.
+
+</P>
+
+<PRE>
+(gdb)
+-target-download
++download,{section=".text",section-size="6668",total-size="9880"}
++download,{section=".text",section-sent="512",section-size="6668",
+total-sent="512",total-size="9880"}
++download,{section=".text",section-sent="1024",section-size="6668",
+total-sent="1024",total-size="9880"}
++download,{section=".text",section-sent="1536",section-size="6668",
+total-sent="1536",total-size="9880"}
++download,{section=".text",section-sent="2048",section-size="6668",
+total-sent="2048",total-size="9880"}
++download,{section=".text",section-sent="2560",section-size="6668",
+total-sent="2560",total-size="9880"}
++download,{section=".text",section-sent="3072",section-size="6668",
+total-sent="3072",total-size="9880"}
++download,{section=".text",section-sent="3584",section-size="6668",
+total-sent="3584",total-size="9880"}
++download,{section=".text",section-sent="4096",section-size="6668",
+total-sent="4096",total-size="9880"}
++download,{section=".text",section-sent="4608",section-size="6668",
+total-sent="4608",total-size="9880"}
++download,{section=".text",section-sent="5120",section-size="6668",
+total-sent="5120",total-size="9880"}
++download,{section=".text",section-sent="5632",section-size="6668",
+total-sent="5632",total-size="9880"}
++download,{section=".text",section-sent="6144",section-size="6668",
+total-sent="6144",total-size="9880"}
++download,{section=".text",section-sent="6656",section-size="6668",
+total-sent="6656",total-size="9880"}
++download,{section=".init",section-size="28",total-size="9880"}
++download,{section=".fini",section-size="28",total-size="9880"}
++download,{section=".data",section-size="3156",total-size="9880"}
++download,{section=".data",section-sent="512",section-size="3156",
+total-sent="7236",total-size="9880"}
++download,{section=".data",section-sent="1024",section-size="3156",
+total-sent="7748",total-size="9880"}
++download,{section=".data",section-sent="1536",section-size="3156",
+total-sent="8260",total-size="9880"}
++download,{section=".data",section-sent="2048",section-size="3156",
+total-sent="8772",total-size="9880"}
++download,{section=".data",section-sent="2560",section-size="3156",
+total-sent="9284",total-size="9880"}
++download,{section=".data",section-sent="3072",section-size="3156",
+total-sent="9796",total-size="9880"}
+^done,address="0x10004",load-size="9880",transfer-rate="6586",
+write-rate="429"
+(gdb)
+</PRE>
+
+
+<H3>The <CODE>-target-exec-status</CODE> Command</H3>
+<P>
+<A NAME="IDX1484"></A>
+
+</P>
+
+<H4>Synopsis</H4>
+
+
+<PRE>
+ -target-exec-status
+</PRE>
+
+<P>
+Provide information on the state of the target (whether it is running or
+not, for instance).
+
+</P>
+
+<H4>GDB Command</H4>
+
+<P>
+There's no equivalent GDB command.
+
+</P>
+
+<H4>Example</H4>
+<P>
+N.A.
+
+</P>
+
+
+<H3>The <CODE>-target-list-available-targets</CODE> Command</H3>
+<P>
+<A NAME="IDX1485"></A>
+
+</P>
+
+<H4>Synopsis</H4>
+
+
+<PRE>
+ -target-list-available-targets
+</PRE>
+
+<P>
+List the possible targets to connect to.
+
+</P>
+
+<H4>GDB Command</H4>
+
+<P>
+The corresponding GDB command is <SAMP>`help target'</SAMP>.
+
+</P>
+
+<H4>Example</H4>
+<P>
+N.A.
+
+</P>
+
+
+<H3>The <CODE>-target-list-current-targets</CODE> Command</H3>
+<P>
+<A NAME="IDX1486"></A>
+
+</P>
+
+<H4>Synopsis</H4>
+
+
+<PRE>
+ -target-list-current-targets
+</PRE>
+
+<P>
+Describe the current target.
+
+</P>
+
+<H4>GDB Command</H4>
+
+<P>
+The corresponding information is printed by <SAMP>`info file'</SAMP> (among
+other things).
+
+</P>
+
+<H4>Example</H4>
+<P>
+N.A.
+
+</P>
+
+
+<H3>The <CODE>-target-list-parameters</CODE> Command</H3>
+<P>
+<A NAME="IDX1487"></A>
+
+</P>
+
+<H4>Synopsis</H4>
+
+
+<PRE>
+ -target-list-parameters
+</PRE>
+
+
+<H4>GDB Command</H4>
+
+<P>
+No equivalent.
+
+</P>
+
+<H4>Example</H4>
+<P>
+N.A.
+
+</P>
+
+
+<H3>The <CODE>-target-select</CODE> Command</H3>
+<P>
+<A NAME="IDX1488"></A>
+
+</P>
+
+<H4>Synopsis</H4>
+
+
+<PRE>
+ -target-select <VAR>type</VAR> <VAR>parameters ...</VAR>
+</PRE>
+
+<P>
+Connect GDB to the remote target.  This command takes two args:
+
+</P>
+<DL COMPACT>
+
+<DT><SAMP>`<VAR>type</VAR>'</SAMP>
+<DD>
+The type of target, for instance <SAMP>`async'</SAMP>, <SAMP>`remote'</SAMP>, etc.
+<DT><SAMP>`<VAR>parameters</VAR>'</SAMP>
+<DD>
+Device names, host names and the like.  See section <A HREF="gdb_17.html#SEC152">Commands for managing targets</A>, for more details.
+</DL>
+
+<P>
+The output is a connection notification, followed by the address at
+which the target program is, in the following form:
+
+</P>
+
+<PRE>
+^connected,addr="<VAR>address</VAR>",func="<VAR>function name</VAR>",
+  args=[<VAR>arg list</VAR>]
+</PRE>
+
+
+<H4>GDB Command</H4>
+
+<P>
+The corresponding GDB command is <SAMP>`target'</SAMP>.
+
+</P>
+
+<H4>Example</H4>
+
+
+<PRE>
+(gdb)
+-target-select async /dev/ttya
+^connected,addr="0xfe00a300",func="??",args=[]
+(gdb)
+</PRE>
+
+
+
+<H2><A NAME="SEC256" HREF="gdb_toc.html#TOC256">GDB/MI Thread Commands</A></H2>
+
+
+<H3>The <CODE>-thread-info</CODE> Command</H3>
+<P>
+<A NAME="IDX1489"></A>
+
+</P>
+
+<H4>Synopsis</H4>
+
+
+<PRE>
+ -thread-info
+</PRE>
+
+
+<H4>GDB command</H4>
+
+<P>
+No equivalent.
+
+</P>
+
+<H4>Example</H4>
+<P>
+N.A.
+
+</P>
+
+
+<H3>The <CODE>-thread-list-all-threads</CODE> Command</H3>
+<P>
+<A NAME="IDX1490"></A>
+
+</P>
+
+<H4>Synopsis</H4>
+
+
+<PRE>
+ -thread-list-all-threads
+</PRE>
+
+
+<H4>GDB Command</H4>
+
+<P>
+The equivalent GDB command is <SAMP>`info threads'</SAMP>.
+
+</P>
+
+<H4>Example</H4>
+<P>
+N.A.
+
+</P>
+
+
+<H3>The <CODE>-thread-list-ids</CODE> Command</H3>
+<P>
+<A NAME="IDX1491"></A>
+
+</P>
+
+<H4>Synopsis</H4>
+
+
+<PRE>
+ -thread-list-ids
+</PRE>
+
+<P>
+Produces a list of the currently known GDB thread ids.  At the
+end of the list it also prints the total number of such threads.
+
+</P>
+
+<H4>GDB Command</H4>
+
+<P>
+Part of <SAMP>`info threads'</SAMP> supplies the same information.
+
+</P>
+
+<H4>Example</H4>
+
+<P>
+No threads present, besides the main process:
+
+</P>
+
+<PRE>
+(gdb)
+-thread-list-ids
+^done,thread-ids={},number-of-threads="0"
+(gdb)
+</PRE>
+
+<P>
+Several threads:
+
+</P>
+
+<PRE>
+(gdb)
+-thread-list-ids
+^done,thread-ids={thread-id="3",thread-id="2",thread-id="1"},
+number-of-threads="3"
+(gdb)
+</PRE>
+
+
+<H3>The <CODE>-thread-select</CODE> Command</H3>
+<P>
+<A NAME="IDX1492"></A>
+
+</P>
+
+<H4>Synopsis</H4>
+
+
+<PRE>
+ -thread-select <VAR>threadnum</VAR>
+</PRE>
+
+<P>
+Make <VAR>threadnum</VAR> the current thread.  It prints the number of the new
+current thread, and the topmost frame for that thread.
+
+</P>
+
+<H4>GDB Command</H4>
+
+<P>
+The corresponding GDB command is <SAMP>`thread'</SAMP>.
+
+</P>
+
+<H4>Example</H4>
+
+
+<PRE>
+(gdb)
+-exec-next
+^running
+(gdb)
+*stopped,reason="end-stepping-range",thread-id="2",line="187",
+file="../../../devo/gdb/testsuite/gdb.threads/linux-dp.c"
+(gdb)
+-thread-list-ids
+^done,
+thread-ids={thread-id="3",thread-id="2",thread-id="1"},
+number-of-threads="3"
+(gdb)
+-thread-select 3
+^done,new-thread-id="3",
+frame={level="0",func="vprintf",
+args=[{name="format",value="0x8048e9c \"%*s%c %d %c\\n\""},
+{name="arg",value="0x2"}],file="vprintf.c",line="31"}
+(gdb)
+</PRE>
+
+
+
+<H2><A NAME="SEC257" HREF="gdb_toc.html#TOC257">GDB/MI Tracepoint Commands</A></H2>
+
+<P>
+The tracepoint commands are not yet implemented.
+
+</P>
+
+
+
+<H2><A NAME="SEC258" HREF="gdb_toc.html#TOC258">GDB/MI Variable Objects</A></H2>
+
+
+<H3>Motivation for Variable Objects in GDB/MI</H3>
+
+<P>
+For the implementation of a variable debugger window (locals, watched
+expressions, etc.), we are proposing the adaptation of the existing code
+used by <CODE>Insight</CODE>.
+
+</P>
+<P>
+The two main reasons for that are:
+
+</P>
+
+<OL>
+<LI>
+
+It has been proven in practice (it is already on its second generation).
+
+<LI>
+
+It will shorten development time (needless to say how important it is
+now).
+</OL>
+
+<P>
+The original interface was designed to be used by Tcl code, so it was
+slightly changed so it could be used through GDB/MI.  This section
+describes the GDB/MI operations that will be available and gives some
+hints about their use.
+
+</P>
+<P>
+<EM>Note</EM>: In addition to the set of operations described here, we
+expect the GUI implementation of a variable window to require, at
+least, the following operations:
+
+</P>
+
+<UL>
+<LI><CODE>-gdb-show</CODE> <CODE>output-radix</CODE>
+
+<LI><CODE>-stack-list-arguments</CODE>
+
+<LI><CODE>-stack-list-locals</CODE>
+
+<LI><CODE>-stack-select-frame</CODE>
+
+</UL>
+
+
+<H3>Introduction to Variable Objects in GDB/MI</H3>
+
+<P>
+<A NAME="IDX1493"></A>
+The basic idea behind variable objects is the creation of a named object
+to represent a variable, an expression, a memory location or even a CPU
+register.  For each object created, a set of operations is available for
+examining or changing its properties.
+
+</P>
+<P>
+Furthermore, complex data types, such as C structures, are represented
+in a tree format.  For instance, the <CODE>struct</CODE> type variable is the
+root and the children will represent the struct members.  If a child
+is itself of a complex type, it will also have children of its own.
+Appropriate language differences are handled for C, C<TT>++</TT> and Java.
+
+</P>
+<P>
+When returning the actual values of the objects, this facility allows
+for the individual selection of the display format used in the result
+creation.  It can be chosen among: binary, decimal, hexadecimal, octal
+and natural.  Natural refers to a default format automatically
+chosen based on the variable type (like decimal for an <CODE>int</CODE>, hex
+for pointers, etc.).
+
+</P>
+<P>
+The following is the complete set of GDB/MI operations defined to
+access this functionality:
+
+</P>
+<P>
+@multitable @columnfractions .4 .6
+<LI><STRONG>Operation</STRONG>
+
+@tab <STRONG>Description</STRONG>
+
+<LI><CODE>-var-create</CODE>
+
+@tab create a variable object
+<LI><CODE>-var-delete</CODE>
+
+@tab delete the variable object and its children
+<LI><CODE>-var-set-format</CODE>
+
+@tab set the display format of this variable
+<LI><CODE>-var-show-format</CODE>
+
+@tab show the display format of this variable
+<LI><CODE>-var-info-num-children</CODE>
+
+@tab tells how many children this object has
+<LI><CODE>-var-list-children</CODE>
+
+@tab return a list of the object's children
+<LI><CODE>-var-info-type</CODE>
+
+@tab show the type of this variable object
+<LI><CODE>-var-info-expression</CODE>
+
+@tab print what this variable object represents
+<LI><CODE>-var-show-attributes</CODE>
+
+@tab is this variable editable? does it exist here?
+<LI><CODE>-var-evaluate-expression</CODE>
+
+@tab get the value of this variable
+<LI><CODE>-var-assign</CODE>
+
+@tab set the value of this variable
+<LI><CODE>-var-update</CODE>
+
+@tab update the variable and its children
+
+In the next subsection we describe each operation in detail and suggest
+how it can be used.
+
+
+
+<P><STRONG>Description And Use of Operations on Variable Objects</STRONG></P>
+
+
+
+<P><STRONG>The <CODE>-var-create</CODE> Command</STRONG></P>
+<A NAME="IDX1494"></A>
+
+
+
+<P><STRONG>Synopsis</STRONG></P>
+
+
+<PRE>
+ -var-create {<VAR>name</VAR> | "-"}
+    {<VAR>frame-addr</VAR> | "*"} <VAR>expression</VAR>
+</PRE>
+
+This operation creates a variable object, which allows the monitoring of
+a variable, the result of an expression, a memory cell or a CPU
+register.
+
+The <VAR>name</VAR> parameter is the string by which the object can be
+referenced.  It must be unique.  If <SAMP>`-'</SAMP> is specified, the varobj
+system will generate a string "varNNNNNN" automatically.  It will be
+unique provided that one does not specify <VAR>name</VAR> on that format.
+The command fails if a duplicate name is found.
+
+The frame under which the expression should be evaluated can be
+specified by <VAR>frame-addr</VAR>.  A <SAMP>`*'</SAMP> indicates that the current
+frame should be used.
+
+<VAR>expression</VAR> is any expression valid on the current language set (must not
+begin with a <SAMP>`*'</SAMP>), or one of the following:
+
+
+<UL>
+<LI>
+
+<SAMP>`*<VAR>addr</VAR>'</SAMP>, where <VAR>addr</VAR> is the address of a memory cell
+
+<LI>
+
+<SAMP>`*<VAR>addr</VAR>-<VAR>addr</VAR>'</SAMP> -- a memory address range (TBD)
+
+<LI>
+
+<SAMP>`$<VAR>regname</VAR>'</SAMP> -- a CPU register name
+</UL>
+
+
+
+<P><STRONG>Result</STRONG></P>
+
+This operation returns the name, number of children and the type of the
+object created.  Type is returned as a string as the ones generated by
+the GDB CLI:
+
+
+<PRE>
+ name="<VAR>name</VAR>",numchild="N",type="<VAR>type</VAR>"
+</PRE>
+
+
+
+<P><STRONG>The <CODE>-var-delete</CODE> Command</STRONG></P>
+<A NAME="IDX1495"></A>
+
+
+
+<P><STRONG>Synopsis</STRONG></P>
+
+
+<PRE>
+ -var-delete <VAR>name</VAR>
+</PRE>
+
+Deletes a previously created variable object and all of its children.
+
+Returns an error if the object <VAR>name</VAR> is not found.
+
+
+
+<P><STRONG>The <CODE>-var-set-format</CODE> Command</STRONG></P>
+<A NAME="IDX1496"></A>
+
+
+
+<P><STRONG>Synopsis</STRONG></P>
+
+
+<PRE>
+ -var-set-format <VAR>name</VAR> <VAR>format-spec</VAR>
+</PRE>
+
+Sets the output format for the value of the object <VAR>name</VAR> to be
+<VAR>format-spec</VAR>.
+
+The syntax for the <VAR>format-spec</VAR> is as follows:
+
+
+<PRE>
+ <VAR>format-spec</VAR> ==>
+ {binary | decimal | hexadecimal | octal | natural}
+</PRE>
+
+
+
+<P><STRONG>The <CODE>-var-show-format</CODE> Command</STRONG></P>
+<A NAME="IDX1497"></A>
+
+
+
+<P><STRONG>Synopsis</STRONG></P>
+
+
+<PRE>
+ -var-show-format <VAR>name</VAR>
+</PRE>
+
+Returns the format used to display the value of the object <VAR>name</VAR>.
+
+
+<PRE>
+ <VAR>format</VAR> ==>
+ <VAR>format-spec</VAR>
+</PRE>
+
+
+
+<P><STRONG>The <CODE>-var-info-num-children</CODE> Command</STRONG></P>
+<A NAME="IDX1498"></A>
+
+
+
+<P><STRONG>Synopsis</STRONG></P>
+
+
+<PRE>
+ -var-info-num-children <VAR>name</VAR>
+</PRE>
+
+Returns the number of children of a variable object <VAR>name</VAR>:
+
+
+<PRE>
+ numchild=<VAR>n</VAR>
+</PRE>
+
+
+
+<P><STRONG>The <CODE>-var-list-children</CODE> Command</STRONG></P>
+<A NAME="IDX1499"></A>
+
+
+
+<P><STRONG>Synopsis</STRONG></P>
+
+
+<PRE>
+ -var-list-children [<VAR>print-values</VAR>] <VAR>name</VAR>
+</PRE>
+
+@anchor{-var-list-children} 
+
+Return a list of the children of the specified variable object and
+create variable objects for them, if they do not already exist.  With
+a single argument or if <VAR>print-values</VAR> has a value for of 0 or
+<CODE>--no-values</CODE>, print only the names of the variables; if
+<VAR>print-values</VAR> is 1 or <CODE>--all-values</CODE>, also print their
+values; and if it is 2 or <CODE>--simple-values</CODE> print the name and
+value for simple data types and just the name for arrays, structures
+and unions.
+
+
+
+<P><STRONG>Example</STRONG></P>
+
+
+<PRE>
+(gdb)
+ -var-list-children n
+ ^done,numchild=<VAR>n</VAR>,children=[{name=<VAR>name</VAR>,
+ numchild=<VAR>n</VAR>,type=<VAR>type</VAR>},(repeats N times)]
+(gdb)
+ -var-list-children --all-values n
+ ^done,numchild=<VAR>n</VAR>,children=[{name=<VAR>name</VAR>,
+ numchild=<VAR>n</VAR>,value=<VAR>value</VAR>,type=<VAR>type</VAR>},(repeats N times)]
+</PRE>
+
+
+
+<P><STRONG>The <CODE>-var-info-type</CODE> Command</STRONG></P>
+<A NAME="IDX1500"></A>
+
+
+
+<P><STRONG>Synopsis</STRONG></P>
+
+
+<PRE>
+ -var-info-type <VAR>name</VAR>
+</PRE>
+
+Returns the type of the specified variable <VAR>name</VAR>.  The type is
+returned as a string in the same format as it is output by the
+GDB CLI:
+
+
+<PRE>
+ type=<VAR>typename</VAR>
+</PRE>
+
+
+
+<P><STRONG>The <CODE>-var-info-expression</CODE> Command</STRONG></P>
+<A NAME="IDX1501"></A>
+
+
+
+<P><STRONG>Synopsis</STRONG></P>
+
+
+<PRE>
+ -var-info-expression <VAR>name</VAR>
+</PRE>
+
+Returns what is represented by the variable object <VAR>name</VAR>:
+
+
+<PRE>
+ lang=<VAR>lang-spec</VAR>,exp=<VAR>expression</VAR>
+</PRE>
+
+where <VAR>lang-spec</VAR> is <CODE>{"C" | "C++" | "Java"}</CODE>.
+
+
+
+<P><STRONG>The <CODE>-var-show-attributes</CODE> Command</STRONG></P>
+<A NAME="IDX1502"></A>
+
+
+
+<P><STRONG>Synopsis</STRONG></P>
+
+
+<PRE>
+ -var-show-attributes <VAR>name</VAR>
+</PRE>
+
+List attributes of the specified variable object <VAR>name</VAR>:
+
+
+<PRE>
+ status=<VAR>attr</VAR> [ ( ,<VAR>attr</VAR> )* ]
+</PRE>
+
+where <VAR>attr</VAR> is <CODE>{ { editable | noneditable } | TBD }</CODE>.
+
+
+
+<P><STRONG>The <CODE>-var-evaluate-expression</CODE> Command</STRONG></P>
+<A NAME="IDX1503"></A>
+
+
+
+<P><STRONG>Synopsis</STRONG></P>
+
+
+<PRE>
+ -var-evaluate-expression <VAR>name</VAR>
+</PRE>
+
+Evaluates the expression that is represented by the specified variable
+object and returns its value as a string in the current format specified
+for the object:
+
+
+<PRE>
+ value=<VAR>value</VAR>
+</PRE>
+
+Note that one must invoke <CODE>-var-list-children</CODE> for a variable
+before the value of a child variable can be evaluated.
+
+
+
+<P><STRONG>The <CODE>-var-assign</CODE> Command</STRONG></P>
+<A NAME="IDX1504"></A>
+
+
+
+<P><STRONG>Synopsis</STRONG></P>
+
+
+<PRE>
+ -var-assign <VAR>name</VAR> <VAR>expression</VAR>
+</PRE>
+
+Assigns the value of <VAR>expression</VAR> to the variable object specified
+by <VAR>name</VAR>.  The object must be <SAMP>`editable'</SAMP>.  If the variable's
+value is altered by the assign, the variable will show up in any
+subsequent <CODE>-var-update</CODE> list.
+
+
+
+<P><STRONG>Example</STRONG></P>
+
+
+<PRE>
+(gdb)
+-var-assign var1 3
+^done,value="3"
+(gdb)
+-var-update *
+^done,changelist=[{name="var1",in_scope="true",type_changed="false"}]
+(gdb)
+</PRE>
+
+
+
+<P><STRONG>The <CODE>-var-update</CODE> Command</STRONG></P>
+<A NAME="IDX1505"></A>
+
+
+
+<P><STRONG>Synopsis</STRONG></P>
+
+
+<PRE>
+ -var-update [<VAR>print-values</VAR>] {<VAR>name</VAR> | "*"}
+</PRE>
+
+Update the value of the variable object <VAR>name</VAR> by evaluating its
+expression after fetching all the new values from memory or registers.
+A <SAMP>`*'</SAMP> causes all existing variable objects to be updated.  The
+option <VAR>print-values</VAR> determines whether names and values, or just
+names are printed in the manner described for
+<CODE>@xref{-var-list-children</CODE>}.
+
+
+
+<P><STRONG>Example</STRONG></P>
+
+
+<PRE>
+(gdb)
+-var-assign var1 3
+^done,value="3"
+(gdb)
+-var-update --all-values var1
+^done,changelist=[{name="var1",value="3",in_scope="true",
+type_changed="false"}]
+(gdb)
+</PRE>
+
+<P><HR><P>
+Go to the <A HREF="gdb_1.html">first</A>, <A HREF="gdb_24.html">previous</A>, <A HREF="gdb_26.html">next</A>, <A HREF="gdb_36.html">last</A> section, <A HREF="gdb_toc.html">table of contents</A>.
+</BODY>
+</HTML>

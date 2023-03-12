@@ -1,0 +1,127 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+<head>
+	<title>Memory Management Programming Guide for Cocoa: Using Memory Zones</title>
+	<meta id="Generator" name="Generator" content="Gutenberg"/>
+	<meta id="GeneratorVersion" name="GeneratorVersion" content="v132"/>
+	<meta http-equiv="content-type" content="text/html;charset=utf-8"/>
+	<meta id="Copyright" name="Copyright" content="Copyright 2009 Apple Inc. All Rights Reserved."/>
+	<meta id="IndexTitle" name="IndexTitle" content="Using Memory Zones"/>
+	<meta id="xcode-display" name="xcode-display" content="render"/>
+	<meta id="toc-file" name="toc-file" content="../toc.html"/>
+	<meta id="RESOURCES" content="../../../../Resources" />
+	
+	<link rel="stylesheet" type="text/css" href="../../../../Resources/CSS/frameset_styles.css"/>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/lib/prototype.js"></script>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/lib/scriptaculous.js"></script>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/page.js"></script>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/pedia.js"></script>
+	<!--[if lte IE 6]>
+		<style type="text/css">
+			/*<![CDATA[*/ 
+			html {overflow-x:auto; overflow-y:hidden;  }
+			/*]]>*/
+		</style>
+	<![endif]-->
+</head>
+<body bgcolor="#ffffff" onload="initialize_page();"><a name="//apple_ref/doc/uid/20001292" title="Using Memory Zones"></a>
+    <noscript>
+    <div id="tocMenu">
+        <iframe id="toc_content" name="toc_content" SRC="../toc.html" width="210" height="100%" align="left" frameborder="0">This document set is best viewed in a browser that supports iFrames.</iframe>
+    </div>
+    </noscript>
+    <div id="bodyText">
+        <a name="top"></a>
+        <div class="hideOnPrint hideInXcode">
+        <!-- start of header -->
+        <!--#include virtual="/includes/framesetheader" -->
+        <!-- end of header -->
+        </div>
+        
+        <!-- start of path -->
+<div class="breadcrumb hideOnPrint hideInXcode"><a href="http://developer.apple.com/" target="_top">ADC Home</a> &gt; <a href="../../../../../referencelibrary/index.html#//apple_ref/doc/uid/TP30000943" target="_top">Reference Library</a> &gt; <a href="../../../../index.html#//apple_ref/doc/uid/TP30000440" target="_top">Guides</a> &gt; <a href="../../../index.html#//apple_ref/doc/uid/TP30000440-TP30000416" target="_top">Cocoa</a> &gt; <a href="../../../ObjectiveCLanguage-date.html#//apple_ref/doc/uid/TP30000440-TP30000416-TP30000856" target="_top">Objective-C Language</a> &gt; <a href="../index.html" target="_top">Memory Management Programming Guide for Cocoa</a> &gt; </div><br class="hideInXcode"/><!-- end of path -->
+        
+        <div class="mini_nav_text" align="left">
+        <span class="navButtons">
+        <a href="mmCFObjects.html">&lt; Previous Page</a><span style="margin-left: 8px"><a href="mmNibObjects.html">Next Page &gt;</a></span>
+        </span>
+        <span id="showHideTOCUpperSpan">
+        <a href="#" onclick="showHideTOC();"><img src="../../../../Resources/Images/show_toc_icon.gif" width="15" height="14" border="0" style="margin-bottom: -2px;" alt="" hideText="Hide TOC" showText="Show TOC" /></a> <a href="#" onclick="showHideTOC();">Hide TOC</a>
+        </span>
+        </div>
+        
+        
+        <a name="//apple_ref/doc/uid/20001292-BBCIGHHF" title="Using Memory Zones"></a><hr /><H1>Using Memory Zones</H1><p>Zones are page-aligned areas of memory that hold the objects and data allocated by an application. Each zone contains a private memory heap, with its own free list and pool of memory pages. The system assigns each application a “default” zone initially and applications can create additional zones later. The use of additional zones has both advantages and disadvantages and should be considered with great care. In most circumstances, using the default zone is faster and more efficient than creating a separate zone.</p><p>Because zones maintain their own pool of memory, creating new zones increases the memory footprint of your application. However, this increased memory footprint can yield performance advantages in other areas. For example, allocating a group of related objects in the same zone co-locates those objects in the same area of memory. If a page fault occurs when trying to access one of the objects, loading the page brings in all of the related objects, which could significantly reduce the number of future page faults.</p><p>Zones are represented in Cocoa by the opaque data type <code>NSZone</code>.</p>
+<!-- This template is being used for both PDF and HTML. -->
+
+    
+    <!-- TopicBook.pm uses this template for its miniTOCs, but needs a different title. -->
+    <h4>Contents:</h4>
+    
+    
+    <p class="blockquote">
+    
+        
+			
+			
+				<a href="mmZones.html#//apple_ref/doc/uid/20001292-1042131">Creating and Managing Zones</a>
+				
+			<br/>
+			
+        
+			
+			
+				<a href="mmZones.html#//apple_ref/doc/uid/20001292-1043791">Allocating Memory in Zones</a>
+				
+			<br/>
+			
+        
+
+    </p><br/>
+
+<a name="//apple_ref/doc/uid/20001292-1042131" title="Creating and Managing Zones"></a><h2>Creating and Managing Zones</h2><p>Creating a zone for your application is not required since the system creates a default zone for you automatically. In fact, creating zones is generally the exception to the rule and should only be used in situations where the need for better performance or memory efficiency outweighs the overhead of maintaining a zone. Most of your memory allocations will otherwise occur in your application’s default zone.</p><p>To create a new zone, you use the <code>NSCreateZone</code> function. This function uses the system zone allocation routines to set aside an area of memory for your zone. When you call this function, you specify the initial size of the zone and the amount by which to grow the zone. If you attempt to allocate memory beyond the size of your zone, the system automatically expands the zone by the amount you indicate in the second parameter. Thus, if you allocate memory for a contiguous block of structures, you can grow the memory by the exact size of the structure. The following example allocates an 8K block of memory and specifies that the block should grow by 4K when more space is needed.</p><div class="codesample"><table><tr><td scope="row"><pre>NSZone* tempZone = NSCreateZone(8192, 4096, YES);<span></span></pre></td></tr></table></div><p>The Foundation Kit defines several functions for setting and getting the name of a zone and for finding existing zones. You can use the <code>NSZoneSetName</code> function to assign a name to a zone and the <code>NSZoneName</code> function to retrieve that name later. The <code>NSZoneFromPointer</code> function takes a pointer to a block of memory and returns the memory zone in which the block was allocated.</p><p>To destroy a zone completely, you must use the system level function <code>malloc_destroy_zone</code>. However, destroying a zone that still contains referenced objects can cause severe problems in your application. Before you destroy a zone, you should make absolutely sure that it does not contain any referenced objects or memory blocks. You should never destroy the default zone assigned to your application. </p><a name="//apple_ref/doc/uid/20001292-1043791" title="Allocating Memory in Zones"></a><h2>Allocating Memory in Zones</h2><p>To allocate Cocoa objects in a zone, use the <code><a href="../../../Reference/Foundation/Classes/NSObject_Class/Reference/Reference.html#//apple_ref/occ/clm/NSObject/allocWithZone:" target="_top">allocWithZone:</a></code> class method of <code>NSObject</code>. This method allocates memory for your object in the zone you specify and returns the object pointer to you. The <code>alloc</code> method also allocates memory in a zone, the default zone in that case, and is equivalent to calling <code>allocWithZone:</code> with a parameter of <code>nil</code>. To release an object, you use the same <code>release</code> and <code>autorelease</code> methods you would normally use.</p><div class="notebox"><a name="//apple_ref/doc/uid/20001292-SW1" title="Note"></a><p><strong>Note:</strong>&nbsp;Although the <code>allocWithZone:</code> method lets you specify a zone in which to allocate the object, the provided zone is only a suggestion. The object’s implementation may ignore the zone if it chooses to. </p></div><p>In addition to allocating Cocoa objects in zones, you can allocate your own custom data structures using functions defined in Foundation Kit. You might use these functions to allocate memory for a C-type data structure or to optimize the storage implementation of one of your classes. The Foundation Kit function names and behaviors are based on routines from the standard C library but include support for allocating memory in zones. </p><p>To allocate a block of memory, use the <code><a href="../../../Reference/Foundation/Miscellaneous/Foundation_Functions/Reference/reference.html#//apple_ref/c/func/NSZoneMalloc" target="_top">NSZoneMalloc</a></code> function. This function allocates a memory block of a fixed size and returns a basic pointer for you to use.<code><a href="../../../Reference/Foundation/Miscellaneous/Foundation_Functions/Reference/reference.html#//apple_ref/c/func/NSZoneMalloc" target="_top">NSZoneMalloc</a></code> doesn’t initialize the allocated memory to zero; if you want zeroed memory, use the <code><a href="../../../Reference/Foundation/Miscellaneous/Foundation_Functions/Reference/reference.html#//apple_ref/c/func/NSZoneCalloc" target="_top">NSZoneCalloc</a></code> function instead. You can resize a pointer block using the <code><a href="../../../Reference/Foundation/Miscellaneous/Foundation_Functions/Reference/reference.html#//apple_ref/c/func/NSZoneRealloc" target="_top">NSZoneRealloc</a></code> function and deallocate a block using <code><a href="../../../Reference/Foundation/Miscellaneous/Foundation_Functions/Reference/reference.html#//apple_ref/c/func/NSZoneFree" target="_top">NSZoneFree</a></code>.</p>
+
+        <br/><br/> 
+
+        <div class="mini_nav_text" align="left">
+        <span class="navButtons">
+        <a href="mmCFObjects.html">&lt; Previous Page</a><span style="margin-left: 8px"><a href="mmNibObjects.html">Next Page &gt;</a></span>
+        </span>
+        <span id="showHideTOCLowerSpan">
+        <a href="#" onclick="showHideTOC();"><img src="../../../../Resources/Images/show_toc_icon.gif" width="15" height="14" border="0" style="margin-bottom: -2px;" alt="" /></a> <a href="#" onclick="showHideTOC();">Hide TOC</a>
+        </span>
+        </div>
+
+        <br/><hr /><div align="center"><p class="content_text" lang="en" dir="ltr"> <!--#if expr="0=1" -->&#x00a9; 2009 Apple Inc. All Rights Reserved. &#40;<!--#endif -->Last updated: 2009-05-06<!--#if expr="0=1" -->&#041;<!--#endif --></p></div>
+
+        
+        <div class="hideOnPrint hideInXcode">
+        <!-- start of footer -->
+        	<table width="100%" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/documentation/Cocoa/Conceptual/MemoryMgmt/Articles/mmZones.html%3Fid%3D10000011i-3.8&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/documentation/Cocoa/Conceptual/MemoryMgmt/Articles/mmZones.html%3Fid%3D10000011i-3.8&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/documentation/Cocoa/Conceptual/MemoryMgmt/Articles/mmZones.html%3Fid%3D10000011i-3.8&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+
+        <!--#include virtual="/includes/framesetfooter" -->
+        <!-- end of footer -->
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,264 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+<head>
+	<title>Kernel Programming Guide: Bootstrap Contexts</title>
+	<meta id="Generator" name="Generator" content="Gutenberg"/>
+	<meta id="GeneratorVersion" name="GeneratorVersion" content="v132"/>
+	<meta http-equiv="content-type" content="text/html;charset=utf-8"/>
+	<meta id="Copyright" name="Copyright" content="Copyright 2009 Apple Inc. All Rights Reserved."/>
+	<meta id="IndexTitle" name="IndexTitle" content="Bootstrap Contexts"/>
+	<meta id="xcode-display" name="xcode-display" content="render"/>
+	<meta id="toc-file" name="toc-file" content="../toc.html"/>
+	<meta id="RESOURCES" content="../../../../Resources" />
+	
+	<link rel="stylesheet" type="text/css" href="../../../../Resources/CSS/frameset_styles.css"/>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/lib/prototype.js"></script>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/lib/scriptaculous.js"></script>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/page.js"></script>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/pedia.js"></script>
+	<!--[if lte IE 6]>
+		<style type="text/css">
+			/*<![CDATA[*/ 
+			html {overflow-x:auto; overflow-y:hidden;  }
+			/*]]>*/
+		</style>
+	<![endif]-->
+</head>    
+<body bgcolor="#ffffff" onload="initialize_page();"><a name="//apple_ref/doc/uid/TP30000905-CH212" title="Bootstrap Contexts"></a>
+    <noscript>
+    <div id="tocMenu">
+        <iframe id="toc_content" name="toc_content" SRC="../toc.html" width="210" height="100%" align="left" frameborder="0">This document set is best viewed in a browser that supports iFrames.</iframe>
+    </div>
+    </noscript>
+    <div id="bodyText">
+        <a name="top"></a>
+        <div class="hideOnPrint hideInXcode">
+        <!-- start of header -->
+        <!--#include virtual="/includes/framesetheader" -->
+        <!-- end of header -->
+        </div>
+        
+        <!-- start of path -->
+<div class="breadcrumb hideOnPrint hideInXcode"><a href="http://developer.apple.com/" target="_top">ADC Home</a> &gt; <a href="../../../../../referencelibrary/index.html#//apple_ref/doc/uid/TP30000943" target="_top">Reference Library</a> &gt; <a href="../../../../index.html#//apple_ref/doc/uid/TP30000440" target="_top">Guides</a> &gt; <a href="../../../index.html#//apple_ref/doc/uid/TP30000440-TP30000422" target="_top">Darwin</a> &gt; <a href="../../../Kernel-date.html#//apple_ref/doc/uid/TP30000440-TP30000422-TP30000532" target="_top">Kernel</a> &gt; <a href="../About/About.html#//apple_ref/doc/uid/TP30000905-CH204-TPXREF101">Kernel Programming Guide</a> &gt; </div><br class="hideInXcode"/><!-- end of path -->
+        
+        <div class="mini_nav_text" align="left">
+        <span class="navButtons">
+        <a href="../scheduler/scheduler.html">&lt; Previous Page</a><span style="margin-left: 8px"><a href="../IOKit/IOKit.html">Next Page &gt;</a></span>
+        </span>
+        <span id="showHideTOCUpperSpan">
+        <a href="#" onclick="showHideTOC();"><img src="../../../../Resources/Images/show_toc_icon.gif" width="15" height="14" border="0" style="margin-bottom: -2px;" alt="" hideText="Hide TOC" showText="Show TOC" /></a> <a href="#" onclick="showHideTOC();">Hide TOC</a>
+        </span>
+        </div>
+
+        <hr />
+        
+        
+        <a name="//apple_ref/doc/uid/TP30000905-CH212-BEHJDFCA" title="Bootstrap Contexts"></a><h1>Bootstrap Contexts</h1><p>In Mac OS X kernel programming, the term context
+has several meanings that appear similar on the surface, but differ
+subtly.</p>
+<p>First, the term context can refer to a BSD process or Mach
+task. Switching from one process to another is often referred to
+as a context switch<a name="//apple_ref/doc/uid/TP30000905-CH212-DontLinkElementID_449"></a><a name="//apple_ref/doc/uid/TP30000905-CH212-DontLinkElementID_450"></a>.</p>
+<p>Second, context can refer to the part of the operating system
+in which your code resides. Examples of this include thread contexts,
+the interrupt context, the kernel context, an application’s context,
+a Carbon File Manager context, and so on. Even for this use of the term,
+the exact meaning depends, ironically, on the context in which the
+term is used.</p>
+<p>Finally, context can refer to a <strong>bootstrap context</strong><a name="//apple_ref/doc/uid/TP30000905-CH212-DontLinkElementID_451"></a><a name="//apple_ref/doc/uid/TP30000905-CH212-DontLinkElementID_452"></a>.
+In Mach, the bootstrap task<a name="//apple_ref/doc/uid/TP30000905-CH212-DontLinkElementID_453"></a> is
+assigned responsibility for looking up requests for Mach ports.
+As part of this effort, each Mach task is registered in one of two
+groups—either in the startup context<a name="//apple_ref/doc/uid/TP30000905-CH212-DontLinkElementID_454"></a><a name="//apple_ref/doc/uid/TP30000905-CH212-DontLinkElementID_455"></a> or a user’s login
+context<a name="//apple_ref/doc/uid/TP30000905-CH212-DontLinkElementID_456"></a><a name="//apple_ref/doc/uid/TP30000905-CH212-DontLinkElementID_457"></a>. (In
+theory, Mach can support any number of independent contexts, however
+the use of additional contexts is beyond the scope of this document.)</p>
+<p>For the purposes of this chapter, the term context refers
+to a bootstrap context.</p>
+<p>When Mac OS X first boots, there is only the top-level context,
+which is generally referred to as the startup context. All other
+contexts are subsets of this context. Basic system services that
+rely on Mach ports must be started in this context in order to work
+properly.</p>
+<p>When a user logs in, the bootstrap task creates a new context
+called the login context. Programs run by the user are started in
+the login context. This allows the user to run a program that provides
+an alternate port lookup mechanism if desired, causing that user’s tasks
+to get a different port when the tasks look up a basic service.
+This has the effect of replacing that service with a user-defined
+version in a way that changes what the user’s tasks see, but does
+not affect any of the rest of the system.</p>
+<p>To avoid wasting memory, currently the login context is destroyed
+when the user logs out (or shortly thereafter). This behavior may
+change in the future, however. In the current implementation, programs
+started by the user will no longer be able to look up Mach ports after
+logout. If a program does not need to do any port lookup, it will
+not be affected. Other programs will terminate, hang, or behave
+erratically.</p>
+<p>For example, in Mac OS 10.1 and earlier, <code>sshd</code> continues
+to function when started from a user context. However, since it
+is unable to communicate with <code>lookupd</code> or <code>netinfo</code>,
+it stops accepting passwords. This is not a particularly useful
+behavior.</p>
+<p>Other programs such as <code>esound</code>, however,
+continue to work correctly after logout when started from a user
+context. Other programs behave correctly in their default configuration but
+fail in other configurations—for example, when authentication
+support is enabled.</p>
+<p>There are no hard and fast rules for which programs will continue
+to operate after their bootstrap context is destroyed. Only thorough
+testing can tell you whether any given program will misbehave if
+started from a user context, since even programs that do not appear
+to directly use Mach communication may still do so indirectly.</p>
+<p>In Mac OS X 10.2, a great deal of effort has gone into making
+sure that programs that use only standard BSD services and functions
+do not use Mach lookups in a way that would fail if started from
+a user context. If you find an application that breaks when started
+from a Terminal.app window, please file a bug report.</p>
+
+
+<!-- This template is being used for both PDF and HTML. -->
+
+    
+    <h4>In this section:</h4>
+    
+    
+    <p class="blockquote">
+    
+        
+			
+			
+				<a href="contexts.html#//apple_ref/doc/uid/TP30000905-CH212-TPXREF108">How Contexts Affect Users</a>
+				
+			<br/>
+			
+        
+			
+			
+				<a href="contexts.html#//apple_ref/doc/uid/TP30000905-CH212-TPXREF109">How Contexts Affect Developers</a>
+				
+			<br/>
+			
+        
+
+    </p><br/>
+
+<a name="//apple_ref/doc/uid/TP30000905-CH212-TPXREF108" title="How Contexts Affect Users"></a><h2>How Contexts Affect Users</h2><a name="//apple_ref/doc/uid/TP30000905-CH212-DontLinkElementID_458"></a>
+<p>From the perspective of a user, contexts are generally unimportant
+as long as they do not want a program to survive past the end of
+their login session.</p>
+<p>Contexts do become a problem for the administrator, however.
+For example, if the administrator upgrades <code>sshd</code> by
+killing the old version, starting the new one, and logging out,
+strange things could happen since the context in which <code>sshd</code> was
+running no longer exists.</p>
+<p>Contexts also pose an issue for users running background jobs
+with <code>nohup</code> or users detaching terminal sessions
+using <code>screen</code>. There are times when it is perfectly
+reasonable for a program to survive past logout, but by default,
+this does not occur.</p>
+<p>There are three basic ways that a user can get around this.
+In the case of daemons, they can modify the startup scripts to start
+the application. On restart, the application will be started in
+the startup context. This is not very practical if the computer
+in question is in heavy use, however. Fortunately, there are other
+ways to start services in a startup context.</p>
+<p>The second way to run a service in the startup context is
+to use <code>ssh</code> to connect to the computer. Since <code>sshd</code> is
+running in the startup context, programs started from an <code>ssh</code> session
+also register themselves in the startup context. (Note that a user
+can safely kill the main <code>sshd</code> process without
+being logged out. The user just needs to be careful to kill the right
+one.)</p>
+<p>The third way is to log in as the console user (<code>>console</code>),
+which causes <code>LoginWindow</code> to exit and causes <code>init</code> to
+spawn a <code>getty</code> process on the console. Since <code>init</code> spawns <code>getty</code>,
+which spawns <code>login</code>, which spawns the user’s
+shell, any programs started from the text console will be in the
+startup context.</p>
+<p>More generally, any process that is the child of a process
+in the startup context (other than those inherited by <code>init</code> because
+their parent process exited) is automatically in the startup context.
+Any process that is the child of a process in the login context
+is, itself, in the login context. This means that daemons can safely
+fork children at any time and those children will be in the startup
+context, as will programs started from the console (not the Console application).
+This also means that any program started by a user in a terminal
+window, from Finder, from the Dock, and so on, will be in the currently
+logged in user’s login context, even if that user runs the application
+using <code>su</code> or <code>sudo</code>.</p>
+<a name="//apple_ref/doc/uid/TP30000905-CH212-TPXREF109" title="How Contexts Affect Developers "></a><h2>How Contexts Affect Developers
+</h2><a name="//apple_ref/doc/uid/TP30000905-CH212-DontLinkElementID_459"></a>
+<p>If you are writing <em>only</em> kernel code,
+contexts are largely irrelevant (unless you are creating a new context,
+of course). However, kernel developers frequently need to write
+a program that registers itself in the startup context in order
+to provide some level of driver communication. For example, you
+could write a user-space daemon that brokers configuration information
+for a sound driver based on which user is logged in at the time.</p>
+<p>In the most general case, the problem of starting an application
+in the startup context can be solved by creating a startup script
+for your daemon, which causes it to be run in the startup context
+after the next reboot. However, users generally do not appreciate
+having to reboot their computers to install a new driver. Asking
+the user to connect to his or her own computer with <code>ssh</code> to
+execute a script is probably not reasonable, either.</p>
+<p>The biggest problem with forcing a reboot, of course, is that
+users often install several programs at once. Rebooting between
+each install inconveniences the end user, and has no other benefit.
+For that reason, you should not force the user to restart. Instead,
+you should offer the user the option, noting that the software may
+not work correctly until the user restarts. While this does not
+solve the fundamental problem, it does at least minimize the most
+common source of complaints.</p>
+<p>There are a number of ways to force a program to start in
+the startup context without rebooting or using <code>ssh</code>.
+However, these are not robust solutions, and are not recommended.
+A standard API for starting daemons is under consideration. When
+an official API becomes available, this chapter will be updated
+to discuss it.<a name="//apple_ref/doc/uid/TP30000905-CH212-DontLinkElementID_460"></a></p>
+
+        <br /><br /> 
+        
+        <div class="mini_nav_text" align="left">
+        <span class="navButtons">
+        <a href="../scheduler/scheduler.html">&lt; Previous Page</a><span style="margin-left: 8px"><a href="../IOKit/IOKit.html">Next Page &gt;</a></span>
+        </span>
+        <span id="showHideTOCLowerSpan">
+        <a href="#" onclick="showHideTOC();"><img src="../../../../Resources/Images/show_toc_icon.gif" width="15" height="14" border="0" style="margin-bottom: -2px;" alt="" /></a> <a href="#" onclick="showHideTOC();">Hide TOC</a>
+        </span>
+        </div>
+
+        <br/><hr /><div align="center"><p class="content_text" lang="en" dir="ltr"> <!--#if expr="0=1" -->&#x00a9; 2002, 2006 Apple Computer, Inc. All Rights Reserved. &#40;<!--#endif -->Last updated: 2006-11-07<!--#if expr="0=1" -->&#041;<!--#endif --></p></div>
+
+        
+        <div class="hideOnPrint hideInXcode">
+        <!-- start of footer -->
+        	<table width="100%" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/documentation/Darwin/Conceptual/KernelProgramming/contexts/contexts.html%3Fid%3DTP30000905-5.7&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/documentation/Darwin/Conceptual/KernelProgramming/contexts/contexts.html%3Fid%3DTP30000905-5.7&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/documentation/Darwin/Conceptual/KernelProgramming/contexts/contexts.html%3Fid%3DTP30000905-5.7&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+
+        <!--#include virtual="/includes/framesetfooter" -->
+        <!-- end of footer -->
+        </div>
+    </div>
+</body>
+</html>

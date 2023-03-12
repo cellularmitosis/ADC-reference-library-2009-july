@@ -1,0 +1,370 @@
+<html><head>
+<script language="JavaScript" src="../../../../../../../../../../frametest.js"></script>
+<title>The SybaseEOAdaptor Framework</title></head>
+<body bgcolor=#ffffff>
+
+<!-- start of header -->
+<!--#include virtual="/includes/framesetheader" -->
+<!-- end of header -->
+
+<!--start of path -->
+<font face="Geneva,Helvetica,Arial" size="1">
+<b>PATH<spacer type="horizontal" size="5">&nbsp;</b>
+ <a href="../../../../../../../../../../webobjects.html" target="_top">WebObjects 4.0 Documentation</a> <b>&gt;</b>
+ <a href="../frameset.html" target="_top">SybaseEOAdaptor Reference</a>
+</font>
+<br><br>
+<!--end of path -->
+
+<!-- start of navigation -->
+<a href="SybaseAdaptor.html"><img src="../../../../../../../../../../images/next.gif" border="0"></a>
+<!-- end of navigation -->
+
+
+
+<hr><br>
+ 
+<h1><a name="//apple_ref/occ/cl/The SybaseEOAdaptor Framework">The SybaseEOAdaptor Framework</a>
+ <BR>
+</h1>
+<p><B>Framework:</B><BR>  
+System/Library/Frameworks/SybaseEOAdaptor.framework
+
+<p><B>Header File Directories:</B><BR>  
+System/Library/Frameworks/SybaseEOAdaptor.framework/Headers
+
+<p><a name="1261">
+<h1>Introduction </h1>
+</a>The SybaseEOAdaptor framework is a set of classes that allow your programs to connect to a Sybase server. These classes provide Sybase-specific method implementations for the EOAccess framework's EOAdaptor, EOAdaptorChannel, EOAdaptorContext, and EOSQLExpression abstract classes.<p>
+The following table lists the classes in the SybaseEOAdaptor Framework and provides a brief description of each class.<p>
+<Table Border="3">
+<caption></caption>
+<tr><th><b>Class
+</b></th><th><b>Description
+</b></th></tr>
+<tr><td scope="row">SybaseAdaptor
+</td><td>Represents a single connection to a Sybase database server, and is responsible for 
+keeping login and model information, performing Sybase-specific formatting of SQL 
+expressions, and reporting errors. 
+</td></tr>
+<tr><td scope="row">SybaseChannel
+</td><td>Represents an independent communication channel to the database server its 
+SybaseAdaptor is connected to.
+</td></tr>
+<tr><td scope="row">SybaseContext
+</td><td>Represents a single transaction scope on the database server to which its adaptor object 
+is connected.
+</td></tr>
+<tr><td scope="row">SybaseSQLExpression
+</td><td>Defines how to build SQL statements for SybaseChannels.
+</td></tr>
+
+</Table>
+
+<Table>
+<tr><td scope="row">
+</Table>
+<p>
+<a name="109">
+<hr width=50% align=left>
+<h2> The Connection Dictionary</h2>
+</a>The connection dictionary contains items needed to connect to a Sybase server, such as the server name and database (it's common to omit the user name and password from the connection dictionary, and prompt users to enter those values in a login panel). The keys of this dictionary identify the information the server expects, and the values of those keys are the values that the adaptor uses when trying to connect to the server. For Sybase databases the required keys are as follows (all are defined constants):<p>
+<blockquote><code>hostName<br>databaseName<br>userName<br>password</code></blockquote><p>The connection dictionary can optionally include three other keys (which are also defined constants): <code>sybasePasswordEncryption</code>, <code>LC_ALL</code>, and <code>primitiveTypeMap</code>. <code>sybasePasswordEncryption</code> provides support for Sybase password encryption. <code>LC_ALL</code> declares to the Sybase server the character set being used by the client (such as eucjis, ascii7, or iso_1). For a complete list of types available for this field, see your Sybase documentation. <code>primitiveTypeMap</code> describes the mapping of user-defined data types to their base Sybase type (such as varchar or datetime). For more information on user-defined data types, see <a href="SybaseEOAdaptor.html#134">"Data Type Mapping"</a>.<p>
+To add any of these optional keys and appropriate values to your connection dictionary, you can manually edit your model file. For example:<p>
+<blockquote><pre>connectionDictionary = {databaseName = People; <br>    hostName = ""; 
+    LC_ALL = eucjis;
+    password = ""; 
+    primitiveTypeMap = {id = varchar; ssn = char(9); };
+    sybasePasswordEncryption = YES;
+    userName = "";
+}; </pre>
+</blockquote><p>
+Subsequently changing the connection dictionary in your model file using the Set Adaptor Info command in EOModeler has no effect on these keys and their values-they are preserved unless you edit the file to remove them. Alternatively you can add the optional keys to a model's connection dictionary programmatically.<p>
+The default character set for non-Japanese systems is iso_1 (that is, ISO Latin 1), while the default character set for Japanese systems is eucjis. You only need to add the LC_ALL key to your connection dictionary if you are using a character set other than your system's default.<p>
+<a name="120">
+<hr width=50% align=left>
+<h2> Error Handling</h2>
+</a>SybaseAdaptor, SybaseContext, and SybaseChannel can raise exceptions due to programming errors that result in invalid argument values or internal inconsistencies. In addition, messages, errors, and failure status returned from the Sybase SQL Server and client libraries can also result in EOGeneralAdaptorExceptions. When an exception results from a callback to the CS_CLIENTMSG_CB (Sybase ClientMessage callback) or the CS_SERVERMSG_CB (Sybase ServerMessage callback), all of the information passed into this routine is available in the userInfo dictionary contained by the exception. When an exception is raised in response to a Sybase ClientMessage callback, you can get the information provided by the client library as follows:<p>
+<blockquote><pre>clientMsgDict = [[localException userInfo]<br>    objectForKey:@"sybaseClientMessageDictionary"];
+</pre></blockquote><p>
+The <B>clientMsgDict </B> contains the following keys which have values corresponding to those sent in the callback function that raised the exception: msgstring, osstring, sqlstate, severity, msgnumber, osnumber, status.<p>
+Similarly, when the exception is raised in response to a Sybase ServerMessage callback, you can get the information provided by the server as follows:<p>
+<blockquote><pre>svrMsgDict = [[localException userInfo]<br>    objectForKey:@"sybaseServerMessageDictionary"];
+</pre></blockquote><p>
+<p>
+The <B>svrMsgDict </B> contains the following keys which have values corresponding to those sent in the callback function that raised the exception: text, svrname, proc, sqlstate, msgnumber, state, severity, line, status.<p>
+<a name="128">
+<hr width=50% align=left>
+<h2> Locking</h2>
+</a>All adaptors use the database server's native locking facilities to lock rows on the server. The Sybase adaptor locks a row by using the HOLDLOCK keyword in SELECT statements. This occurs when:<p>
+<ul><li>You send the adaptor channel a <code>selectAttributes:fetchSpecification:lock:entity:</code> message with <code></code>YES specified as the value for the <B>lock: </B> keyword.
+<li>You explicitly lock an object's row with the EODatabaseContext's <code>lockObjectWithGlobalID:editingContext:</code> message.
+<li>You set pessimistic locking at the database level and fetch objects.
+</ul>The semantics of the HOLDLOCK keyword are such that when you lock a row other users can't update it, but it doesn't guarantee that your update will succeed. This is because other users could be holding a lock on the same row. However, you can still read rows that are locked by other users.<p>
+<a name="134">
+<hr width=50% align=left>
+<h2> Data Type Mapping</h2>
+</a>Every adaptor provides a mapping between each server data type and the Objective-C type to which a database value will be coerced when it's fetched from the database. The following table lists the mapping used by SybaseAdaptor.<p>
+<Table Border="3">
+<caption></caption>
+<tr><th><b>Sybase Data Type
+</b></th><th><b>Objective-C Data Type
+</b></th><th><b>Java Data Type
+</b></th></tr>
+<tr><td scope="row">binary
+</td><td>NSData
+</td><td>NSData
+</td></tr>
+<tr><td scope="row">bit
+</td><td>NSNumber
+</td><td>Number
+</td></tr>
+<tr><td scope="row">char
+</td><td>NSString
+</td><td>String
+</td></tr>
+<tr><td scope="row">datetime
+</td><td>NSCalendarDate
+</td><td>NSGregorianDate
+</td></tr>
+<tr><td scope="row">datetimn
+</td><td>NSCalendarDate
+</td><td>NSGregorianDate
+</td></tr>
+<tr><td scope="row">decimal
+</td><td>NSDecimalNumber
+</td><td>BigDecimal
+</td></tr>
+<tr><td scope="row">decimaln
+</td><td>NSDecimalNumber
+</td><td>BigDecimal
+</td></tr>
+<tr><td scope="row">float
+</td><td>NSNumber
+</td><td>Number
+</td></tr>
+<tr><td scope="row">floatn
+</td><td>NSNumber
+</td><td>Number
+</td></tr>
+<tr><td scope="row">image
+</td><td>NSData
+</td><td>NSData
+</td></tr>
+<tr><td scope="row">int
+</td><td>NSNumber
+</td><td>Number
+</td></tr>
+<tr><td scope="row">intn
+</td><td>NSNumber
+</td><td>Number
+</td></tr>
+<tr><td scope="row">money
+</td><td>NSDecimalNumber
+</td><td>BigDecimal
+</td></tr>
+<tr><td scope="row">moneyn
+</td><td>NSDecimalNumber
+</td><td>BigDecimal
+</td></tr>
+<tr><td scope="row">nchar
+</td><td>NSString
+</td><td>String
+</td></tr>
+<tr><td scope="row">numeric
+</td><td>NSDecimalNumber
+</td><td>BigDecimal
+</td></tr>
+<tr><td scope="row">numericn
+</td><td>NSDecimalNumber
+</td><td>BigDecimal
+</td></tr>
+<tr><td scope="row">nvarchar
+</td><td>NSString
+</td><td>String
+</td></tr>
+<tr><td scope="row">real
+</td><td>NSNumber
+</td><td>Number
+</td></tr>
+<tr><td scope="row">smalldatetime
+</td><td>NSCalendarDate
+</td><td>NSGregorianDate
+</td></tr>
+<tr><td scope="row">smallint
+</td><td>NSNumber
+</td><td>Number
+</td></tr>
+<tr><td scope="row">smallmoney
+</td><td>NSDecimalNumber
+</td><td>BigDecimal
+</td></tr>
+<tr><td scope="row">sysname
+</td><td>NSString
+</td><td>String
+</td></tr>
+<tr><td scope="row">text
+</td><td>NSString
+</td><td>String
+</td></tr>
+<tr><td scope="row">timestamp
+</td><td>NSData
+</td><td>NSData
+</td></tr>
+<tr><td scope="row">tinyint
+</td><td>NSNumber
+</td><td>Number
+</td></tr>
+<tr><td scope="row">varbinary
+</td><td>NSString
+</td><td>String
+</td></tr>
+<tr><td scope="row">varchar
+</td><td>NSString
+</td><td>String
+</td></tr>
+
+</Table>
+
+<Table>
+<tr><td scope="row">
+</Table>
+<p>
+In addition, SybaseAdaptor provides a mapping for user-defined data types. For example, a custom data type <code>partnumber</code><em> </em>defined as char(10) is mapped to NSString-the Objective-C type to which <code>partnumber</code>'s base data type (char) is mapped. SybaseAdaptor's implementation of <code>describeModelWithTableNames:</code> automatically creates mappings for user-defined data types and saves them in the connection dictionary of the newly created model. Consequently, even models created with EOModeler automatically include information about custom data types.<p>
+Since information about custom types is stored in a model's connection dictionary, the type mapping methods-<a href="SybaseAdaptor.html#147"><code>externalTypesWithModel:</code></a>, <a href="SybaseAdaptor.html#1833"><code>internalTypeForExternalType:model:</code></a>, and <code>isValidQualifierType:model:</code>-use the model argument if it is provided. If the model argument isn't provided, these methods don't have user-defined data type information available to them.<p>
+<a name="1514">
+<hr width=50% align=left>
+<h2> Prototype Attributes</h2>
+</a>The SybaseEOAdaptor Framework provides the following set of prototype attributes:<p>
+<Table Border="3">
+<caption></caption>
+<tr><th><b>Name
+</b></th><th><b>External Type
+</b></th><th><b>Value Class Name
+</b></th><th><b>Other Attributes
+</b></th></tr>
+<tr><td scope="row">binaryID
+</td><td>varbinary
+</td><td>NSData
+</td><td>width = 12
+</td></tr>
+<tr><td scope="row">city
+</td><td>varchar
+</td><td>NSString
+</td><td>columnName = CITY
+width = 50
+</td></tr>
+<tr><td scope="row">date
+</td><td>datetime
+</td><td>NSCalendarDate
+</td><td>columnName = ""
+</td></tr>
+<tr><td scope="row">longText
+</td><td>text
+</td><td>NSString
+</td><td>&nbsp;</td></tr>
+<tr><td scope="row">money
+</td><td>money
+</td><td>NSDecimalNumber
+</td><td>columnName = "";
+</td></tr>
+<tr><td scope="row">phoneNumber
+</td><td>varchar
+</td><td>NSString
+</td><td>columnName = PHONE
+width = 20
+</td></tr>
+<tr><td scope="row">rawImage
+</td><td>image
+</td><td>NSData
+</td><td>columnName = RAW_IMAGE
+</td></tr>
+<tr><td scope="row">state
+</td><td>varchar
+</td><td>NSString
+</td><td>columnName = STATE
+width = 2
+</td></tr>
+<tr><td scope="row">streetAddress
+</td><td>varchar
+</td><td>NSString
+</td><td>columnName = STREET_ADDRESS
+width = 100
+</td></tr>
+<tr><td scope="row">tiffImage
+</td><td>image
+</td><td>NSImage
+</td><td>adaptorValueConversionMethodName = TIFFRepresentation
+columnName = PHOTO
+valueFactoryMethodName = "imageWithData:"
+</td></tr>
+<tr><td scope="row">uniqueID
+</td><td>int
+</td><td>NSNumber
+</td><td>columnName = "";
+valueType = i
+</td></tr>
+<tr><td scope="row">zipCode
+</td><td>varchar
+</td><td>NSString
+</td><td>columnName = ZIP
+width = 10
+</td></tr>
+
+</Table>
+
+<Table>
+<tr><td>
+</Table>
+<p>
+<a name="138">
+<hr width=50% align=left>
+<h2> SQL and User-Defined Transactions</h2>
+</a>Certain data definition commands, such as CREATE TABLE, can't be executed in a user-defined transaction. However, the database channel and adaptor channel require you to start a transaction before evaluating any SQL. To work around this problem, you need to send the adaptor context or database context a <B>transactionDidBegin </B> message to make it think a transaction is in progress. Then you can send it the SQL statement, followed by a <B>transactionDidCommit </B> message.<p>
+<a name="1274">
+<hr width=50% align=left>
+<h2> Processing Compute Rows and Stored Procedures</h2>
+</a>SybaseChannel's delegate methods used for processing compute rows and stored procedures give you access to the three types of non-regular rows supported by Sybase: compute rows, return parameters (from a stored procedure), and status from a stored procedure. Because the access layer can only handle regular table rows, the Sybase adaptor channel normally skips non-regular rows. However, you can use the delegate methods to intercept non-regular rows before they are skipped. These delegate methods are <a href="../Protocols/SybaseChannelDelegate.html#2067"><code>sybaseChannel:willFetchAttributes:forRowOfType:withComputeRowId:</code></a><code> </code>and<code> </code><a href="../Protocols/SybaseChannelDelegate.html#2103"><code>sybaseChannel:willReturnRow:ofType:withComputeRowId:</code></a>. The method <a href="../Protocols/SybaseChannelDelegate.html#2067"><code>sybaseChannel:willFetchAttributes:forRowOfType:withComputeRowId:</code></a> is invoked when a row is fetched, while <a href="../Protocols/SybaseChannelDelegate.html#2103"><code>sybaseChannel:willReturnRow:ofType:withComputeRowId:</code></a> is invoked when a row is about to be returned. Based on the type of the row, the delegate can specify the appropriate behavior. This enables you to use data in one of the three non-regular row types and either extract the data from them or use the method <B>describeResults </B> to return an array of attributes that describe the properties available in the current result set. Using <B>describeResults </B> is appropriate if you're not concerned with format-for example, if you're just writing raw data to a report.<p>
+<B>Note:	</B>
+The regular rows in the results from a stored procedure must map to the attributes in the 
+corresponding entity, and must be in alphabetical order.
+<p><a name="1289">
+<hr width=50% align=left>
+<h2> Generating Primary Keys</h2>
+</a>Each adaptor provides a database-specific implementation of the method <code>primaryKeyForNewRowWithEntity:</code> for generating primary keys.  The SybaseChannel's implementation uses a table named eo_sequence_table to keep track of the next available primary key value for a given table. The table contains a row for each table for which the adaptor provides primary key values. The statement used to create the eo_sequence_table is:<p>
+<blockquote><pre>create table eo_sequence_table (
+    table_name varchar(32),
+    counter int null
+)
+</pre></blockquote><p>
+SybaseChannel uses a stored procedure named eo_pk_for_table to access and maintain the primary key counter in eo_sequence_table. The stored procedure is defined as follows:<p>
+<blockquote><pre>
+create procedure
+eo_pk_for_table @tname varchar(32) as
+begin
+    define @max int
+    update eo_sequence_table
+    set counter = counter + 1
+    where table_name = @tname
+    select counter
+    from eo_sequence_table
+    where table_name = @tname
+end
+</pre></blockquote><p>
+The stored procedure increments the counter in the eo_sequence_table row for the specified table, selects the counter value, and returns it. SybaseChannel executes this eo_pk_for_table stored procedure from <code>primaryKeyForNewRowWithEntity:</code> and returns the stored procedure's return value.<p>
+To use SybaseChannel's database-specific primary key generation mechanism, be sure that your database accommodates the adaptor's scheme. To modify your database so that it supports the adaptor's mechanism for generating primary keys, use EOModeler. For more information on this topic, see <em>Enterprise Objects Framework Developer's Guide</em>.<p>
+<p>
+
+<hr><br>
+<a href="../frameset.html" target="_top">[TOC]</a> [Prev] <a href="SybaseAdaptor.html">[Next]</a>
+<hr><br>
+
+
+
+<i>Copyright &#169; 1998, Apple Computer, Inc.   All rights
+reserved.</i>
+
+<!-- Last updated: 09/14/98 15:09:25 -->
+
+</body>
+</html>

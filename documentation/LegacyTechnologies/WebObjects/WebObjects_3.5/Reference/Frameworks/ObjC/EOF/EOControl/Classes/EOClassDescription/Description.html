@@ -1,0 +1,534 @@
+<html><head><title></title></head>
+
+<body bgcolor="#ffffff">
+
+ 
+
+ 
+
+<h2><a name="//apple_ref/occ/cl/EOClassDescription">EOClassDescription</a>
+
+ <BR>
+
+</h2>
+
+<p><B>Inherits From:</B><BR>  
+
+NSObject<em> 
+
+</em>
+
+<p><B>Declared in:</B>
+
+EOControl/EOClassDescription.h<em> 
+
+</em>
+
+<p><a name="283">
+
+<a name="description"></a>
+
+<h3>Class Description </h3>
+
+</a>The EOClassDescription class provides a mechanism for extending classes by giving them access to metadata not available in the Objective-C run-time system. This is achieved as follows:<p>
+
+<ul><li>EOClassDescription provides a bridge between enterprise objects and the metadata contained in an external source of information, such as an EOModel. It defines a standard interface for accessing the information in an external source. It also manages the registration of EOClassDescription objects in your application.<p><li>Enterprise Objects Framework extends NSObject by adding several EOClassDescription-related methods to it. An enterprise object class can either provide its own implementation of these methods or it can accept the default implementations. These methods enable an enterprise object to take advantage of behaviors defined by the Framework, such as undo and validation. This is discussed in more detail in the section "<a href="#293">Using EOClassDescription</a>."<p></ul>Enterprise Objects Framework implements a default subclass of EOClassDescription, EOEntityClassDescription. EOEntityClassDescription extends the behavior of enterprise objects by deriving information about them (such as NULL constraints and referential integrity rules) from an associated model file. <p>
+
+<a name="288">
+
+<h3> How Does It Work?</h3>
+
+</a>As noted above, Enterprise Objects Framework implements a default subclass of EOClassDescription, EOEntityClassDescription. In the typical scenario in which an enterprise object has a corresponding model file, a particular operation (such as validating a value) results in the broadcast of an EOClassDescriptionNeeded notification. When an EOModel object receives this notification it registers the metadata (class description) for the EOEntity on which the enterprise object is based.<p>
+
+An enterprise object takes advantage of the metadata registered for it by using the EOClassDescription-related methods that the Framework adds to NSObject. Primary among these methods is <B>classDescription</B>, which returns the class description associated with the enterprise object. Through this class description the enterprise object has access to all of the information relating to its entity in an EOModel file.<p>
+
+In addition to methods that return information based on an enterprise object's class description, the EOClassDescription-related methods that the Framework adds to NSObject include methods that are automatically invoked when a particular operation occurs. These include validation methods and methods that are invoked whenever an enterprise object is inserted or fetched. <p>
+
+All of this comes together in your running application. When a user tries to perform a particular operation on an enterprise object (such as attempting to delete it), the EOEditingContext sends these validation messages to your enterprise object, which in turn (by default) forwards them to its EOClassDescription. Based on the result, the operation is either accepted or refused. For example, referential integrity constraints in your model might state that you can't delete a department object that has employees. If a user attempts to delete a department that has employees, an exception is returned and the deletion is refused.<p>
+
+<a name="293">
+
+<h3> Using EOClassDescription</h3>
+
+</a>For the most part, you don't need to programmatically interact with EOClassDescription. It extends the behavior of your enterprise objects transparently. However, there are two cases in which you do need to programmatically interact with it: <p>
+
+<ul><li>When you override EOClassDescription-related NSObject methods in an enterprise object class<p>These methods are used to perform validation and to intervene when enterprise objects based on EOModels are created and fetched. For objects that don't have EOModels, you can override a different set of NSObject methods; this is described in more detail in the section "<a href="#316">Working with Objects That Don't Have EOModels</a>."<p><li>When you create a subclass of EOClassDescription<p></ul><a name="298">
+
+<h4> Overriding Methods in an Enterprise Object</h4>
+
+</a>As described above, Enterprise Objects Framework adds several EOClassDescription-related methods to NSObject. It's common for enterprise object classes to override the following methods to either perform validation, to assign default values (<B>awakeFromInsertionInEditingContext:</B>), or to provide additional initialization to newly fetched objects (<B>awakeFromFetchInEditingContext:</B>):<p>
+
+validateValue:forKey:<p>validateForSave<p>validateForDelete<p>validateForInsert<p>validateForUpdate<p>awakeFromInsertionInEditingContext:<p>awakeFromFetchInEditingContext:<p>For example, an enterprise object class can implement a <B>validateForSave</B> method that checks the values of <B>salary</B> and <B>jobLevel</B> properties before allowing the values to be saved to the database:<p>
+
+<blockquote><pre>- (NSException *)validateForSave
+
+</pre></blockquote><p>
+
+<blockquote><pre>{
+
+</pre></blockquote><p>
+
+<blockquote><pre>    if (salary &gt; 1500 &amp;&amp; jobLevel &lt; 2)
+
+</pre></blockquote><p>
+
+<blockquote><pre>        return [NSException validationExceptionWithFormat:<br>            @"The salary is too high for that position!"];
+
+</pre></blockquote><p>
+
+<blockquote><pre>    // pass the check on to the EOClassDescription
+
+</pre></blockquote><p>
+
+<blockquote><pre>    return [super validateForSave];  
+
+</pre></blockquote><p>
+
+<blockquote><pre>}
+
+</pre></blockquote><p>
+
+For more discussion of this subject, see the chapter "Designing Enterprise Objects" in the <em>Enterprise Objects Framework Developer's Guide</em>, and the class specification "Extensions to NSObject."<p>
+
+<a name="316">
+
+<h4> Working with Objects That Don't Have EOModels</h4>
+
+</a>Although an EOModel is the most common source of an EOClassDescription for a class, it isn't the only one. Objects that don't have an EOModel can implement EOClassDescription methods directly as instance methods, and the rest of the Framework will treat them just as it does enterprise objects that have this information provided by an external EOModel.<p>
+
+There are a few reasons you might want to do this. First of all, if your object implements the methods <B>entityName</B>, <B>attributeKeys</B>, <B>toOneRelationshipKeys</B>, and <B>toManyRelationshipKeys</B>, EOEditingContexts can snapshot the object and thereby provide undo for it.<p>
+
+For example, the following code excerpt shows an implementation of <code>attributeKeys</code> for a Circle class:<p>
+
+<blockquote><pre>- (NSArray *)attributeKeys {
+
+</pre></blockquote><p>
+
+<blockquote><pre>    static NSArray *array = nil;
+
+</pre></blockquote><p>
+
+<blockquote><pre>    if (!array)
+
+</pre></blockquote><p>
+
+<blockquote><pre>        array = [[NSArray alloc] initWithObjects:@"radius", @"x",<br>            @"y", @"color", nil];
+
+</pre></blockquote><p>
+
+<blockquote><pre>    return array;
+
+</pre></blockquote><p>
+
+<blockquote><pre>}
+
+</pre></blockquote><p>
+
+Secondly, you might want to implement EOClassDescription's validation or referential integrity methods to add these features to your classes.<p>
+
+Implementing EOClassDescription methods on a per-class basis in this way is a good alternative to creating a subclass of EOClassDescription. <p>
+
+<a name="328">
+
+<h4> Creating a Subclass of EOClassDescription</h4>
+
+</a>You create a subclass of EOClassDescription when you want to use an external source of information other than an EOModel to extend your objects. Another possible scenario is if you've added information to an EOModel (such as in its user dictionary) and you want that information to become part of your class description-in that case, you'd probably want to create a subclass of EOEntityClassDescription.<p>
+
+When you create a subclass of EOClassDescription, you only need to implement the methods that have significance for your subclass. <p>
+
+If you're using an external source of information other than an EOModel, you need to decide how to register class descriptions, which you do by invoking the method <B>registerClassDescription:forClass:</B>. You can either invoke <B>registerClassDescription:forClass:</B> in response to an EOClassDescriptionNeeded notification, or you can invoke it at the time you initialize your application (in other words, you can register all potential class descriptions ahead of time). The default implementation in Enterprise Objects Framework is based on responding to an EOClassDescriptionNeeded notification. When EOModel objects receive this notification, they supply a class description for the specified class by invoking <B>registerClassDescription:forClass:</B>.<p>
+
+<a name="332">
+
+<h3> EOEntityClassDescription</h3>
+
+</a>There are only three methods in EOClassDescription have meaningful implementations (that is, that don't either return <B>nil</B> or simply return): <B>invalidateClassDescriptionCache</B>, <B>registerClassDescription:forClass:</B>, and <B>propagateDeleteForObject:editingContext:</B>. The default behavior of the rest of the methods in Enterprise Objects Framework comes from the implementation in the EOClassDescription subclass EOEntityClassDescription. For more information, see the EOEntityClassDescription class specification.<p>
+
+<a name="334">
+
+<h3> The EOClassDescription's Delegate</h3>
+
+</a>You can assign a delegate to the EOClassDescription class. EOClassDescription sends the message <a href="#453"><B>shouldPropagateDeleteForObject:inEditingContext:forRelationshipKey: </B></a> to its delegate when delete propagation is about to take place for a particular object. The delegate can either allow or deny the operation for a specified relationship key. For more information, see the method description for <a href="#453"><B>shouldPropagateDeleteForObject:inEditingContext:forRelationshipKey: </B></a>.<p>
+
+<dl><dt>Managing EOClassDescriptions
+
+<dl><dt><a href="#//apple_ref/occ/clm/EOClassDescription/invalidateClassDescriptionCache"><a href="#376">+ invalidateClassDescriptionCache</a> </a>
+
+<dt><a href="#//apple_ref/occ/clm/EOClassDescription/registerClassDescription:forClass:">+ registerClassDescription:forClass:</a>
+
+</dl><dt>Getting EOClassDescriptions
+
+<dl><dt><a href="#//apple_ref/occ/clm/EOClassDescription/classDescriptionForClass:">+ classDescriptionForClass:</a>
+
+<dt><a href="#//apple_ref/occ/clm/EOClassDescription/classDescriptionForEntityName:">+ classDescriptionForEntityName:</a>
+
+</dl><dt>Allocating new object instances
+
+<dl><dt><a href="#//apple_ref/occ/instm/EOClassDescription/createInstanceWithEditingContext:globalID:zone:">- createInstanceWithEditingContext:globalID:zone:</a>
+
+</dl><dt>Propagating delete
+
+<dl><dt><a href="#//apple_ref/occ/instm/EOClassDescription/propagateDeleteForObject:editingContext:">- propagateDeleteForObject:editingContext:</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOClassDescription/"></a>
+
+</dl><dt>Returning information from the EOClassDescription
+
+<dl><dt><a href="#//apple_ref/occ/instm/EOClassDescription/entityName">- entityName</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOClassDescription/attributeKeys"><a href="#388">- attributeKeys</a> </a>
+
+<dt><a href="#//apple_ref/occ/instm/EOClassDescription/classDescriptionForDestinationKey:">- classDescriptionForDestinationKey:</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOClassDescription/toManyRelationshipKeys">- toManyRelationshipKeys</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOClassDescription/toOneRelationshipKeys">- toOneRelationshipKeys</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOClassDescription/inverseForRelationshipKey:">- inverseForRelationshipKey:</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOClassDescription/ownsDestinationObjectsForRelationshipKey:">- ownsDestinationObjectsForRelationshipKey:</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOClassDescription/deleteRuleForRelationshipKey:">- deleteRuleForRelationshipKey:</a>
+
+</dl><dt>Performing validation
+
+<dl><dt><a href="#//apple_ref/occ/instm/EOClassDescription/validateObjectForDelete:">- validateObjectForDelete:</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOClassDescription/validateObjectForSave:">- validateObjectForSave:</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOClassDescription/validateValue:forKey:">- validateValue:forKey:</a>
+
+</dl><dt>Providing default characteristics for key display
+
+<dl><dt><a href="#//apple_ref/occ/instm/EOClassDescription/defaultFormatterForKey:">- defaultFormatterForKey:</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOClassDescription/displayNameForKey:">- displayNameForKey:</a>
+
+</dl><dt>Handling newly inserted and newly fetched objects
+
+<dl><dt><a href="#//apple_ref/occ/instm/EOClassDescription/awakeObject:fromFetchInEditingContext:">- awakeObject:fromFetchInEditingContext:</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOClassDescription/awakeObject:fromInsertionInEditingContext:">- awakeObject:fromInsertionInEditingContext:</a>
+
+</dl><dt>Setting the delegate
+
+<dl><dt><a href="#//apple_ref/occ/clm/EOClassDescription/delegate">+ delegate</a>
+
+<dt><a href="#//apple_ref/occ/clm/EOClassDescription/setDelegate:">+ setDelegate:</a>
+
+</dl><dt>Getting an object's description
+
+<dl><dt><a href="#//apple_ref/occ/instm/EOClassDescription/userPresentableDescriptionForObject:">- userPresentableDescriptionForObject:</a>
+
+</dl></dl><a name="365">
+
+<a name="clm"></a>
+
+<h3>Class Methods </h3>
+
+</a><a name="366">
+
+<h4> <a name="//apple_ref/occ/clm/EOClassDescription/classDescriptionForClass:">classDescriptionForClass:</a></h4>
+
+</a>+ (EOClassDescription *)<B>classDescriptionForClass:</B>(Class)<em>aClass</em><p>
+
+Invoked by the default implementation of the NSObject method <B>classDescription</B> to return the EOClassDescription for <em>aClass</em>. It's generally not safe to use this method directly-for example, individual EOGenericRecord instances can have different class descriptions.<p>
+
+<a name="369">
+
+<h4> <a name="//apple_ref/occ/clm/EOClassDescription/classDescriptionForEntityName:">classDescriptionForEntityName:</a></h4>
+
+</a>+ (EOClassDescription *)<B>classDescriptionForEntityName:</B>(NSString *)<em>entityName</em><p>
+
+Returns the EOClassDescription registered under <em>entityName</em>.<p>
+
+<a name="372">
+
+<h4> <a name="//apple_ref/occ/clm/EOClassDescription/delegate">delegate</a></h4>
+
+</a>+ (id)<B>delegate</B><p>
+
+Returns the EOClassDescription delegate.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/clm/EOClassDescription/setDelegate:">+ setDelegate:</a>
+
+ </B><p><a name="376">
+
+<h4> <a name="//apple_ref/occ/clm/EOClassDescription/invalidateClassDescriptionCache">invalidateClassDescriptionCache</a></h4>
+
+</a>+ (void)<B>invalidateClassDescriptionCache</B> <p>
+
+Flushes the class description cache. Because the EOModel objects in an application supply and register EOClassDescriptions on demand, the cache continues to be repopulated as needed after you invalidate it.<p>
+
+You'd use this method when a provider of EOClassDescriptions (such as an EOModel) has newly become available, or is about to go away. However, you should rarely need to directly invoke this method unless you're using an external source of information other than an EOModel.<p>
+
+<a name="380">
+
+<h4> <a name="//apple_ref/occ/clm/EOClassDescription/registerClassDescription:forClass:">registerClassDescription:forClass:</a></h4>
+
+</a>+ (void)<B>registerClassDescription:</B>(EOClassDescription *)<em>description </em><B>forClass:</B>(Class)<em>class</em> <p>
+
+Registers an EOClassDescription object for <em>class</em> in the EOClassDescription cache.<em> </em>You should rarely need to directly invoke this method unless you're using an external source of information other than an EOModel.<p>
+
+<a name="383">
+
+<h4> <a name="//apple_ref/occ/clm/EOClassDescription/setDelegate:">setDelegate:</a></h4>
+
+</a>+ (void)<B>setDelegate:</B>(id)<em>delegate</em><p>
+
+Sets the EOClassDescription delegate to <em>delegate</em>, without retaining it.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/clm/EOClassDescription/delegate">+ delegate</a>
+
+ </B><p><a name="387">
+
+<a name="instm"></a>
+
+<h3>Instance Methods </h3>
+
+</a><a name="388">
+
+<h4> <a name="//apple_ref/occ/instm/EOClassDescription/attributeKeys">attributeKeys</a></h4>
+
+</a>- (NSArray *)<B>attributeKeys</B> <p>
+
+Overridden by subclasses to return an array of keys for attributes of the object. Attributes contain data (such as NSNumbers and NSStrings), as opposed to pointers to other enterprise objects. EOClassDescription's implementation of this method returns <B>nil</B>. <p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOClassDescription/entityName">- entityName</a> </B>, <a href="#//apple_ref/occ/instm/EOClassDescription/toOneRelationshipKeys"><B>- toOneRelationshipKeys</a>, <a href="#//apple_ref/occ/instm/EOClassDescription/toManyRelationshipKeys">- toManyRelationshipKeys</a>
+
+ </B><p><a name="392">
+
+<h4> <a name="//apple_ref/occ/instm/EOClassDescription/awakeObject:fromFetchInEditingContext:">awakeObject:fromFetchInEditingContext:</a></h4>
+
+</a>- (void)<B>awakeObject:</B>(id)<em>object <br></em><B>fromFetchInEditingContext:</B>(EOEditingContext *)<em>anEditingContext</em> <p>
+
+Overridden by subclasses to perform standard post-fetch initialization for <em>object</em> in <em>anEditingContext.</em> EOClassDescription's implementation of this method does nothing. <p>
+
+<a name="395">
+
+<h4> <a name="//apple_ref/occ/instm/EOClassDescription/awakeObject:fromInsertionInEditingContext:">awakeObject:fromInsertionInEditingContext:</a></h4>
+
+</a>- (void)<B>awakeObject:</B>(id)<em>object <br></em><B>fromInsertionInEditingContext:</B>(EOEditingContext *)<em>anEditingContext</em> <p>
+
+Assigns empty arrays to to-many relationship properties of newly inserted enterprise objects. Can be overridden by subclasses to propagate inserts for the newly inserted <em>object</em> in <em>anEditingContext</em>. More specifically, if <em>object</em> has a relationship (or relationships) that propagates the object's primary key and if no object yet exists at the destination of that relationship, subclasses should create the new object at the destination of the relationship.<p>
+
+<a name="398">
+
+<h4> <a name="//apple_ref/occ/instm/EOClassDescription/classDescriptionForDestinationKey:">classDescriptionForDestinationKey:</a></h4>
+
+</a>- (EOClassDescription *)<B>classDescriptionForDestinationKey:</B>(NSString *)<em>detailKey</em> <p>
+
+Overridden by subclasses to return the class description for objects at the destination of the relationship identified by <em>detailKey</em>. For example, the statement:<p>
+
+<blockquote><pre>[project classDescriptionForDestinationKey:@"leader"] 
+
+</pre></blockquote><p>
+
+might return the class description for the Employee class. EOClassDescription's implementation of this method returns <B>nil</B>.<p>
+
+<a name="403">
+
+<h4> <a name="//apple_ref/occ/instm/EOClassDescription/createInstanceWithEditingContext:globalID:zone:">createInstanceWithEditingContext:globalID:zone:</a></h4>
+
+</a>- (id)<B>createInstanceWithEditingContext:</B>(EOEditingContext *)<em>anEditingContext </em><B>globalID:</B>(EOGlobalID *)<em>globalID </em><B>zone:</B>(NSZone *)<em>zone</em> <p>
+
+Overridden by subclasses to allocate an object of the appropriate class in <em>anEditingContext</em>, with <em>globalID</em>, in <em>zone</em> (in typical usage, all three of the method's arguments are <B>nil</B>). If the object responds to <B>initWithEditingContext:classDescription:globalID</B> subclasses should invoke that method, otherwise they should invoke <B>init</B>. Implementations of this method should return an autoreleased object. Enterprise Objects Framework uses this method to allocate new instances of objects when fetching existing enterprise objects or inserting new ones in an EODisplayGroup. EOClassDescription's implementation of this method returns <B>nil</B>.<p>
+
+<a name="406">
+
+<h4> <a name="//apple_ref/occ/instm/EOClassDescription/defaultFormatterForKey:">defaultFormatterForKey:</a></h4>
+
+</a>- (NSFormatter *)<B>defaultFormatterForKey:</B>(NSString *)<em>key</em><p>
+
+Returns the default NSFormatter to use when parsing values for assignment to <em>key</em>. EOClassDescription's implementation returns <B>nil</B>. EOEntityClassDescription's implementation returns an NSFormatter based on the Objective-C data type specified for <em>key</em> in the associated model file.<p>
+
+<a name="409">
+
+<h4> <a name="//apple_ref/occ/instm/EOClassDescription/deleteRuleForRelationshipKey:">deleteRuleForRelationshipKey:</a></h4>
+
+</a>- (EODeleteRule)<B>deleteRuleForRelationshipKey:</B>(NSString *)<em>relationshipKey</em> <p>
+
+Overridden by subclasses to return a delete rule indicating how to treat the destination of the given relationship when the receiving object is deleted. For example, the class description for an Invoice object might return EODeleteRuleCascade for the relationship <B>lineItems </B>, because when an Invoice is removed from an external store, its line items should be removed also. EOClassDescription's implementation of this method returns the delete rule EODeleteRuleNullify. In the common case, the delete rule for an enterprise object is defined in its EOModel. For more discussion of delete rules, see the class specification "NSObject Additions."<p>
+
+<a name="412">
+
+<h4> <a name="//apple_ref/occ/instm/EOClassDescription/displayNameForKey:">displayNameForKey:</a></h4>
+
+</a>- (NSString *)<B>displayNameForKey:</B>(NSString *)<em>key</em><p>
+
+Returns the default string to use in the user interface when displaying <em>key</em>. By convention, lowercase words are capitalized (for example, "revenue" becomes "Revenue"), and spaces are inserted into words with mixed case (for example, "firstName" becomes "First Name").<p>
+
+<a name="415">
+
+<h4> <a name="//apple_ref/occ/instm/EOClassDescription/entityName">entityName</a></h4>
+
+</a>- (NSString *)<B>entityName</B> <p>
+
+Overridden by subclasses to return a unique type name for objects of this class. EOEntityClassDescription returns its EOEntity's name. EOClassDescription's implementation of this method returns <B>nil</B>.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOClassDescription/attributeKeys">- attributeKeys</a> </B>, <a href="#//apple_ref/occ/instm/EOClassDescription/toOneRelationshipKeys"><B>- toOneRelationshipKeys</a>, <a href="#//apple_ref/occ/instm/EOClassDescription/toManyRelationshipKeys">- toManyRelationshipKeys</a>
+
+ </B><p><a name="419">
+
+<h4> <a name="//apple_ref/occ/instm/EOClassDescription/inverseForRelationshipKey:">inverseForRelationshipKey:</a></h4>
+
+</a>- (NSString *)<B>inverseForRelationshipKey:</B>(NSString *)<em>relationshipKey</em> <p>
+
+Overridden by subclasses to return the name of the relationship pointing back at the receiver from the destination of the relationship specified by <em>relationshipKey</em>. For example, suppose an Employee object has a relationship called <B>department</B> to a Department object, and Department has a relationship called <B>employees</B> back to Employee. The statement: <p>
+
+<blockquote><pre>[employee inverseForRelationshipKey:@"department"] 
+
+</pre></blockquote><p>
+
+returns the string "employees". <p>
+
+EOClassDescription's implementation of this method returns <B>nil</B>.<p>
+
+<a name="425">
+
+<h4> <a name="//apple_ref/occ/instm/EOClassDescription/ownsDestinationObjectsForRelationshipKey:">ownsDestinationObjectsForRelationshipKey:</a></h4>
+
+</a>- (BOOL)<B>ownsDestinationObjectsForRelationshipKey:</B>(NSString *)<em>relationshipKey</em> <p>
+
+Overridden by subclasses to return YES or NO to indicate whether the objects at the destination of the relationship specified by <em>relationshipKey</em> should be deleted if they are removed from the relationship (and not transferred to the corresponding relationship of another object). For example, an Invoice object owns its line items. If a LineItem object is removed from an Invoice it should be deleted since it can't exist outside of an Invoice. EOClassDescription's implementation of this method returns NO.<em> </em>In the common case, this behavior for an enterprise object is defined in its EOModel.<p>
+
+<a name="428">
+
+<h4> <a name="//apple_ref/occ/instm/EOClassDescription/propagateDeleteForObject:editingContext:">propagateDeleteForObject:editingContext:</a></h4>
+
+</a>- (void)<B>propagateDeleteForObject:</B>(id)<em>object <br></em><B>editingContext:</B>(EOEditingContext *)<em>anEditingContext</em> <p>
+
+Propagates a delete operation for<em> object</em> in <em>anEditingContext</em>, according to the delete rules specified in the object's EOModel. This method is invoked whenever a delete operation needs to be propagated, as indicated by the delete rule specified for the EOEntity's relationship key. For more discussion of delete rules, see the class specification "NSObject Additions."<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOClassDescription/deleteRuleForRelationshipKey:">- deleteRuleForRelationshipKey:</a>
+
+ </B><p><a name="432">
+
+<h4> <a name="//apple_ref/occ/instm/EOClassDescription/toManyRelationshipKeys">toManyRelationshipKeys</a></h4>
+
+</a>- (NSArray *)<B>toManyRelationshipKeys</B> <p>
+
+Overridden by subclasses to return the keys for the to-many relationship properties of the receiver. To-many relationship properties contain arrays of pointers to other enterprise objects. EOClassDescription's implementation of this method returns <B>nil</B>.<em> </em><p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOClassDescription/entityName">- entityName</a> </B>, <a href="#//apple_ref/occ/instm/EOClassDescription/toOneRelationshipKeys"><B>- toOneRelationshipKeys</a>, <a href="#//apple_ref/occ/instm/EOClassDescription/attributeKeys">- attributeKeys</a>
+
+ </B><p><a name="436">
+
+<h4> <a name="//apple_ref/occ/instm/EOClassDescription/toOneRelationshipKeys">toOneRelationshipKeys</a></h4>
+
+</a>- (NSArray *)<B>toOneRelationshipKeys</B> <p>
+
+Overridden by subclasses to return the keys for the to-one relationship properties of the receiver. To-one relationship properties are pointers to other enterprise objects. EOClassDescription's implementation of this method returns <B>nil</B>.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOClassDescription/entityName">- entityName</a> </B>, <a href="#//apple_ref/occ/instm/EOClassDescription/toManyRelationshipKeys"><B>- toManyRelationshipKeys</a>, <a href="#//apple_ref/occ/instm/EOClassDescription/attributeKeys">- attributeKeys</a>
+
+ </B><p><a name="440">
+
+<h4> <a name="//apple_ref/occ/instm/EOClassDescription/userPresentableDescriptionForObject:">userPresentableDescriptionForObject:</a></h4>
+
+</a>- (NSString *)<B>userPresentableDescriptionForObject:</B>(id)<em>anObject</em><p>
+
+Returns a short (no longer than 60 characters) description of <em>anObject</em> based on its data. First checks to see if <em>anObject</em> has an attribute called "name" and if so, it returns that attribute's value. Otherwise, checks for an attribute called "title" and returns that attribute's value. If neither of those attributes exists, this method enumerates <em>anObject</em>'s attributeKeys and returns each attribute's value, separated by commas and with the default formatter applied for numbers and dates.<p>
+
+<a name="443">
+
+<h4> <a name="//apple_ref/occ/instm/EOClassDescription/validateObjectForDelete:">validateObjectForDelete:</a></h4>
+
+</a>- (NSException *)<B>validateObjectForDelete:</B>(id)<em>object</em> <p>
+
+Overridden by subclasses to determine whether it's permissible to delete the object. Subclasses should return <B>nil</B> if the delete operation should proceed, or an unevaluated exception containing a user-presentable (localized) error message if not. EOClassDescription's implementation of this method returns <B>nil</B>.<p>
+
+<a name="446">
+
+<h4> <a name="//apple_ref/occ/instm/EOClassDescription/validateObjectForSave:">validateObjectForSave:</a></h4>
+
+</a>- (NSException *)<B>validateObjectForSave:</B>(id)<em>object</em> <p>
+
+Overridden by subclasses to determine whether the values being saved for the object are acceptable. Subclasses should return <B>nil</B> if the values are acceptable and the save operation should therefore proceed, or an unevaluated exception containing a user-presentable (localized) error message if not. EOClassDescription's implementation of this method returns <B>nil</B>.<p>
+
+<a name="449">
+
+<h4> <a name="//apple_ref/occ/instm/EOClassDescription/validateValue:forKey:">validateValue:forKey:</a></h4>
+
+</a>- (NSException *)<B>validateValue:</B>(id *)<em>valueP </em><B>forKey:</B>(NSString *)<em>key</em> <p>
+
+Overridden by subclasses to validate the value pointed to by <em>valueP</em>. Subclasses should return <B>nil</B> if the value is acceptable, or an unevaluated exception containing a user-presentable (localized) error message if not. Implementations can replace *<em>valueP</em> with a converted value (for example, an EOAttribute might convert an NSString to an NSNumber). EOClassDescription's implementation of this method returns <B>nil</B>.<p>
+
+<p>
+
+<a name="453">
+
+<h4> <a name="//apple_ref/occ/instm/NSObject/shouldPropagateDeleteForObject:inEditingContext:forRelationshipKey:">shouldPropagateDeleteForObject:inEditingContext:forRelationshipKey:</a></h4>
+
+</a>- (BOOL)<B>shouldPropagateDeleteForObject:</B>(id)<em>anObject</em> <br><B>inEditingContext:</B>(EOEditingContext *)<em>anEditingContext</em> <br><B>forRelationshipKey:</B>(NSString *)<em>key</em><p>
+
+Invoked from <a href="#428"><B>propagateDeleteForObject:editingContext: </B></a>. If the delegate returns NO, it prevents <em>anObject</em> in <em>anEditingContext</em> from propagating deletion to the objects at the destination of <em>key</em>. This can be useful if you have a large model and a small application that only deals with a subset of the model's entities. In such a case you might want to disable delete propagation to entities that will never be accessed. You should use this method with caution, however-returning NO and not propagating deletion can lead to dangling references in your object graph.<p>
+
+<p>
+
+<p>
+
+The following notification is declared by EOClassDescription and posted by enterprise objects in your application.<p>
+
+<a name="//apple_ref/c/data/EOClassDescriptionNeededForClassNotification">EOClassDescriptionNeededForClassNotification</a><p>
+
+<dl><dt>Notification Object
+
+<dl><dt>Enterprise object class
+
+</dl><dt>userInfo Dictionary
+
+<dl><dt><B>None
+
+ </B></dl></dl>One of the EOClassDescription-related methods that Enterprise Objects Framework adds to NSObject to extend the behavior of enterprise objects is <B>classDescription</B>. The first time an enterprise object receives a <B>classDescription</B> message (for example, when changes to the object are being saved to the database), it posts EOClassDescriptionNeededForClassNotification to notify observers (by default, the associated EOModel object) that a class description is needed. The observer then locates the appropriate class description and registers it in the application.<p>
+
+<a name="//apple_ref/c/data/EOClassDescriptionNeededForEntityNameNotification">EOClassDescriptionNeededForEntityNameNotification</a><p>
+
+<dl><dt>Notification Object
+
+<dl><dt>Entity name
+
+</dl><dt>userInfo Dictionary
+
+<dl><dt><B>None </B>    
+
+</dl></dl>When <B>classDescriptionForEntityName:</B> is invoked for a previously unregistered entity name, this notification is broadcast with the requested entity name as the object of the notification.<p>
+
+
+
+ 
+
+ 
+
+
+
+
+
+<i>Copyright &#169; 1997, Apple Computer, Inc.   All rights
+
+reserved.</i>
+
+
+
+<!-- Last updated: 10/15/97 16:35:12 -->
+
+
+
+</body>
+
+</html>
+

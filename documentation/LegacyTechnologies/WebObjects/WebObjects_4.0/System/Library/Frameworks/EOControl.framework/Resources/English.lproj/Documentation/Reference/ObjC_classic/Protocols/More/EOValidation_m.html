@@ -1,0 +1,121 @@
+<html><head>
+<script language="JavaScript" src="../../../../../../../../../../../frametest_more.js"></script>
+<title>More about EOValidation</title></head>
+<body bgcolor="#ffffff">
+
+<!-- start of header -->
+<!--#include virtual="/includes/framesetheader" -->
+<!-- end of header -->
+
+<!--start of path -->
+<font face="Geneva,Helvetica,Arial" size="1">
+<b>PATH<spacer type="horizontal" size="5">&nbsp;</b>
+ <a href="../../../../../../../../../../../webobjects.html" target="_top">WebObjects 4.0 Documentation</a> <b>&gt;</b>
+ <a href="../../frameset.html" target="_top">EOControl Reference</a>
+</font>
+<br><br>
+<!--end of path -->
+
+<!-- start of navigation -->
+<a href="../EOValidation.html"><img src="../../../../../../../../../../../images/previous.gif" border="0"></a> 
+<a href="../EOValueMerging.html"><img src="../../../../../../../../../../../images/next.gif" border="0"></a> 
+
+<!-- insert Show/Hide frames -->
+<a href="javascript:testFrame()">
+<script>
+<!--
+ document.write(frameLink);
+//-->
+</script><!-- end Show/Hide frames --></a>
+<!-- end of navigation -->
+
+
+ 
+		<hr>
+		<br>
+		<h1><a name="//apple_ref/occ/intf/EOValidation">EOValidation</a> <br>
+ </h1>
+		<p><a name="4102">
+		<hr width=50% align=left>
+<h3>Validating Individual Properties</h3>
+		</a>The most general method for validating individual properties, <a href="../EOValidation.html"><b>validateValue:forKey: </b></a>, validates a property indirectly by name (or key). This method is responsible for two things: coercing the value into an appropriate type for the object, and validating it according to the object's rules. The default implementation provided by NSObject consults the object's EOClassDescription (using the EOEnterpriseObject informal protocol method <a href="../EOEnterpriseObject.html"><b>classDescription </b></a>) to coerce the value and to check for basic errors, such as a <b>null </b>value when that isn't allowed. If no basic errors exist, this default implementation then validates the value according to the object itself. It searches for a method of the form <b>validate </b><em>Key</em>: and invokes it if it exists. These are the methods that your custom classes can implement to validate individual properties, such as <b>validateAge </b>: to check that the value the user entered is within acceptable limits. The <b>validateAge </b>method sholuld return nil, indicating the value is acceptable, or an NSException created by calling the NSException method <b>validationException:withFormat: </b>. 
+		<p>Coercion is performed automatically for you (by the EOClassDescription), so all you need handle is validation itself. Since you can implement custom validation logic in the <b>validate </b><em>Key</em>: methods, you rarely need to override the EOValidation method <a href="../EOValidation.html"><b>validateValue:forKey: </b></a>. Rather, the default implementation provided by NSObject is generally sufficient. 
+		<p>As an example of how validating a single property works, suppose that Member objects have an <b>age </b>attribute stored as an integer. This attribute has a lower limit of 16, defined by the Member class. Now, suppose a user types &quot;12&quot; into a text field for the age of a member. The value comes into the Framework as a string. When <a href="../EOValidation.html"><b>validateValue:forKey: </b></a>is invoked to validate the new value, the method uses its EOClassDescription to convert the string &quot;12&quot; into an NSNumber, then invokes <b>validateAge: </b>with that NSNumber. The <b>validateAge: </b>method compares the age to its limit of 16 and returns an exception to indicate that the new value is not acceptable: 
+		<p>
+		<blockquote>
+			<pre>
+public void validateAge(java.lang.Object age) throws EOvalidation.Exception {<br>
+    if ((((Number)age).intValue) &lt; 16)<br>
+        throw new EOValidation.Exception(&quot;Age of &quot; + age + &quot; is below minimum.&quot;);<br>
+}
+
+</pre>
+		</blockquote>
+		<p>
+		<blockquote>
+			<pre>
+- (NSException *)validateAge:(NSNumber *)age<br>
+{<br>
+    if ([age intValue] &lt; 16) {<br>
+        return [NSException<br>
+            validationExceptionWithFormat:@&quot;Age of %@ is below minimum.&quot;, age];<br>
+    }<br>
+    return nil;<br>
+}
+</pre>
+		</blockquote>
+		<p>The method <a href="../../Classes/NSExceptionAdditions.html"><b>validationExceptionWithFormat: </b></a>used in the above example is a method that the Framework adds to NSException for convenient creation of validation exceptions. 
+		<p><a name="4438">
+		<hr width=25% align=left>
+<h4>When Properties are Validated</h4>
+		</a>The Framework validates all of an object's properties before the object is saved to an external source-either inserted or updated. Additionally, you can design your application so that changes to a property's value are validated immediately, as soon as a user attempts to leave an editable field in the user interface (in Java Client and Application Kit applications only). Whenever an EODisplayGroup sets a value in an object, it sends the object a <a href="../EOValidation.html"><b>validateValue:forKey: </b></a>message, allowing the object to coerce the value's type, perform any additional validation, and return an exception if the value isn't valid. By default, the display group leaves validation errors to be handled when the object is saved, using <a href="../EOValidation.html"><b>validateValue:forKey: </b></a>only for type coersion. However, you can use the EODisplayGroup method <b>setValidatesChangesImmediately: </b>with an argument of YES to tell the display group to immediately present an attention panel whenever a validation error is encountered. 
+		<p><a name="4436">
+		<hr width=50% align=left>
+<h3>Validating Before an Operation</h3>
+		</a>The remaining EOValidation methods-<a href="../EOValidation.html"><b>validateForInsert </b></a>, <a href="../EOValidation.html"><b>validateForUpdate </b></a>, <a href="../EOValidation.html"><b>validateForSave </b></a>, and <a href="../EOValidation.html"><b>validateForDelete </b></a>-validate an entire object to see if it's valid for a particular operation. These methods are invoked automatically by the Framework when the associated operation is initiated. NSObject provides default implementations, so you only have to implement them yourself when special validation logic is required. For example, you can override these methods in your custom enterprise object classes to allow or refuse the operation based on property values. For example, a Fee object might refuse to be deleted if it hasn't been paid yet. Or you can override these methods to perform delayed validation of properties or to compare multiple properties against one another; for example, you might verify that a pair of dates is in the proper temporal order. 
+		<p>
+		<blockquote>
+			<pre>
+- (NSException *)validateForSave<br>
+{<br>
+    NSException *exception = [super validateForSave];<br>
+    NSException *myException = nil;<br>
+			<br>
+    if ([startDate compare:endDate] == NSOrderedDescending) {<br>
+        myException = [NSException <br>
+            validationExceptionWithFormat:@&quot;Start date must precede end date.&quot;];<br>
+    }<br>
+    if (exception &amp;&amp; myException) {<br>
+        exception = [NSException aggregateExceptionWithExceptions:<br>
+            [NSArray arrayWithObjects:exception, myException, nil]];<br>
+    } else if (myException) {<br>
+        exception = myException;<br>
+    }<br>
+    return exception;<br>
+}
+
+</pre>
+		</blockquote>
+		<p>Note that this method also invokes <b>super </b>'s implementation. This is important, as the default implementations of the <b>validateFor... </b>methods pass the check on to the object's EOClassDescription, which performs basic checking among properties, including invoking <a href="../EOValidation.html"><b>validateValue:forKey: </b></a>for each property. The access layer's EOEntityClassDescription class verifies constraints based on an EOModel, such as delete rules. For example, the delete rule for a Department object might state that it can't be deleted if it still contains Employee objects. 
+		<p>The method <a href="../EOValidation.html"><b>validateForSave </b></a>is the generic validation method for when an object is written to the external store. If an object performs validation that isn't specific to insertion or to updating, it should go in <a href="../EOValidation.html"><b>validateForSave </b></a>. 
+		<p>
+		<p>
+		<hr>
+		<br>
+		<!--<a href="../../EOControlTOC.html" target="_top">[TOC]-->
+<a href="../EOValidation.html"><img src="../../../../../../../../../../../images/previous.gif" border="0"></a> 
+<a href="../EOValueMerging.html"><img src="../../../../../../../../../../../images/next.gif" border="0"></a> 
+
+<!-- insert Show/Hide frames -->
+<a href="javascript:testFrame()">
+<script>
+<!--
+ document.write(frameLink);
+//-->
+</script><!-- end Show/Hide frames --></a> 
+		<hr>
+		<br>
+		<i>Copyright &copy; 1998, Apple Computer, Inc. All rights reserved.</i> <!-- Last updated: 09/21/98 13:50:38 -->
+	</body>
+
+</html>

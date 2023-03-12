@@ -1,0 +1,288 @@
+<html><head><title></title></head>
+
+<body bgcolor="#ffffff">
+
+ 
+
+ 
+
+<h2><a name="//apple_ref/occ/cl/SybaseChannel">SybaseChannel</a>
+
+ <BR>
+
+</h2>
+
+<p><B>Inherits From:</B><BR>  
+
+<em> </em>EOAdaptorChannel : NSObject<em> 
+
+</em>
+
+<p><B>Declared in:</B>
+
+<em> </em>SybaseEOAdaptor/SybaseChannel.h<em> 
+
+</em>
+
+<p><a name="56">
+
+<a name="description"></a>
+
+<h3>Class Description  </h3>
+
+</a>A SybaseChannel represents an independent communication channel to the database server its SybaseAdaptor is connected to. All of a SybaseChannel's operations take place within the context of transactions controlled or tracked by its SybaseContext. A Sybase adaptor context manages one channel, and a channel is associated with only one context.<p>
+
+The feature SybaseChannel adds to EOAdaptorChannel is processing for compute rows and stored procedures.<p>
+
+<a name="59">
+
+<h3> Processing Compute Rows and Stored Procedures</h3>
+
+</a>The delegate methods used for processing compute rows and stored procedures give you access to the three types of non-regular rows supported by Sybase: compute rows, return parameters (from a stored procedure), and status from a stored procedure. Because the access layer can only handle regular table rows, the Sybase adaptor channel normally skips non-regular rows. However, you can use the delegate methods to intercept non-regular rows before they are skipped. These delegate methods are <B>sybaseChannel:willFetchAttributes:forRowOfType:<br>withComputeRowId: and sybaseChannel:willReturnRow:ofType:withComputeRowId: </B> The method <B>sybaseChannel:willFetchAttributes:... </B> is invoked when a row is fetched, while <B>sybaseChannel:willReturnRow:... </B> is invoked when a row is about to be returned. Based on the type of the row, the delegate can specify the appropriate behavior. This enables you to use data in one of the three non-regular row types and either extract the data from them or use the method <code>describeResults</code> to return an array of attributes that describe the properties available in the current result set. Using <code>describeResults</code> is appropriate if you're not concerned with format-for example, if you're just writing raw data to a report.<p>
+
+<B>Note:	</B>
+
+The regular rows in the results from a stored procedure must map to the attributes in the 
+
+corresponding entity, and must be in alphabetical order.
+
+<p><a name="126">
+
+<h3> Generating Primary Keys</h3>
+
+</a>Each adaptor provides a database-specific implementation of the method <B>primaryKeyForNewRowWithEntity: </B> for generating primary keys.  The SybaseChannel's implementation uses a table named eo_sequence_table to keep track of the next available primary key value for a given table. The table contains a row for each table for which the adaptor provides primary key values. The statement used to create the eo_sequence_table is:<p>
+
+<blockquote><pre>create table eo_sequence_table (
+
+</pre></blockquote><p>
+
+<blockquote><pre>    table_name varchar(32),
+
+</pre></blockquote><p>
+
+<blockquote><pre>    counter int null
+
+</pre></blockquote><p>
+
+<blockquote><pre>)
+
+</pre></blockquote><p>
+
+SybaseChannel uses a stored procedure named eo_pk_for_table to access and maintain the primary key counter in eo_sequence_table. The stored procedure is defined as follows:<p>
+
+<blockquote><pre>create procedure
+
+</pre></blockquote><p>
+
+<blockquote><pre>eo_pk_for_table @tname varchar(32) as
+
+</pre></blockquote><p>
+
+<blockquote><pre>begin
+
+</pre></blockquote><p>
+
+<blockquote><pre>    define @max int
+
+</pre></blockquote><p>
+
+<blockquote><pre>    update eo_sequence_table
+
+</pre></blockquote><p>
+
+<blockquote><pre>    set counter = counter + 1
+
+</pre></blockquote><p>
+
+<blockquote><pre>    where table_name = @tname
+
+</pre></blockquote><p>
+
+<blockquote><pre>    select counter
+
+</pre></blockquote><p>
+
+<blockquote><pre>    from eo_sequence_table
+
+</pre></blockquote><p>
+
+<blockquote><pre>    where table_name = @tname
+
+</pre></blockquote><p>
+
+<blockquote><pre>end
+
+</pre></blockquote><p>
+
+The stored procedure increments the counter in the eo_sequence_table row for the specified table, selects th counter value, and returns it. SybaseChannel executes this eo_pk_for_table stored procedure from <B>primaryKeyForNewRowWithEntity: </B> and returns the stored procedure's return value.<p>
+
+To use SybaseChannel's database-specific primary key generation mechanism, be sure that your database accommodates the adaptor's scheme. To modify your database so that it supports the adaptor's mechanism for generating primary keys, use EOModeler. For more information on this topic, see <em>Enterprise Objects Framework Developer's Guide</em>.<p>
+
+<a name="62">
+
+<h4>Methods Implemented By the Delegate </h4>
+
+</a><a name="63">
+
+<h4> <a name="//apple_ref/occ/instm/NSObject/sybaseChannel:willFetchAttributes:forRowOfType:withComputeRowId:">sybaseChannel:willFetchAttributes:forRowOfType:withComputeRowId:</a></h4>
+
+</a>- (NSArray *)<code>sybaseChannel:</code>(SybaseChannel *)<em>channel<br></em><code>willFetchAttributes:</code>(NSArray *)<em>attributes<br></em><code>forRowOfType:</code>(SybaseRowType)<em>rowType<br></em><code>withComputeRowId:</code>(int)<em>computeRowId</em><p>
+
+<em>Invoked whenever a row is fetched. The delegate can return </em>nil<em>, which causes the row to be skipped, or can return a substitute set of attributes that is appropriate for the type of row being fetched. Delegates can have the channel fabricate a set of attributes for the current non-regular row by calling </em>describeResults<em>.</em><p>
+
+For example, the following implementation checks the row type; if it's a regular row, it simply returns the attributes. If it's not a regular row type, <code>describeResults</code> is used to return an array of attributes that describe the properties available in the current result set. Note that <code>describeResults</code> always describes the current row type.<p>
+
+<blockquote><pre>- (NSArray *)sybaseChannel:(SybaseChannel *)channel
+
+</pre></blockquote><p>
+
+<blockquote><pre>willFetchAttributes:(NSArray *)attributes
+
+</pre></blockquote><p>
+
+<blockquote><pre>forRowOfType:(SybaseRowType)rowType
+
+</pre></blockquote><p>
+
+<blockquote><pre>withComputeRowId:(int)computeRowId
+
+</pre></blockquote><p>
+
+<blockquote><pre>{
+
+</pre></blockquote><p>
+
+<blockquote><pre>if (rowType == SybaseRegularRow)
+
+</pre></blockquote><p>
+
+<blockquote><pre>return attributes;
+
+</pre></blockquote><p>
+
+<blockquote><pre>    
+
+</pre></blockquote><p>
+
+<blockquote><pre>attributes = [(EOAdaptorChannel *) channel describeResults];
+
+</pre></blockquote><p>
+
+<blockquote><pre>return attributes;
+
+</pre></blockquote><p>
+
+<blockquote><pre>}
+
+</pre></blockquote><p>
+
+<a name="78">
+
+<h4> <a name="//apple_ref/occ/instm/NSObject/sybaseChannel:willReturnRow:ofType:withComputeRowId:">sybaseChannel:willReturnRow:ofType:withComputeRowId:</a></h4>
+
+</a>- (BOOL)<code>sybaseChannel:</code>(SybaseChannel *)<em>channel</em> <code>willReturnRow:</code>(NSDictionary *)<em>row</em> <code>ofType:</code>(SybaseRowType)<em>rowType</em> <code>withComputeRowId:</code>(int)<em>computeRowId</em><p>
+
+<em>Invoked once a row has been read from the database and packaged into the dictionary. Delegates can return YES to cause the row to be returned from </em>fetchAttributes:WithZone:<em>, or they can return NO to cause the row to be skipped.</em><p>
+
+For example, the following implementation checks each row type and uses <code>NSLog()</code> to output a message describing the row's type. In this example all rows are returned, but you could use this template to selectively return or not return rows based on type.<p>
+
+<blockquote><pre>- (BOOL)sybaseChannel:(SybaseChannel *)channel
+
+</pre></blockquote><p>
+
+<blockquote><pre>willReturnRow:(NSDictionary *)row ofType:(SybaseRowType)rowType 
+
+</pre></blockquote><p>
+
+<blockquote><pre>withComputeRowId:(int)computeRowId
+
+</pre></blockquote><p>
+
+<blockquote><pre>{
+
+</pre></blockquote><p>
+
+<blockquote><pre>switch (rowType) {
+
+</pre></blockquote><p>
+
+<blockquote><pre>    case SybaseRegularRow:
+
+</pre></blockquote><p>
+
+<blockquote><pre>        break;
+
+</pre></blockquote><p>
+
+<blockquote><pre>    case SybaseComputeRow:
+
+</pre></blockquote><p>
+
+<blockquote><pre>        NSLog(@"Returning compute row");
+
+</pre></blockquote><p>
+
+<blockquote><pre>        break;
+
+</pre></blockquote><p>
+
+<blockquote><pre>    case SybaseReturnParameterRow:
+
+</pre></blockquote><p>
+
+<blockquote><pre>        NSLog(@"Returning return parameter row");
+
+</pre></blockquote><p>
+
+<blockquote><pre>        break;
+
+</pre></blockquote><p>
+
+<blockquote><pre>    case SybaseReturnStatusRow:
+
+</pre></blockquote><p>
+
+<blockquote><pre>        NSLog(@"Returning return status row");
+
+</pre></blockquote><p>
+
+<blockquote><pre>        break;
+
+</pre></blockquote><p>
+
+<blockquote><pre>}
+
+</pre></blockquote><p>
+
+<blockquote><pre>return YES;
+
+</pre></blockquote><p>
+
+<blockquote><pre>}
+
+</pre></blockquote><p>
+
+<p>
+
+ 
+
+ 
+
+
+
+
+
+<i>Copyright &#169; 1997, Apple Computer, Inc.   All rights
+
+reserved.</i>
+
+
+
+<!-- Last updated: 10/16/97 16:23:30 -->
+
+
+
+</body>
+
+</html>
+

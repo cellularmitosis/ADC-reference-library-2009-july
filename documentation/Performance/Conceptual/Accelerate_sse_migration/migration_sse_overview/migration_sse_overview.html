@@ -1,0 +1,177 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+<head>
+	<title>AltiVec/SSE Migration Guide: AltiVec to SSE Migration Overview</title>
+	<meta id="Generator" name="Generator" content="Gutenberg"/>
+	<meta id="GeneratorVersion" name="GeneratorVersion" content="v132"/>
+	<meta http-equiv="content-type" content="text/html;charset=utf-8"/>
+	<meta id="Copyright" name="Copyright" content="Copyright 2009 Apple Inc. All Rights Reserved."/>
+	<meta id="IndexTitle" name="IndexTitle" content="AltiVec to SSE Migration Overview"/>
+	<meta id="xcode-display" name="xcode-display" content="render"/>
+	<meta id="toc-file" name="toc-file" content="../toc.html"/>
+	<meta id="RESOURCES" content="../../../../Resources" />
+	
+	<link rel="stylesheet" type="text/css" href="../../../../Resources/CSS/frameset_styles.css"/>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/lib/prototype.js"></script>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/lib/scriptaculous.js"></script>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/page.js"></script>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/pedia.js"></script>
+	<!--[if lte IE 6]>
+		<style type="text/css">
+			/*<![CDATA[*/ 
+			html {overflow-x:auto; overflow-y:hidden;  }
+			/*]]>*/
+		</style>
+	<![endif]-->
+</head>    
+<body bgcolor="#ffffff" onload="initialize_page();"><a name="//apple_ref/doc/uid/TP40002729-CH206" title="AltiVec to SSE Migration Overview"></a>
+    <noscript>
+    <div id="tocMenu">
+        <iframe id="toc_content" name="toc_content" SRC="../toc.html" width="210" height="100%" align="left" frameborder="0">This document set is best viewed in a browser that supports iFrames.</iframe>
+    </div>
+    </noscript>
+    <div id="bodyText">
+        <a name="top"></a>
+        <div class="hideOnPrint hideInXcode">
+        <!-- start of header -->
+        <!--#include virtual="/includes/framesetheader" -->
+        <!-- end of header -->
+        </div>
+        
+        <!-- start of path -->
+<div class="breadcrumb hideOnPrint hideInXcode"><a href="http://developer.apple.com/" target="_top">ADC Home</a> &gt; <a href="../../../../../referencelibrary/index.html#//apple_ref/doc/uid/TP30000943" target="_top">Reference Library</a> &gt; <a href="../../../../index.html#//apple_ref/doc/uid/TP30000440" target="_top">Guides</a> &gt; <a href="../../../index.html#//apple_ref/doc/uid/TP30000440-TP30000430" target="_top">Performance</a> &gt; <a href="../../../VelocityEngine-date.html#//apple_ref/doc/uid/TP30000440-TP30000430-TP30000587" target="_top">Vector Engines</a> &gt; <a href="../migration_intro/migration_intro.html#//apple_ref/doc/uid/TP40002729-CH204-DontLinkElementID_1">AltiVec/SSE Migration Guide</a> &gt; </div><br class="hideInXcode"/><!-- end of path -->
+        
+        <div class="mini_nav_text" align="left">
+        <span class="navButtons">
+        <a href="../migration_intro/migration_intro.html">&lt; Previous Page</a><span style="margin-left: 8px"><a href="../migration_sse_C/migration_sse_C.html">Next Page &gt;</a></span>
+        </span>
+        <span id="showHideTOCUpperSpan">
+        <a href="#" onclick="showHideTOC();"><img src="../../../../Resources/Images/show_toc_icon.gif" width="15" height="14" border="0" style="margin-bottom: -2px;" alt="" hideText="Hide TOC" showText="Show TOC" /></a> <a href="#" onclick="showHideTOC();">Hide TOC</a>
+        </span>
+        </div>
+
+        <hr />
+        
+        
+        <a name="//apple_ref/doc/uid/TP40002729-CH206-DontLinkElementID_10" title="AltiVec to SSE Migration Overview"></a><h1><a name="//apple_ref/doc/uid/TP40002729-CH206-TPXREF101" title="AltiVec to SSE Migration Overview"></a>AltiVec to SSE Migration Overview</h1>
+<p>Intel's Streaming SIMD Extensions, or “SSE” is a 128-bit SIMD vector extension to the x86 ISA that is quite similar to AltiVec. Most of the good practices for AltiVec apply. These include enabling full compiler optimizations, function call inlining, proper alignment and organization of data, attention to pipeline latencies, dispatch limitations, etc. As always, the largest opportunities for performance improvement comes from high level optimization techniques, most importantly choosing the right algorithm. The same goes for PowerPC vs. x86 in general.</p>
+<p>However, there are some key differences between the two. For a broad overview of general tips and techniques for writing universal binaries, please see:<span class="content_text"><a href="../../../../MacOSX/Conceptual/universal_binary/index.html#//apple_ref/doc/uid/TP40002217" target="_top">Universal Binary Programming Guidelines</a></span>.</p>
+<p>A good source of x86 specific tuning advice and architectural documentation is Intel's web site. In particular, please see the processor optimization reference manual and accompanying software developers manuals: <span class="content_text"><a href="http://www.intel.com/design/pentium4/manuals/index_new.htm" target="_blank">Intel Pentium References</a></span></p>
+<p>There are also a number of very interesting (though in many cases highly speculative) resources available on the web to help you better understand Pentium behavior.</p>
+<p>This document is intended to be an addendum to the above sources with information specifically relevant to tuning for SSE and high performance programming in general. It is targeted specifically towards the segment of the developer population that is already knowledgeable about high performance programming using AltiVec, especially those people with a substantial investment in AltiVec who would like to leverage that investment moving forward onto the Intel architecture.</p>
+<p>Before we begin, we would like to strongly urge developers who are starting the process of porting AltiVec code to SSE to look to see if this work has already been done for you in Accelerate.framework. There has been a large body of work added to Accelerate.framework in recent years that you may not have been able to take advantage of previously, for reasons that may no longer exist. We recommend taking a few minutes to take a look. Accelerate.framework does signal processing (<span class="content_text"><a href="http://developer.apple.com/documentation/Performance/Conceptual/vDSP/index.html?http://developer.apple.com/documentation/Performance/Conceptual/vDSP/intro_chap/chapter_1_section_1.html" target="_top">vDSP.h</a></span>), image processing (<span class="content_text"><a href="http://developer.apple.com/documentation/Performance/Conceptual/vImage/Chapter1/chapter_1_section_1.html" target="_top">vImage.h</a></span>), linear algebra (<span class="content_text"><a href="http://developer.apple.com/hardwaredrivers/ve/vector_libraries.html#BLAS" target="_top">BLAS</a></span>/<span class="content_text"><a href="http://developer.apple.com/hardwaredrivers/ve/vector_libraries.html#LAPACK" target="_top">LAPACK</a></span>), vector math library (<span class="content_text"><a href="http://developer.apple.com/hardwaredrivers/ve/vector_libraries.html#vMathLib" target="_top">vMathLib</a></span>), and large integer computation (<span class="content_text"><a href="http://developer.apple.com/hardwaredrivers/ve/vector_libraries.html#vBasicOps" target="_top">vBasicOps.h</a></span>, <span class="content_text"><a href="http://developer.apple.com/hardwaredrivers/ve/vector_libraries.html#vBigNum" target="_top">vBigNum.h</a></span>). The framework will transparently select the best code for the appropriate CPU, be that G3, G4, G5 or Pentium. In many cases, you don't have to know anything about vector programming to use Accelerate.framework.</p>
+
+<!-- This template is being used for both PDF and HTML. -->
+
+    
+    <h4>In this section:</h4>
+    
+    
+    <p class="blockquote">
+    
+        
+			
+			
+				<a href="migration_sse_overview.html#//apple_ref/doc/uid/TP40002729-CH206-271673">AltiVec and SSE</a>
+				
+			<br/>
+			
+        
+			
+			
+				<a href="migration_sse_overview.html#//apple_ref/doc/uid/TP40002729-CH206-242505">Hardware Overview</a>
+				
+			<br/>
+			
+        
+			
+			
+				<a href="migration_sse_overview.html#//apple_ref/doc/uid/TP40002729-CH206-BCIBAEDH">Instruction Overview</a>
+				
+			<br/>
+			
+        
+
+    </p><br/>
+
+<a name="//apple_ref/doc/uid/TP40002729-CH206-271673" title="AltiVec and SSE"></a><h2>AltiVec and SSE</h2>
+<p>What we are calling SSE in this document was actually delivered as three separate vector extensions to the IA-32 ISA, which appeared (in order over time) under the names SSE, SSE2 and SSE3. Each builds on the extension that went before it. The first two are defined to be part of the baseline hardware requirement for MacOS X for Intel. SSE3 has been recently introduced (first in the Prescott family of Pentium 4 processors) and may or may not be available on a machine running MacOS X for Intel. In addition, another vector extension, MMX, was available before SSE was introduced. It does packed integer arithmetic in a separate 64-bit register file that aliases to the x87 FPU register set, the scalar floating point unit (used only for long double on MacOS X for Intel.) It is also a defined part of the MacOS X for Intel, but for reasons explained later does not get as much use. All of these vector extensions are also defined for EM64T and AMD64.</p>
+<p>AltiVec and SSE are quite similar at the highest levels. They are SIMD vector units with the same vector size (128-bits) and a similar general design. SSE adds several important new features compared to AltiVec. The single and double precision floating point engines are fully IEEE-754 compliant, which means that all four rounding modes, exceptions and flags are available. Misaligned loads and stores are handled in hardware. There is hardware support for floating point division and square root. There is a Sum of Absolute Differences instruction for video encoding. All of the floating point operations provided are available in both scalar and packed variants. These features will be described in more detail in later sections.</p>
+<a name="//apple_ref/doc/uid/TP40002729-CH206-242505" title="Hardware Overview"></a><h2>Hardware Overview</h2>
+<p><em>Registers</em></p>
+<p>The Streaming SIMD Extensions define a set of 8 named 128-bit wide vector registers, called XMM registers. These are a flat register file like AltiVec. It is not stack based like the x87 register file. It has no special purpose registers like the x86 integer register file. On our ABI, all eight registers are volatile. For EM64T, the register file grows to 16 registers. (Note: Apple has not yet defined a ABI for 64-bit programming on MacOS X for Intel. 06/24/05)</p>
+<p>In addition, there is a parallel set of 64-bit MMX registers that are used by the MMX extension to x86. The MMX register file aliases the x87 floating point register stack. Use of MMX causes an automatic x87 state save. The x87 unit will not function properly until you issue a EMMS instruction. (Use _mm_empty() for this.) Thus, MMX and x87 are mutually exclusive and may not be used at the same time. There is however no piece of hardware or software that is in place to prevent you from making this mistake. Unsurprisingly, failure to call _mm_empty() or use of MMX concurrently with x87 floating point code is a common mistake for people new to MMX. In certain cases, the paranoid may choose to use compiler devices like <code>-mno-mmx</code> flag to prevent unintentional MMX use, although such measures do not provide complete automatic protection. The flag does nothing to prevent use of those segments of SSE or SSE2 that use the MMX register file.</p>
+<p><em>Pipelines, Latencies and Unrolling</em></p>
+<p>There is quite a bit of variability between implementations of x86 based processors. Small parts of the design get regular tweaking even in minor updates to the processor. It is difficult to make sweeping generalization about the exact operation of various stages of the x86 pipelines: fetch, decode, dispatch, issue, execution and completion. Please see processor specific Intel documentation for a more complete description of the particular performance characteristics of each processor that you are targeting.</p>
+<p>Generally speaking, the smaller register file on the x86 architecture compared to PowerPC is backed by a much larger reorder buffer, to reorder the execution of instructions to keep pipelines full. From the perspective of a developer experienced with AltiVec, it may initially appear difficult to keep pipelines full with eight registers. While this would be true of a strictly in-order architecture, the large reorder window allows the processor to pull future instructions forward to fill gaps in the pipelines to help make sure that the processor stays full. The processor may pull instructions forward from the next loop iteration. Indeed, in some cores it may not be uncommon to see several loop iterations unrolled in hardware in the reorder buffers. This process occurs transparently to the developer and may perform differently on different cores.</p>
+<p>Utilizing a heavily out-of-order core may mean that your approach to unrolling your code may need to be different. Whereas in AltiVec it may have been a good idea to unroll up to eight-way in parallel, on SSE this will most likely overflow the register file. That will cause the compiler to spill temporary data onto the stack, introducing a large number of extra loads and stores into the critical code path, likely slowing things down dramatically.</p>
+<p>Here is a code example unrolled two-way in parallel:</p>
+<div class="codesample"><table><tr><td scope="row"><pre>for( i = 0; i &lt; N - 1; i+= 2 )<span></span></pre></td></tr><tr><td scope="row"><pre>{<span></span></pre></td></tr><tr><td scope="row"><pre>    float a0 = in[0]; float a1 = in[1]; in += 2;<span></span></pre></td></tr><tr><td scope="row"><pre>    float b0 = in2[0]; float b1 = in2[1]; in2 += 2;<span></span></pre></td></tr><tr><td scope="row"><pre>    a0 += b0; a1 += b1;<span></span></pre></td></tr><tr><td scope="row"><pre>    a0 *= 3.14159f; a1 *= 3.14159f;<span></span></pre></td></tr><tr><td scope="row"><pre>    out[0] = a0; out[1] = a1; out += 2;<span></span></pre></td></tr><tr><td scope="row"><pre>}<span></span></pre></td></tr></table></div>
+<p>It is important to minimize register spillage on x86. The right thing to do on x86 is usually to either not unroll at all (cores with a trace cache) or unroll serially (cores without a trace cache). Either approach should keep the pipelines full, presuming that the core of the loop is not so large that the distance that the processor needs to look ahead to find parallel calculation streams exceeds the size of the reorder buffer. Serial unrolling is a way to eliminate a few test and branch instructions. However, if the processor core has a trace cache, this advantage will often be more than offset by the cost of flushing more microcode out of the cache to make room for the unrolled loop.</p>
+<p>Here is a code example unrolled two-way serially:</p>
+<div class="codesample"><table><tr><td scope="row"><pre>for( i = 0; i &lt; N - 1; i+= 2 )<span></span></pre></td></tr><tr><td scope="row"><pre>{<span></span></pre></td></tr><tr><td scope="row"><pre>    //First loop iteration<span></span></pre></td></tr><tr><td scope="row"><pre>    float a = in[0]; float b = in2[0]; a += b;<span></span></pre></td></tr><tr><td scope="row"><pre>    a *= 3.14159f;<span></span></pre></td></tr><tr><td scope="row"><pre>    out[0] = a;<span></span></pre></td></tr><tr><td scope="row"><pre>    //second iteration<span></span></pre></td></tr><tr><td scope="row"><pre>    a = in[1]; b = in2[1]; a += b;<span></span></pre></td></tr><tr><td scope="row"><pre>    a *= 3.14159f;<span></span></pre></td></tr><tr><td scope="row"><pre>    out[1] = a;<span></span></pre></td></tr><tr><td scope="row"><pre>    in += 2; in2 += 2; out += 2;<span></span></pre></td></tr><tr><td scope="row"><pre>}<span></span></pre></td></tr></table></div>
+<p>For many SSE instructions, the second (non-destination) instruction argument may be a direct reference to memory instead of a register. Direct memory references are a good way to save registers, since they allow you to make use of data without first needing to load it into a named register. Make no mistake, the load still happens. The out-of-order processor core is probably doing a load behind the scenes. The key difference is that you don't need to sacrifice a named register to hold the loaded data. Also, the processor doesn't have to then get the data back out of the named register, a process which is more expensive on Intel than PowerPC, and which can actually cause processor stalls on Intel.</p>
+<p>The good news is that these changes make life easy for you, the software developer. You may find that you don't need to unroll by hand at all. It is very easy for the compiler to unroll code serially, since it can do so without worrying about aliasing problems. Direct memory references reduce the work involved with making use of constants.</p>
+<p>The latencies and throughputs for various instructions are listed in the Intel Pentium Processor Optimization Reference Manuals (Appendix C, see link at the top of this page). At the time of the announcement of MacOS X for Intel (June, 2005), a student of comparative architecture between PowerPC and x86 would observe that pipeline lengths are generally shorter on x86. Lower latencies make it possible to more easily fill pipelines with a modestly sized reorder window. In addition, then current architectures commonly have a vector throughput of one instruction per two cycles on vector execution units. This has the effect of halving the amount of instruction level parallelism required to saturate pipelines, at the cost of decreased throughput. All AltiVec instructions proceed with a throughput of one instruction per cycle.</p>
+<a name="//apple_ref/doc/uid/TP40002729-CH206-244096" title="Instruction Overview"></a><a name="//apple_ref/doc/uid/TP40002729-CH206-BCIBAEDH" title="Instruction Overview"></a><h2>Instruction Overview</h2>
+<p>The instruction set architecture (ISA) for SSE is similar to other parts of the x86 ISA. No operations take more than two register operands. (Sometimes a third argument is present as an immediate operand set at compile/link time.) Typically, one of the register operands is used for both input and output data, which is to say that one of the two operands is destroyed and replaced with the instruction results. It is frequently necessary to copy data that is needed later to avoid having it destroyed. (If you are using a C compiler, the compiler will do this for you and provide the illusion of non-destructive operations.) The other argument frequently may be either a register or a direct memory reference, that takes its data straight from memory.</p>
+<p>There are three major classes of data on the SSE vector unit: integer, single precision floating point and double precision floating point vectors, each of which may be serviced by separate parts of the processor, akin to the AltiVec VSIU, VCIU, VFPU, but for int, float and double. The three data types share the same XMM register file, so you can do one type operation directly on the result of an another type of operation (for example do a vector floating point add of the result of a vector integer computation). This is exactly like AltiVec. No conversions are done. The bits are just passed around unmodified. If you want to convert between types (e.g. convert an int to a float) with retention of value (e.g. 0x00000001 ? 1.0f), there are special instructions for that.</p>
+<p>However, unlike AltiVec, passing data back and forth between the three parts of the vector unit in this manner is frowned upon. In many cases, you will discover up to three seemingly redundant instructions that all do the same thing, one each for integer, single precision floating-point and double precision floating-point. Typical examples are vector loads and stores, certain permutes, and Boolean operations. There may be performance penalties for inter-unit data passing. It is recommended that, where possible, you use the appropriate instruction for the appropriate data type.</p>
+<p>The Intel SIMD vector architecture was deployed over time as a series of four vector extensions to the x86 ISA. The first was MMX, followed by SSE, SSE2, and SSE3. SSE3 is the most recent, and is an optional feature of machines supported by MacOS X for Intel. The other three are guaranteed to be there, so you need only worry about SSE3. Details on each follow.</p>
+<p><em>MMX</em></p>
+<p>MMX, the first of the vector extensions provides a series of packed integer operators that utilize eight 64-bit registers described above. We do not describe MMX at length here because the operations defined by MMX are, generally speaking, also available in a 128-bit format in SSE2. Their use on SSE2 does not collide with the x87 unit, making SSE2 the generally preferred way to do these sorts of operations. MMX remains useful in a limited number of cases, especially those involving small data sets (particularly those 64 bits in size) and for some difficult to parallelize operations such as large-precision integer addition, but these cases are rare. MMX is sometimes used as a source of additional register storage area. However, since the vector ALU is shared with SSE2, there is likely no throughput advantage to using the two in parallel. Likewise since the cost of moving data to and from the MMX register file from XMM is likely to be larger than a simple aligned 128-bit load or store, such uses should be justified by real performance improvements.</p>
+<p>MMX is enabled using the GCC compiler flag <code>-mmmx</code>. MMX is enabled by default on gcc-4.0. If MMX is enabled, the C preprocessor symbol <code>__MMX__</code> is defined. MMX is disabled using the <code>-mno-mmx</code> flag on GCC.</p>
+<p><em>SSE</em></p>
+<p>SSE adds a series of packed and scalar single precision floating point operations, and some conversions between single precision and integer. SSE uses the XMM register file, which is distinct from the MMX register file and does not alias the x87 floating point stack.</p>
+<p>All operations under SSE are done under the control of the MXCSR, a special purpose control register that contains IEEE-754 flags and mask bits. SSE is enabled using the GCC compiler flag <code>-msse</code>. SSE is enabled by default on gcc-4.0. If SSE is enabled, the C preprocessor symbol <code>__SSE__</code> is defined.</p>
+<p><em>SSE2</em></p>
+<p>SSE2 adds a series of packed and scalar double precision floating point operations. Like SSE, SSE2 uses the XMM register file. All floating point operations under SSE2 are also done under the control of the MXCSR to set rounding modes, flags and exception masks. In addition, SSE2 replicates most of the integer operations in MMX, except modified appropriately to fit the 128-bit XMM register size. In addition, SSE2 adds a large number of data type conversion instructions.</p>
+<p>SSE2 is enabled using the GCC compiler flag -msse2. SSE2 is enabled by default on gcc-4.0. If SSE2 is enabled, the C preprocessor symbol __SSE2__ is defined.</p>
+<p><em>SSE3</em></p>
+<p>SSE3 adds a small series of instructions mostly geared to making complex floating point arithmetic work better in some data layouts. However, since it is possible to get the same or better performance by repacking data as uniform vectors rather than non-uniform vectors ahead of time, it is not expected that most developers will need to rely on this feature. Finally, it adds a small set of additional permutes and some horizontal floating point adds and subtracts that may be of use to some developers. Further details on SSE3 can be found in the <span class="content_text"><a href="http://www.intel.com/technology/itj/2004/volume08issue01/art01_microarchitecture/p06_sse.htm" target="_blank">Intel’s documentation</a></span>.</p>
+<p>SSE3 is enabled using the GCC compiler flag -msse3. SSE3 is an optional hardware feature on MacOS X for Intel and is not enabled by default on gcc-4.0. If SSE3 is turned on, the C preprocessor symbol <code>__SSE3__</code> is defined.</p>
+
+        <br /><br /> 
+        
+        <div class="mini_nav_text" align="left">
+        <span class="navButtons">
+        <a href="../migration_intro/migration_intro.html">&lt; Previous Page</a><span style="margin-left: 8px"><a href="../migration_sse_C/migration_sse_C.html">Next Page &gt;</a></span>
+        </span>
+        <span id="showHideTOCLowerSpan">
+        <a href="#" onclick="showHideTOC();"><img src="../../../../Resources/Images/show_toc_icon.gif" width="15" height="14" border="0" style="margin-bottom: -2px;" alt="" /></a> <a href="#" onclick="showHideTOC();">Hide TOC</a>
+        </span>
+        </div>
+
+        <br/><hr /><div align="center"><p class="content_text" lang="en" dir="ltr"> <!--#if expr="0=1" -->&#x00a9; 2005 Apple Computer, Inc. All Rights Reserved. &#40;<!--#endif -->Last updated: 2005-09-08<!--#if expr="0=1" -->&#041;<!--#endif --></p></div>
+
+        
+        <div class="hideOnPrint hideInXcode">
+        <!-- start of footer -->
+        	<table width="100%" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/documentation/Performance/Conceptual/Accelerate_sse_migration/migration_sse_overview/migration_sse_overview.html%3Fid%3DTP40002729-1.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/documentation/Performance/Conceptual/Accelerate_sse_migration/migration_sse_overview/migration_sse_overview.html%3Fid%3DTP40002729-1.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/documentation/Performance/Conceptual/Accelerate_sse_migration/migration_sse_overview/migration_sse_overview.html%3Fid%3DTP40002729-1.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+
+        <!--#include virtual="/includes/framesetfooter" -->
+        <!-- end of footer -->
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,477 @@
+<html><head><title></title></head>
+<body bgcolor="#ffffff">
+ 
+ 
+<a name="816"></a>
+<h1>
+<FONT COLOR="#000066">
+ <a name="//apple_ref/java/intf/EnterpriseObject">EnterpriseObject</a>
+</FONT>
+</h1>
+<p><B>Implemented By:	</B><BR>
+<a href="../../Classes/CustomObject/Frameset.html#" target="_top">CustomObject</a><br>
+<a href="../../Classes/GenericRecord/Frameset.html#" target="_top">GenericRecord</a>
+
+<p><a name="826">
+<a name="description"></a>
+<H2>Interface Description
+</H2>
+</a>EnterpriseObject defines methods for supporting operations common to all enterprise objects. Among these are methods for initializing instances, announcing changes, setting and retrieving property values, and performing validation of state. The purpose of each method is highlighted in the following sections, which describe the major functional groups.<p>
+You rarely need to implement the EnterpriseObject interface from scratch. Instead use GenericRecords to represent enterprise objects that don't require custom behavior, and use your own subclasses of CustomObject for enterprise objects that do require custom behavior. For more information on how <a href="../../Classes/GenericRecord/Frameset.html#" target="_top">GenericRecord</a> and <a href="../../Classes/CustomObject/Frameset.html#" target="_top">CustomObject</a> implement the EnterpriseObject interface, see the class specifications for those classes.<p>
+<h3>
+<a name="3072">
+ Initialization Methods
+</a>
+</h3>
+After an enterprise object is created, it receives an <code>awake...</code> message. The particular message depends on whether the object has been fetched from a database or created anew in the application. In the former case, it receives an <a href="#2728"><code>awakeFromFetchInEditingContext</code></a> message. In the latter, it receives an <a href="#2713"><code>awakeFromInsertionInEditingContext</code></a> message. The receiver can override either method to perform extra initialization-such as setting default values-based on how it was created.<p>
+<h3>
+<a name="3080">
+ Announcing Changes
+</a>
+</h3>
+For the Framework to keep all areas of an application synchronized, enterprise objects must notify their observers when their state changes. Objects do this by invoking <a href="#1851"><code>willChange</code></a> before altering any instance variable or other kind of state. This method informs all observers that the invoker is about to change. See the <a href="../../Classes/ObserverCenter/Frameset.html#" target="_top">ObserverCenter</a> class specification for more information on change notification.<p>
+The primary observer of changes in an object is its EditingContext. EditingContext is a subclass of ObjectStore that manages collections of objects in memory, tracking inserts, deletes, and updates, and propagating changes to the persistent store as needed. You can get the EditingContext that contains an object by sending the object an <a href="#2800"><code>editingContext</code></a> message.<p>
+<h3>
+<a name="3089">
+ Getting Object and Class Metadata
+</a>
+</h3>
+One of the larger groups of methods in the EnterpriseObject interface provides information about an object's properties. Most of these methods consult a ClassDescription to provide their answers. The <a href="#837"><code>classDescription</code></a> method returns an object's <a href="../../Classes/ClassDescription/Frameset.html#" target="_top">ClassDescription</a>. See that class specification for the methods it implements. Methods you can send directly to a custom object include <a href="#860"><code>entityName</code></a>, which provides the name of the entity mapped to the receiver's class; <a href="#2702"><code>allPropertyKeys</code></a>, which returns the names of all the receiver's class properties, attributes and relationships alike; and <a href="#2687"><code>attributeKeys</code></a>, which returns just the names of the attributes.<p>
+Some methods return information about relationships. <a href="#906"><code>toOneRelationshipKeys</code></a> and <a href="#3002"><code>toManyRelationshipKeys</code></a> return the names of the receiver's relationships, while <a href="#2884"><code>isToManyKey</code></a> tells which kind a particular relationship is. <a href="#2795"><code>deleteRuleForRelationshipKey</code></a> indicates what should happen to the receiver's relationships when it's deleted. Similarly, <a href="#2889"><code>ownsDestinationObjectsForRelationshipKey</code></a> indicates what should happen when another object is added to or removed from the receiver's relationship. Another method, <a href="#2753"><code>classDescriptionForDestinationKey</code></a>, returns the ClassDescription for the objects at the destination of a relationship.<p>
+<h3>
+<a name="3127">
+ Key-Value Coding Methods
+</a>
+</h3>
+A special set of methods form the Framework's main data transport mechanism, in which the properties of an enterprise object are accessed indirectly by name (or <em>key</em>), rather than directly through invocation of an accessor method or as instance variables. Thus, all of a the EnterpriseObject interface's attributes and relationships can be accessed in a consistent manner.<p>
+The basic methods for accessing an enterprise object's values are <code><a href="#2982">takeValueForKey</a></code> and <code><a href="#1592">valueForKey</a></code>. Another pair of methods, <code><a href="#2992">takeValuesFromDictionary</a></code> and <code><a href="#1708">valuesForKeys</a></code>, gives access to groups of properties. Lastly, <code><a href="#2987">takeValueForKeyPath</a></code> and <code><a href="#1650">valueForKeyPath</a></code> give access to properties across key paths of the form <em>relationship.property</em>; for example, "department.name".<p>
+<h3>
+<a name="3245">
+ Relationship Accessor Methods
+</a>
+</h3>
+Building on the key-value coding methods, another group of methods allows you to modify to-many relationship properties by adding and removing single objects, rather than replacing the entire content of the relationship array, and to modify relationships so that reciprocal relationships are automatically adjusted. <a href="#2677"><code>addObjectToPropertyWithKey</code></a> and <a href="#2920"><code>removeObjectFromPropertyWithKey</code></a> handle the first situation, doing all the work of altering arrays for to-many relationships.<p>
+Reciprocal relationships are handled by <a href="#2672"><code>addObjectToBothSidesOfRelationshipWithKey</code></a> and <a href="#2915"><code>removeObjectFromBothSidesOfRelationshipWithKey</code></a>. For example, when you add an Employee to a Department's <code>employees</code> relationship, or remove it, you also want the Employee's <code>department</code> relationship altered to suit. Unless you have specific reasons to do otherwise, you should always use the methods that handle reciprocal relationships so that back pointers are properly updated; the <code>...BothSidesOfRelationshipWithKey</code> methods work properly whether or not a reciprocal relationship exists. <p>
+Two other methods that affect relationships are typically used internally by the Framework. You should rarely have a need to invoke or override them. <a href="#2910"><code>propagateDeleteWithEditingContext</code></a> applies an object's delete rule to the destinations of its relationships. The delete rule specifies whether a destination object should be ignored, also deleted, or whether the deletion should be disallowed if a destination exists. <a href="#2765"><code>clearProperties</code></a> simply sets all of the receiver's relationship properties to <code>null</code>. An EditingContext uses this method to break circular references between its objects when the context is deallocated.<p>
+<h3>
+<a name="3273">
+ Snapshots
+</a>
+</h3>
+The key-value coding methods define a general mechanism for accessing an object's properties, but you first have to know what those properties are. Sometimes, however, you just want to preserve an object's entire state for later use, whether to undo changes to the object, compare the values that have changed, or just keep a record of the changes. The snapshotting methods provide this service, extracting or setting all properties at once and performing the necessary conversions for proper behavior. <code><a href="#2977">snapshot</a></code> returns a dictionary containing all the receiver's properties, with NullValue substituted for <code>null</code>. <code><a href="#3027">updateFromSnapshot</a></code> sets properties of the receiver to the values in a snapshot, converting NullValue to <code>null</code>.<p>
+<h3>
+<a name="3281">
+ Validation
+</a>
+</h3>
+Validating new values is a vital part of business logic. Several EnterpriseObject interface methods support validation at different stages of an object's life. Validation methods check for illegal value types, values outside of established limits, illegal relationships, and so on. All validation methods return <code>null</code> if the values under consideration are valid, or an exception object indicating how the values aren't valid.<p>
+There are two kinds of validation methods: The first covers individual properties while the second kind covers operations to the external store-inserting, updating, and deleting. The most general method, <a href="#3058"><code>validateValueForKey</code></a>, does two things: coerce the value into an appropriate type for the object, and validate it according to the object's rules. The operation-specific validation methods-<a href="#3047"><code>validateForInsert</code></a>, <a href="#1291"><code>validateForUpdate</code></a>, <a href="#1087"><code>validateForSave</code></a>, and <a href="#3037"><code>validateForDelete</code></a> are invoked when the associated operation is performed.<p>
+<a name="3484">
+<HR WIDTH=50% ALIGN=LEFT>
+<h2>Method Types
+</h2>
+</a><dl>
+<dt>Initializing enterprise objects<dl><dl><dl><dl>
+<dt><a href="#2728">awakeFromFetchInEditingContext</a><dt><a href="#2713">awakeFromInsertionInEditingContext</a></dl>
+</dl></dl></dl><dt>Announcing changes<dl><dl><dl><dl>
+<dt><a href="#1851">willChange</a></dl>
+</dl></dl></dl><dt>Accessing an object's EditingContext<dl><dl><dl><dl>
+<dt><a href="#2800">editingContext</a></dl>
+</dl></dl></dl><dt>Accessing class description information<dl><dl><dl><dl>
+<dt><a href="#2702">allPropertyKeys</a><dt><a href="#2687">attributeKeys</a><dt><a href="#837">classDescription</a><dt><a href="#2753">classDescriptionForDestinationKey</a><dt><a href="#2795">deleteRuleForRelationshipKey</a><dt><a href="#860">entityName</a><dt><a href="#4182">inverseForRelationshipKey</a><dt><a href="#2884">isToManyKey</a><dt><a href="#2889">ownsDestinationObjectsForRelationshipKey</a><dt><a href="#3002">toManyRelationshipKeys</a><dt><a href="#906">toOneRelationshipKeys</a></dl>
+</dl></dl></dl><dt>Firing faults<dl><dl><dl><dl>
+<dt><a href="#1878">willRead</a></dl>
+</dl></dl></dl><dt>Key-value coding<dl><dl><dl><dl>
+<dt><a href="#2982">takeValueForKey</a><dt><a href="#1592">valueForKey</a><dt><a href="#2992">takeValuesFromDictionary</a><dt><a href="#1708">valuesForKeys</a><dt><a href="#2987">takeValueForKeyPath</a><dt><a href="#1650">valueForKeyPath</a><dt><a href="#4186">handleTakeValue</a><dt><a href="#2852">handleQueryWithUnboundKey</a><dt><a href="#3022">unableToSetNullForKey</a></dl>
+</dl></dl></dl><dt>Modifying relationships<dl><dl><dl><dl>
+<dt><a href="#2677">addObjectToPropertyWithKey</a><dt><a href="#2920">removeObjectFromPropertyWithKey</a><dt><a href="#2672">addObjectToBothSidesOfRelationshipWithKey</a><dt><a href="#2915">removeObjectFromBothSidesOfRelationshipWithKey</a><dt><a href="#2910">propagateDeleteWithEditingContext</a><dt><a href="#2765">clearProperties</a></dl>
+</dl></dl></dl><dt>Working with snapshots<dl><dl><dl><dl>
+<dt><a href="#2977">snapshot</a><dt><a href="#3027">updateFromSnapshot</a></dl>
+</dl></dl></dl><dt>Validating values<dl><dl><dl><dl>
+<dt><a href="#3037">validateForDelete</a><dt><a href="#3047">validateForInsert</a><dt><a href="#1087">validateForSave</a><dt><a href="#1291">validateForUpdate</a><dt><a href="#3058">validateValueForKey</a></dl>
+</dl></dl></dl><dt>Accessing descriptions<dl><dl><dl><dl>
+<dt><a href="#2821">eoDescription</a><dt><a href="#2826">eoShallowDescription</a><dt><a href="#1064">userPresentableDescription</a></dl>
+</dl></dl></dl></dl>
+<HR WIDTH=50% ALIGN=LEFT>
+<a name="instm"></a>
+<h2>Instance Methods</h2>  
+
+
+<a name="2672"></a>
+<h3>
+ <a name="//apple_ref/java/intfm/EnterpriseObject/addObjectToBothSidesOfRelationshipWithKey">addObjectToBothSidesOfRelationshipWithKey</a>
+</h3>
+public abstract void <code>addObjectToBothSidesOfRelationshipWithKey</code>(java.lang.Object <em>anObject</em>, 
+java.lang.String <em>key</em>)
+
+<P>Sets or adds <em>anObject</em> as the destination for the receiver's relationship identified by <em>key</em>, and also sets or adds the receiver for <em>anObject</em>'s reciprocal relationship if there is one. This method also properly handles removing <code>this</code> and <em>anObject</em> from their previous relationship as needed. For example, if an Employee object belongs to the Research department, invoking this method with the Maintenance department removes the Employee from the Research department as well as setting the Employee's department to Maintenance.<p>
+<B>See also: </B>  
+<a href="#2915"><code>removeObjectFromBothSidesOfRelationshipWithKey</code></a>, <a href="#2677"><code>addObjectToPropertyWithKey</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="2677"></a>
+<h3> <a name="//apple_ref/java/intfm/EnterpriseObject/addObjectToPropertyWithKey">addObjectToPropertyWithKey</a></h3>
+public abstract void <code>addObjectToPropertyWithKey</code>(java.lang.Object <em>anObject</em>, java.lang.String <em>key</em>)
+
+<P>Adds <em>anObject</em> to the receiver's to-many relationship identified by <em>key</em>, without setting a reciprocal relationship.<p>
+<B>See also: </B>  
+<a href="#2920"><code>removeObjectFromPropertyWithKey</code></a>, <a href="#2672"><code>addObjectToBothSidesOfRelationshipWithKey</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="2702"></a>
+<h3> <a name="//apple_ref/java/intfm/EnterpriseObject/allPropertyKeys">allPropertyKeys</a></h3>
+public abstract next.util.ImmutableVector <code>allPropertyKeys</code>()
+
+<P>Returns all of the receiver's property keys, as returned by <a href="#2687"><code>attributeKeys</code></a>, <a href="#906"><code>toOneRelationshipKeys</code></a>, and <a href="#3002"><code>toManyRelationshipKeys</code></a>.<p>
+<hr WIDTH=25% ALIGN=LEFT>
+<a name="2687"></a>
+<h3> <a name="//apple_ref/java/intfm/EnterpriseObject/attributeKeys">attributeKeys</a></h3>
+public abstract next.util.ImmutableVector <code>attributeKeys</code>()
+
+<P>Returns the names of the receiver's attributes.<p>
+<B>See also: </B>  
+<a href="#906"><code>toOneRelationshipKeys</code></a>, <a href="#3002"><code>toManyRelationshipKeys</code></a>., <code>attributeKeys</code> (ClassDescription)
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="2728"></a>
+<h3> <a name="//apple_ref/java/intfm/EnterpriseObject/awakeFromFetchInEditingContext">awakeFromFetchInEditingContext</a></h3>
+public abstract void <code>awakeFromFetchInEditingContext</code>(next.eo.EditingContext <em>anEditingContext</em>)
+
+<P>Performs additional initialization on the receiver upon its being fetched from the external repository into <em>anEditingContext</em>.<p>
+<B>See also: </B>  
+<a href="#2713"><code>awakeFromInsertionInEditingContext</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="2713"></a>
+<h3> <a name="//apple_ref/java/intfm/EnterpriseObject/awakeFromInsertionInEditingContext">awakeFromInsertionInEditingContext</a></h3>
+public abstract void 
+<code>awakeFromInsertionInEditingContext</code>(next.eo.EditingContext <em>anEditingContext</em>)
+
+<P>Performs additional initialization on the receiver upon its being inserted into <em>anEditingContext</em>. This is commonly used to assign default values or record the time of insertion.<p>
+<B>See also: </B>  
+<a href="#2728"><code>awakeFromFetchInEditingContext</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="837"></a>
+<h3> <a name="//apple_ref/java/intfm/EnterpriseObject/classDescription">classDescription</a></h3>
+public abstract next.eo.ClassDescription <code>classDescription</code>()
+
+<P>Returns the ClassDescription registered for the receiver's class. <p>
+<hr WIDTH=25% ALIGN=LEFT>
+<a name="2753"></a>
+<h3> <a name="//apple_ref/java/intfm/EnterpriseObject/classDescriptionForDestinationKey">classDescriptionForDestinationKey</a></h3>
+public abstract next.eo.ClassDescription <code>classDescriptionForDestinationKey</code>(java.lang.String <em>key</em>)
+
+<P>Returns the ClassDescription for the destination objects of the relationship identified by <em>key</em>. <p>
+<B>See also: </B>  
+<a href="../../Classes/ClassDescription/Frameset.html#" target="_top"><code>classDescriptionForDestinationKey</code></a> (ClassDescription)
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="2765"></a>
+<h3> <a name="//apple_ref/java/intfm/EnterpriseObject/clearProperties">clearProperties</a></h3>
+public abstract void <code>clearProperties</code>()
+
+<P>Sets all of the receiver's to-one and to-many relationships to <code>null</code>. EditingContexts use this method to break circular references among objects when they're deallocated. You should never need to invoke this method.<p>
+<B>See also: </B>  
+<a href="#906"><code>toOneRelationshipKeys</code></a>, <a href="#3002"><code>toManyRelationshipKeys</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="2795"></a>
+<h3> <a name="//apple_ref/java/intfm/EnterpriseObject/deleteRuleForRelationshipKey">deleteRuleForRelationshipKey</a></h3>
+public abstract int <code>deleteRuleForRelationshipKey</code>(java.lang.String <em>relationshipKey</em>)
+
+<P>Returns a rule indicating how to handle the destination of the receiver's relationship named by <em>relationshipKey</em> when the receiver is deleted. The delete rule is one of:<p>
+<ul><li>DeleteRuleNullify<br>
+<li>DeleteRuleCascade<br>
+<li>DeleteRuleDeny<br>
+<li>DeleteRuleNoAction<br>
+</ul>Which are defined in ClassDescription. For example, an Invoice object might return DeleteRuleCascade for the relationship named "lineItems", since when an invoice is deleted, its line items should be deleted as well.<p>
+<B>See also: </B>  
+<a href="#2910"><code>propagateDeleteWithEditingContext</code></a>, <a href="#3037"><code>validateForDelete</code></a>, 
+<a href="../../Classes/ClassDescription/Frameset.html#" target="_top"><code>deleteRuleForRelationshipKey</code></a> (ClassDescription)
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="2800"></a>
+<h3> <a name="//apple_ref/java/intfm/EnterpriseObject/editingContext">editingContext</a></h3>
+public abstract next.eo.EditingContext <code>editingContext</code>()
+
+<P>Returns the EditingContext that holds the receiver.<p>
+<hr WIDTH=25% ALIGN=LEFT>
+<a name="860"></a>
+<h3> <a name="//apple_ref/java/intfm/EnterpriseObject/entityName">entityName</a></h3>
+public abstract java.lang.String <code>entityName</code>()
+
+<P>Returns the name of the receiver's entity, or <code>null</code> if it doesn't have one.<p>
+<B>See also: </B>  
+<a href="../../Classes/ClassDescription/Frameset.html#" target="_top"><code>entityName</code></a> (ClassDescription)
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="2821"></a>
+<h3> <a name="//apple_ref/java/intfm/EnterpriseObject/eoDescription">eoDescription</a></h3>
+public abstract java.lang.String <code>eoDescription</code>()
+
+<P>Returns a full description of the receiver's property values by extracting them using the key-value coding methods. This method is useful for debugging. You can implement a <code>description</code> method that invokes this one, and the debugger's print-object command (<code>po</code> on the command line) automatically displays this description. You can also invoke this method directly on the command line of the debugger.<p>
+<B>See also: </B>  
+<a href="#1064"><code>userPresentableDescription</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="2826"></a>
+<h3> <a name="//apple_ref/java/intfm/EnterpriseObject/eoShallowDescription">eoShallowDescription</a></h3>
+public abstract java.lang.String <code>eoShallowDescription</code>()
+
+<P>Returns a string containing the receiver's class and entity names.<p>
+<B>See also: </B>  
+<a href="#2821"><code>eoDescription</code></a>, <a href="#1064"><code>userPresentableDescription</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="2852"></a>
+<h3> <a name="//apple_ref/java/intfm/EnterpriseObject/handleQueryWithUnboundKey">handleQueryWithUnboundKey</a></h3>
+public abstract java.lang.Object <code>handleQueryWithUnboundKey</code>(java.lang.String <em>key</em>)
+
+<P>Invoked from <code><a href="#1592">valueForKey</a></code> when it finds no property binding for <em>key</em>.<p>
+<B>See also: </B>  
+<a href="#4186"><code>handleTakeValue</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="4186"></a>
+<h3> <a name="//apple_ref/java/intfm/EnterpriseObject/handleTakeValue">handleTakeValue</a></h3>
+public abstract void <code>handleTakeValue</code>(java.lang.Object <em>value</em>, java.lang.String <em>key</em>)
+
+<P>Invoked from <code><a href="#2982">takeValueForKey</a></code> when it finds no property binding for <em>key</em>.<p>
+<B>See also: </B>  
+<a href="#2852"><code>handleQueryWithUnboundKey</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="4182"></a>
+<h3> <a name="//apple_ref/java/intfm/EnterpriseObject/inverseForRelationshipKey">inverseForRelationshipKey</a></h3>
+public abstract java.lang.String <code>inverseForRelationshipKey</code>(java.lang.String <em>relationshipKey</em>)
+
+<P>Returns the name of the relationship pointing back to the receiver's class or entity from that named by <em>relationshipKey</em>, or <code>null</code> if there isn't one. With next.eo.Entity and next.eo.Relationship, for example, reciprocality is determined by the join attributes of the two Relationships.<p>
+<B>See also: </B>  
+<a href="../../Classes/ClassDescription/Frameset.html#" target="_top"><code>inverseForRelationshipKey</code></a> (ClassDescription)
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="2884"></a>
+<h3> <a name="//apple_ref/java/intfm/EnterpriseObject/isToManyKey">isToManyKey</a></h3>
+public abstract boolean <code>isToManyKey</code>(java.lang.String <em>key</em>)
+
+<P>Returns <code>true</code> if the receiver has a to-many relationship identified by <em>key</em>, <code>false</code> otherwise.<p>
+<B>See also: </B>  
+<a href="#3002"><code>toManyRelationshipKeys</code></a>, <a href="#906"><code>toOneRelationshipKeys</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="2889"></a>
+<h3> <a name="//apple_ref/java/intfm/EnterpriseObject/ownsDestinationObjectsForRelationshipKey">ownsDestinationObjectsForRelationshipKey</a></h3>
+public abstract boolean <code>ownsDestinationObjectsForRelationshipKey</code>(java.lang.String <em>key</em>)
+
+<P>Returns <code>true</code> if the receiver has a relationship identified by <em>key</em> that owns its destination, <code>false</code> otherwise. If an object owns the destination for a relationship, then when that destination object is removed from the relationship, it's automatically deleted. Ownership of a relationship thus contrasts with a delete rule, in that the first applies when the destination is removed and the second applies when the source is deleted.<p>
+<B>See also: </B>  
+<a href="#2795"><code>deleteRuleForRelationshipKey</code></a>, 
+<a href="../../Classes/ClassDescription/Frameset.html#" target="_top"><code>ownsDestinationObjectsForRelationshipKey</code></a> (ClassDescription), 
+<code>ownsDestination</code> (next.eo.Relationship)
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="2910"></a>
+<h3> <a name="//apple_ref/java/intfm/EnterpriseObject/propagateDeleteWithEditingContext">propagateDeleteWithEditingContext</a></h3>
+public abstract void <code>propagateDeleteWithEditingContext</code>(next.eo.EditingContext <em>anEditingContext</em>)
+
+<P>Deletes the destination objects of the receiver's relationships according to the delete rule for each relationship:<p>
+<Table Border="3">
+<caption></caption>
+<tr><th><b>Delete Rule</b>
+</th><th><b>Action</b>
+</th></tr>
+<tr><td colspan=1 rowspan=3 scope="row">DeleteRuleNullify
+</td><td colspan=1 rowspan=3>The destination object is simply removed from the relationship, and the receiver 
+is likewise removed from the destination's reciprocal relationship if there is one.
+</td></tr>
+<tr></tr>
+<tr></tr>
+<tr><td colspan=1 rowspan=2 scope="row">DeleteRuleCascade
+</td><td colspan=1 rowspan=2>As above, but the destination object is also deleted and sent a 
+<code>propagateDeleteWithEditingContext</code> message.
+</td></tr>
+<tr></tr>
+<tr><td scope="row">DeleteRuleDeny
+</td><td>Applied in <a href="#3037"><code>validateForDelete</code></a>, not in this method.
+</td></tr>
+<tr><td scope="row">DeleteRuleNoAction
+</td><td>The relationship is ignored when the receiver is deleted. 
+</td></tr>
+
+</Table>
+
+<Table>
+<tr><td>
+</Table>
+<p>
+The DeleteRuleNoAction option is useful for tuning performance. In order to perform a deletion, Enterprise Objects Framework fires all the faults of the deleted object and then fires any to-many faults that point back to the deleted object. For example, suppose you have a simple application based on the sample Movies database. Deleting a Movie object has the effect of firing a to-one fault for the Movie's <code>studio</code> relationship, and then firing the to-many <code>movies</code> fault for that studio. In this scenario, it would make sense to set the delete rule DeleteRuleNoAction for Movie's <code>studio</code> relationship. However, you should use this delete rule with great caution since it can result in dangling references in your object graph.<p>
+<B>See also: </B>  
+<a href="#2795"><code>deleteRuleForRelationshipKey</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="2915"></a>
+<h3> <a name="//apple_ref/java/intfm/EnterpriseObject/removeObjectFromBothSidesOfRelationshipWithKey">removeObjectFromBothSidesOfRelationshipWithKey</a></h3>
+public abstract void 
+<code>removeObjectFromBothSidesOfRelationshipWithKey</code>(java.lang.Object <em>anObject</em>, 
+java.lang.String <em>key</em>)
+
+<P>Removes <em>anObject</em> from the receiver's relationship identified by <em>key</em>, and also removes the receiver from <em>anObject</em>'s reciprocal relationship if there is one.<p>
+<B>See also: </B>  
+<a href="#2672"><code>addObjectToBothSidesOfRelationshipWithKey</code></a>, <a href="#2920"><code>removeObjectFromPropertyWithKey</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="2920"></a>
+<h3> <a name="//apple_ref/java/intfm/EnterpriseObject/removeObjectFromPropertyWithKey">removeObjectFromPropertyWithKey</a></h3>
+public abstract void <code>removeObjectFromPropertyWithKey</code>(java.lang.Object <em>anObject</em>, 
+java.lang.String <em>key</em>)
+
+<P>Removes <em>anObject</em> from the receiver's to-many relationship identified by <em>key</em>, without modifying a reciprocal relationship.<p>
+<B>See also: </B>  
+<a href="#2677"><code>addObjectToPropertyWithKey</code></a>, <a href="#2915"><code>removeObjectFromBothSidesOfRelationshipWithKey</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="2977"></a>
+<h3> <a name="//apple_ref/java/intfm/EnterpriseObject/snapshot">snapshot</a></h3>
+public abstract next.util.ImmutableHashtable <code>snapshot</code>()
+
+<P>Returns a dictionary whose keys are those of the receiver's attributes, to-one relationships, and to-many relationships, and whose values are the values of those properties, with NullValue substituted for <code>null</code>.<p>
+<B>See also: </B>  
+<a href="#3027"><code>updateFromSnapshot</code></a>, <a href="#2702"><code>allPropertyKeys</code></a>, <a href="#1592"><code>valueForKey</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="2982"></a>
+<h3> <a name="//apple_ref/java/intfm/EnterpriseObject/takeValueForKey">takeValueForKey</a></h3>
+public abstract void <code>takeValueForKey</code>(java.lang.Object <em>value</em>, java.lang.String <em>key</em>)
+
+<P>Sets the value for the property identified by <em>key</em> to <em>value</em>. Invokes <a href="#4186"><code>handleTakeValue</code></a> if the receiver doesn't recognize <em>key</em>.<p>
+<B>See also: </B>  
+<a href="#2987"><code>takeValueForKeyPath</code></a>, <a href="#2992"><code>takeValuesFromDictionary</code></a>, <a href="#1592"><code>valueForKey</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="2987"></a>
+<h3> <a name="//apple_ref/java/intfm/EnterpriseObject/takeValueForKeyPath">takeValueForKeyPath</a></h3>
+public abstract void <code>takeValueForKeyPath</code>(java.lang.Object <em>value</em>, java.lang.String <em>keyPath</em>)
+
+<P>Sets the value for the derived property identified by <em>keyPath</em> to <em>value</em>. A key path has the form <em>relationship.property</em> (with one or more relationships); for example "department.name".<p>
+<B>See also: </B>  
+<a href="#2982"><code>takeValueForKey</code></a>, <a href="#2992"><code>takeValuesFromDictionary</code></a>, <a href="#1650"><code>valueForKeyPath</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="2992"></a>
+<h3> <a name="//apple_ref/java/intfm/EnterpriseObject/takeValuesFromDictionary">takeValuesFromDictionary</a></h3>
+public abstract void 
+<code>takeValuesFromDictionary</code>(next.util.ImmutableHashtable <em>anImmutableHashtable</em>)
+
+<P>Sets properties of the receiver with values from <em>anImmutableHashtable</em>, using the keys to identify the properties.<p>
+<B>See also: </B>  
+<a href="#2982"><code>takeValueForKey</code></a>, <a href="#2987"><code>takeValueForKeyPath</code></a>, <a href="#1708"><code>valuesForKeys</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="3002"></a>
+<h3> <a name="//apple_ref/java/intfm/EnterpriseObject/toManyRelationshipKeys">toManyRelationshipKeys</a></h3>
+public abstract next.util.ImmutableVector <code>toManyRelationshipKeys</code>()
+
+<P>Returns the names of the receiver's to-many relationships.<p>
+<B>See also: </B>  
+<a href="#906"><code>toOneRelationshipKeys</code></a>., <a href="#2687"><code>attributeKeys</code></a>, <a href="../../Classes/ClassDescription/Frameset.html#" target="_top"><code>toManyRelationshipKeys</code></a> (ClassDescription)
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="906"></a>
+<h3> <a name="//apple_ref/java/intfm/EnterpriseObject/toOneRelationshipKeys">toOneRelationshipKeys</a></h3>
+public abstract next.util.ImmutableVector <code>toOneRelationshipKeys</code>()
+
+<P>Returns the names of the receiver's to-one relationships.<p>
+<B>See also: </B>  
+<a href="#3002"><code>toManyRelationshipKeys</code></a>., <a href="#2687"><code>attributeKeys</code></a>, <a href="../../Classes/ClassDescription/Frameset.html#" target="_top"><code>toOneRelationshipKeys</code></a> (ClassDescription)
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="3022"></a>
+<h3> <a name="//apple_ref/java/intfm/EnterpriseObject/unableToSetNullForKey">unableToSetNullForKey</a></h3>
+public abstract void <code>unableToSetNullForKey</code>(java.lang.String <em>aString</em>)
+
+<P>Invoked from <code><a href="#2982">takeValueForKey</a></code> when it's given a <code>null</code> value for a scalar property (such as an <code>int</code> or a <code>float</code>).<p>
+<hr WIDTH=25% ALIGN=LEFT>
+<a name="3027"></a>
+<h3> <a name="//apple_ref/java/intfm/EnterpriseObject/updateFromSnapshot">updateFromSnapshot</a></h3>
+public abstract void <code>updateFromSnapshot</code>(next.util.ImmutableHashtable <em>aSnapshot</em>)
+
+<P>Takes the values from <em>aSnapshot</em>, setting each one according to its key.<p>
+<B>See also: </B>  
+<a href="#2992"><code>takeValuesFromDictionary</code></a>, <a href="#2977"><code>snapshot</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="1064"></a>
+<h3> <a name="//apple_ref/java/intfm/EnterpriseObject/userPresentableDescription">userPresentableDescription</a></h3>
+public abstract java.lang.String <code>userPresentableDescription</code>()
+
+<P>Returns a short (no longer than 60 characters) description of an enterprise object based on its data.<p>
+<B>See also: </B>  
+<a href="#2821"><code>eoDescription</code></a>, <a href="#2826"><code>eoShallowDescription</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="3037"></a>
+<h3> <a name="//apple_ref/java/intfm/EnterpriseObject/validateForDelete">validateForDelete</a></h3>
+public abstract java.lang.Throwable <code>validateForDelete</code>()
+
+<P>Confirms that the receiver can be deleted in its current state, returning <code>null</code> if it can or an exception that the sender may throw if it can't. For example, an object can't be deleted if it has a relationship with a delete rule of DeleteRuleDeny and that relationship has a destination object.<p>
+<B>See also: </B>  
+<a href="#3047"><code>validateForInsert</code></a>, <a href="#1087"><code>validateForSave</code></a>, <a href="#1291"><code>validateForUpdate</code></a>, <a href="#3058"><code>validateValueForKey</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="3047"></a>
+<h3> <a name="//apple_ref/java/intfm/EnterpriseObject/validateForInsert">validateForInsert</a></h3>
+public abstract java.lang.Throwable <code>validateForInsert</code>()
+
+<P>Confirms that the receiver can be inserted in its current state, returning <code>null</code> if it can or an exception that can be thrown if it can't.<p>
+<B>See also: </B>  
+<a href="#3037"><code>validateForDelete</code></a>, <a href="#1291"><code>validateForUpdate</code></a>, <a href="#1087"><code>validateForSave</code></a>, <a href="#3058"><code>validateValueForKey</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="1087"></a>
+<h3> <a name="//apple_ref/java/intfm/EnterpriseObject/validateForSave">validateForSave</a></h3>
+public abstract java.lang.Throwable <code>validateForSave</code>()
+
+<P>Confirms that the receiver can be saved in its current state, returning <code>null</code> if it can or an exception that the sender may throw if it can't.<p>
+<B>See also: </B>  
+<a href="#3037"><code>validateForDelete</code></a>, <a href="#3047"><code>validateForInsert</code></a>, <a href="#1291"><code>validateForUpdate</code></a>, <a href="#3058"><code>validateValueForKey</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="1291"></a>
+<h3> <a name="//apple_ref/java/intfm/EnterpriseObject/validateForUpdate">validateForUpdate</a></h3>
+public abstract java.lang.Throwable <code>validateForUpdate</code>()
+
+<P>Confirms that the receiver can be updated in its current state, returning <code>null</code> if it can or an exception that the sender may throw if it can't.<p>
+<B>See also: </B>  
+<a href="#3037"><code>validateForDelete</code></a>, <a href="#3047"><code>validateForInsert</code></a>, <a href="#1087"><code>validateForSave</code></a>, <a href="#3058"><code>validateValueForKey</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="3058"></a>
+<h3> <a name="//apple_ref/java/intfm/EnterpriseObject/validateValueForKey">validateValueForKey</a></h3>
+public abstract java.lang.Throwable <code>validateValueForKey</code>(next.util.MutableVector <em>value</em>, 
+java.lang.String <em>key</em>)
+
+<P>Confirms that the object in <em>value</em> is legal for the receiver's property named by <em>key</em>, returning <code>null</code> if it can or an exception that the sender may throw if it can't. This method can replace the object in <em>value</em>.<p>
+<B>See also: </B>  
+<a href="#3037"><code>validateForDelete</code></a>, <a href="#3047"><code>validateForInsert</code></a>, <a href="#1291"><code>validateForUpdate</code></a>, <a href="#1087"><code>validateForSave</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="1592"></a>
+<h3> <a name="//apple_ref/java/intfm/EnterpriseObject/valueForKey">valueForKey</a></h3>
+public abstract java.lang.Object <code>valueForKey</code>(java.lang.String <em>key</em>)
+
+<P>Returns the value for the property identified by <em>key</em>. Invokes <a href="#2852"><code>handleQueryWithUnboundKey</code></a> if the receiver doesn't recognize <em>key</em>.<p>
+<B>See also: </B>  
+<a href="#1650"><code>valueForKeyPath</code></a>, <a href="#1708"><code>valuesForKeys</code></a>, <a href="#2982"><code>takeValueForKey</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="1650"></a>
+<h3> <a name="//apple_ref/java/intfm/EnterpriseObject/valueForKeyPath">valueForKeyPath</a></h3>
+public abstract java.lang.Object <code>valueForKeyPath</code>(java.lang.String <em>keyPath</em>)
+
+<P>Returns the value for the derived property identified by <em>keyPath</em>. A key path has the form <em>relationship.property</em> (with one or more relationships); for example "department.name".<p>
+<B>See also: </B>  
+<a href="#1708"><code>valuesForKeys</code></a>, <a href="#2987"><code>takeValueForKeyPath</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="1708"></a>
+<h3> <a name="//apple_ref/java/intfm/EnterpriseObject/valuesForKeys">valuesForKeys</a></h3>
+public abstract next.util.ImmutableHashtable <code>valuesForKeys</code>(next.util.ImmutableVector <em>keys</em>)
+
+<P>Returns a dictionary containing the property values identified by each of the keys (Strings) in <em>keys</em>.<p>
+<B>See also: </B>  
+<a href="#1650"><code>valueForKeyPath</code></a>, <a href="#2992"><code>takeValuesFromDictionary</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="1851"></a>
+<h3> <a name="//apple_ref/java/intfm/EnterpriseObject/willChange">willChange</a></h3>
+public abstract void <code>willChange</code>()
+
+<P>Notifies any observers that the receiver's state is about to change, by sending each an <code>objectWillChange</code> message. In Enterprise Objects Framework, objects that need to know about changes to an enterprise object register as observers for change notifications. When an enterprise object is about to change, it has the responsibility of posting a change notification so that registered observers are notified. To do this, enterprise objects should invoke the method <code>willChange</code> prior to altering their state, most typically in "set" methods such as the following:<p>
+<blockquote><pre>public void setRoleName(String value) {<br>    willChange();<br>    roleName = value;<br>}
+</pre></blockquote><p>For more information on observing and change notifications, see the <a href="../../Classes/ObserverCenter/Frameset.html#" target="_top">ObserverCenter</a> class specification.<p>
+<hr WIDTH=25% ALIGN=LEFT>
+<a name="1878"></a>
+<h3> <a name="//apple_ref/java/intfm/EnterpriseObject/willRead">willRead</a></h3>
+public abstract void <code>willRead</code>()
+
+<P>Fills the receiver with values fetched from the database. Before your application attempts to message an enterprise object, you must ensure that it has been filled with its data. To do this, enterprise objects invoke the method <code>willRead</code> prior to any attempt to access the object's state, most typically in "get" methods such as the following:<p>
+<blockquote><pre>public String roleName() {<br>    willRead();<br>    return roleName;<br>}
+</pre></blockquote><p><p>
+
+ 
+ 
+
+
+<i>Copyright &#169; 1998, Apple Computer, Inc.   All rights
+reserved.</i>
+
+<!-- Last updated: 01/19/98 08:58:32 -->
+
+</body>
+</html>

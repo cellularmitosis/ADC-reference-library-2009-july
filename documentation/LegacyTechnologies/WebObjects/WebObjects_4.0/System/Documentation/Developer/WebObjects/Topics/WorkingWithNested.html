@@ -1,0 +1,464 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML EXPERIMENTAL 970324//EN">
+<HTML>
+<HEAD>
+<META NAME="GENERATOR" CONTENT="Adobe FrameMaker 5.5/HTML Export Filter">
+<LINK REL="STYLESHEET" HREF="WorkingWithNested.css">
+<TITLE> </TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+<!--start of banner -->
+<!--#include virtual="/includes/framesetheader" -->
+<!-- end of banner -->
+<!--start of path -->
+<font face="Geneva,Helvetica,Arial" size="1">
+<b>PATH<spacer type="horizontal" size="5">&nbsp;</b>
+ <a href="../../../../../webobjects.html" target="_top">WebObjects 4.0 Documentation</a> <b>&gt;</b>
+ <a href="TopicsTOC.html" target="_top">WebObjects Programming Topics</a>
+</font>
+<br><br>
+<!--end of path -->
+
+
+<H1 CLASS="TopictTitleTOC">
+Using Nested Editing Contexts
+</H1>
+<DIV>
+<H2 CLASS="Synopsis">
+<A NAME="pgfId=606101">
+ </A>
+Synopsis<DIV>
+<IMG SRC="WorkingWithNested-1.gif">
+</DIV>
+</H2>
+<P CLASS="Body">
+<A NAME="pgfId=606102">
+ </A>
+Describes how to use nested editing contexts as a working area for complex edit screens.</P>
+</DIV>
+<DIV>
+<H2 CLASS="Heading1">
+<A NAME="pgfId=606103">
+ </A>
+Discussion<DIV>
+<IMG SRC="WorkingWithNested-1.gif">
+</DIV>
+</H2>
+<P CLASS="Body">
+<A NAME="pgfId=606104">
+ </A>
+EOEditingContexts can be viewed as working areas into which objects are fetched and modified. By default, every session is given its own <EM CLASS="Code">
+defaultEditingContext</EM>
+ as a means of separating different user's objects. </P>
+<P CLASS="Body">
+<A NAME="pgfId=606105">
+ </A>
+When changes are made to objects within an editing context, the editing context tracks the changes for future saving. When the editing context sends the message <EM CLASS="Code">
+saveChanges</EM>
+, it hands off the changes to its parent EOObjectStore. Normally, the parent is the EOObjectStoreCoordinator which in turn hands off the changes to the appropriate EODatabaseContext for each entity. The EODatabaseContext then saves the changes to the database.</P>
+<P CLASS="Body">
+<A NAME="pgfId=606106">
+ </A>
+Since an EOEditingContext is itself an EOObjectStore, you can nest EOEditingContexts, thereby making different levels of working areas that can <EM CLASS="Code">
+saveChanges</EM>
+ to its parent level. With a little bit of effort, this feature of EOF can be used within WebObjects applications to provide scratch areas where users can make changes, submit forms, update EOs, submit more forms, and then decide if all the changes should be saved to the session's <EM CLASS="Code">
+defaultEditingContext</EM>
+ or completely forgotten.</P>
+<P CLASS="Body">
+<A NAME="pgfId=606107">
+ </A>
+This more complicated approach to editing is necessary because the Web permits users to edit on a special edit page and, without saving or canceling, hyperlink directly to another page, leaving the <EM CLASS="Code">
+defaultEditingContext</EM>
+ with incomplete or inconsistent EOs. This action can be disastrous unless care is taken to prevent the partial or undesired changes from being saved by accident.</P>
+<P CLASS="Body">
+<A NAME="pgfId=606108">
+ </A>
+To better illustrate this issue, assume you create a special object edit page that uses multiple Submit buttons to switch between sections of data to be edited. Also, assume that the WOTextfields, WOPopuplists, and so on, are bound directly to the object via key paths. As soon as you edit the data on the first section, and switch to see the data on a different section, the object will be changed to reflect any changes you made in the first section. Assume further that the user clicks a hyperlink in a different frame and jumps to a completely different screen. The user subsequently edits another object and finishes by selecting the Save button. The changes from the first edit screen will alsobe applied to the database! This is undesirable because the user never acknowledged a save for those changes.</P>
+<P CLASS="Body">
+<A NAME="pgfId=606109">
+ </A>
+There are two possible workarounds for this problem.</P>
+<OL>
+<P CLASS="Numbered">
+<A NAME="pgfId=606111">
+ </A>
+1.	Create a temporary instance variable for every data element that might be changed. Initialize the temporary variables upon entering the edit page. Update the real variables only during the actual <EM CLASS="Code">
+saveChanges</EM>
+ action.</P>
+<P CLASS="Numbered">
+<A NAME="pgfId=607203">
+ </A>
+2.	Create a nested EOEditingContext and fault in the object to be edited. The relationships will automatically be faulted into this temporary nested work area as needed. Bind the new editing instance of the object directly to the page's components. When <EM CLASS="Code">
+saveChanges</EM>
+ is invoked on the temporary EOEditingContext, the changes will be applied to the session's <EM CLASS="Code">
+defaultEditingContext</EM>
+. To apply them to the database, you can invoke <EM CLASS="Code">
+saveChanges</EM>
+ to the session's <EM CLASS="Code">
+defaultEditingContext</EM>
+, after which you can destroy the object and the temporary EOEditingContext.</P>
+</OL>
+<P CLASS="Body">
+<A NAME="pgfId=609225">
+ </A>
+We discuss the second approach. The techniques presented here can be used to build a reusable framework that manages the nested editing contexts without doubly-nesting them.</P>
+<DIV>
+<H4 CLASS="Heading2">
+<A NAME="pgfId=609240">
+ </A>
+Creating the Nested EOEditingContext</H4>
+<P CLASS="Body">
+<A NAME="pgfId=609247">
+ </A>
+The following code creates a nested editing context.</P>
+<DIV>
+<H5 CLASS="Code-Listing">
+<A NAME="pgfId=609228">
+ </A>
+Figure 1.  Java Code</H5>
+<DIV>
+<pre>EOEditingContext ec=session().defaultEditingContext();</pre></DIV>
+<A NAME="pgfId=609230">
+ </A>
+<DIV>
+<pre>EOEditingContext nestedEditingContext=new EOEditingContext(ec);</pre></DIV>
+<A NAME="pgfId=609232">
+ </A>
+</DIV>
+<DIV>
+<H5 CLASS="Code-Listing">
+<A NAME="pgfId=609235">
+ </A>
+Figure 2.  Objective-C Code</H5>
+<DIV>
+<pre>EOEditingContext *ec=[[self session] defaultEditingContext];</pre></DIV>
+<A NAME="pgfId=609237">
+ </A>
+<DIV>
+<pre>EOEditingContext *nestedEditingContext=[[EOEditingContext alloc] initWithParentObjectStore:ec];</pre></DIV>
+<A NAME="pgfId=609239">
+ </A>
+<P CLASS="Body">
+<A NAME="pgfId=615768">
+ </A>
+&nbsp;</P>
+</DIV>
+</DIV>
+<DIV>
+<H4 CLASS="Heading2">
+<A NAME="pgfId=609241">
+ </A>
+Faulting the Original EO into the Nested EOEditingContext</H4>
+<P CLASS="Body">
+<A NAME="pgfId=606128">
+ </A>
+Using the new convenience API from EOUtilities</P>
+<DIV>
+<H5 CLASS="Code-Listing">
+<A NAME="pgfId=608230">
+ </A>
+Figure 3.  Java Code</H5>
+<DIV>
+<pre>EOEnterpriseObject editingObject=(EOEnterpriseObject) EOUtilities.localInstanceOfObject (nestedEditingContext, objectToEdit);</pre></DIV>
+<A NAME="pgfId=608232">
+ </A>
+<P CLASS="Body">
+<A NAME="pgfId=606131">
+ </A>
+Using the standard API</P>
+</DIV>
+<DIV>
+<H5 CLASS="Code-Listing">
+<A NAME="pgfId=608235">
+ </A>
+Figure 4.  Java Code</H5>
+<DIV>
+<pre>EOGlobalID gid=objectToEdit.editingContext().globalIDForObject(objectToEdit);</pre></DIV>
+<A NAME="pgfId=608237">
+ </A>
+<DIV>
+<pre>EOEnterpriseObject editingObject=nestedEditingContext.faultForGlobalID(gid, nestedEditingContext);</pre></DIV>
+<A NAME="pgfId=608239">
+ </A>
+<P CLASS="Body">
+<A NAME="pgfId=606136">
+ </A>
+Using the new convenience API from EOUtilities</P>
+</DIV>
+<DIV>
+<H5 CLASS="Code-Listing">
+<A NAME="pgfId=608244">
+ </A>
+Figure 5.  Objective-C Code</H5>
+<DIV>
+<pre>id editingObject=[nestedEditingContext localInstanceOfObject: objectToEdit];</pre></DIV>
+<A NAME="pgfId=608246">
+ </A>
+<P CLASS="Body">
+<A NAME="pgfId=606139">
+ </A>
+Using the standard API</P>
+</DIV>
+<DIV>
+<H5 CLASS="Code-Listing">
+<A NAME="pgfId=608249">
+ </A>
+Figure 6.  Objective-C Code</H5>
+<DIV>
+<pre>gid=[[objectToEdit editingContext] globalIDForObject: objectToEdit];</pre></DIV>
+<A NAME="pgfId=608251">
+ </A>
+<DIV>
+<pre>id editingObject=[nestedEditingContext faultForGlobalID: gid editingContext: nestedEditingContext];</pre></DIV>
+<A NAME="pgfId=608253">
+ </A>
+</DIV>
+</DIV>
+<DIV>
+<H4 CLASS="Heading2">
+<A NAME="pgfId=606143">
+ </A>
+Saving All the Changes to the Database</H4>
+<P CLASS="Body">
+<A NAME="pgfId=609248">
+ </A>
+The following code saves the changes to a nested editing context.</P>
+<DIV>
+<H5 CLASS="Code-Listing">
+<A NAME="pgfId=608262">
+ </A>
+Figure 7.  Java Code</H5>
+<DIV>
+<pre>try {</pre></DIV>
+<A NAME="pgfId=608264">
+ </A>
+<DIV>
+<pre>     nestedEditingContext.saveChanges();</pre></DIV>
+<A NAME="pgfId=608266">
+ </A>
+<DIV>
+<pre>     session().defaultEditingContext().saveChanges();</pre></DIV>
+<A NAME="pgfId=608268">
+ </A>
+<DIV>
+<pre>}</pre></DIV>
+<A NAME="pgfId=608270">
+ </A>
+<DIV>
+<pre>catch (EOValidationException e) { // handle save error</pre></DIV>
+<A NAME="pgfId=608272">
+ </A>
+<DIV>
+<pre></pre></DIV>
+<A NAME="pgfId=608276">
+ </A>
+</DIV>
+<DIV>
+<H5 CLASS="Code-Listing">
+<A NAME="pgfId=608284">
+ </A>
+Figure 8.  Objective-C Code</H5>
+<DIV>
+<pre>NS_DURING</pre></DIV>
+<A NAME="pgfId=608286">
+ </A>
+<DIV>
+<pre>     [ nestedEditingContext saveChanges];</pre></DIV>
+<A NAME="pgfId=608288">
+ </A>
+<DIV>
+<pre>     [[[self session] defaultEditingContext] saveChanges];</pre></DIV>
+<A NAME="pgfId=608290">
+ </A>
+<DIV>
+<pre>NS_HANDLER // handle save error and the exception in variable localException</pre></DIV>
+<A NAME="pgfId=608292">
+ </A>
+<DIV>
+<pre>NS_ENDHANDLER</pre></DIV>
+<A NAME="pgfId=608296">
+ </A>
+</DIV>
+<DIV>
+<H5 CLASS="Code-Listing">
+<A NAME="pgfId=608301">
+ </A>
+Figure 9.  WebScript Code</H5>
+<DIV>
+<pre>NSException *e=[nestedEditingContext tryToSaveChanges];</pre></DIV>
+<A NAME="pgfId=608303">
+ </A>
+<DIV>
+<pre>     if  (!e)</pre></DIV>
+<A NAME="pgfId=608305">
+ </A>
+<DIV>
+<pre>     e=[[[self session] defaultEditingContext] saveChanges];</pre></DIV>
+<A NAME="pgfId=608307">
+ </A>
+<DIV>
+<pre>     if (e) {</pre></DIV>
+<A NAME="pgfId=608309">
+ </A>
+<DIV>
+<pre>     // handle save error and the exception in variable e</pre></DIV>
+<A NAME="pgfId=608311">
+ </A>
+<DIV>
+<pre>}</pre></DIV>
+<A NAME="pgfId=608313">
+ </A>
+<P CLASS="Body">
+<A NAME="pgfId=615776">
+ </A>
+&nbsp;</P>
+</DIV>
+</DIV>
+<DIV>
+<H4 CLASS="Heading2">
+<A NAME="pgfId=606172">
+ </A>
+Issues to Consider</H4>
+<P CLASS="Body">
+<A NAME="pgfId=607318">
+ </A>
+You should consider the following issues:</P>
+<UL>
+<P CLASS="Bulleted">
+<A NAME="pgfId=607321">
+ </A>
+&#183;	You need to ensure that the nested EOEditingContexts are retained.	</P>
+<P CLASS="Bulleted">
+<A NAME="pgfId=614805">
+ </A>
+&#183;	You probably want to keep track of the nested EOEditingContexts so that you can eventually free them. The session might be a good place to store these references.</P>
+<P CLASS="Bulleted">
+<A NAME="pgfId=606174">
+ </A>
+&#183;		You might want to keep track of the editing page for a given nested EOEditingContext so that you can jump back to that page if the user jumps off the edit page, and then requests to edit the same original object.</P>
+<P CLASS="Bulleted">
+<A NAME="pgfId=606175">
+ </A>
+&#183;		You might want to restrict the user by only allowing one editable object at a time. You can present the user with an AlertPanel page that asks if the user wants to abort a previous unfinished edit, jump back to an unfinished edit, or cancel attempting to edit a second object.</P>
+<P CLASS="Bulleted">
+<A NAME="pgfId=606176">
+ </A>
+&#183;		Care must be taken to avoid creating a doubly-nested EOEditingContext. You must ensure that the object you will edit is within the session's <EM CLASS="Code">
+defaultEditingContext</EM>
+.</P>
+<P CLASS="Bulleted">
+<A NAME="pgfId=606177">
+ </A>
+&#183;		Remember that the EOEditingContext does not retain its objects (unless<BR>
+<EM CLASS="Code">
+instancesRetainAllObjects</EM>
+ is YES, i.e., when you're writing in Java). Instead, it listens for deallocation notifications and automatically removes the object from the editing context. Therefore, it is important to ensure that the object being edited is retained by something for the life of the nested editing context.</P>
+</UL>
+</DIV>
+</DIV>
+<DIV>
+<H2 CLASS="Heading1">
+<A NAME="pgfId=606179">
+ </A>
+See Also<DIV>
+<IMG SRC="WorkingWithNested-1.gif">
+</DIV>
+</H2>
+<UL>
+<P CLASS="Bulleted">
+<A NAME="pgfId=606180">
+ </A>
+&#183;	EOEditingContext</P>
+<P CLASS="Bulleted">
+<A NAME="pgfId=606181">
+ </A>
+&#183;	EOObjectStore</P>
+<P CLASS="Bulleted">
+<A NAME="pgfId=606182">
+ </A>
+&#183;	EOObjectStoreCoordinator</P>
+<P CLASS="Bulleted">
+<A NAME="pgfId=606183">
+ </A>
+&#183;	EOUtilities</P>
+</UL>
+</DIV>
+<DIV>
+<H2 CLASS="Heading1">
+<A NAME="pgfId=606185">
+ </A>
+Questions<DIV>
+<IMG SRC="WorkingWithNested-1.gif">
+</DIV>
+</H2>
+<UL>
+<P CLASS="Bulleted">
+<A NAME="pgfId=606186">
+ </A>
+&#183;		How do I safely edit an object and not worry if the user forgets to revert undesired changes?</P>
+<P CLASS="Bulleted">
+<A NAME="pgfId=606187">
+ </A>
+&#183;		How do I use the nested EOEditingContexts to aid in complex WOF edit screens?</P>
+<P CLASS="Bulleted">
+<A NAME="pgfId=606188">
+ </A>
+&#183;		How do I copy an object from a parent EOEditingContext into a nested EOEditingContext?</P>
+</UL>
+</DIV>
+<DIV>
+<H2 CLASS="Heading1">
+<A NAME="pgfId=606189">
+ </A>
+Keywords<DIV>
+<IMG SRC="WorkingWithNested-1.gif">
+</DIV>
+</H2>
+<UL>
+<P CLASS="Bulleted">
+<A NAME="pgfId=606190">
+ </A>
+&#183;	Faulting</P>
+<P CLASS="Bulleted">
+<A NAME="pgfId=606191">
+ </A>
+&#183;	Nested</P>
+<P CLASS="Bulleted">
+<A NAME="pgfId=606192">
+ </A>
+&#183;	EOEditingContext</P>
+<P CLASS="Bulleted">
+<A NAME="pgfId=606193">
+ </A>
+&#183;	Complex Edit Screens</P>
+<P CLASS="Bulleted">
+<A NAME="pgfId=606194">
+ </A>
+&#183;	EOGlobalID</P>
+<P CLASS="Bulleted">
+<A NAME="pgfId=606195">
+ </A>
+&#183;	EOUtilities</P>
+</UL>
+</DIV>
+<DIV>
+<H2 CLASS="Heading1">
+<A NAME="pgfId=606197">
+ </A>
+Revision History<DIV>
+<IMG SRC="WorkingWithNested-1.gif">
+</DIV>
+</H2>
+<P CLASS="Body">
+<A NAME="pgfId=606198">
+ </A>
+24 July, 1998. David Scheck. First Draft.<BR>
+18 November, 1998. Clif Liu. Second Draft.</P>
+</DIV>
+
+
+<!--start of footer -->
+<!--#include virtual="/includes/framesetfooter" -->
+<!-- end of footer -->
+
+</body>
+</HTML>

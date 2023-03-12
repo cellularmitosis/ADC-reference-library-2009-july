@@ -1,0 +1,128 @@
+<html><head>
+<script language="JavaScript" src="../../../../../../../../../../../frametest_more.js"></script>
+<title>More about EOSQLExpression</title></head>
+<body bgcolor=#ffffff>
+
+<!-- start of header -->
+<!--#include virtual="/includes/framesetheader" -->
+<!-- end of header -->
+
+<!--start of path -->
+<font face="Geneva,Helvetica,Arial" size="1">
+<b>PATH<spacer type="horizontal" size="5">&nbsp;</b>
+ <a href="../../../../../../../../../../../webobjects.html" target="_top">WebObjects 4.0 Documentation</a> <b>&gt;</b>
+ <a href="../../frameset.html" target="_top">EOAccess Reference</a>
+</font>
+<br><br>
+<!--end of path -->
+
+<!-- start of navigation -->
+<a href="../EOSQLExpression.html"><img src="../../../../../../../../../../../images/previous.gif" border="0"></a> 
+<a href="../EOSQLQualifier.html"><img src="../../../../../../../../../../../images/next.gif" border="0"></a> 
+
+<!-- insert Show/Hide frames -->
+<a href="javascript:testFrame()">
+<script>
+<!--
+ document.write(frameLink);
+//-->
+</script><!-- end Show/Hide frames --></a>
+<!-- end of navigation -->
+
+
+<hr><br>
+ 
+<h1><a name="//apple_ref/java/cl/EOSQLExpression">EOSQLExpression</a>
+ <BR>
+</h1>
+<p><a name="3726">
+<hr width=50% align=left>
+<h2> Building Expressions</h2>
+</a>The following four methods create EOSQLExpression objects for the four basic database operations-select, insert, update, and delete:<p>
+<ul><li><a href="../EOSQLExpression.html#1117">selectStatementForAttributes</a>
+<li><a href="../EOSQLExpression.html#1113">insertStatementForRow</a>
+<li><a href="../EOSQLExpression.html#1133">updateStatementForRow</a>
+<li><a href="../EOSQLExpression.html#1095">deleteStatementWithQualifier</a>
+<li>Unless you're implementing an EOSQLExpression subclass, these and the static method <a href="../EOSQLExpression.html#1099"><code>expressionForString</code></a> are the only EOSQLExpression methods you should ever need. If, on the other hand, you are creating a subclass, you need to understand the mechanics of how EOSQLExpression builds SQL statements. Each of the creation methods above creates an EOSQLExpression, initializes the expression with a specified entity, and sends the new expression object one of the following <code>prepare...</code> methods:<a href="../EOSQLExpression.html#6831">prepareSelectExpressionWithAttributes</a>
+<li><a href="../EOSQLExpression.html#6788">prepareInsertExpressionWithRow</a>
+<li><a href="../EOSQLExpression.html#6856">prepareUpdateExpressionWithRow</a>
+<li><a href="../EOSQLExpression.html#6751">prepareDeleteExpressionForQualifier</a>
+</ul>The <code>prepare...</code> methods, in turn, invoke a corresponding <code>assemble...</code> method, first generating values for the <code>assemble...</code> method's arguments. The <code>assemble...</code> methods:<p>
+<ul><li><a href="../EOSQLExpression.html#6537">assembleSelectStatementWithAttributes</a>
+<li><a href="../EOSQLExpression.html#6528">assembleInsertStatementWithRow</a>
+<li><a href="../EOSQLExpression.html#6550">assembleUpdateStatementWithRow</a>
+<li><a href="../EOSQLExpression.html#6506">assembleDeleteStatementWithQualifier</a>
+</ul>combine their arguments into SQL statements that the database server can understand.<p>
+These three sets of methods establish a framework in which SQL statements are generated. The bulk of the remaining methods generate pieces of an SQL statement.<p>
+An individual SQL statement is constructed by combining the SQL strings for any model or value objects specified in the "build" method in the appropriate form. An SQL string for a modeling or value object is a string representation of the object that the database understands; for example, the SQL string for an EOEntity is ultimately its table name. An EOSQLExpression gets the SQL strings for attributes and values with the methods <a href="../EOSQLExpression.html#6962"><code>sqlStringForAttributeNamed</code></a> and <a href="../EOSQLExpression.html#7193"><code>sqlStringForValue</code></a>. If necessary, it also formats the SQL strings according to an EOAttribute's "read" or "write" format with the static method <a href="../EOSQLExpression.html#1103"><code>formatSQLString</code></a>.<p>
+Each of the "build" methods above invokes a number of instance methods. These methods are documented individually below.<p>
+<a name="3600">
+<hr width=50% align=left>
+<h2> Using Table Aliases</h2>
+</a>By default, EOSQLExpression uses table aliases in SELECT statements. For example, the following SELECT statement uses table aliases:<p>
+<blockquote><pre>SELECT t0.FIRST_NAME, t0.LAST_NAME, t1.NAME<br>FROM EMPLOYEE t0, DEPARTMENT t1<br>WHERE t0.DEPARTMENT_ID = t1.DEPARTMENT_ID
+</pre></blockquote><p>
+The EMPLOYEE table is aliased t0, and the DEPARTMENT table is aliased t1. Table aliases are necessary in some SELECT statements-when a table contains a self-referential relationship, for example. Assume the EMPLOYEE table contains a manager column. Managers are also employees, so to retrieve all the employees whose manager is Bob Smith, the SELECT statement looks like this:<p>
+<blockquote><pre>SELECT t0.FIRST_NAME, t0.LAST_NAME<br>FROM EMPLOYEE t0, EMPLOYEE t1<br>WHERE t1.FIRST_NAME = "BOB" AND t1.LAST_NAME = "SMITH" AND<br>    t0.MANAGER_ID = t1.EMPLOYEE_ID 
+</pre></blockquote><p>
+When the Framework maps operations on enterprise objects to operations on database rows, it reduces insert, update, and delete operations to one or more single-table operations. As a result, EOSQLExpression assumes that INSERT, UPDATE, and DELETE statements are always single-table operations, and does not use table aliases in the statements of these types.<p>
+In addition, if EOSQLExpression detects that all the attributes in a SELECT statement's attribute list are flattened attributes and they're all flattened from the same table, the expression doesn't use table aliases. For example, suppose that an EOSQLExpression object is created to select a customer's credit card. In the application, a customer object has a credit card object as one of its properties, and all operations on credit cards are described in terms of a customer. As a result, the expression object is initialized with the entity for the Customer object. Rather than create a statement like the following:<p>
+<blockquote><pre>SELECT t1.TYPE, t1.NUMBER, t1.EXPIRATION, t1.CREDIT_LIMIT, t1.CUSTOMER_ID<br>FROM CUSTOMER t0, CREDIT_CARD t1<br>WHERE t1.CUSTOMER_ID = t0.CUSTOMER_ID AND t1.CUSTOMER_ID = 459
+</pre></blockquote><p>
+EOSQLExpression detects that all the attributes correspond to columns in the CREDIT_CARD table and creates the following statement:<p>
+<blockquote><pre>SELECT TYPE, NUMBER, EXPIRATION, CREDIT_LIMIT, CUSTOMER_ID<br>FROM CREDIT_CARD<br>WHERE CUSTOMER_ID = 459
+</pre></blockquote><p>
+<a name="3610">
+<hr width=50% align=left>
+<h2> Bind Variables</h2>
+</a>Some RDBMS client libraries use bind variables. A bind variable is a placeholder used in an SQL statement that is replaced with an actual value after the database server determines an execution plan. If you are writing an adaptor for a database server that uses bind variables, you must override the following EOSQLExpression methods:<p>
+<ul><li><a href="../EOSQLExpression.html#6569">bindVariableDictionaryForAttribute</a>
+<li><a href="../EOSQLExpression.html#6731">mustUseBindVariableForAttribute</a>
+<li><a href="../EOSQLExpression.html#6900">shouldUseBindVariableForAttribute</a>
+</ul>If your adaptor doesn't need to use bind variables, the default implementations of the bind variable methods are sufficient.<p>
+<a name="3625">
+<hr width=50% align=left>
+<h2> Generating SQL for EOModeler's Schema Generation</h2>
+</a>EOSQLExpression provides a set of methods that generate SQL that can be used to create a database. EOModeler uses these methods to generate scripts that you can execute from within EOModeler to create a database or that you can copy and paste into an interactive SQL shell for your database. If you are writing an adaptor, you must ensure that the following EOSQLExpression method implementations are sufficient to support EOModeler's schema generation: <p>
+<ul><li><a href="../EOSQLExpression.html#19929">schemaCreationScriptForEntities</a>
+<li><a href="../EOSQLExpression.html#19945">schemaCreationStatementsForEntities</a>
+<li><a href="../EOSQLExpression.html#19588">appendExpression</a>
+<li><a href="../EOSQLExpression.html#19599">createTableStatementsForEntityGroup</a>
+<li><a href="../EOSQLExpression.html#19647">createTableStatementsForEntityGroups</a>
+<li><a href="../EOSQLExpression.html#19725">dropTableStatementsForEntityGroup</a>
+<li><a href="../EOSQLExpression.html#19746">dropTableStatementsForEntityGroups</a>
+<li><a href="../EOSQLExpression.html#19859">primaryKeyConstraintStatementsForEntityGroup</a>
+<li><a href="../EOSQLExpression.html#19886">primaryKeyConstraintStatementsForEntityGroups</a>
+<li><a href="../EOSQLExpression.html#19896">primaryKeySupportStatementsForEntityGroup</a>
+<li><a href="../EOSQLExpression.html#19919">primaryKeySupportStatementsForEntityGroups</a>
+<li><a href="../EOSQLExpression.html#19690">dropPrimaryKeySupportStatementsForEntityGroup</a>
+<li><a href="../EOSQLExpression.html#19711">dropPrimaryKeySupportStatementsForEntityGroups</a>
+<li><a href="../EOSQLExpression.html#20481">prepareConstraintStatementForRelationship</a>
+<li><a href="../EOSQLExpression.html#19769">foreignKeyConstraintStatementsForRelationship</a>
+<li><a href="../EOSQLExpression.html#20179">addCreateClauseForAttribute</a>
+<li><a href="../EOSQLExpression.html#20369">columnTypeStringForAttribute</a>
+<li><a href="../EOSQLExpression.html#20252">allowsNullClauseForConstraint</a>
+<dl><dt>
+</dl></ul>
+<hr><br>
+<a href="../EOSQLExpression.html"><img src="../../../../../../../../../../../images/previous.gif" border="0"></a> 
+<a href="../EOSQLQualifier.html"><img src="../../../../../../../../../../../images/next.gif" border="0"></a> 
+
+<!-- insert Show/Hide frames -->
+<a href="javascript:testFrame()">
+<script>
+<!--
+ document.write(frameLink);
+//-->
+</script><!-- end Show/Hide frames --></a>
+<hr><br>
+ 
+
+
+<i>Copyright &#169; 1998, Apple Computer, Inc.   All rights
+reserved.</i>
+
+<!-- Last updated: 09/15/98 18:24:10 -->
+
+</body>
+</html>

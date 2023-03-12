@@ -1,0 +1,155 @@
+<html><head>
+<script language="JavaScript" src="../../../../../../../../../../../frametest_more.js"></script>
+<title>More about EODatabaseContext</title></head>
+<body bgcolor=#ffffff>
+
+<!-- start of header -->
+<!--#include virtual="/includes/framesetheader" -->
+<!-- end of header -->
+
+<!--start of path -->
+<font face="Geneva,Helvetica,Arial" size="1">
+<b>PATH<spacer type="horizontal" size="5">&nbsp;</b>
+ <a href="../../../../../../../../../../../webobjects.html" target="_top">WebObjects 4.0 Documentation</a> <b>&gt;</b>
+ <a href="../../frameset.html" target="_top">EOAccess Reference</a>
+</font>
+<br><br>
+<!--end of path -->
+
+<!-- start of navigation -->
+<a href="../EODatabaseContext.html"><img src="../../../../../../../../../../../images/previous.gif" border="0"></a> 
+<a href="../EODatabaseDataSource.html"><img src="../../../../../../../../../../../images/next.gif" border="0"></a> 
+
+<!-- insert Show/Hide frames -->
+<a href="javascript:testFrame()">
+<script>
+<!--
+ document.write(frameLink);
+//-->
+</script><!-- end Show/Hide frames --></a>
+<!-- end of navigation -->
+
+
+<hr><br>
+ 
+<h1><a name="//apple_ref/occ/cl/EODatabaseContext">More about EODatabaseContext</a>
+ <BR>
+</h1>
+<p>The relationship between EODatabaseContext and other classes in the control and access layers is illustrated in the following diagram.<p>
+<img src="EODatabaseContext_more.anc.gif"><p>
+As a subclass of EOCooperatingObjectStore, EODatabaseContext acts as one of possibly several EOCooperatingObjectStores for an EOObjectStoreCoordinator, which mediates between EOEditingContexts and EOCooperatingObjectStores. <p>
+An EODatabaseContext creates an EOAdaptorContext when initialized, and uses this object to communicate with the database server.<p>
+<a name="3549">
+<hr width=50% align=left>
+<h2> Creating and Using an EODatabaseContext</h2>
+</a>Though you can create an EODatabaseContext explicitly by using the class method <a href="../EODatabaseContext.html#751"><code>registeredDatabaseContextForModel:editingContext:</code></a>, you should rarely need to do so. If you're using the "higher-level" objects EOEditingContexts and EODatabaseDataSources, the database contexts those objects need are created automatically, on demand. When you create database data source (typically for use with a display group-one ofEODisplayGroup, EODisplayGroup, or WODisplayGroup), it registers a database context that's capable of fetching objects for the data source's entities. If objects fetched into an editing context (described more in the following section) have references to objects from EOModels that are based on another database, an EODatabaseContext is creates and registered for each of the additional databases.<p>
+EODatabaseContexts are created on demand when an EOObjectStoreCoordinator posts an EOCooperatingObjectStoreNeeded notification. The EODatabaseContext class registers for the notification, and it provides the coordinator with a new EODatabaseContext instance that can handle the request. For more discussion of this topic, see the chapter "Application Configurations" in the <em>Enterprise Objects Framework Developer's Guide</em>.<p>
+For the most part, you don't need to programmatically interact with an EODatabaseContext. However, some of the reasons you might want to are as follows:<p>
+<ul><li>To implement your own locking strategy, either application-wide, or on a per-fetch basis. This is described in the section "<a href="EODatabaseContext_more.html#3765">Updating And Locking Strategies</a>."
+<li>To do performance tuning, which is described in the section "<a href="EODatabaseContext_more.html#3661">Faulting</a>."
+<li>To intervene when objects are created and fetched to provide custom behavior. This is described in the section "<a href="EODatabaseContext_more.html#3706">Delegate Methods</a>," and in the individual delegate method descriptions in the section "<a href="../../Protocols/EODatabaseContextDelegate.html#30207"></a><a href="../../Protocols/EODatabaseContextDelegate.html#30207">Instance Methods</a>."
+</ul><a name="3592">
+<hr width=50% align=left>
+<h2> Fetching and Saving Objects</h2>
+</a>Conceptually, an EODatabaseContext fetches and saves objects on behalf of an EOEditingContext. However, the two objects don't interact with each other directly-an EOObjectStoreCoordinator acts as a mediator between them. The relationship between EOEditingContext, EOObjectStoreCoordinator, and EODatabaseContext is illustrated in the following figure. This configuration includes one EOObjectStoreCoordinator, and can include one or more EOEditingContexts, and one or more EODatabaseContexts.<p>
+<img src="EODatabaseContext_more.anc1.gif"><p>
+When an editing context fetches objects, the request is passed through the coordinator, which forwards it to the appropriate database context based on the fetch specification or global ID. When the database context receives a request to fetch or write information to the database, it tries to use one of its EODatabaseChannels. If all of its channels are busy, it broadcasts an <a href="../EODatabaseContext.html#1098">EODatabaseChannelNeededNotification</a> in the hopes that an observer can provide a new channel or that an existing channel can be freed up. This observer could be a manager that decides how many database cursors can be opened by a particular client.<p>
+EODatabaseContext knows how to interact with other EOCooperatingObjectStores to save changes made to an object graph in more than one database server. For a more detailed discussion of this subject, see the class specifications for EOObjectStoreCoordinator and EOCooperatingObjectStore.<p>
+<a name="3616">
+<hr width=50% align=left>
+<h2> Setting a Fetch Limit</h2>
+</a>EODatabaseContext defines a hint for use with an EOFetchSpecification in the <a href="../EODatabaseContext.html#956"><code>objectsWithFetchSpecification:editingContext:</code></a> method. Named by the key EOFetchLimitHintKey, the hint's value is an NSNumber containing an unsigned integer value indicating the maximum number of objects to fetch. Depending on the value of the EOPromptAfterFetchLimitHintKey (NO or YES), the EODatabaseContext will either stop fetching objects when this limit is reached or it will ask the EOEditingContext's message handler to ask the user whether it should continue fetching. For more information on hint keys, see the method description for <code>objectsWithFetchSpecification:editingContext:</code>.<p>
+<a name="3637">
+<hr width=50% align=left>
+<h2> Using a Custom Query</h2>
+</a>EODatabaseContext defines a hint for use with an EOFetchSpecification in the <a href="../EODatabaseContext.html#956"><code>objectsWithFetchSpecification:editingContext:</code></a> method. Named by the key <a href="../EODatabaseContext.html#956">EOCustomQueryExpressionHintKey</a>, the hint's value is a SQL string for performing the fetch. The expression must query the same attributes in the same order that Enterprise Objects Framework would if it were generating the SELECT expression dynamically. If this key is supplied, other characteristics of the EOFetchSpecification such as <code>isDeep</code>, <code>qualifier</code>, and <code>sortOrderings</code> are ignored-in that sense this key is more of a directive than a hint. For more information on hint keys, see the method description for <code>objectsWithFetchSpecification:editingContext:</code>.<p>
+<a name="3661">
+<hr width=50% align=left>
+<h2> Faulting</h2>
+</a>When an EODatabaseContext fetches an object, it examines the relationships defined in the model and creates objects representing the destinations of the fetched object's relationships. For example, if you fetch an employee object, you can ask for its manager and immediately receive an object; you don't have to get the manager's employee ID from the object you just fetched and fetch the manager yourself.<p>
+However, EODatabaseContext doesn't immediately fetch data for the destination objects of relationships since fetching is fairly expensive. To avoid this waste of time and resources, the destination objects are created as EOFault objects which act as placeholders. EOFaults (or faults) come in two varieties: single object faults for to-one relationships, and array faults for to-many relationships.<p>
+When an EOFault is accessed (sent a message), it triggers its EODatabaseContext to fetch its data and transform it into an instance of the appropriate object class. This preserves both the object's <code>id</code> and its EOGlobalID.<p>
+You can fine-tune faulting behavior for additional performance gains by using two different mechanisms: batch faulting, and prefetching relationships.<p>
+<a name="3668">
+<hr width=25% align=left>
+<h3> Batch Faulting</h3>
+</a>When you access a fault, its data is fetched from the database. However, triggering one fault has no effect on other faults-it just fetches the object or array of objects for the one fault. You can take advantage of this expensive round trip to the database server by batching faults together. EODatabaseContext provides the <a href="../EODatabaseContext.html#888"><code>batchFetchRelationship:forSourceObjects:editingContext:</code></a> method for doing this. For example, given an array of Employee objects, this method can fetch all of their departments with one round trip to the server, rather than asking the server for each of the employee's departments individually. You can use the delegate methods <a href="../../Protocols/EODatabaseContextDelegate.html#1058"><code>databaseContext:shouldFetchArrayFault:</code></a> and <a href="../../Protocols/EODatabaseContextDelegate.html#1062"><code>databaseContext:shouldFetchObjectFault:</code></a> to fine-tune batch faulting behavior.<p>
+You can also set batch faulting in an EOModel. In that approach, you specify the <em>number</em> of faults that should be triggered along with the first fault; you don't actually control which faults are triggered the way you do with <code>batchFetchRelationship:forSourceObjects:editingContext:</code>. For more information on setting batch faulting in an EOModel, see the chapter "Using EOModeler" in the <em>Enterprise Objects Framework Developer's Guide</em>.<p>
+<a name="3684">
+<hr width=25% align=left>
+<h3> Prefetching Relationships</h3>
+</a>EODatabaseContext defines a hint for use with an EOFetchSpecification in the <a href="../EODatabaseContext.html#956"><code>objectsWithFetchSpecification:editingContext:</code></a> method. Named by the key EOPrefetchingRelationshipHintKey, the hint's value specifies relationships whose destinations should be fetched along with the objects matching the fetch specification. Although prefetching increases the initial fetch cost, it can improve overall performance by reducing the number of round trips made to the database server. For more information on this and other hint keys, see the method description for <code>objectsWithFetchSpecification:editingContext:</code>.<p>
+Using this key also has an effect on how an EOFetchSpecification refreshes. "Refreshing" refers to existing objects being overwritten with fetched values-this allows your application to see changes to the database that have been made by someone else. Normally, when you set an EOFetchSpecification to refresh using <code>setRefreshesRefetchedObjects:</code>, it only refreshes the objects you're fetching. For example, if you fetch employees, you don't also fetch the employees' departments. However, if you have the EOPrefetchingRelationshipHintKey set, the refetch is propagated for all of the relationships specified for the hint.<p>
+<a name="3706">
+<hr width=50% align=left>
+<h2> Delegate Methods</h2>
+</a>An EODatabaseContext shares its delegate with its EODatabaseChannels. These delegate methods are actually sent from EODatabaseChannel, but they're defined in EODatabaseContext for ease of access:<p>
+<ul><li><a href="../../Protocols/EODatabaseContextDelegate.html#1049">databaseContext:didSelectObjectsWithFetchSpecification:databaseChannel:</a>
+<li><a href="../../Protocols/EODatabaseContextDelegate.html#1078">databaseContext:shouldSelectObjectsWithFetchSpecification:databaseChannel:</a>
+<li><a href="../../Protocols/EODatabaseContextDelegate.html#1081">databaseContext:shouldUpdateCurrentSnapshot:newSnapshot:globalID:databaseChannel:</a>
+<li><a href="../../Protocols/EODatabaseContextDelegate.html#1084">databaseContext:shouldUsePessimisticLockWithFetchSpecification: databaseChannel:</a>
+</ul><a href="../../Protocols/EODatabaseContextDelegate.html#1049">- databaseContext:didSelectObjectsWithFetchSpecification:databaseChannel:</a><p>
+<a href="../../Protocols/EODatabaseContextDelegate.html#1078">- databaseContext:shouldSelectObjectsWithFetchSpecification:databaseChannel:</a><p>
+<a href="../../Protocols/EODatabaseContextDelegate.html#1081">- databaseContext:shouldUpdateCurrentSnapshot:newSnapshot:globalID:databaseChannel:</a><p>
+<a href="../../Protocols/EODatabaseContextDelegate.html#1084">- databaseContext:shouldUsePessimisticLockWithFetchSpecification: databaseChannel:</a><p>
+You can use the EODatabaseContext delegate methods to intervene when objects are created and when they're fetched from the database. This gives you more fine-grained control over such issues as how an object's primary key is generated (<code>databaseContextNewPrimaryKeyForObjectdatabaseContext:newPrimaryKeyForObject:entity:</code>), how and if objects are locked (<code>databaseContextShouldLockObjectWithGlobalIDdatabaseContext:shouldLockObjectWithGlobalID:snapshot:</code>), what fetch specification is used to fetch objects (<a href="../../Protocols/EODatabaseContextDelegate.html#1078"><code>databaseContext:shouldSelectObjectsWithFetchSpecification:databaseChannel:</code></a>), how batch faulting is performed (<a href="../../Protocols/EODatabaseContextDelegate.html#1058"><code>databaseContext:shouldFetchArrayFault:</code></a> and <a href="../../Protocols/EODatabaseContextDelegate.html#1062"><code>databaseContext:shouldFetchObjectFault:</code></a>), and so on. For more information, see the individual delegate method descriptions in the section "<a href="../../Protocols/EODatabaseContextDelegate.html#30207"></a><a href="../../Protocols/EODatabaseContextDelegate.html#30207">Instance Methods</a>."<p>
+<a name="3762">
+<hr width=50% align=left>
+<h2> Snapshots</h2>
+</a>An EODatabase records snapshots for its EODatabaseContexts. These snapshots form the application's view of the current state of the database server. This global view is overridden locally by database contexts, which form their own snapshots as they make changes during a transaction. When a database context commits its top-level transaction, it reconciles all changed snapshots with the global view of the database object, so that other database contexts (except those with open transactions) immediately use the new snapshots as well.<p>
+<a name="3765">
+<hr width=50% align=left>
+<h2> Updating And Locking Strategies</h2>
+</a>EODatabaseContext supports two updating strategies defined by the <code>EOUpdateStrategy</code> type as integer values:<p>
+<Table Border="3">
+<caption></caption>
+<tr><th><b>Type
+</b></th><th><b>Description
+</b></th></tr>
+<tr><td scope="row">EOUpdateWithOptimisticLocking
+</td><td>The default update strategy. Under optimistic locking, objects aren't locked 
+immediately on being fetched from the server. Instead, whenever you attempt 
+to save updates to an object in the database, the object's snapshot is used to 
+ensure that the values in the corresponding database row haven't changed 
+since the object was fetched. As long as the snapshot matches the values in 
+the database, the update is allowed to proceed.
+</td></tr>
+<tr><td scope="row">EOUpdateWithPessimisticLocking
+</td><td>Causes objects to be locked in the database when they're selected. This 
+ensures that no one else can modify the objects until the transaction ends. 
+However, this doesn't necessarily mean that either the select or the update 
+operation will succeed.
+</td></tr>
+
+</Table>
+
+<Table>
+<tr><td>
+</Table>
+ <p>
+EODatabaseContext also supports "on-demand" locking, in which specific optimistic locks can be promoted to database locks during the course of program execution. You can either use <a href="../EODatabaseContext.html#1133"><code>lockObjectWithGlobalID:editingContext:</code></a> to lock a database row for a particular object, or <a href="../EODatabaseContext.html#956"><code>objectsWithFetchSpecification:editingContext:</code></a> to fetch objects with a fetch specification that includes locking. <p>
+For more discussion of locking strategies, see the chapter "Behind the Scenes" in the <em>Enterprise Objects Framework Developer's Guide</em>.<p>
+<dl><dt>
+</dl>
+<hr><br>
+<a href="../EODatabaseContext.html"><img src="../../../../../../../../../../../images/previous.gif" border="0"></a> 
+<a href="../EODatabaseDataSource.html"><img src="../../../../../../../../../../../images/next.gif" border="0"></a> 
+
+<!-- insert Show/Hide frames -->
+<a href="javascript:testFrame()">
+<script>
+<!--
+ document.write(frameLink);
+//-->
+</script><!-- end Show/Hide frames --></a>
+<hr><br>
+ 
+
+
+<i>Copyright &#169; 1998, Apple Computer, Inc.   All rights
+reserved.</i>
+
+<!-- Last updated: 09/17/98 17:43:04 -->
+
+</body>
+</html>

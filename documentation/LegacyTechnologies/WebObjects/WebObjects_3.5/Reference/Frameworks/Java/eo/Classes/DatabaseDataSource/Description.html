@@ -1,0 +1,197 @@
+<html><head><title></title></head>
+<body bgcolor="#ffffff">
+ 
+ 
+<h1>
+<FONT COLOR="#000066">
+<a name="816">
+ <a name="//apple_ref/java/cl/DatabaseDataSource">DatabaseDataSource</a>
+</a>
+</FONT>
+</h1>
+<p><B>Extends:</B><BR>  
+next.eo.DataSource
+
+<p><B>Implements:</B><BR>
+next.util.Coding
+
+<p><a name="829"></a>
+<a name="description"></a>
+<H2>Class Description
+</H2>
+DatabaseDataSource is a concrete subclass of next.eo.DataSource that fetches objects based on a Model object, using a DatabaseContext that services the data source's next.eo.EditingContext. A DatabaseDataSource can be set up to fetch all objects for its root entity, to fetch objects matching a particular FetchSpecification, and to further filter its fetching with an auxiliary qualifier.<p>
+DatabaseDataSource implements all the functionality defined by DataSource: In addition to fetching objects, it can insert and delete them (provided the entity isn't read-only). See the DataSource class specification for more information on these topics.<p>
+As with other data sources, DatabaseDataSource can also provide a detail data source. The most significant consequence of using an master-detail configuration is that the detail operates directly on the master's object graph. The DetailDataSource has a <em>master object</em> and a <em>detail key</em> through which the detail data source accesses the its objects. The master object is simply the object that's selected in the master display group, and the detail key is the name of a relationship property in the master object. When the detail display group asks its data source to fetch, the DetailDataSource simply gets the value for the relationship property named <em>detail key</em> from its master object and returns it. When you add and remove objects from the detail, you're directly modifying the master's relationship array. In fact, you can think of DetailDataSource as an interface to its master object's relationship property.<p>
+<h3>
+<a name="1637">
+ Master-Peer Configurations
+</a>
+</h3>
+DatabaseDataSources can also be used in <em>master-peer</em> configurations. In a master-peer configuration, instead of using a DatabaseDataSource as the master and a DetailDataSource as the detail, you use two DatabaseDataSources (one as the master and one as the detail).<p>
+The peer DatabaseDataSource in a master-peer configuration operates independently of its master. It goes to the database to fetch its objects and maintains its own objects in. Because the peer data source acts independently, if you add or remove objects from the peer, the changes aren't automatically reflected in the master. The database is updated correctly, but the master's relationship array (if it exists) isn't. Consequently, if you're using master-peer <em>and</em> the master has a to-many relationship as a class property, you're responsible for modifying the master's relationship array to keep it in sync with the peer.<p>
+<h4>
+<a name="1640">
+ When to Use Master-Peer
+</a>
+</h4>
+You might want to use a master-peer configuration instead of a master-detail if the master doesn't have a class property that represents a relationship to the peer. With master-detail, the master must have a class property that represents a relationship to the detail, but because a peer does its own fetching, the master in a master-detail doesn't have this restriction.<p>
+Another scenario in which you might want to use a master-peer configuration is when you need to further qualify the set of objects related to the master's selected object. For example, instead of displaying all of a studio's movies, you want to display only the movies whose revenues are greater than $5,000,000. You can accomplish this by assigning an in-memory qualifier to a display group displaying the detail objects, but if the number of records in the unfiltered set is prohibitively large, the filtering is better performed in the database. Using a master-peer configuration, you can further qualify the peer's set of objects <em>in the database</em> by assigning an auxiliary qualifier. You must also use this auxiliary qualifier approach if the qualifier can't be executed in memory (for example, because it uses custom SQL or accesses properties not in the object graph). For an example of applying an auxiliary qualifier, see "<a href="#1647">Creating a Master-Peer Configuration</a>."<p>
+<h4>
+<a name="1647">
+ Creating a Master-Peer Configuration 
+</a>
+</h4>
+To set up a master-peer configuration, follow these basic steps:<p>
+<ol>
+<a name="1649">
+<li>Create the master display group and DatabaseDataSource.<p>
+</a><a name="1650">
+<li>Create the peer display group and DatabaseDataSource.<p>
+</a><a name="1651">
+<li>Connect the display groups.<p>
+</a><a name="1652">
+<li>Optionally, apply an auxiliary qualifier to the peer's data source.<p>
+</a></ol>
+For an OpenStep application, the easiest way to create a display group and its data source is to drag a model file (or an entity from EOModeler) into a nib in Interface Builder. This action creates a DisplayGroup and a corresponding DatabaseDataSource. Using this approach, you can then connect your two display groups as you would for a master-detail configuration, but create a MasterPeerAssociation instead of a MasterDetailAssociation. For more information on this topic, see <em>Using Enterprise Objects Framework with OPENSTEP</em>.<p>
+For a WebObjects application, start out similarly by dragging a model file (or an entity from EOModeler) into a component in WebObjects Builder to create a next.wo.DisplayGroup and a corresponding DatabaseDataSource. Do this twice, once to create a master display group and again to create the peer. Don't configure your peer display group to have a detail data source as you would for a master-detail configuration. Instead, you must establish the master-peer relationship in code, using the DataSource method <code>qualifyWithRelationshipKeyAndObject</code>. The following method demonstrates the procedure:<p>
+<blockquote><pre>public void selectObject() {<br>    DisplayGroup studioDisplayGroup;    // Assume this exists.<br>    DisplayGroup movieDisplayGroup;     // Assume this exists. <br>    Studio studio;                      // Assume this exists.<br>    DatabaseDataSource movieDataSource;<br>    <br>    movieDataSource = (DatabaseDataSource)movieDisplayGroup.dataSource();<br>    studioDisplayGroup.selectObject(studio);<br>    movieDataSource.qualifyWithRelationshipKeyAndObject("movies", studio);<br>    movieDisplayGroup.fetch();<br>}
+</pre></blockquote><p>In this example, the <code>selectObject</code> method is invoked when a user selects a new master object (<code>studio</code>). It updates the selection of the master display group (<code>studioDisplayGroup</code>) and requalifies the peer data source (<code>movieDataSource</code>) to match. The final step is to send a <code>fetch</code> message to the peer display group (<code>movieDisplayGroup</code>), causing <code>movieDataSource</code> to refetch its objects from the database using a newly formed qualifier.<p>
+For both OpenStep and WebObjects applications, to apply an auxiliary qualifier, use DatabaseDataSource's <a href="#1614"><code>setAuxiliaryQualifier</code></a> method. The following example demonstrates the procedure:<p>
+<blockquote><pre>public Component requalifyMovies() {<br>    DecimalNumber revenue;              // Assume this exists.<br>    DisplayGroup movieDisplayGroup;     // Assume this exists.<br>    Qualifier auxiliaryQualifier;<br>    DatabaseDataSource movieDataSource;<br>    <br>    /* Construct qualifier. */<br>    java.lang.Object qualifierComponentArray[] = {"revenue", revenue};<br>    ImmutableVector qualifierComponentVector =<br>        new ImmutableVector(qualifierComponentArray);<br>    auxiliaryQualifier = Qualifier.qualifierWithQualifierFormat("%@ &gt; %@",<br>            qualifierComponentVector);<br>    <br>    /* Apply qualifier to peer data source. */<br>    movieDataSource = (DatabaseDataSource)movieDisplayGroup.dataSource();<br>    movieDataSource.setAuxiliaryQualifier(auxiliaryQualifier);<br>    <br>    /* Tell peer controller to fetch. */<br>    movieDisplayGroup.fetch();<br>    return this;<br>}
+</pre></blockquote><p>This method constructs a qualifier that selects movies whose revenues are greater than <code>revenue</code>, assigns that qualifier as the auxiliary qualifier for the peer data source (<code>movieDataSource</code>), and then directs the peer display group to fetch. Because the peer display group uses a DatabaseDataSource instead of a DetailDataSource, the refetch performs a fetch with the qualifier in the database.<p>
+<HR WIDTH=50% ALIGN=LEFT>
+<h2>Interfaces Implemented</h2>  
+
+
+<dl>
+<dt>next.util.Coding<dl><dl><dl><dl>
+<dt>encodeWithCoder</dl>
+</dl></dl></dl></dl>
+<a name="833">
+<HR WIDTH=50% ALIGN=LEFT>
+<h2>Method Types
+</h2>
+</a><dl>
+<dt>Constructors<dl><dl><dl><dl>
+<dt><a href="#1496">DatabaseDataSource</a></dl>
+</dl></dl></dl><dt>Accessing selection criteria<dl><dl><dl><dl>
+<dt><a href="#1624">setFetchSpecification</a><dt><a href="#1589">fetchSpecification</a><dt><a href="#1614">setAuxiliaryQualifier</a><dt><a href="#1530">auxiliaryQualifier</a><dt><a href="#1594">fetchSpecificationForFetch</a></dl>
+</dl></dl></dl><dt>Accessing objects used for fetching<dl><dl><dl><dl>
+<dt><a href="#840">entity</a><dt><a href="#1584">entityName</a><dt><a href="#1544">databaseContext</a></dl>
+</dl></dl></dl><dt>Enabling fetching<dl><dl><dl><dl>
+<dt><a href="#995">setFetchEnabled</a><dt><a href="#1604">isFetchEnabled</a></dl>
+</dl></dl></dl></dl>
+<HR WIDTH=50% ALIGN=LEFT>
+<a name="1489"></a>
+<a name="cons"></a>
+<h2>Constructors</h2>  
+
+
+<a name="1496"></a>
+<h3>
+ DatabaseDataSource
+</h3>
+public <code>next.eo.DatabaseDataSource</code>(next.eo.EditingContext <em>anEditingContext</em>, 
+java.lang.String <em>anEntityName</em>)
+
+<P>public <code>next.eo.DatabaseDataSource</code>(next.util.Coder <em>aCoder</em>)
+
+<P>Creates and returns a new DatabaseDataSource object.<p>
+If <em>anEditingContext</em> and <em>anEntityName</em> are provided, the new DatabaseDataSource fetches objects into <em>anEditingContext</em> for the Entity named by <em>anEntityName</em>. If <em>anEditingContext</em>'s next.eo.ObjectStoreCoordinator doesn't have a DatabaseChannel that services the Model containing the named Entity, this method creates one.<p>
+If <em>aCoder</em> is provided, the new DatabaseDataSource is decoded from <em>aCoder</em>. This constructor, together with the method <code>encodeWithCoder</code>, provide the basis for archiving DatabaseDataSources to a <code>nib</code> file. For more information, see the next.util.Coding interface specification in the <em>Foundation Framework Reference</em>.<p>
+<HR WIDTH=50% ALIGN=LEFT>
+<a name="instm"></a>
+<h2>Instance Methods</h2>  
+
+
+<a name="1530"></a>
+<h3>
+ <a name="//apple_ref/java/instm/DatabaseDataSource/auxiliaryQualifier">auxiliaryQualifier</a>
+</h3>
+public next.eo.Qualifier <code>auxiliaryQualifier</code>()
+
+<P>Returns the Qualifier used to further filter the objects fetched by the receiver's next.eo.FetchSpecification. <p>
+<B>See also: </B>  
+<a href="#1614"><code>setAuxiliaryQualifier</code></a>, <a href="#1594"><code>fetchSpecificationForFetch</code></a>, <a href="#1589"><code>fetchSpecification</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="1544"></a>
+<h3> <a name="//apple_ref/java/instm/DatabaseDataSource/databaseContext">databaseContext</a></h3>
+public next.eo.DatabaseContext <code>databaseContext</code>()
+
+<P>Returns the DatabaseContext that the receiver uses to access the external database. This is either the root next.eo.ObjectStore for the receiver's next.eo.EditingContext, or if the root is a next.eo.CooperatingObjectStore, it's the DatabaseContext under that CooperatingObjectStore that services the Model containing the Entity for the receiver.<p>
+<hr WIDTH=25% ALIGN=LEFT>
+<a name="840"></a>
+<h3> <a name="//apple_ref/java/instm/DatabaseDataSource/entity">entity</a></h3>
+public next.eo.Entity <code>entity</code>()
+
+<P>Returns the Entity from which the receiver fetches objects.<p>
+<B>See also: </B>  
+<a href="#1489">"Constructors"</a>, <a href="#1584"><code>entityName</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="1584"></a>
+<h3> <a name="//apple_ref/java/instm/DatabaseDataSource/entityName">entityName</a></h3>
+public java.lang.String <code>entityName</code>()
+
+<P>Returns the name of the receiver's Entity.<p>
+<B>See also: </B>  
+<a href="#1489">"Constructors"</a>, <a href="#840"><code>entity</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="1589"></a>
+<h3> <a name="//apple_ref/java/instm/DatabaseDataSource/fetchSpecification">fetchSpecification</a></h3>
+public next.eo.FetchSpecification <code>fetchSpecification</code>()
+
+<P>Returns the receiver's basic FetchSpecification. Its Qualifier is conjoined with the receiver's auxiliary Qualifier when the receiver fetches objects. The sender of this message can alter the FetchSpecification directly, or replace it using <a href="#1624"><code>setFetchSpecification</code></a>.<p>
+<B>See also: </B>  
+<a href="#1594"><code>fetchSpecificationForFetch</code></a>, <a href="#1530"><code>auxiliaryQualifier</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="1594"></a>
+<h3> <a name="//apple_ref/java/instm/DatabaseDataSource/fetchSpecificationForFetch">fetchSpecificationForFetch</a></h3>
+public next.eo.FetchSpecification <code>fetchSpecificationForFetch</code>()
+
+<P>Returns a copy of the FetchSpecification that the receiver uses to fetch. This is constructed by conjoining the Qualifier of the receiver's FetchSpecification with its auxiliary Qualifier. Modifying the returned FetchSpecification doesn't affect the receiver's fetching behavior; use <a href="#1624"><code>setFetchSpecification</code></a> and <a href="#1614"><code>setAuxiliaryQualifier</code></a> for that purpose.<p>
+<B>See also: </B>  
+<a href="#1589"><code>fetchSpecification</code></a>, <a href="#1530"><code>auxiliaryQualifier</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="1604"></a>
+<h3> <a name="//apple_ref/java/instm/DatabaseDataSource/isFetchEnabled">isFetchEnabled</a></h3>
+public boolean <code>isFetchEnabled</code>()
+
+<P>Returns <code>true</code> if the receiver's <code>fetchObjects</code> method actually fetches objects, <code>false</code> if it returns an empty array without fetching. Fetching is typically disabled in a master-peer configuration when no object is selected in the master.<p>
+<B>See also: </B>  
+<a href="#995"><code>setFetchEnabled</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="1614"></a>
+<h3> <a name="//apple_ref/java/instm/DatabaseDataSource/setAuxiliaryQualifier">setAuxiliaryQualifier</a></h3>
+public void <code>setAuxiliaryQualifier</code>(next.eo.Qualifier <em>aQualifier</em>)
+
+<P>Sets the receiver's auxiliary qualifier to <em>aQualifier</em>. The auxiliary qualifier usually adds conditions to the primary qualifier and is useful for narrowing the scope of a data source without altering its primary qualifier. This is especially useful for setting a qualifier on a qualified peer data source, since a peer's primary qualifiers specifies the matching criteria for the relationship it fetches for. For more information on auxiliary qualifiers, see <a href="#1647">"Creating a Master-Peer Configuration"</a> in the class description. <p>
+<B>See also: </B>  
+<a href="#1594"><code>fetchSpecificationForFetch</code></a>, <a href="#1589"><code>fetchSpecification</code></a>, <a href="#1530"><code>auxiliaryQualifier</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="995"></a>
+<h3> <a name="//apple_ref/java/instm/DatabaseDataSource/setFetchEnabled">setFetchEnabled</a></h3>
+public void <code>setFetchEnabled</code>(boolean <em>flag</em>)
+
+<P>Controls whether the receiver can fetch. If <em>flag</em> is <code>true</code> the receiver's <code>fetchObjects</code> method actually fetches objects, if <code>false</code> it returns an empty array without fetching. Fetching is typically disabled in a master-peer configuration when no object is selected in the master. For example, DatabaseDataSource's implementation of <code>qualifyWithRelationshipKeyAndObject</code> invokes this method to enable or disable fetching based on whether a master object is provided.<p>
+<B>See also: </B>  
+<a href="#1604"><code>isFetchEnabled</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="1624"></a>
+<h3> <a name="//apple_ref/java/instm/DatabaseDataSource/setFetchSpecification">setFetchSpecification</a></h3>
+public void <code>setFetchSpecification</code>(next.eo.FetchSpecification <em>aFetchSpecification</em>)
+
+<P>Sets the receiver's basic FetchSpecification to <em>aFetchSpecification</em>. Its Qualifier is conjoined with the receiver's auxiliary Qualifier when the receiver fetches objects.<p>
+<B>See also: </B>  
+<a href="#1614"><code>setAuxiliaryQualifier</code></a>, <a href="#1594"><code>fetchSpecificationForFetch</code></a>, <a href="#1589"><code>fetchSpecification</code></a>
+<p>
+ 
+ 
+
+
+<i>Copyright &#169; 1998, Apple Computer, Inc.   All rights
+reserved.</i>
+
+<!-- Last updated: 01/18/98 16:11:55 -->
+
+</body>
+</html>

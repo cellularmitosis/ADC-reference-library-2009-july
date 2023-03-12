@@ -1,0 +1,801 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+<head>
+	<title>Kernel Programming Guide: Memory and Virtual Memory</title>
+	<meta id="Generator" name="Generator" content="Gutenberg"/>
+	<meta id="GeneratorVersion" name="GeneratorVersion" content="v132"/>
+	<meta http-equiv="content-type" content="text/html;charset=utf-8"/>
+	<meta id="Copyright" name="Copyright" content="Copyright 2009 Apple Inc. All Rights Reserved."/>
+	<meta id="IndexTitle" name="IndexTitle" content="Memory and Virtual Memory"/>
+	<meta id="xcode-display" name="xcode-display" content="render"/>
+	<meta id="toc-file" name="toc-file" content="../toc.html"/>
+	<meta id="RESOURCES" content="../../../../Resources" />
+	
+	<link rel="stylesheet" type="text/css" href="../../../../Resources/CSS/frameset_styles.css"/>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/lib/prototype.js"></script>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/lib/scriptaculous.js"></script>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/page.js"></script>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/pedia.js"></script>
+	<!--[if lte IE 6]>
+		<style type="text/css">
+			/*<![CDATA[*/ 
+			html {overflow-x:auto; overflow-y:hidden;  }
+			/*]]>*/
+		</style>
+	<![endif]-->
+</head>    
+<body bgcolor="#ffffff" onload="initialize_page();"><a name="//apple_ref/doc/uid/TP30000905-CH210" title="Memory and Virtual Memory"></a>
+    <noscript>
+    <div id="tocMenu">
+        <iframe id="toc_content" name="toc_content" SRC="../toc.html" width="210" height="100%" align="left" frameborder="0">This document set is best viewed in a browser that supports iFrames.</iframe>
+    </div>
+    </noscript>
+    <div id="bodyText">
+        <a name="top"></a>
+        <div class="hideOnPrint hideInXcode">
+        <!-- start of header -->
+        <!--#include virtual="/includes/framesetheader" -->
+        <!-- end of header -->
+        </div>
+        
+        <!-- start of path -->
+<div class="breadcrumb hideOnPrint hideInXcode"><a href="http://developer.apple.com/" target="_top">ADC Home</a> &gt; <a href="../../../../../referencelibrary/index.html#//apple_ref/doc/uid/TP30000943" target="_top">Reference Library</a> &gt; <a href="../../../../index.html#//apple_ref/doc/uid/TP30000440" target="_top">Guides</a> &gt; <a href="../../../index.html#//apple_ref/doc/uid/TP30000440-TP30000422" target="_top">Darwin</a> &gt; <a href="../../../Kernel-date.html#//apple_ref/doc/uid/TP30000440-TP30000422-TP30000532" target="_top">Kernel</a> &gt; <a href="../About/About.html#//apple_ref/doc/uid/TP30000905-CH204-TPXREF101">Kernel Programming Guide</a> &gt; </div><br class="hideInXcode"/><!-- end of path -->
+        
+        <div class="mini_nav_text" align="left">
+        <span class="navButtons">
+        <a href="../Mach/Mach.html">&lt; Previous Page</a><span style="margin-left: 8px"><a href="../scheduler/scheduler.html">Next Page &gt;</a></span>
+        </span>
+        <span id="showHideTOCUpperSpan">
+        <a href="#" onclick="showHideTOC();"><img src="../../../../Resources/Images/show_toc_icon.gif" width="15" height="14" border="0" style="margin-bottom: -2px;" alt="" hideText="Hide TOC" showText="Show TOC" /></a> <a href="#" onclick="showHideTOC();">Hide TOC</a>
+        </span>
+        </div>
+
+        <hr />
+        
+        
+        <a name="//apple_ref/doc/uid/TP30000905-CH210-BEHJDFCA" title="Memory and Virtual Memory"></a><h1>Memory and Virtual
+Memory</h1><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1022"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1023"></a><p>This chapter describes allocating memory and
+the low-level routines for modifying memory maps in the kernel.
+It also describes a number of commonly used interfaces to the virtual
+memory system. It does not describe how to make changes in paging
+policy or add additional pagers. Mac OS X does not support external
+pagers<a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1024"></a>, although
+much of the functionality can be achieved in other ways, some of
+which are covered at a high level in this chapter. The implementation
+details of these interfaces are subject to change, however, and
+are thus left undocumented.</p>
+<p>With the exception of the section <span class="content_text"><a href="vm.html#//apple_ref/doc/uid/TP30000905-CH210-CHDHIIJF">“Allocating Memory in the Kernel,”</a></span>
+this chapter is of interest only if you are writing file systems
+or are modifying the virtual memory system itself.</p>
+
+
+<!-- This template is being used for both PDF and HTML. -->
+
+    
+    <h4>In this section:</h4>
+    
+    
+    <p class="blockquote">
+    
+        
+			
+			
+				<a href="vm.html#//apple_ref/doc/uid/TP30000905-CH210-CHDEDGCA">Mac OS X VM Overview</a>
+				
+			<br/>
+			
+        
+			
+			
+				<a href="vm.html#//apple_ref/doc/uid/TP30000905-CH210-CHDGIDHB">Memory Maps Explained</a>
+				
+			<br/>
+			
+        
+			
+			
+				<a href="vm.html#//apple_ref/doc/uid/TP30000905-CH210-TPXREF109">Named Entries</a>
+				
+			<br/>
+			
+        
+			
+			
+				<a href="vm.html#//apple_ref/doc/uid/TP30000905-CH210-CHDIFICG">Universal Page Lists (UPLs)</a>
+				
+			<br/>
+			
+        
+			
+			
+				<a href="vm.html#//apple_ref/doc/uid/TP30000905-CH210-CHDBJBEJ">Using Mach Memory Maps</a>
+				
+			<br/>
+			
+        
+			
+			
+				<a href="vm.html#//apple_ref/doc/uid/TP30000905-CH210-CHDJBFBC">Other VM and VM-Related Subsystems</a>
+				
+			<br/>
+			
+        
+			
+			
+				<a href="vm.html#//apple_ref/doc/uid/TP30000905-CH210-CHDBCBCB">Address Spaces</a>
+				
+			<br/>
+			
+        
+			
+			
+				<a href="vm.html#//apple_ref/doc/uid/TP30000905-CH210-CHDHIIJF">Allocating Memory in the Kernel</a>
+				
+			<br/>
+			
+        
+
+    </p><br/>
+
+<a name="//apple_ref/doc/uid/TP30000905-CH210-CHDEDGCA" title="Mac OS X VM Overview"></a><h2>Mac OS X VM Overview</h2>
+<p>The VM<a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1025"></a> system
+used in Mac OS X is a descendent of Mach VM, which was created at Carnegie
+Mellon University in the 1980s. To a large extent, the fundamental
+design is the same, although some of the details are different,
+particularly when enhancing the VM system. It does, however, support
+the ability to request certain paging behavior through the use of <a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1026"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1027"></a><strong>universal
+page lists (UPLs)</strong>. See <span class="content_text"><a href="vm.html#//apple_ref/doc/uid/TP30000905-CH210-CHDIFICG">“Universal Page Lists (UPLs)”</a></span> for
+more information.</p>
+<p>The design of Mach VM centers around the concept of physical
+memory being a cache for virtual memory.</p>
+<p>At its highest level, Mach VM consists of address spaces<a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1028"></a> and
+ways to manipulate the contents of those address spaces from outside
+the space. These address spaces are sparse and have a notion of
+protections<a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1029"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1030"></a> to limit what tasks
+can access their contents.</p>
+<p>At a lower level, the object level, virtual memory is seen
+as a collection of VM objects<a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1031"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1032"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1033"></a> and memory objects<a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1034"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1035"></a>, each with a particular owner and
+protections. These objects can be modified with object calls that
+are available both to the task and (via the back end of the VM)
+to the pager<a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1036"></a>s.</p><div class="notebox"><a name="//apple_ref/doc/uid/TP30000905-CH210-SW1" title="Note"></a><p><strong>Note:</strong>&nbsp;While
+memory objects and VM objects are closely related, the terms are
+not equivalent and should not be confused. .A VM object can be backed
+by one or more memory objects, which are, in turn, managed by a
+pager. A VM object may also be partially backed by other VM objects,
+as occurs in the case of shadow chains (described later in this
+section).</p></div>
+<p>The VM object is internal to the virtual memory system, and
+includes basic information about accessing the memory. The memory
+object, by contrast, is provided by the pager. The contents of the
+memory associated with that memory object can be retrieved from
+disk or some other backing store by exchanging messages with the
+memory object. Implicitly, each VM object is associated with a given
+pager through its memory object.</p>
+<p>VM objects are cached with system pages (RAM), which can be
+any power of two multiple of the hardware page size. In the Mac
+OS X kernel, system pages are the same size as hardware pages. Each
+system page is represented in a given address space by a map entry. Each
+map entry has its own protection and inheritance. A given map entry
+can have an inheritance of <code>shared</code>, <code>copy</code>,
+or <code>none</code>. If a page is
+marked <code>shared</code> in a given
+map, child tasks share this page for reading and writing. If a page
+is marked <code>copy</code>, child
+tasks get a copy of this page (using copy-on-write). If a page is
+marked <code>none</code>, the child’s
+page is left unallocated.</p>
+<p>VM objects are managed by the machine-independent VM system,
+with the underlying virtual to physical mappings handled by the
+machine-dependent <a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1037"></a><strong>pmap
+system</strong>. The <code>pmap</code> system
+actually handles page tables, translation lookaside buffers, segments,
+and so on, depending on the design of the underlying hardware.</p>
+<p>When a VM object<a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1038"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1039"></a> is duplicated (for example,
+the data pages from a process that has just called <code><a href="../../../Reference/ManPages/man2/fork.2.html#//apple_ref/doc/man/2/fork" target="_top">fork</a></code><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1040"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1041"></a>),
+a <strong>shadow object</strong><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1042"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1043"></a> is created. A shadow object is initially
+empty, and contains a reference to another object. When the contents
+of a page are modified, the page is copied from the parent object
+into the shadow object and then modified. When reading data from a
+page, if that page exists in the shadow object, the page listed
+in the shadow object is used. If the shadow object has no copy of
+that page, the original object is consulted. A series of shadow
+objects pointing to shadow objects or original objects is known
+as a <strong>shadow chain</strong><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1044"></a>.</p>
+<p>Shadow chains can become arbitrarily long if an object is
+heavily reused in a copy-on-write fashion. However, since <code><a href="../../../Reference/ManPages/man2/fork.2.html#//apple_ref/doc/man/2/fork" target="_top">fork</a></code> is
+frequently followed by <code><a href="../../../Reference/ManPages/man3/exec.3.html#//apple_ref/doc/man/3/exec" target="_top">exec</a></code><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1045"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1046"></a>,
+which replaces all of the material being shadowed, long chains are
+rare. Further, Mach automatically garbage collects shadow objects,
+removing any intermediate shadow objects whose pages are no longer
+referenced by any (nondefunct) shadow object. It is even possible
+for the original object to be released if it no longer contains
+pages that are relevant to the chain.</p>
+<p>The VM calls available to an application include <a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1047"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1048"></a><code><!--a-->vm_map<!--/a--></code> and <a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1049"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1050"></a><code><!--a-->vm_allocate<!--/a--></code>,
+which can be used to map file data or anonymous memory into the
+address space. This is possible only because the address space is
+initially sparse. In general, an application can either map a file into
+its address space (through file mapping primitives, abstracted by
+BSD) or it can map an object (after being passed a handle to that
+object). In addition, a task can change the protections of the objects
+in its address space and can share those objects with other tasks.</p>
+<p>In addition to the mapping and allocation aspects of virtual
+memory, the VM system contains a number of other subsystems. These
+include the back end (pagers) and the shared memory subsystem. There
+are also other subsystems closely tied to VM, including the VM shared
+memory server. These are described in <span class="content_text"><a href="vm.html#//apple_ref/doc/uid/TP30000905-CH210-CHDJBFBC">“Other VM and VM-Related Subsystems.”</a></span></p>
+<a name="//apple_ref/doc/uid/TP30000905-CH210-CHDGIDHB" title="Memory Maps Explained"></a><h2>Memory Maps Explained</h2>
+<p>Each Mach task has its own memory map. In Mach, this memory
+map takes the form of an ordered doubly linked list. As described
+in <span class="content_text"><a href="vm.html#//apple_ref/doc/uid/TP30000905-CH210-CHDEDGCA">“Mac OS X VM Overview,”</a></span>
+each of these objects contains a list of pages and shadow references
+to other objects.</p>
+<p>In general, you should never need to access a memory map directly
+unless you are modifying something deep within the VM system. The <code>vm_map_entry</code><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1051"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1052"></a> structure
+contains task-specific information about an individual mapping along
+with a reference to the backing object. In essence, it is the glue
+between an VM object and a VM map.</p>
+<p>While the details of this data structure are beyond the scope
+of this document, a few fields are of particular importance.</p>
+<p>The field <code>is_submap</code> is
+a Boolean value that tells whether this map entry is a normal VM object
+or a <a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1053"></a><strong>submap</strong>.
+A submap is a collection of mappings that is part of a larger map. Submaps
+are often used to group mappings together for the purpose of sharing
+them among multiple Mach tasks, but they may be used for many purposes.
+What makes a submap particularly powerful is that when several tasks
+have mapped a submap into their address space, they can see each
+other’s changes, not only to the contents of the objects in the
+map, but to the objects themselves. This means that as additional
+objects are added to or deleted from the submap, they appear in
+or disappear from the address spaces of all tasks that share that
+submap.</p>
+<p>The field <code>behavior</code> controls
+the paging reference behavior of a specified range in a given map.
+This value changes how pageins are clustered. Possible values are <code>VM_BEHAVIOR_DEFAULT</code><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1054"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1055"></a>, <code>VM_BEHAVIOR_RANDOM</code><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1056"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1057"></a>, <code>VM_BEHAVIOR_SEQUENTIAL</code><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1058"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1059"></a>,
+and <code>VM_BEHAVIOR_RSEQNTL</code><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1060"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1061"></a>,
+for default, random, sequential, or reverse-sequential pagein ordering.</p>
+<p>The <code>protection</code><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1062"></a> and <code>max_protection</code> fields
+control the permissions on the object. The <code>protection</code> field
+indicates what rights the task currently has for the object, while
+the <code>max_protection</code> field
+contains the maximum access that the current task can obtain for
+the object.</p>
+<p>You might use the <code>protection</code> field
+when debugging shared memory. By setting the protection to be read-only,
+any inadvertent writes to the shared memory would cause an exception.
+However, when the task actually needs to write to that shared region,
+it could increase its permissions in the <code>protection</code> field
+to allow writes.</p>
+<p>It would be a security<a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1063"></a> hole if a task could increase
+its own permissions on a memory object arbitrarily, however. In
+order to preserve a reasonable security model, the task that owns a
+memory object must be able to limit the rights granted to a subordinate
+task. For this reason, a task is not allowed to increase its protection
+beyond the permissions granted in <code>max_protection</code>.</p>
+<p>Possible values for <code>protection</code> and <code>max_protection</code> are
+described in detail in <code>xnu/osfmk/mach/vm_prot.h</code>.</p>
+<p>Finally, the <code>use_pmap<a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1064"></a></code> field
+indicates whether a submap’s low-level mappings should be shared
+among all tasks into which the submap is mapped. If the mappings
+are not shared, then the structure of the map is shared among all
+tasks, but the actual contents of the pages are not.</p>
+<p>For example, shared libraries<a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1065"></a> are handled with
+two submaps. The read-only shared code section has <code>use_pmap</code> set
+to true. The read-write (nonshared) section has <code>use_pmap</code> set
+to false, forcing a clean copy of the library’s <code>DATA</code> segment
+to be mapped in from disk for each new task.</p>
+<a name="//apple_ref/doc/uid/TP30000905-CH210-TPXREF109" title="Named Entries"></a><h2>Named Entries</h2>
+<p>The Mac OS X VM system provides an abstraction known as a <strong>named
+entry</strong><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1066"></a>. A
+named entry is nothing more than a handle to a shared object or
+a submap.</p>
+<p>Shared memory support in Mac OS X is achieved by sharing objects
+between the memory maps of various tasks. Shared memory objects
+must be created from existing VM objects by calling <code><!--a-->vm_allocate<!--/a--></code><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1067"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1068"></a> to
+allocate memory in your address space and then calling <a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1069"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1070"></a><code><!--a-->mach_make_memory_entry_64<!--/a--></code> to
+get a handle to the underlying VM object.</p>
+<p>The handle returned by <a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1071"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1072"></a><code><!--a-->mach_make_memory_entry_64<!--/a--></code> can
+be passed to <code><!--a-->vm_map<!--/a--></code><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1073"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1074"></a> to
+map that object into a given task’s address space. The handle
+can also be passed via IPC or other means to other tasks so that
+they can map it into their address spaces. This provides the ability
+to share objects with tasks that are not in your direct lineage,
+and also allows you to share additional memory with tasks in your
+direct lineage after those tasks are created.</p>
+<p>The other form of named entry, the submap, is used to group
+a set of mappings. The most common use of a submap is to share mappings
+among multiple Mach tasks. A submap can be created with <a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1075"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1076"></a><code><!--a-->vm_region_object_create<!--/a--></code>.</p>
+<p>What makes a submap particularly powerful is that when several
+tasks have mapped a submap into their address space, they can see
+each other’s changes to both the data and the structure of the
+map. This means that one task can map or unmap a VM object in another task’s
+address space simply by mapping or unmapping that object in the
+submap.</p>
+<a name="//apple_ref/doc/uid/TP30000905-CH210-CHDIFICG" title="Universal Page Lists (UPLs)"></a><h2>Universal
+Page Lists (UPLs)</h2><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1077"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1078"></a>
+<p>A universal page list, or UPL, is a data structure used when
+communicating with the virtual memory system. UPLs can be used to
+change the behavior of pages with respect to caching, permissions,
+mapping, and so on. UPLs can also be used to push data into and pull
+data from VM objects. The term is also often used to refer to the
+family of routines that operate on UPLs. The flags used when dealing
+with UPLs are described in <code>osfmk/mach/memory_object_types.h</code>.</p>
+<p>The life cycle of a UPL looks like this:</p>
+<ol class="ol"><li class="li"><p>A UPL is
+created based on the contents of a VM object. This UPL includes
+information about the pages within that object.</p></li>
+<li class="li"><p>That UPL is modified in some way.</p></li>
+<li class="li"><p>The changes to the UPL are either committed (pushed back to
+the VM system) or aborted, with <a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1079"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1080"></a><code><!--a target="_top" -->ubc_upl_commit<!--/a--></code> or <a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1081"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1082"></a><code><!--a target="_top" -->ubc_upl_abort<!--/a--></code>,
+respectively.</p></li></ol>
+<p>If you have a control handle for a given VM object (which
+generally means that you are inside a pager), you can use <code><!--a-->vm_object_upl_request<!--/a--></code><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1083"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1084"></a> to
+get a UPL for that object. Otherwise, you must use the <a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1085"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1086"></a><code><!--a-->vm_map_get_upl<!--/a--></code> call.
+In either case, you are left with a handle to the UPL.</p>
+<p>When a pagein is requested, the pager receives a list of pages
+that are locked against the object, with certain pages set to not
+valid. The pager must either write data into those pages or must
+abort the transaction to prevent invalid data in the kernel. Similarly
+in pageout, the kernel must write the data to a backing store or
+abort the transaction to prevent data loss. The pager may also elect
+to bring additional pages into memory or throw additional pages
+out of memory at its discretion.</p>
+<p>Because pagers can be used both for virtual memory and for
+memory mapping of file data, when a pageout is requested, the data
+may need to be freed from memory, or it may be desirable to keep
+it there and simply flush the changes to disk. For this reason,
+the flag <code>UPL_CLEAN_IN_PLACE</code><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1087"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1088"></a> exists
+to allow a page to be flushed to disk but not removed from memory.</p>
+<p>When a pager decides to page in or out additional pages, it
+must determine which pages to move. A pager can request all of the
+dirty pages by setting the <code>RETURN_ONLY_DIRTY</code><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1089"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1090"></a> flag. It
+can also request all pages that are not in memory using the <code>RETURN_ONLY_ABSENT</code><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1091"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1092"></a> flag.</p>
+<p>There is a slight problem, however. If a given page is marked
+as <code>BUSY</code> in the UPL, a
+request for information on that page would normally block. If the
+pager is doing prefetching or preflushing, this is not desirable,
+since it might be blocking on itself or on some other pager that
+is blocked waiting for the current transaction to complete. To avoid
+such deadlock, the UPL mechanism provides the <code>UPL_NOBLOCK</code> flag.
+This is frequently used in the anonymous pager for requesting free
+memory.</p>
+<p>The flag <code>QUERY_OBJECT_TYPE</code><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1093"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1094"></a> can
+be used to determine if an object is physically contiguous and to
+get other properties of the underlying object.</p>
+<p>The flag <code>UPL_PRECIOUS</code><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1095"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1096"></a> means
+that there should be only one copy of the data. This prevents having
+a copy both in memory and in the backing store. However, this breaks
+the adjacency of adjacent pages in the backing store, and is thus
+generally not used to avoid a performance hit.</p>
+<p>The flag <code>SET_INTERNAL</code><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1097"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1098"></a> is
+used by the BSD subsystem to cause all information about a UPL to
+be contained in a single memory object so that it can be passed
+around more easily. It can only be used if your code is running
+in the kernel’s address space.</p>
+<p>Since this handle can be used for multiple small transactions
+(for example, when mapping a file into memory block-by-block), the
+UPL API includes functions for committing and aborting changes to
+only a portion of the UPL. These functions are <code><!--a target="_top" -->upl_commit_range<!--/a--></code><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1099"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1100"></a> and <a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1101"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1102"></a><code><!--a target="_top" -->upl_abort_range<!--/a--></code>,
+respectively.</p>
+<p>To aid in the use of UPLs for handling multi-part transactions,
+the <code><!--a target="_top" -->upl_commit_range<!--/a--></code> and <code><!--a target="_top" -->upl_abort_range<!--/a--></code> calls
+have a flag that causes the UPL to be freed when there are no unmodified
+pages in the UPL. If you use this flag, you must be very careful
+not to use the UPL after all ranges have been committed or aborted.</p>
+<p>Finally, the function <code><!--a-->vm_map_get_upl<!--/a--></code> is
+frequently used in file systems. It gets the underlying VM object
+associated with a given range within an address space. Since this returns
+only the first object in that range, it is your responsibility to
+determine whether the entire range is covered by the resulting UPL
+and, if not, to make additional calls to get UPLs for other objects.
+Note that while the <code><!--a-->vm_map_get_upl<!--/a--></code> call
+is against an address space range, most UPL<a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1103"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1104"></a> calls
+are against a <code>vm_object</code>.</p>
+<a name="//apple_ref/doc/uid/TP30000905-CH210-CHDBJBEJ" title="Using Mach Memory Maps"></a><h2>Using Mach Memory Maps</h2>
+<div class="warningbox"><img src="../../../../Resources/Images/icon_warning.gif" alt="!" width="20" height="20" border="0" class="warningicon" /><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_13" title="Warning:"></a><p><strong>Warning:</strong>&nbsp;
+
+This section describes the low-level API for dealing
+with Mach VM maps<a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1105"></a>. These
+maps cannot be modified in this way from a kernel extension. These
+functions are not available for use in a KEXT. They are presented
+strictly for use within the VM system and other parts of Mach. If
+you are not doing in-kernel development, you should be using the
+methods described in the chapter <span class="content_text"><a href="../boundaries/boundaries.html#//apple_ref/doc/uid/TP30000905-CH217-BEHJDFCA">“Boundary Crossings.”</a></span></p><p></p><div class="clear"></div></div>
+<p>From the context of the kernel (<em>not</em> from
+a KEXT), there are two maps that you will probably need to deal
+with. The first is the kernel map. Since your code is executing
+in the kernel’s address space, no additional effort is needed
+to use memory referenced in the kernel map. However, you may need
+to add additional mappings into the kernel map and remove them when
+they are no longer needed.</p>
+<p>The second map of interest is the memory map for a given task.
+This is of most interest for code that accepts input from user programs,
+for example a <code>sysctl</code> or
+a Mach RPC handler. In nearly all cases, convenient wrappers provide
+the needed functionality, however.</p>
+<p>The low-level VM map API includes the following functions:<a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1106"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1107"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1108"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1109"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1110"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1111"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1112"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1113"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1114"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1115"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1116"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1117"></a></p>
+<div class="codesample"><table><tr><td scope="row"><pre>kern_return_t vm_map_copyin(vm_map_t src_map, vm_offset_t src_addr,<span></span></pre></td></tr><tr><td scope="row"><pre>            vm_size_t len, boolean_t src_destroy,<span></span></pre></td></tr><tr><td scope="row"><pre>            vm_map_copy_t *copy_result);<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>kern_return_t vm_map_copyout(vm_map_t map, vm_offset_t *addr, /*  Out */<span></span></pre></td></tr><tr><td scope="row"><pre>            register vm_map_copy_t copy);<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>kern_return_t vm_map_copy_overwrite(vm_map_t dst_map,<span></span></pre></td></tr><tr><td scope="row"><pre>            vm_offset_t dst_address,vm_map_copy_t copy,<span></span></pre></td></tr><tr><td scope="row"><pre>            boolean_t interruptible, pmap_t pmap);<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>void vm_map_copy_discard(vm_map_copy_t copy);<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>void vm_map_wire(vm_map_t map, vm_offset_t start, vm_offset_t end,<span></span></pre></td></tr><tr><td scope="row"><pre>            vm_prot_t access_type, boolean_t user_wire);<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>void vm_map_unwire(vm_map_t map, vm_offset_t start, vm_offset_t  end,<span></span></pre></td></tr><tr><td scope="row"><pre>            boolean_t user_wire);<span></span></pre></td></tr></table></div>
+<p>The function <code><!--a-->vm_map_copyin<!--/a--></code> copies
+data from an arbitrary (potentially non–kernel) memory map into
+a copy list and returns the copy list pointer in <code>copy_result</code>.
+If something goes wrong and you need to throw away this intermediate
+object, it should be freed with <code><!--a-->vm_map_copy_discard<!--/a--></code><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1118"></a>.</p>
+<p>In order to actually get the data from the copy list, you
+need to overwrite a memory object in the kernel’s address space
+with <code><!--a-->vm_map_copy_overwrite<!--/a--></code>. This overwrites
+an object with the contents of a copy list. For most purposes, the
+value passed for <code>interruptible</code> should be <code>FALSE</code>,
+and <code>pmap</code> should be <code>NULL</code>.</p>
+<p>Copying data from the kernel to user space is exactly the
+same as copying data from user space, except that you pass <code>kernel_map </code>to <a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1119"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1120"></a><code><!--a-->vm_map_copyin<!--/a--></code> and
+pass the user map to <a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1121"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1122"></a><code><!--a-->vm_map_copy_overwrite<!--/a--></code>.
+In general, however, you should avoid doing this, since you could end
+up with a task’s memory being fragmented into lots of tiny objects,
+which is undesirable.</p>
+<p>Do <em>not</em> use <a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1123"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1124"></a><code><!--a-->vm_map_copyout<!--/a--></code> when
+copying data into an existing user task’s address map. The function <code><!--a-->vm_map_copyout<!--/a--></code> is
+used for filling an unused region in an address map. If the region
+is allocated, then <code><!--a-->vm_map_copyout<!--/a--></code> does
+nothing. Because it requires knowledge of the current state of the
+map, it is primarily used when creating a new address map (for example,
+if you are manually creating a new process). For most purposes,
+you do not need to use <code><!--a-->vm_map_copyout<!--/a--></code>.</p>
+<p>The functions <code><!--a-->vm_map_wire<!--/a--></code> and <a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1125"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1126"></a><code><!--a-->vm_map_unwire<!--/a--></code> can
+be used to wire and unwire portions of an address map. If you set
+the argument <code>user_wire</code> to <code>TRUE</code>,
+then the page can be unwired from user space. This should be set
+to <code>FALSE</code> if you are about
+to use the memory for I/O or for some other operation that cannot
+tolerate paging. In <code><!--a-->vm_map_wire<!--/a--></code><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1127"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1128"></a>,
+the argument <code>access_type</code> indicates
+the types of accesses that should not be allowed to generate a page fault.
+In general, however, you should be using <a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1129"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1130"></a><code><!--a-->vm_wire<!--/a--></code> to
+wire memory.</p>
+<p>As mentioned earlier, this information is presented strictly
+for use in the heart of the kernel. You should not use anything
+in this section from a kernel extension.</p>
+<a name="//apple_ref/doc/uid/TP30000905-CH210-CHDJBFBC" title="Other VM and VM-Related Subsystems"></a><h2>Other VM and VM-Related Subsystems</h2>
+<p>There are two additional VM subsystems: pagers and the working
+set detection subsystem. In addition, the VM shared memory server
+subsystem is closely tied to (but is not part of) the VM subsystem.
+This section describes these three VM and VM-related subsystems.</p>
+<a name="//apple_ref/doc/uid/TP30000905-CH210-TPXREF110" title="Pagers"></a><h3>Pagers</h3><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1131"></a>
+<p>Mac OS X has three basic pagers: the vnode pager, the default
+pager (or anonymous pager), and the device pager. These are used
+by the VM system to actually get data into the VM objects that underlie
+named entries. Pagers are linked into the VM system through a combination
+of a subset of the old Mach pager interface and UPLs.</p>
+<p>The default pager<a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1132"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1133"></a> is what most people
+think of when they think of a VM system. It is responsible for moving
+normal data into and out of the backing store. In addition, there
+is a facility known as the dynamic pager<a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1134"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1135"></a> that
+sits on top of the default pager and handles the creation and deletion
+of backing store files. These pager files are filled with data in
+clusters (groups of pages).</p>
+<p>When the total fullness of the paging file pool reaches a
+high–water mark, the default pager asks the dynamic pager to allocate
+a new store file. When the pool drops below its low water mark,
+the VM system selects a pager file, moves its contents into other
+pager files, and deletes it from disk.</p>
+<p>The vnode pager<a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1136"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1137"></a> has a 1:1 (onto) mapping between
+objects in VM space and open files (vnodes). It is used for memory
+mapped file I/O. The vnode pager is generally hidden behind calls
+to BSD file APIs.</p>
+<p>The device pager<a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1138"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1139"></a> allows you to map non–general-purpose
+memory with the cache characteristics required for that memory (<strong>WIMG</strong><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1140"></a>). Non–general–purpose
+memory includes physical addresses that are mapped onto hardware
+other than main memory—for example, PCI memory, frame buffer memory,
+and so on. The device pager is generally hidden behind calls to
+various I/O Kit functions.</p>
+<a name="//apple_ref/doc/uid/TP30000905-CH210-TPXREF111" title="Working Set Detection Subsystem "></a><h3>Working Set Detection Subsystem
+</h3><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1141"></a>
+<p>To improve performance, Mac OS X has a subsystem known as
+the working set detection subsystem. This subsystem is called on
+a VM fault; it keeps a profile of the fault behavior of each task
+from the time of its inception. In addition, just before a page
+request, the fault code asks this subsystem which adjacent pages
+should be brought in, and then makes a single large request to the
+pager.</p>
+<p>Since files on disk tend to have fairly good locality, and
+since address space locality is largely preserved in the backing
+store, this provides a substantial performance boost. Also, since
+it is based upon the application’s previous behavior, it tends
+to pull in pages that would probably have otherwise been needed
+later. This occurs for all pagers.</p>
+<p>The working set code works well once it is established. However,
+without help, its performance would be the baseline performance
+until a profile for a given application has been developed. To overcome
+this, the first time that an application is launched in a given user
+context, the initial working set required to start the application
+is captured and stored in a file. From then on, when the application
+is started, that file is used to seed the working set.</p>
+<p>These working set files are established on a per-user basis.
+They are stored in <code>/var/vm/app_profile</code> and
+are only accessible by the super-user (and the kernel).</p>
+<a name="//apple_ref/doc/uid/TP30000905-CH210-TPXREF112" title="VM Shared Memory Server Subsystem "></a><h3>VM Shared Memory Server Subsystem
+</h3><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1142"></a>
+<p>The VM shared memory<a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1143"></a> server
+subsystem is a BSD service that is closely tied to VM, but is not
+part of VM. This server provides two submaps that are used for shared
+library support in Mac OS X. Because shared libraries<a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1144"></a> contain
+both read-only portions (text segment) and read-write portions (data
+segment), the two portions are treated separately to maximize efficiency.
+The read-only portions are completely shared between tasks, including
+the underlying <code>pmap</code><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1145"></a> entries.
+The read-write portions share a common submap, but have different
+underlying data objects (achieved through copy-on-write).</p>
+<p>The three functions exported by the VM shared memory server
+subsystem should only be called by <a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1146"></a><code>dyld</code>.
+Do not use them in your programs.</p>
+<p>The function <code><!--a-->load_shared_file<!--/a--></code><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1147"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1148"></a> is
+used to load a new shared library into the system. Once such a file
+is loaded, other tasks can then depend on it, so a shared library
+cannot be unshared. However, a new set of shared regions can be
+created with <a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1149"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1150"></a><code><!--a-->new_system_shared_regions<!--/a--></code> so
+that no new tasks will use old libraries.</p>
+<p>The function <a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1151"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1152"></a><code><!--a-->reset_shared_file<!--/a--></code> can
+be used to reset any changes that your task may have made to its
+private copy of the data section for a file.</p>
+<p>Finally, the function <code><!--a-->new_system_shared_regions<!--/a--></code> can
+be used to create a new set of shared regions for future tasks.
+New regions can be used when updating prebinding with new shared
+libraries to cause new tasks to see the latest libraries at their
+new locations in memory. (Users of old shared libraries will still
+work, but they will fall off the pre-bound path and will perform
+less efficiently.) It can also be used when dealing with private libraries
+that you want to share only with your task’s descendents.</p>
+<a name="//apple_ref/doc/uid/TP30000905-CH210-CHDBCBCB" title="Address Spaces"></a><h2>Address Spaces</h2>
+<p>This section explains issues that some developers may see
+when using their drivers in Panther or later. These changes were
+necessitated by a combination of hardware and underlying OS changes;
+however, you may see problems resulting from the changes even on
+existing hardware.</p>
+<p>There are three basic areas of change in Mac OS X 10.3. These
+are: </p>
+<ul class="ul"><li class="li"><p><code>IOMemoryDescriptor</code> changes</p></li>
+<li class="li"><p>VM system (<code>pmap</code>)
+changes</p></li>
+<li class="li"><p>Kernel dependency changes</p></li></ul>
+<p>These are described in detail in the sections that follow. </p>
+<a name="//apple_ref/doc/uid/TP30000905-CH210-TPXREF113" title="Background Info on PCI Address Translation"></a><h3>Background Info on PCI Address
+Translation</h3>
+<p>To allow existing device drivers to work with upcoming 64-bit
+system architectures, a number of changes were required. To explain
+these, a brief introduction to PCI bus bridges is needed.</p>
+<p>When a PCI device needs to perform a data transaction to or
+from main memory, the device driver calls a series of functions
+intended to prepare this memory for I/O. In an architecture where
+both the device drivers and the memory subsystem use 32-bit addressing,
+everything just works, so long as the memory doesn't get paged out
+during the I/O operation. As kernel memory is generally not pageable,
+the preparation is largely superfluous.</p>
+<p>On a system whose memory subsystem uses 64-bit addressing,
+however, this becomes a bit of a problem. Because the hardware devices
+on the PCI bus can only handle 32-bit addresses, the device can
+only “see” a 4 gigabyte aperture into the (potentially much larger)
+main memory at any given time. </p>
+<p>There are two possible solutions for this problem. The easy
+(but slow) solution would be to use “bounce buffers”. In such
+a design, device drivers would copy data into memory specifically
+allocated within the bottom 4 gigs of memory. However, this incurs
+a performance penalty and also puts additional constraints on the
+lower 4 gigs of memory, causing numerous problems for the VM system.</p>
+<p>The other solution, the one chosen in Apple's 64-bit implementation,
+is to use address translation to “map” blocks of memory into
+the 32-bit address space of the PCI devices. While the PCI device
+can still only see a 4 gig aperture, that aperture can then be non-contiguous,
+and thus bounce buffers and other restrictions are unnecessary.
+This address translation is done using a part of the memory controller
+known as DART, which stands for Device Address Resolution Table.</p>
+<p>This introduces a number of potential problems, however. First,
+physical addresses as seen by the processor no longer map 1:1 onto
+the addresses as seen by PCI devices. Thus, a new term, I/O addresses,
+is introduced to describe this new view. Because I/O addresses and physical
+addresses are no longer the same, the DART must keep a table of
+translations to use when mapping between them. Fortunately, if your
+driver is written according to Apple guidelines (using only documented
+APIs), this process is handled transparently.</p><div class="notebox"><a name="//apple_ref/doc/uid/TP30000905-CH210-SW2" title="Note"></a><p><strong>Note:</strong>&nbsp;This
+additional addressing mode has an impact when debugging I/O Kit
+device drivers. For more information, see <span class="content_text"><a href="../build/build.html#//apple_ref/doc/uid/TP30000905-CH221-CIHBJCGC">“When Things Go Wrong: Debugging the Kernel.”</a></span></p></div>
+<a name="//apple_ref/doc/uid/TP30000905-CH210-TPXREF114" title="IOMemoryDescriptor Changes"></a><h3><code>IOMemoryDescriptor</code> Changes</h3>
+<p>When your driver calls <code>IOMemoryDescriptor</code><code>::</code><code>prepare</code>,
+a  mapping is automatically injected into the DART.  When it calls <code>IOMemoryDescriptor</code><code>::</code><code>release</code> ,
+the mapping is removed.  If  you fail to do this, your driver could
+experience random data  corruption or panics.</p>
+<p>Because the DART requires different caching for reads and
+writes,  the DMA direction is important on hardware that includes
+a DART.  While you may receive random failures if the direction
+is wrong in  general (on any system), if you attempt to call WriteBytes
+on a memory region whose DMA direction is set  up for reading, you
+will cause a kernel panic on 64-bit hardware.</p>
+<p>If you attempt to perform a DMA transaction to unwired (user)
+ memory, on previous systems, you would only get random crashes,
+ panics, and data corruption.  On machines with a DART, you will
+ likely get no data whatsoever.</p>
+<p>As a side-effect of changes in the memory subsystem, Mac OS
+X is  much more likely to return physically contiguous page ranges
+in  memory regions.  Historically, Mac OS X returned multi-page
+memory  regions in reverse order, starting with the last page and moving
+ towards the first page.  The result of this was that multi-page
+ memory regions essentially never had a contiguous range of physical
+ pages.</p>
+<p>Because of the increased probability of seeing physically
+ contiguous blocks of memory in a memory region, this change may
+ expose latent bugs in some drivers that only show up when handling
+ contiguous ranges of physical pages, which could result in incorrect
+ behavior or panics.</p>
+<p>Note that the problems mentioned above are caused by bugs
+in the drivers, and could result in problems on older hardware prior
+to Panther. These issues are more likely to occur in Panther and
+later versions of Mac OS X, however, because of the new hardware designs
+and the OS changes that were made to support those designs.</p>
+<a name="//apple_ref/doc/uid/TP30000905-CH210-TPXREF115" title="VM System and pmap Changes: "></a><h3>VM System and 
+<code>pmap</code> Changes: </h3>
+<p>In Panther, as a result of the changes described in detail
+in the section on PCI address translation, physical addresses obtained
+directly from the <code>pmap</code> layer
+have no useful purpose outside the VM system itself. To prevent
+their inadvertent use in device drivers, the <code>pmap</code> calls
+are no longer available from kernel extensions.</p>
+<p>A few drivers written prior to the addition of the <code>IOMemoryDescriptor</code> class
+still use <code>pmap</code> calls
+to get the  physical pages associated with a virtual address.  Also,
+a few  developers have looked at the <code>IOMemoryDescriptor</code> implementation
+and chosen to obtain addresses directly from the <code>pmap</code> 
+layer to remove what was perceived as an unnecessary abstraction
+ layer.</p>
+<p>Even without removing access to the <code>pmap</code> calls,
+these drivers would not function on systems with a DART (see the
+PCI section above for info on DARTs). To better emphasize this upcoming
+failure, Panther will cause these drivers to fail to load with an
+undefined symbol error (generally for <code><!--a-->pmap_extract<!--/a--></code> )
+even  on systems without a DART.</p>
+<a name="//apple_ref/doc/uid/TP30000905-CH210-TPXREF116" title="Kernel Dependency Changes"></a><h3>Kernel Dependency Changes</h3>
+<p>Beginning in Panther, device drivers that declare a dependency
+on version 7 (the Panther version) of the I/O Kit will no longer
+automatically get symbols from Mach and BSD. This change was made
+to discourage I/O Kit developers from relying on symbols that are
+not explicitly approved for use in the I/O Kit. </p>
+<p>Existing drivers are unaffected by this change.  This change
+only  affects you if you explicitly modify your device driver to
+declare a  dependency on version 7 of the I/O Kit to take advantage
+of new I/O  Kit features.</p>
+<a name="//apple_ref/doc/uid/TP30000905-CH210-TPXREF117" title="Summary"></a><h3>Summary</h3>
+<p>As described above, some device drivers may require minor
+modifications to support Panther and higher. Apple has made every
+effort to ensure compatibility with existing device drivers to the
+greatest extent possible, but a few drivers may break. If your driver breaks,
+you should first check to see if your driver includes any of the
+bugs described in the previous sections. If it does not, contact
+Apple Developer Technical Support for additional debugging suggestions.</p>
+<a name="//apple_ref/doc/uid/TP30000905-CH210-CHDHIIJF" title="Allocating Memory in the Kernel"></a><h2>Allocating Memory in the Kernel</h2>
+<p>As with most things in the Mac OS X kernel, there are a number
+of ways to allocate memory. The choice of routines depends both
+on the location of the calling routine and on the reason for allocating
+memory. In general, you should use Mach routines for allocating memory
+unless you are writing code for use in the I/O Kit, in which case
+you should use I/O Kit routines.</p>
+<a name="//apple_ref/doc/uid/TP30000905-CH210-CHDBGHAC" title="Allocating Memory Using Mach Routines"></a><h3>Allocating Memory Using Mach
+Routines</h3>
+<p>Mach routines provide a relatively straightforward interface
+for allocating and releasing memory. They are the preferred mechanism
+for allocating memory outside of the I/O Kit. BSD also offers <code><!--a-->_MALLOC<!--/a--></code><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1153"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1154"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1155"></a> and <a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1156"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1157"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1158"></a><code><!--a-->_FREE<!--/a--></code>,
+which may be used in BSD parts of the kernel.</p>
+<p>They do not provide for forced mapping of a given physical
+address to a virtual address. However, if you need such a mapping,
+you are probably writing a device driver, in which case you should
+be using I/O Kit routines instead of Mach routines.</p>
+<p>These are some of the commonly used Mach routines for allocating
+memory:<a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1159"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1160"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1161"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1162"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1163"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1164"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1165"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1166"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1167"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1168"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1169"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1170"></a></p>
+<div class="codesample"><table><tr><td scope="row"><pre>kern_return_t kmem_alloc(vm_map_t map, vm_offset_t *addrp, vm_size_t  size);<span></span></pre></td></tr><tr><td scope="row"><pre>void kmem_free(vm_map_t map, vm_offset_t addr, vm_size_t size);<span></span></pre></td></tr><tr><td scope="row"><pre>kern_return_t mem_alloc_aligned(vm_map_t map, vm_offset_t *addrp,<span></span></pre></td></tr><tr><td scope="row"><pre>            vm_size_t size);<span></span></pre></td></tr><tr><td scope="row"><pre>kern_return_t kmem_alloc_wired(vm_map_t map, vm_offset_t *addrp,<span></span></pre></td></tr><tr><td scope="row"><pre>            vm_size_t size);<span></span></pre></td></tr><tr><td scope="row"><pre>kern_return_t kmem_alloc_pageable(vm_map_t map, vm_offset_t *addrp,<span></span></pre></td></tr><tr><td scope="row"><pre>            vm_size_t size);<span></span></pre></td></tr><tr><td scope="row"><pre>kern_return_t kmem_alloc_contig(vm_map_t map, vm_offset_t *addrp,<span></span></pre></td></tr><tr><td scope="row"><pre>            vm_size_t size, vm_offset_t mask, int flags);<span></span></pre></td></tr></table></div>
+<p>These functions all take a map as the first argument. Unless
+you need to allocate memory in a different map, you should pass <code>kernel_map</code> for
+this argument.</p>
+<p>All of the <code><!--a-->kmem_alloc<!--/a--></code> functions
+except <code><!--a-->kmem_alloc_pageable<!--/a--></code> allocate
+wired memory. The function <code><!--a-->kmem_alloc_pageable<!--/a--></code> creates
+the appropriate VM structures but does not back the region with
+physical memory. This function could be combined with <a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1171"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1172"></a><code><!--a-->vm_map_copyout<!--/a--></code> when creating
+a new address map, for example. In practice, it is rarely used.</p>
+<p>The function <a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1173"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1174"></a><code><!--a-->kmem_alloc_aligned<!--/a--></code> allocates
+memory aligned according to the value of the <code>size</code> argument,
+which must be a power of 2.</p>
+<p>The function <code><!--a-->kmem_alloc_wired<!--/a--></code><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1175"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1176"></a> is
+synonymous with <a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1177"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1178"></a><code><!--a-->kmem_alloc<!--/a--></code> and
+is appropriate for data structures that cannot be paged out. It
+is not strictly necessary; however, if you explicitly need certain
+pieces of data to be wired, using <code><!--a-->kmem_alloc_wired<!--/a--></code> makes
+it easier to find those portions of your code.</p>
+<p>The function <a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1179"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1180"></a><code><!--a-->kmem_alloc_contig<!--/a--></code> attempts
+to allocate a block of physically contiguous memory. This is not
+always possible, and requires a full sort of the system free list
+even for short allocations. After startup, this sort can cause long
+delays, particularly on systems with lots of RAM. You should generally
+not use this function.</p>
+<p>The function <a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1181"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1182"></a><code><!--a-->kmem_free<!--/a--></code> is
+used to free an object allocated with one of the <code><!--a-->kmem_alloc<!--/a--></code> functions.
+Unlike the standard C <code><a href="../../../Reference/ManPages/man3/free.3.html#//apple_ref/doc/man/3/free" target="_top">free</a></code> function, <code><!--a-->kmem_free<!--/a--></code> requires
+the length of the object. If you are not allocating fixed-size objects
+(for example, <code>sizeof struct foo</code>),
+you may have to do some additional bookkeeping, since you must free
+an entire object, not just a portion of one.</p>
+<a name="//apple_ref/doc/uid/TP30000905-CH210-TPXREF108" title="Allocating Memory From the I/O Kit"></a><h3>Allocating Memory From the
+I/O Kit</h3>
+<p>Although the I/O Kit is generally beyond the scope of this
+document, the I/O Kit memory management routines are presented here
+for completeness. In general, I/O Kit routines should not be used
+outside the I/O Kit. Similarly, Mach allocation routines should
+not be directly used from the I/O Kit because the I/O Kit has abstractions
+for those routines that fit the I/O Kit development model more closely.</p>
+<p>The I/O Kit includes the following routines for kernel memory
+allocation:<a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1183"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1184"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1185"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1186"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1187"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1188"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1189"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1190"></a></p>
+<div class="codesample"><table><tr><td scope="row"><pre>void *IOMalloc(vm_size_t size);<span></span></pre></td></tr><tr><td scope="row"><pre>void *IOMallocAligned(vm_size_t size, vm_size_t alignment);<span></span></pre></td></tr><tr><td scope="row"><pre>void *IOMallocContiguous(vm_size_t size, vm_size_t alignment,<span></span></pre></td></tr><tr><td scope="row"><pre>            IOPhysicalAddress *physicalAddress);<span></span></pre></td></tr><tr><td scope="row"><pre>void *IOMallocPageable(vm_size_t size, vm_size_t alignment);<span></span></pre></td></tr><tr><td scope="row"><pre>void IOFree(void *address, vm_size_t size);<span></span></pre></td></tr><tr><td scope="row"><pre>void IOFreeAligned(void *address, vm_size_t size);<span></span></pre></td></tr><tr><td scope="row"><pre>void IOFreeContiguous(void *address, vm_size_t size);<span></span></pre></td></tr><tr><td scope="row"><pre>void IOFreePageable(void *address, vm_size_t size);<span></span></pre></td></tr></table></div>
+<p><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1191"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1192"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1193"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1194"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1195"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1196"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1197"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1198"></a>Most
+of these routines are relatively transparent wrappers around the
+Mach allocation functions. There are two major differences, however.
+First, the caller does not need to know which memory map is being
+modified. Second, they have a separate free call for each allocation
+call for internal bookkeeping reasons.</p>
+<p>The functions <code><a href="../../../Reference/KernelIOKitFramework/IOLib_h/index.html#//apple_ref/c/func/IOMallocContiguous" target="_top">IOMallocContiguous</a></code><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1199"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1200"></a> and <a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1201"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1202"></a><code><a href="../../../Reference/KernelIOKitFramework/IOLib_h/index.html#//apple_ref/c/func/IOMallocAligned" target="_top">IOMallocAligned</a></code> differ
+somewhat from their Mach underpinnings. <code><a href="../../../Reference/KernelIOKitFramework/IOLib_h/index.html#//apple_ref/c/func/IOMallocAligned" target="_top">IOMallocAligned</a></code> uses
+calls directly to Mach VM to add support for arbitrary (power of
+2) data alignment, rather than aligning based on the size of the
+object. <code><a href="../../../Reference/KernelIOKitFramework/IOLib_h/index.html#//apple_ref/c/func/IOMallocContiguous" target="_top">IOMallocContiguous</a></code> adds
+an additional parameter, <code>PhysicalAddress</code>.
+If this pointer is not <code>NULL</code>,
+the physical address is returned through this pointer. Using Mach
+functions, obtaining the physical address requires a separate function
+call.</p>
+<div class="importantbox"><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_14" title="Important:"></a><p><strong>Important:</strong>&nbsp;
+If your KEXT allocates memory that will be shared,
+you should create a buffer of type <code><a href="../../../Reference/KernelIOKitFramework/IOMemoryDescriptor_h/Classes/IOMemoryDescriptor/index.html#//apple_ref/cpp/cl/IOMemoryDescriptor" target="_top">IOMemoryDescriptor</a></code><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1203"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1204"></a> or <code><a href="../../../Reference/KernelIOKitFramework/IOBufferMemoryDescriptor_h/Classes/IOBufferMemoryDescriptor/index.html#//apple_ref/cpp/cl/IOBufferMemoryDescriptor" target="_top">IOBufferMemoryDescriptor</a></code><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1205"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1206"></a> and
+specify that the buffer should be sharable. If you are allocating
+memory in a user application that will be shared with the kernel,
+you should use <code><a href="../../../Reference/ManPages/man3/valloc.3.html#//apple_ref/doc/man/3/valloc" target="_top">valloc</a></code><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1207"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1208"></a> or <a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1209"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1210"></a><code><!--a-->vm_allocate<!--/a--></code> instead
+of <code><a href="../../../Reference/ManPages/man3/malloc.3.html#//apple_ref/doc/man/3/malloc" target="_top">malloc</a></code> and
+then call <a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1211"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1212"></a><code><!--a-->mach_make_memory_entry_64<!--/a--></code>.<a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1213"></a><a name="//apple_ref/doc/uid/TP30000905-CH210-DontLinkElementID_1214"></a></p><p></p></div>
+
+        <br /><br /> 
+        
+        <div class="mini_nav_text" align="left">
+        <span class="navButtons">
+        <a href="../Mach/Mach.html">&lt; Previous Page</a><span style="margin-left: 8px"><a href="../scheduler/scheduler.html">Next Page &gt;</a></span>
+        </span>
+        <span id="showHideTOCLowerSpan">
+        <a href="#" onclick="showHideTOC();"><img src="../../../../Resources/Images/show_toc_icon.gif" width="15" height="14" border="0" style="margin-bottom: -2px;" alt="" /></a> <a href="#" onclick="showHideTOC();">Hide TOC</a>
+        </span>
+        </div>
+
+        <br/><hr /><div align="center"><p class="content_text" lang="en" dir="ltr"> <!--#if expr="0=1" -->&#x00a9; 2002, 2006 Apple Computer, Inc. All Rights Reserved. &#40;<!--#endif -->Last updated: 2006-11-07<!--#if expr="0=1" -->&#041;<!--#endif --></p></div>
+
+        
+        <div class="hideOnPrint hideInXcode">
+        <!-- start of footer -->
+        	<table width="100%" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/documentation/Darwin/Conceptual/KernelProgramming/vm/vm.html%3Fid%3DTP30000905-5.7&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/documentation/Darwin/Conceptual/KernelProgramming/vm/vm.html%3Fid%3DTP30000905-5.7&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/documentation/Darwin/Conceptual/KernelProgramming/vm/vm.html%3Fid%3DTP30000905-5.7&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+
+        <!--#include virtual="/includes/framesetfooter" -->
+        <!-- end of footer -->
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,255 @@
+<html><head><title>Answers to Common Design Questions</title></head>
+<body bgcolor="#ffffff">
+
+<!--start of banner -->
+<!--#include virtual="/includes/framesetheader" -->
+<!-- end of banner -->
+
+<!--start of path -->
+<font face="Geneva,Helvetica,Arial" size="1">
+<b>PATH<spacer type="horizontal" size="5">&nbsp;</b>
+ <a href="../../../../../webobjects.html" target="_top">WebObjects 4.0 Documentation</a> <b>&gt;</b>
+ <a href="GuideTOC.html" target="_top">EOF Developer's Guide</a>
+</font>
+<br><br>
+<!--end of path -->
+
+ 
+<a href="FAQ.html"><IMG SRC="ArrowUp.gif">Table of Contents</a> <a href="FAQ1.html"><IMG SRC="ArrowLeft.gif">Previous Section</a>
+ 
+<a name="256">
+<h1> How Do I Generate Primary Keys?</h1>
+</a><a name="258">
+Enterprise Objects Framework requires you to specify a primary key for each entity in a model. In applications that create new enterprise objects to insert into a database, unique values must be generated and assigned to an object's primary key. The Framework typically does this for you, but you can override or customize its default behavior.<p>
+</a><a name="5311">
+<B>Note: </B> Enterprise Objects Framework doesn't support modifiable primary key values-you shouldn't design your application so that users can change a primary key's value. If you really need this behavior, you have to implement it by deleting an affected object and reinserting it with a new primary key.<p>
+</a><a name="1102">
+<h2> Defining a Primary Key</h2>
+</a><a name="1118">
+When designing a database, keep the following tips in mind for defining primary keys:<p>
+</a><ul><a name="1138">
+<p><li>Don't use floating point values such as doubles and dates because they aren't precise in equality tests.
+</a><a name="1119">
+<p><li>Use integer or 12 byte binary primary keys when you want Enterprise Objects Framework to generate primary key values automatically. For more information on the format of 12 byte primary keys, see the constructor description (or the method description for <strong>assignGloballyUniqueBytes:</strong> in Objective-C) in the EOTemporaryGlobalID class specification in the <em>Enterprise Objects Framework Reference</em>.
+</a><a name="1109">
+<p><li>Try to avoid using compound keys. A compound key incurs additional overhead in not only its entity but also in related entities: the destination entities of all to-one relationships must contain an attribute for each primary key attribute in the source. In addition, you can't use Enterprise Objects Framework's automatic primary key generation mechanism for compound primary keys.
+</a></ul><ul><a name="1122">
+<li>You can improve the efficiency of enterprise object inheritance support by encoding the class of an object in its primary key. When the class of an object is encoded in its key and you implement the EOModelGroup delegate method to tell the Framework the subentity and subclass for a key, Enterprise Objects Framework creates a more efficient fault for the object than it would otherwise. Try to encode the class of an object in a large integer or binary key instead of using a compound key. For more information, see the section<a href="EOsII3.html#4474"> "Delegation Hooks for Optimizing Inheritance"</a> in the "<a href="EOsII.html#14046">Advanced Enterprise Object Modeling</a>" chapter.
+</a></ul><a name="261">
+<h2> Generating Primary Key Values</h2>
+</a><a name="3374">
+There are four ways to provide primary key values for enterprise objects:<p>
+</a><ol>
+<a name="3375">
+<P><li><em>An enterprise object can provide its own primary key value.</em> With this approach, the primary key must be a class property of the object. If the primary key value of an object is <strong>null</strong> (<strong>nil</strong> in Objective-C) or zero when the Framework attempts to insert it, the Framework falls back on one of the other mechanisms to provide the value.
+</a><a name="276">
+<P><li><em>An EODatabaseContext's delegate provides a primary key value.</em> If the EODatabaseContext that's inserting an enterprise object has a delegate, and if the delegate has a method called <strong>databaseContextNewPrimaryKey</strong> (<strong>databaseContext:newPrimaryKeyForObject:entity:</strong> in Objective-C) that returns a non-<strong>null</strong> (non-<strong>nil</strong>) value, the Framework uses the returned object as the primary key value.
+</a><a name="277">
+<P><li><em>A database stored procedure provides a primary key value.</em> If an enterprise object's entity has a stored procedure assigned to the NextPrimaryKeyProcedureOperation, the Framework invokes the stored procedure and uses the result as the primary key value.
+</a><a name="279">
+<P><li><em>Your adaptor provides a primary key value using a database-specific mechanism.</em> Each adaptor provides a database-specific implementation of the method <strong>primaryKeyForNewRowWithEntity</strong> (<strong>primaryKeyForNewRowWithEntity:</strong> in Objective-C) that provides unique values for primary key attributes.
+</a><a name="3008">
+<p>This is the technique used when your primary keys are integers. However, as described in the preceding section, when you want Enterprise Objects Framework to generate primary keys, you can also use 12 byte NSDatas. The difference is that integer primary keys are fetched from the database, whereas NSData keys are generated on the client (see the EOTemporaryGlobalID class specification in the <em>Enterprise Objects Framework Reference</em> for more information). Consequently, using 12 byte NSDatas is faster, but integer primary keys have the advantage of being more readable.<p>
+</a></ol>
+<a name="281">
+If the Framework can't assign a primary key using one of the mechanisms above, it throws an exception.<p>
+</a><a name="282">
+The following sections provide more information on when and how to use each mechanism.<p>
+</a><a name="283">
+<h3> When the Enterprise Object Provides the Key</h3>
+</a><a name="284">
+An enterprise object generally provides its own primary key value when the primary key is meaningful to users-a social security number, account number, or part number, for example. In some cases, the user provides the primary key value by entering it in the user interface. In other cases, the enterprise object generates its own unique primary key value. For example, a Part object's primary key could encode the part's type, the plant from which it came, and the batch in which it was made. Although generated, part numbers may still be meaningful to users if they use them to identify parts.<p>
+</a><a name="286">
+To specify that an enterprise object provides its own key, you must set the primary key attributes as class properties in the object's entity. Your enterprise object class should provide an instance variable or accessor methods for each of the primary key attributes. If you want to provide the primary key value for a newly created enterprise object, be sure to assign it before the object is saved.<p>
+</a><a name="5356">
+<B>Note: </B> In the case of Number objects (NSNumbers in Objective-C), don't set the value to zero unless you intend to have the primary key generated. See the section<a href="FAQ2.html#3408"> "Why is EOF Generating Primary Key Values for Number Objects Set to Zero?"</a> below for details.)<p>
+</a><a name="5363">
+If an enterprise object generates its own primary key value programmatically, you must generate and assign it in an appropriate method. You could, for example, provide a primary key value when the &#32;object is first instantiated by implementing the method <strong>awakeFromInsertion</strong> (<strong>awakeFromInsertionInEditingContext:</strong> in Objective-C).<p>
+</a><a name="5367">
+On the other hand, if your application's user interface provides a way for the user to enter primary key values, you don't need to handle them any differently than you handle the object's other properties. For example, if &#32;an application uses social security numbers as the primary keys for employees, it must provide a way for users to enter them. The interface layer of the Framework takes care of assigning the user-provided value to the object.<p>
+</a><a name="5380">
+The disadvantage of letting users enter primary key values is that there's a chance for data-entry error and the possibility that the object's primary key will need to be modified later. Since Enterprise Objects Framework doesn't support modifiable primary keys, you have to delete an object and reinsert it with a new primary key value to change its primary key. It's generally better to define a "meaningless" primary key to use instead.<p>
+</a><a name="5364">
+<h3> When the EODatabaseContext Delegate <br>Provides the Key</h3>
+</a><a name="291">
+An EODatabaseContext's delegate is given an opportunity to provide a primary key value for enterprise objects that don't already have one. This is the most commonly used mechanism in applications that don't use the adaptor's database-specific primary key generation mechanism. You might use the delegate to provide primary key values when you want to avoid making a trip to the database. For example, you might implement this method to generate globally unique identifiers based on an IP &#32;address and a time stamp.<p>
+</a><a name="292">
+To allow your EODatabaseContext's delegate to provide primary keys, implement the method <strong>databaseContextNewPrimaryKey </strong>(<strong>databaseContext:newPrimaryKeyForObject:entity:</strong> in Objective-C). An &#32;EODatabaseContext sends this method to its delegate when a newly &#32;inserted enterprise object doesn't have a primary key value. If &#32;the &#32;delegate is not implemented or returns <strong>null</strong> (<strong>nil</strong>), the EODatabaseContext gets a primary key by invoking a stored procedure &#32;or using its adaptor's database-specific mechanism.<p>
+</a><a name="294">
+<h3> When a Database Stored Procedure Provides the Key</h3>
+</a><a name="295">
+You typically use a stored procedure to provide primary key values when you need to override the adaptor's database-specific mechanism but still need to make a trip to the database to generate values.<p>
+</a><a name="296">
+To use a stored procedure to provide primary key values, you must define the stored procedure in your model. Stored procedures are read from the database when you create a new model and included in the model's <strong>.eomodeld</strong> file. You can also add stored procedures in EOModeler using the Stored Procedure view of the Model Editor.<p>
+</a><a name="298">
+After defining the stored procedure, you assign it to an entity. You can set it in EOModeler: In the Stored Procedure Inspector, type the name of the stored procedure in the Get PK field. Alternatively, you can set it programmatically using EOEntity's <strong>setStoredProcedure</strong> method (<strong>setStoredProcedure:forOperation:</strong> in Objective-C). For more information on defining stored procedures and assigning them to entities, see the section<a href="FAQ4.html#554"> "How Do I Invoke a Stored Procedure?"</a>.<p>
+</a><a name="299">
+<h3> When the Adaptor Provides the Key</h3>
+</a><a name="302">
+Each adaptor provides a database-specific mechanism for generating primary keys. Unless you specify one of the other four mechanisms, Enterprise Objects Framework automatically uses the adaptor's mechanism.<p>
+</a><a name="303">
+Each adaptor provides an implementation of the method <strong>primaryKeyForNewRowWithEntity</strong> (<strong>primaryKeyForNewRowWithEntity:</strong> in Objective-C). When invoked, this method returns a unique primary key value. For example, the Oracle adaptor uses Oracle sequences to generate unique values.<p>
+</a><a name="304">
+To use the adaptor's database-specific mechanism, you must be sure that your database accommodates the adaptor's scheme. The primary keys of the affected tables must be simple (that is, they can't be compound primary keys), and they must be number types. <p>
+</a><a name="1130">
+To modify your database so that it supports the adaptor's mechanism for generating primary keys:<p>
+</a><ol>
+<a name="305">
+<P><li>In EOModeler's Model Editor, select the entities for which you want the adaptor to generate primary key values. 
+</a><a name="1128">
+<P><li>Choose Property &#181; Generate SQL. 
+</a><a name="1131">
+<P><li>In the SQL Generation panel that appears, check the "Create Primary Key Support" box as well as any of the others that you might need.
+</a></ol>
+<a name="306">
+The following sections describe the support added to your database for &#32;each of Enterprise Objects Framework's adaptors.<p>
+</a><a name="309">
+ Informix and Sybase<p>
+</a><a name="310">
+The Informix and Sybase adaptor use the same approach to generating primary key values. Both adaptors use a table named eo_sequence_table to keep track of the next available primary key value for a given table. The table contains a row for each table for which the adaptor provides primary key values.<p>
+</a><a name="311">
+The statements used to create the eo_sequence_tables are: 
+<Table Border="3">
+<caption></caption>
+<tr><th><a name="4324">
+Informix
+</a></th><th><a name="4326">
+Sybase
+</a></th></tr>
+<tr><td scope="row"><a name="4328">
+create table eo_sequence_table<br>(table_name varchar(32, 0),<br>counter integer)
+</a></td><td><a name="4331">
+create table eo_sequence_table <br>(table_name varchar(32),<br>counter int null)
+</a></td></tr>
+
+</Table>
+
+<Table>
+<tr><td scope="row">
+</Table>
+<p>
+</a><a name="314">
+The adaptors use a stored procedure called eo_pk_for_table to access and maintain the primary key counters in eo_sequence_table. The stored procedures are defined as follows: 
+<Table Border="3">
+<caption></caption>
+<tr><th><a name="4666">
+Informix
+</a></th><th><a name="4668">
+Sybase
+</a></th></tr>
+<tr><td scope="row"><a name="4670">
+create procedure
+</a><a name="4671">
+eo_pk_for_table (tname varchar(32))
+</a><a name="4672">
+returning int;<br>define cntr int;
+</a><a name="4673">
+<br>update EO_SEQUENCE_TABLE<br>set COUNTER = COUNTER + 1<br>where TABLE_NAME = tname;<br><br>select COUNTER into cntr<br>from EO_SEQUENCE_TABLE<br>where TABLE_NAME = tname;<br><br>return cntr;
+</a><a name="4674">
+end procedure;
+</a></td><td><a name="4678">
+create procedure
+</a><a name="4679">
+eo_pk_for_table @tname varchar(32) as
+</a><a name="4680">
+begin<br>declare @max int
+</a><a name="4681">
+<br>update eo_sequence_table<br>set counter = counter + 1<br>where table_name = @tname<br><br>select counter<br>from eo_sequence_table<br>where table_name = @tname
+</a><a name="4695">
+
+</a><a name="4682">
+end
+</a></td></tr>
+
+</Table>
+
+<Table>
+<tr><td scope="row">
+</Table>
+<p>
+</a><a name="318">
+The stored procedures increment the counter in the eo_sequence_table row for the specified table, select the counter value, and return it. The Informix and Sybase adaptor's <strong>primaryKeyForNewRowWithEntity</strong> methods execute the eo_pk_for_table stored procedure and return the stored procedure's return value.<p>
+</a><a name="319">
+ ODBC<p>
+</a><a name="320">
+The approach taken by the ODBC adaptor is very similar to that of the Informix and Sybase adaptors. The ODBC adaptor uses a table named EO_PK_TABLE to keep track of the next available primary key value for a table, but the ODBC adaptor can create this table on demand. (The Informix and Sybase adaptors do not create the table and corresponding stored procedures. Rather, you create them ahead of time using the SQL Generation panel in EOModeler.)<p>
+</a><a name="321">
+The ODBC adaptor's <strong>primaryKeyForNewRowWithEntity</strong> method attempts to select a value from the EO_PK_TABLE for the new row's table. If the attempt fails because the table doesn't exist, the adaptor creates the table using the following SQL statement:<p>
+</a><pre><a name="323">CREATE TABLE EO_PK_TABLE (
+</a><a name="324">	NAME <em>TEXT_TYPE</em>(40),
+</a><a name="327">	PK <em>NUMBER_TYPE
+</em></a><a name="328">)
+</a></pre><a name="329">
+where <em>TEXT_TYPE</em> is the external (database) type for characters and <em>NUMBER_TYPE</em> is the external type for the table's primary key attribute. The ODBC adaptor sets the PK value for each row to the corresponding table's maximum primary key value plus one. After determining a primary key value for the new row, the ODBC adaptor updates the counter in the corresponding row in EO_PK_TABLE.<p>
+</a><a name="334">
+ Oracle<p>
+</a><a name="335">
+The Oracle adaptor uses sequence objects to provide primary key values. It creates a sequence using the following SQL statement:<p>
+</a><pre><a name="336">create sequence <em>table</em>_SEQ
+</a></pre><a name="337">
+where <em>table</em> is the name of a table for which the adaptor provides primary key values. The adaptor sets the sequence start value to the corresponding table's maximum primary key value plus one.<p>
+</a><a name="3236">
+<h2> Why Can't I Use Identity Columns?</h2>
+</a><a name="339">
+Some databases provide mechanisms that automatically generate primary key values. For example, Sybase allows you to specify <em>identity</em> columns that automatically replace nulls with unique values. In databases that don't provide identity columns, you can define <em>triggers</em> to produce the same result. These mechanisms are very useful when users interact directly with the database using SQL. However, they are difficult to use in applications that mediate between users and a database. You shouldn't use them in applications built with Enterprise Objects Framework.<p>
+</a><a name="340">
+Suppose that a database application allowed you to insert a row without providing a primary key value. An identity column or database trigger could generate an identifying value for the row, but the corresponding application object wouldn't have the value. The application could attempt to fetch the object using the values provided by the user, but a query that doesn't specify a primary key value might return more than one row. As a result, the application can't guarantee that it will be able to associate the current object with a row in the database. For this reason, Enterprise Objects Framework requires that you assign a primary key value to an object before it's inserted in the database.<p>
+</a><a name="3408">
+<h2> Why is EOF Generating Primary Key Values for Number Objects Set to Zero?</h2>
+</a><a name="3409">
+The EODatabaseContext assumes that an Number object (NSNumber in Objective-C) with a single attribute primary key value set to zero is a newly created instance, and therefore, will attempt to generate the primary key. This behavior allows you to use scalar data types (such as <strong>int</strong>) as an object's primary key, and still rely on automatic primary key generation.<p>
+</a><a name="3410">
+This can cause problems if you have an existing database containing rows that use zero as the primary key value. The EODatabaseContext will incorrectly assume that an object created from that row needs a new primary key. This behavior may result in invalid foreign key references in other tables of your database.<p>
+</a><a name="3411">
+To alter this behavior, assign a delegate to the EODatabaseContext object and implement the <strong>databaseContextNewPrimaryKey</strong> delegate method (<strong>databaseContext:newPrimaryKeyForObject:entity:</strong> in &#32;Objective-C) to return a Number object of value zero if the primary key should remain zero (an NSNumber in Objective-C), otherwise return<strong> null</strong> (<strong>nil</strong>). Returning <strong>null</strong> will tell EOF to find another way to generate the primary key value as described above.<p>
+</a><a name="341">
+<h2> Summary</h2>
+</a><a name="342">
+The following table summarizes the primary key generation options you have to choose from. 
+<Table Border="3">
+<caption></caption>
+<tr><th><a name="4703">
+Mechanism
+</a></th><th><a name="4705">
+ Primary Use
+</a></th></tr>
+<tr><td scope="row"><a name="4707">
+Object provides its own value
+</a></td><td><a name="4709">
+When the primary key value is meaningful to users and is displayed in the application's user interface.
+</a></td></tr>
+<tr><td scope="row"><a name="4711">
+EODatabaseContext delegate method
+</a></td><td><a name="4713">
+When you don't want to use the adaptor's mechanism.
+</a></td></tr>
+<tr><td scope="row"><a name="4715">
+Stored procedure
+</a></td><td><a name="4717">
+When you want to use your own stored procedure to provide primary key values.
+</a></td></tr>
+<tr><td scope="row"><a name="4719">
+Adaptor's mechanism
+</a></td><td><a name="4721">
+When the primary key is a simple (not &#32;compound), numeric value that is &#32;not &#32;meaningful to users.
+</a></td></tr>
+
+</Table>
+
+<Table>
+<tr><td>
+</Table>
+<p>
+</a>
+<P>
+ 
+<a href="FAQ.html"><IMG SRC="ArrowUp.gif">Table of Contents</a> <a href="FAQ3.html"><IMG SRC="ArrowRight.gif">Next Section</a>
+<P>
+
+
+<!--start of footer -->
+<!--#include virtual="/includes/framesetfooter" -->
+<!-- end of footer -->
+
+</body>
+</html>

@@ -1,0 +1,128 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+<head>
+	<title>I/O Kit Device Driver Design Guidelines: Displaying Localized Information About Drivers</title>
+	<meta id="Generator" name="Generator" content="Gutenberg"/>
+	<meta id="GeneratorVersion" name="GeneratorVersion" content="v132"/>
+	<meta http-equiv="content-type" content="text/html;charset=utf-8"/>
+	<meta id="Copyright" name="Copyright" content="Copyright 2009 Apple Inc. All Rights Reserved."/>
+	<meta id="IndexTitle" name="IndexTitle" content="Displaying Localized Information About Drivers"/>
+	<meta id="xcode-display" name="xcode-display" content="render"/>
+	<meta id="toc-file" name="toc-file" content="../toc.html"/>
+	<meta id="RESOURCES" content="../../../../Resources" />
+	
+	<link rel="stylesheet" type="text/css" href="../../../../Resources/CSS/frameset_styles.css"/>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/lib/prototype.js"></script>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/lib/scriptaculous.js"></script>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/page.js"></script>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/pedia.js"></script>
+	<!--[if lte IE 6]>
+		<style type="text/css">
+			/*<![CDATA[*/ 
+			html {overflow-x:auto; overflow-y:hidden;  }
+			/*]]>*/
+		</style>
+	<![endif]-->
+</head>    
+<body bgcolor="#ffffff" onload="initialize_page();"><a name="//apple_ref/doc/uid/TP30000700" title="Displaying Localized Information About Drivers"></a>
+    <noscript>
+    <div id="tocMenu">
+        <iframe id="toc_content" name="toc_content" SRC="../toc.html" width="210" height="100%" align="left" frameborder="0">This document set is best viewed in a browser that supports iFrames.</iframe>
+    </div>
+    </noscript>
+    <div id="bodyText">
+        <a name="top"></a>
+        <div class="hideOnPrint hideInXcode">
+        <!-- start of header -->
+        <!--#include virtual="/includes/framesetheader" -->
+        <!-- end of header -->
+        </div>
+        
+        <!-- start of path -->
+<div class="breadcrumb hideOnPrint hideInXcode"><a href="http://developer.apple.com/" target="_top">ADC Home</a> &gt; <a href="../../../../../referencelibrary/index.html#//apple_ref/doc/uid/TP30000943" target="_top">Reference Library</a> &gt; <a href="../../../../index.html#//apple_ref/doc/uid/TP30000440" target="_top">Guides</a> &gt; <a href="../../../../HardwareDrivers/index.html#//apple_ref/doc/uid/TP30000440-TP40003576" target="_top">Hardware &amp; Drivers</a> &gt; <a href="../Introduction/Intro.html#//apple_ref/doc/uid/TP40002799-TPXREF101">I/O Kit Device Driver Design Guidelines</a> &gt; </div><br class="hideInXcode"/><!-- end of path -->
+        
+        <div class="mini_nav_text" align="left">
+        <span class="navButtons">
+        <a href="../KernelUserNotification/KernelUserNotification.html">&lt; Previous Page</a><span style="margin-left: 8px"><a href="../DebuggingDrivers/DebuggingDrivers.html">Next Page &gt;</a></span>
+        </span>
+        <span id="showHideTOCUpperSpan">
+        <a href="#" onclick="showHideTOC();"><img src="../../../../Resources/Images/show_toc_icon.gif" width="15" height="14" border="0" style="margin-bottom: -2px;" alt="" hideText="Hide TOC" showText="Show TOC" /></a> <a href="#" onclick="showHideTOC();">Hide TOC</a>
+        </span>
+        </div>
+
+        <hr />
+        
+        
+        <a name="//apple_ref/doc/uid/TP30000700-BBCJHBHB" title="Displaying Localized Information About Drivers"></a><h1>Displaying Localized Information About Drivers</h1><p>A frequently repeated fact in Darwin documentation is that a kernel extension is a bundle. What does this mean, and what are the implications?</p><p><a name="//apple_ref/doc/uid/TP30000700-DontLinkElementID_485"></a>A bundle is a directory with a strictly defined internal structure that (usually) contains executable code and the resources that support that code. A bundle<a name="//apple_ref/doc/uid/TP30000700-DontLinkElementID_486"></a> on Mac OS X is the primary form of packaging for executables in the file system. Applications and frameworks are bundles, as are all other loadable bundles such as kernel extensions. Although some executables are not bundles—most notably command-line tools, some libraries, and CFM-PEF applications—they are definitely in the minority. The Finder presents most bundles to users opaquely, as a file. </p><p>A bundle can be programmatically represented by a NSBundle object (for Cocoa code) or by a CFBundle opaque type (for all other application environments). The APIs of NSBundle and CFBundle permit your executable to access and manipulate the resources in the represented bundle.</p><p>Among the benefits that the bundle form of packaging brings to executables is internationalization<a name="//apple_ref/doc/uid/TP30000700-DontLinkElementID_487"></a>. Internationalization is the mechanism by which executables on Mac OS X store localized resources in bundles and access them in order to present them in a graphical user interface. <a name="//apple_ref/doc/uid/TP30000700-DontLinkElementID_488"></a>Localized resources are those that have been translated and adapted to particular languages and locales; text, images, and sounds are among the resources that are frequently localized. Mac OS X attempts to present those localizations that match a language preference of the user.</p><p>Device drivers and other kernel extensions occasionally need to have localized information displayed to users during tasks that require user input, such as configuration and installation. But you should remember that kernel extensions are a different breed of bundle. The executable code in these bundles is loaded into the kernel and kernel code, by definition, does not play a direct role in user interfaces. <a name="//apple_ref/doc/uid/TP30000700-DontLinkElementID_489"></a>If a kernel extension contains localized resources for display, it must have a user-space agent to do the displaying for it. In many cases, the kernel extension will have a helper application or preference pane to present the localized user interface.</p><p>One might ask: why not put all localized resources in the helper application instead of the kernel extension? Doing so would seem to make it easier to locate the resources. That may be true when there is only one kernel extension per helper application. But typically a helper application is responsible for a family of kernel extensions, both current and anticipated products. If the application is to contain all localized resources, it must have prior knowledge of every kernel extension it might display information about. Because this is impractical, it makes more sense for a kernel extension to encapsulate its own localizations.</p><p>This section provides an overview of internationalizing kernel extensions and describes the special APIs and procedures that code in user space must use to access localized resources stored in these bundles.<a name="//apple_ref/doc/uid/TP30000700-DontLinkElementID_490"></a></p><div class="importantbox"><a name="//apple_ref/doc/uid/TP30000700-DontLinkElementID_74" title="Important:"></a><p><strong>Important:</strong>&nbsp;The Kernel–User Notification Center (KUNC) enables a kernel extension to display a dialog that can have a fairly sophisticated set of user-interface elements and whose text, images, and sounds can be localized. You must internationalize the bundle containing these localized resources, but you need only use the KUNC APIs to have them displayed. For more on the KUNC facility, see <span class="content_text"><a href="../KernelUserNotification/KernelUserNotification.html#//apple_ref/doc/uid/TP30000699-BAJIIAGJ">“Kernel–User Notification.”</a></span> </p><p></p></div>
+<!-- This template is being used for both PDF and HTML. -->
+
+    
+    <h4>In this section:</h4>
+    
+    
+    <p class="blockquote">
+    
+        
+			
+			
+				<a href="InternationalizingDrivers.html#//apple_ref/doc/uid/TP30000700-TPXREF101">Internationalizing Kernel Extensions</a>
+				
+			<br/>
+			
+        
+			
+			
+				<a href="InternationalizingDrivers.html#//apple_ref/doc/uid/TP30000700-TPXREF102">Getting the Path to a KEXT From User Space</a>
+				
+			<br/>
+			
+        
+
+    </p><br/>
+
+<a name="//apple_ref/doc/uid/TP30000700-TPXREF101" title="Internationalizing Kernel Extensions"></a><h2>Internationalizing Kernel Extensions</h2><p><a name="//apple_ref/doc/uid/TP30000700-DontLinkElementID_491"></a><a name="//apple_ref/doc/uid/TP30000700-DontLinkElementID_492"></a>Internationalizing your kernel extension is a fairly painless process. You need to set up your project files in a certain way and you may need to modify code. Of course, you must have localized resources to put into your project. This means someone must complete all necessary translations and adaptations of the following resources:</p><ul class="ul"><li class="li"><p>Images (for example, the equivalent of a U.S. stop sign in other cultures)</p></li><li class="li"><p>Sounds (for example, a recorded voice speaking a phrase)</p></li><li class="li"><p>Long text files (for example, an HTML help file)</p></li><li class="li"><p>Nib files (user-interface archives created by the Interface Builder application)</p></li><li class="li"><p>Strings that appear in the user interface (for example, titles of buttons and text fields)</p></li></ul><p>This section summarizes the steps you must follow to internationalize your kernel extension. For all single-file resources such as images, sounds, nib files, and help files, internationalization is a simple matter of putting the resource files in certain subdirectories of the kernel extension. In your user-space code, you may then have to use CFBundle (or NSBundle) APIs to obtain a path to a resource file in the current localization prior to loading that resource. The procedure for internationalizing user-interface strings is a bit more involved; this procedure is summarized in <span class="content_text"><a href="InternationalizingDrivers.html#//apple_ref/doc/uid/TP30000700-BBCGFFFG">“Internationalizing Strings.”</a></span></p><div class="notebox"><a name="//apple_ref/doc/uid/TP30000700-DontLinkElementID_75" title="Note"></a><p><strong>Note:</strong>&nbsp;The procedures for internationalizing bundles are introduced in <em><a href="../../../../MacOSX/Conceptual/OSX_Technology_Overview/index.html#//apple_ref/doc/uid/TP40001067" target="_top">Mac OS X Technology Overview</a></em>.  For more in-depth information, see <span class="content_text"><a href="../../../../Internationalization/index.html#//apple_ref/doc/uid/TP30001073" target="_top">Internationalization Documentation</a></span>.</p></div><a name="//apple_ref/doc/uid/TP30000700-BBCDAFDH" title="Creating and Populating the Localization Directories"></a><h3>Creating and Populating the Localization Directories</h3><p><a name="//apple_ref/doc/uid/TP30000700-DontLinkElementID_493"></a>If you looked at the internal structure of a simple internationalized kernel extension in the file system, you might see something like this:</p><div class="codesample"><table><tr><td scope="row"><pre>MyDriver.kext/<span></span></pre></td></tr><tr><td scope="row"><pre>    Contents/<span></span></pre></td></tr><tr><td scope="row"><pre>        MacOS/              // contains kernel binary<span></span></pre></td></tr><tr><td scope="row"><pre>        Resources/<span></span></pre></td></tr><tr><td scope="row"><pre>            Logo.tiff           // non-localized resource<span></span></pre></td></tr><tr><td scope="row"><pre>            en.lproj/<span></span></pre></td></tr><tr><td scope="row"><pre>                Stop.tiff       // English-localized resource<span></span></pre></td></tr><tr><td scope="row"><pre>            fr.lproj/<span></span></pre></td></tr><tr><td scope="row"><pre>                Stop.tiff       // French-localized resource<span></span></pre></td></tr></table></div><p>As you can see, a bundle’s resources go (logically enough) in the <code>Resources</code> subdirectory of the bundle. Resources at the top level of <code>Resources</code> are non-localized and thus are displayed in the user interface regardless of the logged-in user’s language preference. Localized resources (the two image files named <code>Stop.tiff</code> in the above examples) are put in subdirectories of <code>Resources</code>; each of these directories has an extension of <code>.lproj</code> and a name that is either the English name of a major language or an ISO 639 abbreviation for a language (such as “en”). The name can also have a suffix that is an ISO 3166 abbreviation for locale (for example, “en_US” for U.S. English). When an application needs to display a localized resource, Mac OS X gets the logged-in user’s language preferences—this is a sorted list of preferred languages set through the International pane of System Preferences—and goes down the list until it finds the first language matching one of the <code>.lproj</code> localization directories in the bundle. This is how the internationalization mechanism basically works.</p><p>You can create the internal localization structure of your bundle by hand, but it is more convenient to let the Project Builder application do much of the work for you. The procedure is fairly straightforward. In Project Builder:</p><ol class="ol"><li class="li"><p>Create a group for localized and non-localized resources.</p><p>Click the Files tab. Choose New Group from the Project menu and name the new group. (Go ahead, name it “Resources”.) </p></li><li class="li"><p>Add a resource to the group.</p><p>Choose Add Files from the Project menu. In the browser, locate and select a file containing a sound, image, text, or other resource. When this file appears in the Files pane of Project Builder, drag it into the Resources group, if necessary.</p></li><li class="li"><p>Mark the localization attribute of the file. </p><ol class="ol"><li class="ol ol"><p>Select the file and choose Show Info from the Project menu.</p></li><li class="ol ol"><p>From the Localization &amp; Platforms pop-up list, select Add Localized Variant.</p></li><li class="ol ol"><p>In the sheet that next appears, either select a language name from the combo box or, if the localization is for some other language, type the ISO 639 abbreviation in the text field. Click OK.</p></li><li class="ol ol"><p>If you later decide the resource should not be localized, select it and choose Make Global from the Localization &amp; Platforms pop-up list.</p></li></ol></li></ol><p>Complete the above procedure for every resource, localized and non-localized, that you want included in your project. When you build the project, Project Builder will create an <code>.lproj</code> directory for each localization and put all resources designated for that localization in the directory. The name and extension of the resource file must be exactly the same for each localization.<a name="//apple_ref/doc/uid/TP30000700-DontLinkElementID_494"></a><a name="//apple_ref/doc/uid/TP30000700-DontLinkElementID_495"></a></p><a name="//apple_ref/doc/uid/TP30000700-BBCGFFFG" title="Internationalizing Strings"></a><h3>Internationalizing Strings</h3><p><a name="//apple_ref/doc/uid/TP30000700-DontLinkElementID_496"></a><a name="//apple_ref/doc/uid/TP30000700-DontLinkElementID_497"></a><a name="//apple_ref/doc/uid/TP30000700-DontLinkElementID_498"></a>If an application gets the localized strings for its user interface from a nib file, you need only store localized nib files in each <code>.lproj</code> directory of the kernel extension to internationalize them. However, if an application is to display localized strings for a kernel extension <em>programmatically</em>, you need to have a strings file in each <code>.lproj</code> directory of the kernel extension. A strings file is so-called because its extension is <code>.strings</code>; the conventional name before the extension is <code>Localizable</code>, but this is not a requirement.</p><p>The format of a strings file is a simple key-value pairing for each string entry; the entry is terminated by a semicolon and a carriage return (that is, one entry per line). The key is a string in the development language; the value is the localized string. Between the key and the value is an equal sign. For example: </p><div class="codesample"><table><tr><td scope="row"><pre>/* a comment */<span></span></pre></td></tr><tr><td scope="row"><pre>/* "key" = "value"; */<span></span></pre></td></tr><tr><td scope="row"><pre>"Yes" = "Oui";<span></span></pre></td></tr><tr><td scope="row"><pre>"The same text in English" = "Le meme texte en francais";<span></span></pre></td></tr></table></div><p>Once you’ve created a localized strings file, put it in the appropriate <code>.lproj</code> directory (as described in <span class="content_text"><a href="InternationalizingDrivers.html#//apple_ref/doc/uid/TP30000700-BBCDAFDH">“Creating and Populating the Localization Directories”</a></span>). The next step is to modify the code of the application to display the localized string. At each point where a localized string is needed, use the macro <code><a href="../../../../CoreFoundation/Reference/CFBundleRef/Reference/reference.html#//apple_ref/doc/c_ref/CFCopyLocalizedString" target="_top">CFCopyLocalizedString</a></code><a name="//apple_ref/doc/uid/TP30000700-DontLinkElementID_499"></a> (and variants) if you are using CFBundle APIs; if you are using Cocoa’s NSBundle, use the <code><a href="../../../../Cocoa/Reference/Foundation/Miscellaneous/Foundation_Functions/Reference/reference.html#//apple_ref/doc/c_ref/NSLocalizedString" target="_top">NSLocalizedString</a></code><a name="//apple_ref/doc/uid/TP30000700-DontLinkElementID_500"></a> macro (and variants) instead. In the simplest version of the macro, you specify two parameters: the key and a comment. For example:</p><div class="codesample"><table><tr><td scope="row"><pre>CFStringRef locstr = CFCopyLocalizedString(CFSTR("Yes"), CFSTR("");<span></span></pre></td></tr></table></div><p>If the logged-in user’s language preference is French, the variable <code>locstr</code> holds the value of “Oui”. The comment is there for a particular reason. Instead of creating a strings file from scratch, you can put all required <code><a href="../../../../CoreFoundation/Reference/CFBundleRef/Reference/reference.html#//apple_ref/doc/c_ref/CFCopyLocalizedString" target="_top">CFCopyLocalizedString</a></code> (or <code><a href="../../../../Cocoa/Reference/Foundation/Miscellaneous/Foundation_Functions/Reference/reference.html#//apple_ref/doc/c_ref/NSLocalizedString" target="_top">NSLocalizedString</a></code>) calls in your application code first. In the comment parameter, give any instructions to the translator for the string. Then run the <code>genstrings</code> command-line utility on your source-code file to generate a strings file. You can then give a copy of the generated file to the translator for each localization. </p><div class="importantbox"><a name="//apple_ref/doc/uid/TP30000700-DontLinkElementID_76" title="Important:"></a><p><strong>Important:</strong>&nbsp;The XML<a name="//apple_ref/doc/uid/TP30000700-DontLinkElementID_501"></a> description file used by the Kernel-User Notification Center (KUNC) is similar to the <code>Localizable.strings</code> file in that, for each dialog, a key (in the development language) can be paired with a localized string value (or an array of such values). Alternatively, you can create <code>Localizable.strings</code> files for each localization and the values of the XML keys can themselves be keys in the strings file. Also, KUNC handles the localization details and not CFBundle or NSBundle (directly, at least).<a name="//apple_ref/doc/uid/TP30000700-DontLinkElementID_502"></a><a name="//apple_ref/doc/uid/TP30000700-DontLinkElementID_503"></a><a name="//apple_ref/doc/uid/TP30000700-DontLinkElementID_504"></a><a name="//apple_ref/doc/uid/TP30000700-DontLinkElementID_505"></a><a name="//apple_ref/doc/uid/TP30000700-DontLinkElementID_506"></a><a name="//apple_ref/doc/uid/TP30000700-DontLinkElementID_507"></a></p><p></p></div><a name="//apple_ref/doc/uid/TP30000700-TPXREF102" title="Getting the Path to a KEXT From User Space"></a><h2>Getting the Path to a KEXT From User Space</h2><p><a name="//apple_ref/doc/uid/TP30000700-DontLinkElementID_508"></a>If you’re responsible for the user-space code that must display your kernel extension’s localized information, you’ll need to get the path to your KEXT. CFBundle and NSBundle require a path to a bundle to create a bundle object, which you need to programmatically access the resources of the bundle.</p><p>The solution to this is to pass the <code>CFBundleIdentifier</code> of your KEXT to a special KEXT Manager function to obtain the bundle path. The KEXT Manager defines the following function for this purpose (in <code>IOKit.framework/Headers/kext/KextManager.h</code>):<a name="//apple_ref/doc/uid/TP30000700-DontLinkElementID_509"></a></p><div class="codesample"><table><tr><td scope="row"><pre>CFURLRef KEXTManagerCreateURLForBundleIdentifier(<span></span></pre></td></tr><tr><td scope="row"><pre>    CFAllocatorRef allocator,<span></span></pre></td></tr><tr><td scope="row"><pre>    CFStringRef    bundleIdentifier);<span></span></pre></td></tr></table></div><p>The <code><!--a-->KEXTManagerCreateURLForBundleIdentifier<!--/a--></code> function returns a CFURLRef object representing the path to any KEXT currently installed in <code>/System/Library/Extensions</code> identified by the passed-in <code>CFBundleIdentifier</code>. For the CFAllocatorRef parameter, you can obtain the current default allocator with a call to <code><a href="../../../../CoreFoundation/Reference/CFAllocatorRef/Reference/reference.html#//apple_ref/doc/c_ref/CFAllocatorGetDefault" target="_top">CFAllocatorGetDefault</a></code><a name="//apple_ref/doc/uid/TP30000700-DontLinkElementID_510"></a>.</p><p>Once you have the path to the kernel extension (as a CFURLRef object), you can create a bundle object (CFBundleRef) from it using the following CFBundle<a name="//apple_ref/doc/uid/TP30000700-DontLinkElementID_511"></a> function:</p><div class="codesample"><table><tr><td scope="row"><pre>CF_EXPORT<span></span></pre></td></tr><tr><td scope="row"><pre>CFBundleRef CFBundleCreate(CFAllocatorRef allocator, CFURLRef bundleURL);<span></span></pre></td></tr></table></div><p>You can make the bundle object the subsequent target of calls for returning localized resources, such as strings, images, and icons.<a name="//apple_ref/doc/uid/TP30000700-DontLinkElementID_512"></a></p>
+
+        <br /><br /> 
+        
+        <div class="mini_nav_text" align="left">
+        <span class="navButtons">
+        <a href="../KernelUserNotification/KernelUserNotification.html">&lt; Previous Page</a><span style="margin-left: 8px"><a href="../DebuggingDrivers/DebuggingDrivers.html">Next Page &gt;</a></span>
+        </span>
+        <span id="showHideTOCLowerSpan">
+        <a href="#" onclick="showHideTOC();"><img src="../../../../Resources/Images/show_toc_icon.gif" width="15" height="14" border="0" style="margin-bottom: -2px;" alt="" /></a> <a href="#" onclick="showHideTOC();">Hide TOC</a>
+        </span>
+        </div>
+
+        <br/><hr /><div align="center"><p class="content_text" lang="en" dir="ltr"> <!--#if expr="0=1" -->&#x00a9; 2002, 2007 Apple Inc. All Rights Reserved. &#40;<!--#endif -->Last updated: 2007-03-06<!--#if expr="0=1" -->&#041;<!--#endif --></p></div>
+
+        
+        <div class="hideOnPrint hideInXcode">
+        <!-- start of footer -->
+        	<table width="100%" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/documentation/DeviceDrivers/Conceptual/WritingDeviceDriver/InternationalizingDrivers/InternationalizingDrivers.html%3Fid%3DTP30000694-2.13&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/documentation/DeviceDrivers/Conceptual/WritingDeviceDriver/InternationalizingDrivers/InternationalizingDrivers.html%3Fid%3DTP30000694-2.13&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/documentation/DeviceDrivers/Conceptual/WritingDeviceDriver/InternationalizingDrivers/InternationalizingDrivers.html%3Fid%3DTP30000694-2.13&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+
+        <!--#include virtual="/includes/framesetfooter" -->
+        <!-- end of footer -->
+        </div>
+    </div>
+</body>
+</html>

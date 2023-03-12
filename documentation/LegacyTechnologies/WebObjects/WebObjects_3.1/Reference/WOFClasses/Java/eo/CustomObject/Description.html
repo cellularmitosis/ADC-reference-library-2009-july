@@ -1,0 +1,478 @@
+<html>
+
+<body bgcolor="#FFFFFF">
+
+<CENTER><H1>Class next.eo.CustomObject</H1></CENTER>
+
+<a name="description"></a><CENTER><H2>CLASS DESCRIPTION</H2></CENTER>
+
+<!-- extends:next.util.NextObject -->
+
+<DL>
+
+<DT><B>Extends:</B></DT><DD>next.util.NextObject</DD>
+
+</DL>
+
+<P>
+
+<DL>
+
+<DT><B>Implements:</B></DT>
+
+<!-- implements:next/util/Coding  -->
+
+<DD>next/util/Coding </DD><BR>
+
+</DL>
+
+<P>
+
+Enterprise Objects Framework adds a number of methods to NextObject for supporting operations common to all enterprise objects. Among these are methods for initializing instances, announcing changes, setting and retrieving property values, and performing validation of state. Some of these methods are for enterprise objects to implement or override, and some are meant to be used as defined by the Framework. Many methods are used internally by the Framework and rarely invoked by application code. The implementation or use of each method is highlighted in the following sections, which describe the major functional groups.
+
+<H3>Initialization Methods</H3>
+<!--
+Enterprise objects are initialized using the initWithEditingContext:classDescription:globalID:, which by default simply invokes init. You can place your custom initialization code in init, or you can override initWithEditingContext:classDescription:globalID: to take advantage of the extra information available with this method.-->
+After initialization, an enterprise object receives an <B>awake...</B> message. The particular message depends on whether the object has been fetched from a database or created anew in the application. In the former case, it receives an <B>awakeFromFetchInEditingContext</B> message. In the latter, it receives an <B>awakeFromInsertionInEditingContext</B> message. The receiver can override either method to perform extra initialization-such as setting default values-based on how it was created.
+
+<H3>Announcing Changes</H3>
+For the Framework to keep all areas of an application synchronized, enterprise objects must notify their observers when their state changes. Objects do this by simply invoking <B>willChange</B> before altering any instance variable or other kind of state. This method informs all observers that the invoker is about to change. See the EOObserverCenter class specification in the <I>Enterprise Objects Framework Reference</I> for more information on change notification.
+<P>
+The primary observer of changes in an object is its EditingContext. EditingContext is a subclass of ObjectStore that manages collections of objects in memory, tracking inserts, deletes, and updates, and propagating changes to the persistent store as needed. You can get the EditingContext that contains an object by sending the object an <B>editingContext</B> message.
+
+<H3>Getting Object and Class Metadata</H3>
+One of the larger groups of methods added to NextObject provides information about an object's properties. <!-- Most of these methods consult an EOClassDescription to provide their answers. The classDescription method return an object's EOClassDescription. See that class specification for the methods it implements.--> Methods you can send directly to any object include <!-- entityName, which provides the name of the entity mapped to the receiver's class; --> <B>allPropertyKeys</B>, which returns the names of all the receiver's class properties, attributes and relationships alike; and <B>attributeKeys</B>, which returns just the names of the attributes.
+<P>
+Some methods return information about relationships. <B>toOneRelationshipKeys</B> and <B>toManyRelationshipKeys</B> return the names of the receiver's relationships, while <B>isToManyKey</B> tells which kind a particular relationship is. <!-- deleteRuleForRelationshipKey: indicates what should happen to the receiver's relationships when it's deleted. Similarly, ownsDestinationObjectsForRelationshipKey: indicates what should happen when another object is added to or removed from the receiver's relationship. Another method, classDescriptionForDestinationKey:, returns the EOClassDescription for the destination of a relationship.-->
+<P>
+These methods are all properly implemented <!-- in terms of the receiver's EOClassDescription,--> so <!--unless your object class doesn't have an EOClassDescription,--> there's little need to override them. One method you might override in your enterprise object class, however, is <B>inverseForRelationshipKey</B>. Given the name of one of the receiver's relationships, this method finds the destination object's class data and determines the name of the relationship that points back at the receiver. The default implementation of this method looks for a relationship predicated on the same attributes in both the source and destination, which works correctly in most cases. If, however, you define a reciprocal pair of relationships on different attributes, you should override this method to take that into account.<!-- See the method description for an example.-->
+
+<!-- Key-Value Coding Methods
+A special set of methods form the Framework's main data transport mechanism, in which the properties of an enterprise object are accessed indirectly by name (or key), rather than directly through invocation of an accessor method or as instance variables. Thus, any object's state can be accessed in a consistent manner.
+The basic methods for accessing an enterprise object's values are takeValue:forKey: and valueForKey:. These two methods are defined by NSObject to use the accessor methods normally implemented by objects (or to access instance variables directly if need be), so that you don't have to write special code simply to integrate your enterprise objects into the Framework. Another pair of methods, takeValuesFromDictionary: and valuesForKeys:, gives access to groups of properties. Lastly, valueForKeyPath: and valueForKeyPath: give access to flattened properties, of the form relationship.property; for example, "department.name".
+Default Implementations; Handling Access Errors
+The Framework provides default implementations of takeValue:forKey: and valueForKey: that work for all objects. The other four access methods are implemented in terms of these two. These implementations are general enough that your enterprise object classes should rarely need to override either key-value coding method. In accessing an object's property, the default NSObject implementations of the key-value coding methods use the class definition as follows:
+The key-value coding method looks for an accessor method based on the key. For example, with a key of "lastName", takeValue:forKey: looks for a method named setLastName: (note that the first letter of the property name is made uppercase), and valueForKey: looks for a method of the form lastName.
+If the key-value coding method doesn't find an accessor method, and the class responds YES to an accessInstanceVariablesDirectly message (which it does by default), it looks for an instance variable whose name is the same as the key and sets or retrieves its value directly. In setting an instance variable that's an object, takeValue:forKey: retains the new value and autoreleases the old one.
+If neither an accessor method nor an instance variable can be found, the default implementations invoke methods that your custom objects can override to handle failures. handleTakeValue:forUnboundKey: is invoked from takeValue:forKey:, and handleQueryWithUnboundKey: is invoked from valueForKey:. Normally these methods raise an exception, but you can implement them to set or get a value in whatever way is needed.
+The key-value coding methods cache attribute bindings for both accessor methods and instance variables, making lookups efficient. If you need to clear these bindings-as when you add or remove a class from the run-time system-you can invoke flushKeyBindings to do so.
+Some subclasses of NSObject override the default implementations. EOGenericRecord's implementations, for example, simply store nd retrieve the properties in an NSDictionary object held by the EOGenericRecord. NSDictionary and NSMutableDictionary, though not suitable for use as enterprise objects, meaningfully implement these methods by directly accessing their key-value pairs.
+Type Checking and Type Conversion
+The default implementations of the key-value coding methods accept any object as a value, and do no type checking or type conversion among object classes. It's possible, for example, to pass an NSString to takeValue:forKey: as the value for a property the receiver expects to be an NSDate. The sender of a key-value coding message is thus responsible for ensuring that a values is of the proper class, typically by using the validateValue:forKey: method to coerce it to the proper type. The interface layer's EODisplayGroup uses this on all values received from interface user objects, for example, as well as relying on number and date formatters to interpret string values typed by the user. For more information on the validateValue:forKey: method, see the EOClassDescription and EOEntityClassDescription class specifications.
+The key-value coding methods handle one special case with regard to value types. For enterprise objects that access numeric values as C scalar types, these methods automatically convert between the scalar types and NSNumber objects. For example, suppose your enterprise object defines these accessor methods:
+-(void)setSalary:(unsignedint)salary
+-(unsignedint)salary
+For the setSalary: method, takeValue:forKey: converts the object value for the "salary" key in the dictionary to an unsigned int and passes it as salary. Similarly, valueForKey: converts the return value of the salary method to an NSNumber and returns that.
+The default implementations support the following scalar types:
+char	unsigned char
+short	unsigned short
+int	unsigned int
+long	unsigned long
+float	double
+Object values are converted to these types with the standard messages charValue, intValue, floatValue, and so on. Note that the key-value coding methods don't check that an object value actually responds to these messages; this can result in a run-time error if the object doesn't respond to the appropriate message.
+One type of conversion these methods can't perform is that from a nil object value to a scalar value. C scalar values define no equivalent of a database system's NULL value, so these must be handled by the object itself. Upon encountering an nil while setting a scalar value, the takeValue:forKey: invokes unableToSetNilForKey:, which by default simply raises an exception. Enterprise object classes that use scalar values which may be NULL in the database should override this method to substitute the appropriate scalar value for nil, reinvoking takeValue:forKey: to set the substitute value. This method works in general to handle setting scalar properties to nil.
+EONull in Collections
+Because collection objects such as NSArray and NSDictionary can't contain nil as a value, it must represented by a special object, EONull. EONull provides a single instance that represents the NULL value for object attributes. The default implementations of takeValuesFromDictionary: and valuesForKeys: translate EONull and nil between NSDictionaries and enterprise objects, removing the need for your objects to explicitly test for EONull values. 
+Relationship Accessor Methods
+Building on the key-value coding methods, another group of methods allows you to modify relationship properties by adding and removing single objects, rather than replacing the entire content of the relationship, and to modify relationships so that reciprocal relationships are automatically adjusted. addObject:toPropertyWithKey: and removeObject:fromPropertyWithKey: handle the first situation, doing all the work of altering arrays for to-many relationships. They both check first for a method you might implement, addToKey: or removeFromKey:, invoking that method if it's implemented, otherwise using the basic key-value coding methods to do the work.
+Reciprocal relationships are handled by addObject:toBothSidesOfRelationshipWithKey: and removeObject:fromBothSidesOfRelationshipWithKey:. For example, when you add an Employee to a Department's employees relationship, or remove it, you also want the Employee's department relationship altered to suit. These two methods take care of tracing the inverse relationship and use addObject:toPropertyWithKey: and removeObject:fromPropertyWithKey: to alter both relationships, whether they're to-one or to-many. Unless you have specific reasons to do otherwise, you should always use the methods that handle reciprocal relationships so that back pointers are properly updated.
+-->
+Two <!--other--> methods that affect relationships are typically used internally by the Framework. You should rarely have a need either to invoke or override them. <B>propagateDeleteWithEditingContext</B> applies an object's delete rule to the destinations of its relationships. The delete rule specifies whether a destination object should be ignored, also deleted, or whether the deletion should be disallowed if a destination exists. <B>clearProperties</B> simply sets all of the receiver's relationship properties to <B>nil</B>. EditingContexts use this method to break circular references when they're deallocated.
+<!--
+Snapshots
+The key-value coding methods define a general mechanism for accessing an object's properties, but you first have to know what those properties are. Sometimes, however, you just want to preserve an object's entire state for later use, whether to undo changes to the object, compare the values that have changed, or just keep a record of the changes. The snapshotting methods provide this service, extracting or setting all properties at once and performing the necessary conversions for proper behavior. snapshot returns an NSDictionary containing all the receiver's properties, with EONull substituted for nil and arrays reproduced as shallow, immutable copies. updateFromSnapshot: sets properties of the receiver to the values in a snapshot, converting EONull to nil, and making shallow, mutable copies of any array values (allowing the object to add to and remove from the array).
+-->
+
+<H3>Validation</H3>
+Validating new values is a vital part of business logic. Several methods added to NextObject support validation at different stages of an object's life. Validation methods check for illegal value types, values outside of established limits, illegal relationships, and so on. All validation methods return <B>nil</B> if the values under consideration are valid, or an Exception indicating how the values aren't valid.
+<P>
+<!--There are two kinds of validation methods that you can override. The first covers individual properties, when it's important to validate a value before it changes. These methods are invoked automatically by the Framework when it changes a property value, such as when the user makes an edit in the user interface. These methods are dynamically invoked based on the property name. The second kind covers operations to the external store-inserting, updating, and deleting.
+--> The validation methods that you can override are invoked when the associated operation is performed. You can override these methods in your custom enterprise object classes to perform delayed validation of properties, to compare multiple properties against one another, and to allow or refuse the operation based on property values. For example, a Fee object might refuse to be deleted if it hasn't been paid yet.
+
+<!--Immediate Validation of Individual Properties
+The most general method, validateValue:forKey:, is used by the Framework when an EODisplayGroup passes an updated value to the object and when the object is saved. This method does two things: coerce the value into an appropriate type for the object, and validate it according to the object's rules. Coercion is performed automatically for you, so all you need handle is validation itself.
+The default implementation of validateValue:forKey: consults the object's EOClassDescription for basic errors, such as a nil value when that isn't allowed. If no basic errors exist, this method then examines the object's class itself for a method of the form validateKey: and invokes that. These are the methods that your custom classes can implement to validate individual properties, such as validateAge: to check that the value the user entered is within acceptable limits.
+For example, suppose that Member objects have an age attribute stored as an integer. This attribute has an lower limit of 16, defined by the Member class. Now, suppose the user types "12" into a text field for the age. Before the EODisplayGroup updates the selected object, it sends the object a validateValue:forKey: message. The object uses its EOEntityClassDescription to convert the string "12" into an NSNumber, then invokes validateAge: with that NSNumber. Member's implementation of this method compares the age to its limit of 16 and returns an EOValidationException:
+- (NSException *)validateAge:(NSNumber *)age
+{
+    if ([age intValue] < 16) {
+        return [NSException
+            validationExceptionWithFormat:@"Age of %@ is below minimum.", age];
+    }
+    return nil;
+}
+The Framework adds the validationExceptionWithFormat: method to NSException for convenient creation of validation exceptions.
+-->
+
+<H3>Validation for Specific Operations</H3>
+The <!--other--> validation methods are invoked at specific times-such as before the object is written to or deleted from the external store-and are particularly useful when properties must be compared or when calculation is necessary. The methods are <B>validateForInsert</B>, <B>validateForUpdate</B>, <B>validateForSave</B>, and <B>validateForDelete</B>, and they're invoked automatically for the operations indicated by the method name. You can override these methods to check values individually or in groups; for example, you might verify that a pair of dates is in the proper temporal order.
+<!--:
+- (NSException *)validateForSave
+{
+    if ([startDate compare:endDate] == NSOrderedDescending) {
+        return [NSException
+            validationExceptionWithFormat:@"Start date must not follow end date."];
+    }
+    return [super validateForSave];
+}
+Note that this method also invokes super's implementation. This is important, as the default implementations of the validateFor... pass the check on to the object's EOClassDescription, which performs basic checking among properties. The access layer's EOEntityClassDescription class verifies constraints based on an EOModel, such as delete rules. For example, the delete rule for a Department object might state that it can't be deleted if it still contains Employee objects.
+-->
+<P>
+<B>validateForSave</B> is the generic validation method for when an object is written to the external store. The default implementations of <B>validateForInsert</B> and <B>validateForUpdate</B> both invoke this method. If an object performs validation that isn't specific to insertion or to updating, it should go in <B>validateForSave</B>.
+<hr>
+
+</body>
+
+</html><html>
+
+<body bgcolor="#FFFFFF"><!-- constructors -->
+
+<a name="constructors"><CENTER><H2>CONSTRUCTORS</H2></CENTER></a>
+
+<!-- consKey:CustomObject(public) cons:CustomObject descr:<TT>public  <B>CustomObject</B>()</TT>:<TT>public  <B>CustomObject</B>(next.util.Coder <I>aCoder</I>)</TT> -->
+
+<H3><a name="CustomObject(public)">CustomObject</a></H3>
+
+<TT>public  <B>CustomObject</B>()</TT><br>
+
+<TT>public  <B>CustomObject</B>(next.util.Coder <I>aCoder</I>)</TT>
+
+<P>
+
+Returns a newly-allocated and initialized CustomObject object. If <I>aCoder</I> is supplied, this method initializes the newly allocated object from data in <I>aCoder</I>.
+<P>
+
+<!-- <B>See Also: </B>[See Also's go here] -->
+
+<hr>
+
+</body>
+
+</html><html>
+
+<body bgcolor="#FFFFFF"><!-- methods -->
+
+<a name="methods"><CENTER><H2>METHODS</H2></CENTER></a>
+
+<!-- methKey:allPropertyKeys(public) meth:allPropertyKeys descr:<TT>public next.util.ImmutableVector <B>allPropertyKeys</B>()</TT> -->
+
+<H3><a name="allPropertyKeys(public)">allPropertyKeys</a></H3>
+
+<TT>public next.util.ImmutableVector <B>allPropertyKeys</B>()</TT>
+
+<P>
+
+Returns all of the receiver's property keys, as returned by <B>attributeKeys</B>, <B>toOneRelationshipKeys</B>, and <B>toManyRelationshipKeys</B>.
+<P>
+
+<!-- <B>See Also: </B>[See Also's go here] -->
+
+<hr>
+
+<!-- methKey:attributeKeys(public) meth:attributeKeys descr:<TT>public next.util.ImmutableVector <B>attributeKeys</B>()</TT> -->
+
+<H3><a name="attributeKeys(public)">attributeKeys</a></H3>
+
+<TT>public next.util.ImmutableVector <B>attributeKeys</B>()</TT>
+
+<P>
+
+Overridden by subclasses to return an array of keys for attributes of the object. Attributes contain data (such as numbers and strings), as opposed to pointers to other enterprise objects.<!-- EOClassDescription's implementation of this method returns nil. -->
+<P>
+
+<!-- <B>See Also: </B>[See Also's go here] -->
+
+<hr>
+
+<!-- methKey:awakeFromFetchInEditingContext(public) meth:awakeFromFetchInEditingContext descr:<TT>public void <B>awakeFromFetchInEditingContext</B>(next.eo.EditingContext <I>anEditingContext</I>)</TT> -->
+
+<H3><a name="awakeFromFetchInEditingContext(public)">awakeFromFetchInEditingContext</a></H3>
+
+<TT>public void <B>awakeFromFetchInEditingContext</B>(next.eo.EditingContext <I>anEditingContext</I>)</TT>
+
+<P>
+
+Overridden by subclasses to perform additional initialization upon being fetched from the external repository into <I>anEditingContext</I>. <!--NSObject's implementation merely sends an awakeObject:fromFetchInEditingContext: to the receiver's EOClassDescription. -->Subclasses should invoke super's implementation before performing their own initialization.
+<P>
+
+<!-- <B>See Also: </B>[See Also's go here] -->
+
+<hr>
+
+<!-- methKey:awakeFromInsertionInEditingContext(public) meth:awakeFromInsertionInEditingContext descr:<TT>public void <B>awakeFromInsertionInEditingContext</B>(next.eo.EditingContext <I>anEditingContext</I>)</TT> -->
+
+<H3><a name="awakeFromInsertionInEditingContext(public)">awakeFromInsertionInEditingContext</a></H3>
+
+<TT>public void <B>awakeFromInsertionInEditingContext</B>(next.eo.EditingContext <I>anEditingContext</I>)</TT>
+
+<P>
+
+Overridden by subclasses to perform additional initialization upon being inserted into <I>anEditingContext</I>. This is commonly used to assign default values or record the time of insertion. <!-- NSObject's implementation merely sends an awakeObject:fromInsertionInEditingContext: to the receiver's EOClassDescription.--> Subclasses should invoke super's implementation before performing their own initialization.
+<P>
+
+<!-- <B>See Also: </B>[See Also's go here] -->
+
+<hr>
+
+<!-- methKey:clearProperties(public) meth:clearProperties descr:<TT>public void <B>clearProperties</B>()</TT> -->
+
+<H3><a name="clearProperties(public)">clearProperties</a></H3>
+
+<TT>public void <B>clearProperties</B>()</TT>
+
+<P>
+
+Sets all of the receiver's to-one and to-many relationships to <B>nil</B>. EditingContexts use this method to break circular references among objects when they're deallocated. You should never need to invoke this method or override it.
+<P>
+
+<!-- <B>See Also: </B>[See Also's go here] -->
+
+<hr>
+
+<!-- methKey:editingContext(public) meth:editingContext descr:<TT>public next.eo.EditingContext <B>editingContext</B>()</TT> -->
+
+<H3><a name="editingContext(public)">editingContext</a></H3>
+
+<TT>public next.eo.EditingContext <B>editingContext</B>()</TT>
+
+<P>
+
+Returns the EditingContext that holds the receiver.
+<P>
+
+<!-- <B>See Also: </B>[See Also's go here] -->
+
+<hr>
+
+<!-- methKey:encodeWithCoder(public) meth:encodeWithCoder descr:<TT>public void <B>encodeWithCoder</B>(next.util.Coder <I>aCoder</I>)</TT> -->
+
+<H3><a name="encodeWithCoder(public)">encodeWithCoder</a></H3>
+
+<TT>public void <B>encodeWithCoder</B>(next.util.Coder <I>aCoder</I>)</TT>
+
+<P>
+
+Encodes the receiver using <I>aCoder</I>. See the Coding interface description for more information.
+<P>
+
+<!-- <B>See Also: </B>[See Also's go here] -->
+
+<hr>
+
+<!-- methKey:inverseForRelationshipKey(public) meth:inverseForRelationshipKey descr:<TT>public java.lang.String <B>inverseForRelationshipKey</B>(java.lang.String <I>aString</I>)</TT> -->
+
+<H3><a name="inverseForRelationshipKey(public)">inverseForRelationshipKey</a></H3>
+
+<TT>public java.lang.String <B>inverseForRelationshipKey</B>(java.lang.String <I>relationshipKey</I>)</TT>
+
+<P>
+
+Returns the name of the relationship pointing back to the receiver's class or entity from that named by <I>relationshipKey</I>, or <B>nil</B> if there isn't one. <!-- With EOEntity and EORelationship, for example, reciprocality is determined by the join attributes of the two EORelationships.-->
+<P>
+You might override this method for reciprocal relationships that aren't defined using the same join attributes. For example, if a Member object has a relationship to CreditCard based on the card number, but a CreditCard has a relationship to Member based on the Member's primary key, both classes need to override this method. <!--This is how Member might implement it:
+- (NSString *)inverseForRelationshipKey:(NSString *)relationshipKey
+{
+    if ([relationshipKey isEqual:@"creditCard"]) return @"member";
+    return [super inverseForRelationshipKey:relationshipKey];
+}
+-->
+<P>
+
+<!-- <B>See Also: </B>[See Also's go here] -->
+
+<hr>
+
+<!-- methKey:isToManyKey(public) meth:isToManyKey descr:<TT>public boolean <B>isToManyKey</B>(java.lang.String <I>aString</I>)</TT> -->
+
+<H3><a name="isToManyKey(public)">isToManyKey</a></H3>
+
+<TT>public boolean <B>isToManyKey</B>(java.lang.String <I>key</I>)</TT>
+
+<P>
+
+Returns <B>true</B> if the receiver has a to-many relationship identified by <I>key</I>, <B>false</B> otherwise.
+<P>
+
+<!-- <B>See Also: </B>[See Also's go here] -->
+
+<hr>
+
+<!-- methKey:propagateDeleteWithEditingContext(public) meth:propagateDeleteWithEditingContext descr:<TT>public void <B>propagateDeleteWithEditingContext</B>(next.eo.EditingContext <I>anEditingContext</I>)</TT> -->
+
+<H3><a name="propagateDeleteWithEditingContext(public)">propagateDeleteWithEditingContext</a></H3>
+
+<TT>public void <B>propagateDeleteWithEditingContext</B>(next.eo.EditingContext <I>anEditingContext</I>)</TT>
+
+<P>
+
+<!-- Sends a propagateDeleteForObject:editingContext: message to the receiver's EOClassDescription. This c--> Causes the destination objects of the receiver's relationships to be deleted according to the delete rule for each relationship:
+<pre>
+<B>
+Delete Rule	       Action</B>
+EODeleteRuleNullify    The destination object is simply removed from
+                       the relationship, and the receiver is 
+                       likewise removed from the destination's
+                       reciprocal relationship if there is one.
+EODeleteRuleCascade    As above, but the destination object is also
+                       deleted.
+EODeleteRuleDeny       Applied in <B>validateForDelete</B>, not in 
+                       this method.
+</pre>
+<P>
+
+<!-- <B>See Also: </B>[See Also's go here] -->
+
+<hr>
+
+<!-- methKey:toManyRelationshipKeys(public) meth:toManyRelationshipKeys descr:<TT>public next.util.ImmutableVector <B>toManyRelationshipKeys</B>()</TT> -->
+
+<H3><a name="toManyRelationshipKeys(public)">toManyRelationshipKeys</a></H3>
+
+<TT>public next.util.ImmutableVector <B>toManyRelationshipKeys</B>()</TT>
+
+<P>
+
+Returns the names of the receiver's to-many relationships. <!--, as determined from the EOClassDescription.--> You might wish to override this method to add keys for relationships not already defined. <!-- by the EOClassDescription. The access layer's subclass of EOClassDescription, EOEntityClassDescription, returns the names of to-many relationships designated as class properties.-->
+<P>
+
+<!-- <B>See Also: </B>[See Also's go here] -->
+
+<hr>
+
+<!-- methKey:toOneRelationshipKeys(public) meth:toOneRelationshipKeys descr:<TT>public next.util.ImmutableVector <B>toOneRelationshipKeys</B>()</TT> -->
+
+<H3><a name="toOneRelationshipKeys(public)">toOneRelationshipKeys</a></H3>
+
+<TT>public next.util.ImmutableVector <B>toOneRelationshipKeys</B>()</TT>
+
+<P>
+
+Returns the names of the receiver's to-one relationships. <!--, as determined from the EOClassDescription.--> You might wish to override this method to add keys for relationships not defined elsewhere. <!-- by the EOClassDescription. The access layer's subclass of EOClassDescription, EOEntityClassDescription, returns the names of to-one relationships designated as class properties.-->
+<P>
+
+<!-- <B>See Also: </B>[See Also's go here] -->
+
+<hr>
+
+<!-- methKey:validateForDelete(public) meth:validateForDelete descr:<TT>public java.lang.Throwable <B>validateForDelete</B>()</TT> -->
+
+<H3><a name="validateForDelete(public)">validateForDelete</a></H3>
+
+<TT>public java.lang.Throwable <B>validateForDelete</B>()</TT>
+
+<P>
+
+Confirms that the receiver can be deleted in its current state, returning <B>nil</B> if it can or an Exception that the sender may throw if it can't. For example, an object can't be deleted if it has a relationship with a delete rule of EODeleteRuleDeny and that relationship has a destination object.
+<!-- NSObject's implementation sends the receiver's EOClassDescription a validateObjectForDelete: message (which performs basic checking based on the presence or absence of values).--> Subclasses should invoke super's implementation before performing their own validation, and should combine any exception returned by super's implementation with their own. <!-- :
+- (NSException *)validateForDelete
+{
+    NSException *exception = [super validateForDelete];
+
+    if (/* some other violation */ ) {
+        NSException *newException = /* the extra exception */;
+        exception = [NSException aggregateExceptionWithExceptions:[NSArray
+             arrayWithObjects:exception, newException, nil]];
+    }
+
+    return exception;
+}
+-->
+<P>
+
+<!-- <B>See Also: </B>[See Also's go here] -->
+
+<hr>
+
+<!-- methKey:validateForInsert(public) meth:validateForInsert descr:<TT>public java.lang.Throwable <B>validateForInsert</B>()</TT> -->
+
+<H3><a name="validateForInsert(public)">validateForInsert</a></H3>
+
+<TT>public java.lang.Throwable <B>validateForInsert</B>()</TT>
+
+<P>
+
+Confirms that the receiver can be inserted in its current state, returning <B>nil</B> if it can or an Exception that can be thrown if it can't. NextObject's implementation simply invokes <b>validateForSave</B>.
+<P>
+
+<!-- <B>See Also: </B>[See Also's go here] -->
+
+<hr>
+
+<!-- methKey:validateForSave(public) meth:validateForSave descr:<TT>public java.lang.Throwable <B>validateForSave</B>()</TT> -->
+
+<H3><a name="validateForSave(public)">validateForSave</a></H3>
+
+<TT>public java.lang.Throwable <B>validateForSave</B>()</TT>
+
+<P>
+
+Confirms that the receiver can be saved in its current state, returning <B>nil</B> if it can or an Exception that the sender may throw if it can't. <!-- NSObject's implementation sends the receiver's EOClassDescription a validateObjectForSave: message, then iterates through all of the receiver's properties, invoking validateValue:forKey: for each one. If this results in more than one exception, the exception returned contains the additional ones in its userInfo dictionary under the EOAdditionalExceptions key.--> Subclasses should invoke super's implementation before performing their own validation, and should combine any exception returned by super's implementation with their own, <!--:
+- (NSException *)validateForSave
+{
+    NSException *exception = [super validateForSave];
+
+    if (/* some other violation */ ) {
+        NSException *newException = /* the extra exception */;
+        exception = [NSException aggregateExceptionWithExceptions:[NSArray
+             arrayWithObjects:exception, newException, nil]];
+    }
+
+    return exception;
+}
+-->
+<P>
+Enterprise objects can implement this method to check that certain relations between properties hold; for example, that the end date of a vacation period follows the begin date. To validate an individual property, you can simply implement a method for it. <!-- as described under validateValue:forKey:.-->
+<P>
+
+<!-- <B>See Also: </B>[See Also's go here] -->
+
+<hr>
+
+<!-- methKey:validateForUpdate(public) meth:validateForUpdate descr:<TT>public java.lang.Throwable <B>validateForUpdate</B>()</TT> -->
+
+<H3><a name="validateForUpdate(public)">validateForUpdate</a></H3>
+
+<TT>public java.lang.Throwable <B>validateForUpdate</B>()</TT>
+
+<P>
+
+Confirms that the receiver can be updated in its current state, returning <B>nil</B> if it can or an Exception that the sender may throw if it can't. NextObject's implementation simply invokes <b>validateForSave</B>.
+<P>
+
+<!-- <B>See Also: </B>[See Also's go here] -->
+
+<hr>
+
+<!-- methKey:willChange(public) meth:willChange descr:<TT>public void <B>willChange</B>()</TT> -->
+
+<H3><a name="willChange(public)">willChange</a></H3>
+
+<TT>public void <B>willChange</B>()</TT>
+
+<P>
+
+Notifies any observers that the receiver's state is about to change. <!--, by sending each an objectWillChange: message.--> See the EOObserverCenter class specification in the <I>Enterprise Objects Framework Reference</I> for more information.
+<P>
+
+<!-- <B>See Also: </B>[See Also's go here] -->
+
+<hr>
+
+<!-- methKey:willRead(public) meth:willRead descr:<TT>public void <B>willRead</B>()</TT> -->
+
+<H3><a name="willRead(public)">willRead</a></H3>
+
+<TT>public void <B>willRead</B>()</TT>
+
+<P>
+
+Notifies any observers that the receiver is about to read.
+<P>
+
+<!-- <B>See Also: </B>[See Also's go here] -->
+
+<hr>
+
+</body>
+
+</html>

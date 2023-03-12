@@ -1,0 +1,77 @@
+<BODY bgcolor=#FFFFFF>
+<P><A HREF="ServingWebObjectsTOC.mif.html"><IMG SRC="ArrowUp.gif" border=0>Table of Contents</A>
+<A HREF="Logging.html"><IMG SRC="ArrowLeft.gif" border=0>Previous Section</A>
+<!-- This file was created with the fm2html filter.
+The filter is copyright Norwegian Telecom Research and
+was programmed by Jon Stephenson von Tetzchner. -->
+
+
+<H1><A NAME="REF58620"><B></B>Load Balancing</A></H1>
+<P>When you deploy a WebObjects application, you will probably want to improve performance by distributing the processing load among multiple instances of the application. This application processes can be running on the same machine as the server or on remote machines. The task that accomplishes this distribution is called load balancing.
+<P>You perform load balancing by creating a public configuration file named <B>WebObjects.conf</B> and manually starting an application for each instance described in the file. When the adaptor receives an HTTP request for an application, it first (in its initial mode) checks <B>WebObjects.conf</B> for an application instance that is accepting connections and forwards the request to it. The public configuration file can contain entries for instances of multiple applications and multiple instances of the same application running on different machines. The section "<A HREF="HTTPAdaptors.html#REF13616">HTTP Adaptors</A>" describes in some detail both the <A HREF="ConfigFiles.html#REF26481">public configuration file</A> and the <A HREF="AdaptorModes.html#REF67950">adaptor modes</A> involved in load balancing. 
+<P><B>Note</B>: Load balancing is possible only with the WebObjects Enterprise product. The feature is not supported in the WebObjects Pro product.
+<BR><BR>
+<BR><H2><B>Making the Public Configuration File</H2>
+<P></B>The following steps describe the composition of a typical public configuration file using some WebObjects applications found in <I>DOCUMENT_ROOT</I><B>/WebObjects/Examples</B>.
+
+<OL>
+<P><LI>Using a text editor (such as the TextEdit application), create an ASCII file named <B>WebObjects.conf</B>.
+<BR>
+<P><LI>Insert the lines of configuration information in <B>WebObjects.conf</B> needed by the adaptor to interact with application instances. Each line must conform to this format:
+<BR><BR><I>ApplicationDirectory</I><B>:<I></B>InstanceNumber</I><B>@<I></B>HostName</I> <I>PortNumber</I>
+<BR><BR>
+<P>For example, say you want one instance of the HelloWorld application to run on host toga.acme.com. You might make this entry:
+<P><PRE>    Examples/HelloWorld:1@toga.acme.com 3001</PRE>
+<BR>There are several things to note about the parts of a <B>WebObjects.conf </B>entry:
+<BR>
+
+<UL>
+<P><LI><I>ApplicationDirectory</I> is relative to <I>DOCUMENT_ROOT</I><B>/WebObjects</B>. This path must map to the URL used to access the application.
+<BR>
+<P><LI><I>InstanceNumber</I> must be a unique positive integer per application per host. (However, for ease of identification, you could assign each instance a unique number regardless of host.)
+<BR>
+<P><LI><I>PortNumber</I> must be a unique number over 1024 per host (numbers from zero to 1024 are reserved).
+</UL>
+<P>You cannot omit any part of an entry.
+<P>Of course, to be useful, the public configuration file should describe multiple instances of the same application and perhaps other applications as well. The following example shows load balancing among two hosts (togo.acme.com and tutu.acme.com) and two applications (HelloWorld and CyberWind).
+<PRE>    Examples/HelloWorld:1@toga.acme.com 3001
+    Examples/HelloWorld:2@toga.acme.com 3002
+    Examples/HelloWorld:3@toga.acme.com 3003
+    Examples/HelloWorld:4@tutu.acme.com 3001
+    Examples/HelloWorld:5@tutu.acme.com 3002
+    Examples/CyberWind:1@toga.acme.com 4001
+    Examples/CyberWind:2@tutu.acme.com 4001
+</PRE>
+<P>When the adaptor gets a request, it tries to resolve the request's URL against the entries in the public configuration file until it finds an application it can contact. Thus, if a user submits the following URL:
+<PRE>    http://toga.acme.com/cgi-bin/WebObjects/Examples/CyberWind</PRE>
+<P>and the CyberWind application instance on the server machine (toga.acme.com) is already processing a request, it will contact the application instance 2 of CyberWind on tutu.acme.com.
+<BR></UL>
+
+
+<P><LI> Save <B>WebObjects.conf</B> in the location or locations appropriate to the platform and adaptors (specified directories are relative to the server root): 
+<BR>
+<TABLE BORDER=2 CELLPADDING=2>
+<TR><TH></TH><TH>Mach</TH><TH>Solaris</TH><TH>HPUX</TH><TH>Windows NT</TH></TR>
+<TR><TD><B>CGI</B></TD><TD>cgi-bin</TD><TD>cgi-bin</TD><TD>cgi-bin</TD><TD>cgi-bin</TD></TR>
+<TR><TD><B>NSAPI</B></TD><TD>n/a</TD><TD>httpd-<I>port</I>/config<BR>or<BR>https-<I>port</I>/config</TD><TD>httpd-<I>port</I>/config<BR>or<BR>https-<I>port</I>/config</TD><TD>httpd-<I>port</I>/config<BR>or<BR>https-<I>port</I>/config </TD></TR>  
+<TR><TD><B>NSAPI2</B></TD><TD>n/a</TD><TD>httpd-<I>port</I>/config<BR>or<BR>https-<I>port</I>/config</TD><TD>httpd-<I>port</I>/config<BR>or<BR>https-<I>port</I>/config</TD><TD>httpd-<I>port</I>/config<BR>or<BR>https-<I>port</I>/config </TD></TR>
+<TR><TD><B>ISAPI</B></TD><TD>n/a</TD><TD>n/a</TD><TD>n/a</TD><TD>               <I>D</I>:\WINNT\<BR>System32</BR>(<I>D</I> = drive letter)  
+</TABLE>
+<b>Note:</b> If you are using WebObjects Release 3.1, you can save the <b>WebObjects.conf</b> file in the directory <B><I>&lt;NextRoot&gt;</i>/NextLibrary/WOAdaptors/Configuration</b> regardless of which adaptor you are using. WebObjects 3.1 is backwards compatible with WebObjects 3.0, so storing <b>WebObjects.conf</b> under the server will still work.
+</OL>
+
+<BR>
+<BR><H2><B>Running the Applications</H2>
+<P></B>You must manually start each application instance specified in <B>WebObjects.conf </B>from a separate shell program window <I>on</I> the host indicated by the <B>WebObjects.conf</B> entry. For each instance, go to the appropriate machine and start a new shell (on Windows NT, use the Bourne Shell program provided in the WebObjects program group). When you give the command, make sure the command line names an adaptor class (WODefaultAdaptor is the default) and specifies port and instance-number arguments that match the entry in <B>WebObject.conf</B>. The following example---for a Netscape 1.1 server on Windows NT and using the default adaptor class---corresponds to the first entry in the example above. The command would be given from a shell on host toga.acme.com:
+<PRE>    C:\NeXT\NextLibrary\Executables\WODefaultApp -a WODefaultAdaptor -n 1 -p 3001 
+	-d C:/NETSCAPE/ns-home/docs Examples/HelloWorld</PRE>
+<P>If the application directory (the last argument) is on a remote machine rather than on the same document root as the server, and you want load-balancing to be transparent, you'd specify the document root (the path after the <B>-d</B> flag) of that remote WebObjects machine. Note that the remote document root doesn't have to mirror the document root on the server machine. The following would be an acceptable command:
+<PRE>    C:\NeXT\NextLibrary\Executables\WODefaultApp -a WODefaultAdaptor -n 1 -p 3001 
+	-d C:/WOApps Examples/HelloWorld</PRE>
+<P>For this command to be valid, however, you'd have to create on the remote machine a subdirectory in <B>C:\WOApps</B> called WebObjects and install the HelloWorld application in that subdirectory. Note that the Examples directory is unnecessary, but to get load balancing to work properly you'd have to modify the entry in <B>WebObjects.conf</B> appropriately and move HelloWorld from the Examples directory up to <I>DOCUMENT_ROOT</I><B>/WebObjects</B>:
+<PRE>    HelloWorld:1@toga.acme.com 3001</PRE>
+<BR><P>See "<A HREF="ManualStarting.html#REF18279">Manually Starting WebObjects Applications</A>" for more about the arguments of this command.
+
+<P><A HREF="ServingWebObjectsTOC.mif.html"><IMG SRC="ArrowUp.gif" border=0>Table of Contents</A>
+<A HREF="NSAPIConfig.html"><IMG SRC="ArrowRight.gif" border=0>Next Section</A>
+</BODY >

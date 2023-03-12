@@ -1,0 +1,99 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+<head>
+	<title>Notification Programming Topics for Cocoa: Delivering Notifications To Particular Threads</title>
+	<meta id="Generator" name="Generator" content="Gutenberg"/>
+	<meta id="GeneratorVersion" name="GeneratorVersion" content="v132"/>
+	<meta http-equiv="content-type" content="text/html;charset=utf-8"/>
+	<meta id="Copyright" name="Copyright" content="Copyright 2009 Apple Inc. All Rights Reserved."/>
+	<meta id="IndexTitle" name="IndexTitle" content="Delivering Notifications To Particular Threads"/>
+	<meta id="xcode-display" name="xcode-display" content="render"/>
+	<meta id="toc-file" name="toc-file" content="../toc.html"/>
+	<meta id="RESOURCES" content="../../../../Resources" />
+	
+	<link rel="stylesheet" type="text/css" href="../../../../Resources/CSS/frameset_styles.css"/>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/lib/prototype.js"></script>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/lib/scriptaculous.js"></script>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/page.js"></script>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/pedia.js"></script>
+	<!--[if lte IE 6]>
+		<style type="text/css">
+			/*<![CDATA[*/ 
+			html {overflow-x:auto; overflow-y:hidden;  }
+			/*]]>*/
+		</style>
+	<![endif]-->
+</head>
+<body bgcolor="#ffffff" onload="initialize_page();"><a name="//apple_ref/doc/uid/20001289" title="Delivering Notifications To Particular Threads"></a>
+    <noscript>
+    <div id="tocMenu">
+        <iframe id="toc_content" name="toc_content" SRC="../toc.html" width="210" height="100%" align="left" frameborder="0">This document set is best viewed in a browser that supports iFrames.</iframe>
+    </div>
+    </noscript>
+    <div id="bodyText">
+        <a name="top"></a>
+        <div class="hideOnPrint hideInXcode">
+        <!-- start of header -->
+        <!--#include virtual="/includes/framesetheader" -->
+        <!-- end of header -->
+        </div>
+        
+        <!-- start of path -->
+<div class="breadcrumb hideOnPrint hideInXcode"><a href="http://developer.apple.com/" target="_top">ADC Home</a> &gt; <a href="../../../../../referencelibrary/index.html#//apple_ref/doc/uid/TP30000943" target="_top">Reference Library</a> &gt; <a href="../../../../index.html#//apple_ref/doc/uid/TP30000440" target="_top">Guides</a> &gt; <a href="../../../index.html#//apple_ref/doc/uid/TP30000440-TP30000416" target="_top">Cocoa</a> &gt; <a href="../../../EventsOtherInput-date.html#//apple_ref/doc/uid/TP30000440-TP30000416-TP30000447" target="_top">Events &amp; Other Input</a> &gt; <a href="../index.html" target="_top">Notification Programming Topics for Cocoa</a> &gt; </div><br class="hideInXcode"/><!-- end of path -->
+        
+        <div class="mini_nav_text" align="left">
+        <span class="navButtons">
+        <a href="Posting.html">&lt; Previous Page</a><span style="margin-left: 8px"><a href="../RevisionHistory.html">Next Page &gt;</a></span>
+        </span>
+        <span id="showHideTOCUpperSpan">
+        <a href="#" onclick="showHideTOC();"><img src="../../../../Resources/Images/show_toc_icon.gif" width="15" height="14" border="0" style="margin-bottom: -2px;" alt="" hideText="Hide TOC" showText="Show TOC" /></a> <a href="#" onclick="showHideTOC();">Hide TOC</a>
+        </span>
+        </div>
+        
+        
+        <a name="//apple_ref/doc/uid/20001289-CEGJFDFG" title="Delivering Notifications To Particular Threads"></a><hr /><H1>Delivering Notifications To Particular Threads</H1><p>Regular notification centers deliver notifications on the thread in which the notification was posted. Distributed notification centers deliver notifications are delivered on the main thread (prior to Mac OS X v10.3, they were delivered on an undefined thread). At times, you may require notifications to be delivered on a particular thread that is determined by you instead of the notification center. For example, if an object running in a background thread is listening for notifications from the user interface, such as a window closing, you would like to receive the notifications in the background thread instead of the main thread. In these cases, you must capture the notifications as they are delivered on the default thread and redirect them to the appropriate thread.</p><p>One way to redirect notifications is to use a custom notification queue (not an <code>NSNotificationQueue</code> object) to hold any notifications that are received on incorrect threads and then process them on the correct thread. This technique works as follows. You register for a notification normally. When a notification arrives, you test whether the current thread is the thread that should handle the notification. If it is the wrong thread, you store the notification in a queue and then send a signal to the correct thread, indicating that a notification needs processing. The other thread receives the signal, removes the notification from the queue, and processes the notification.</p><p>To implement this technique, your observer object needs to have instance variables for the following values: a mutable array to hold the notifications, a communication port for signaling the correct thread (a Mach port), a lock to prevent multithreading conflicts with the notification array, and a value that identifies the correct thread (an <code>NSThread</code> object). You also need methods to setup the variables, to process the notifications, and to receive the Mach messages. Here are the necessary definitions to add to the class of your observer object.</p><div class="codesample"><table><tr><td scope="row"><pre>@interface MyThreadedClass: NSObject<span></span></pre></td></tr><tr><td scope="row"><pre>{<span></span></pre></td></tr><tr><td scope="row"><pre>    /* Threaded notification support */<span></span></pre></td></tr><tr><td scope="row"><pre>    NSMutableArray *notifications;<span></span></pre></td></tr><tr><td scope="row"><pre>    NSThread *notificationThread;<span></span></pre></td></tr><tr><td scope="row"><pre>    NSLock *notificationLock;<span></span></pre></td></tr><tr><td scope="row"><pre>    NSMachPort *notificationPort;<span></span></pre></td></tr><tr><td scope="row"><pre>}<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>- (void) setUpThreadingSupport;<span></span></pre></td></tr><tr><td scope="row"><pre>- (void) handleMachMessage:(void *) msg;<span></span></pre></td></tr><tr><td scope="row"><pre>- (void) processNotification:(NSNotification *) notification;<span></span></pre></td></tr><tr><td scope="row"><pre>@end<span></span></pre></td></tr></table></div><p>Before registering for any notifications, you need to initialize the instance variables. The following method initializes the queue and lock objects, retains a reference to the current thread object, and creates a Mach communication port, which it adds to the current thread’s run loop.</p><div class="codesample"><table><tr><td scope="row"><pre>- (void) setUpThreadingSupport {<span></span></pre></td></tr><tr><td scope="row"><pre>    if ( notifications ) return;<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>    notifications      = [[NSMutableArray alloc] init];<span></span></pre></td></tr><tr><td scope="row"><pre>    notificationLock   = [[NSLock alloc] init];<span></span></pre></td></tr><tr><td scope="row"><pre>    notificationThread = [[NSThread currentThread] retain];<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>    notificationPort = [[NSMachPort alloc] init];<span></span></pre></td></tr><tr><td scope="row"><pre>    [notificationPort setDelegate:self];<span></span></pre></td></tr><tr><td scope="row"><pre>    [[NSRunLoop currentRunLoop] addPort:notificationPort<span></span></pre></td></tr><tr><td scope="row"><pre>            forMode:(NSString *) kCFRunLoopCommonModes];<span></span></pre></td></tr><tr><td scope="row"><pre>}<span></span></pre></td></tr></table></div><p>After this method runs, any messages sent to <code>notificationPort</code> are received in the run loop of the thread that first ran this method. If the receiving thread’s run loop is not running when the Mach message arrives, the kernel holds on to the message until the next time the run loop is entered. The receiving thread’s run loop sends the incoming messages to the <code>handleMachMessage:</code> method of the port’s delegate.</p><p>In this implementation, no information is contained in the messages sent to <code>notificationPort</code>. Instead, the information passed between threads is contained in the notification array. When a Mach message arrives, the <code>handleMachMessage:</code> method ignores the contents of the message and just checks the  <code>notifications</code> array for any notifications that need processing. The notifications are removed from the array and forwarded to the real notification processing method. Because port messages may get dropped if too many are sent simultaneously, the <code>handleMachMessage:</code> method iterates over the array until it is empty. The method must acquire a lock when accessing the notification array to prevent conflicts between one thread adding notifications and another removing notifications from the array.</p><div class="codesample"><table><tr><td scope="row"><pre>- (void) handleMachMessage:(void *) msg {<span></span></pre></td></tr><tr><td scope="row"><pre>    [notificationLock lock];<span></span></pre></td></tr><tr><td scope="row"><pre>    while ( [notifications count] ) {<span></span></pre></td></tr><tr><td scope="row"><pre>        NSNotification *notification = [[notifications objectAtIndex:0] retain];<span></span></pre></td></tr><tr><td scope="row"><pre>        [notifications removeObjectAtIndex:0];<span></span></pre></td></tr><tr><td scope="row"><pre>        [notificationLock unlock];<span></span></pre></td></tr><tr><td scope="row"><pre>        [self processNotification:notification];<span></span></pre></td></tr><tr><td scope="row"><pre>        [notification release];<span></span></pre></td></tr><tr><td scope="row"><pre>        [notificationLock lock];<span></span></pre></td></tr><tr><td scope="row"><pre>    };<span></span></pre></td></tr><tr><td scope="row"><pre>    [notificationLock unlock];<span></span></pre></td></tr><tr><td scope="row"><pre>}<span></span></pre></td></tr></table></div><p>When a notification is delivered to your object, the method that receives the notification must identify whether it is running in the correct thread or not. If it is the correct thread, the notification is processed normally. If it is the wrong thread, the notification is added to the queue and the notification port signaled.</p><div class="codesample"><table><tr><td scope="row"><pre>- (void) processNotification:(NSNotification *) notification {<span></span></pre></td></tr><tr><td scope="row"><pre>    if( [NSThread currentThread] != notificationThread ) {<span></span></pre></td></tr><tr><td scope="row"><pre>        // Forward the notification to the correct thread<span></span></pre></td></tr><tr><td scope="row"><pre>        [notificationLock lock];<span></span></pre></td></tr><tr><td scope="row"><pre>        [notifications addObject:notification];<span></span></pre></td></tr><tr><td scope="row"><pre>        [notificationLock unlock];<span></span></pre></td></tr><tr><td scope="row"><pre>        [notificationPort sendBeforeDate:[NSDate date]<span></span></pre></td></tr><tr><td scope="row"><pre>                components:nil<span></span></pre></td></tr><tr><td scope="row"><pre>                from:nil<span></span></pre></td></tr><tr><td scope="row"><pre>                reserved:0];<span></span></pre></td></tr><tr><td scope="row"><pre>    }<span></span></pre></td></tr><tr><td scope="row"><pre>    else {<span></span></pre></td></tr><tr><td scope="row"><pre>        // Process the notification here;<span></span></pre></td></tr><tr><td scope="row"><pre>    }<span></span></pre></td></tr><tr><td scope="row"><pre>}<span></span></pre></td></tr></table></div><p>Finally, to register for a notification that you want delivered on the current thread, regardless of the thread in which it may be posted, you must initialize your object’s notification instance variables by invoking <code>setUpThreadingSupport</code> and then register for the notification normally, specifying the special notification processing method as the selector.</p><div class="codesample"><table><tr><td scope="row"><pre>[self setupThreadingSupport];<span></span></pre></td></tr><tr><td scope="row"><pre>[[NSNotificationCenter defaultCenter]<span></span></pre></td></tr><tr><td scope="row"><pre>        addObserver:self<span></span></pre></td></tr><tr><td scope="row"><pre>        selector:@selector(processNotification:)<span></span></pre></td></tr><tr><td scope="row"><pre>        name:@"NotificationName"<span></span></pre></td></tr><tr><td scope="row"><pre>        object:nil];<span></span></pre></td></tr></table></div><p>This implementation is limited in several aspects. First, all threaded notifications processed by this object must pass through the same method  (<code>processNotification:</code>). Second, each object must provide its own implementation and communication port. A better, but more complex, implementation would generalize the behavior into either a subclass of <code>NSNotificationCenter</code> or a separate class that would have one notification queue for each thread and be able to deliver notifications to multiple observer objects and methods.</p>
+
+        <br/><br/> 
+
+        <div class="mini_nav_text" align="left">
+        <span class="navButtons">
+        <a href="Posting.html">&lt; Previous Page</a><span style="margin-left: 8px"><a href="../RevisionHistory.html">Next Page &gt;</a></span>
+        </span>
+        <span id="showHideTOCLowerSpan">
+        <a href="#" onclick="showHideTOC();"><img src="../../../../Resources/Images/show_toc_icon.gif" width="15" height="14" border="0" style="margin-bottom: -2px;" alt="" /></a> <a href="#" onclick="showHideTOC();">Hide TOC</a>
+        </span>
+        </div>
+
+        <br/><hr /><div align="center"><p class="content_text" lang="en" dir="ltr"> <!--#if expr="0=1" -->&#x00a9; 2007 Apple Inc. All Rights Reserved. &#40;<!--#endif -->Last updated: 2007-05-03<!--#if expr="0=1" -->&#041;<!--#endif --></p></div>
+
+        
+        <div class="hideOnPrint hideInXcode">
+        <!-- start of footer -->
+        	<table width="100%" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/documentation/Cocoa/Conceptual/Notifications/Articles/Threading.html%3Fid%3D10000043i-2.4&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/documentation/Cocoa/Conceptual/Notifications/Articles/Threading.html%3Fid%3D10000043i-2.4&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/documentation/Cocoa/Conceptual/Notifications/Articles/Threading.html%3Fid%3D10000043i-2.4&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+
+        <!--#include virtual="/includes/framesetfooter" -->
+        <!-- end of footer -->
+        </div>
+    </div>
+</body>
+</html>

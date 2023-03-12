@@ -1,0 +1,2348 @@
+<HTML>
+<HEAD>
+<!-- This HTML file has been created by texi2html 1.51
+     from /SourceCache/gdb/gdb-960/src/gdb/doc/gdbint.texinfo on 18 May 2008 -->
+
+<TITLE>gdb Internals - Target Architecture Definition</TITLE>
+</HEAD>
+<BODY>
+Go to the <A HREF="gdbint_1.html">first</A>, <A HREF="gdbint_8.html">previous</A>, <A HREF="gdbint_10.html">next</A>, <A HREF="gdbint_20.html">last</A> section, <A HREF="gdbint_toc.html">table of contents</A>.
+<P><HR><P>
+
+
+<H1><A NAME="SEC63" HREF="gdbint_toc.html#TOC63">Target Architecture Definition</A></H1>
+
+<P>
+<A NAME="IDX196"></A>
+GDB's target architecture defines what sort of
+machine-language programs GDB can work with, and how it works
+with them.
+
+</P>
+<P>
+The target architecture object is implemented as the C structure
+<CODE>struct gdbarch *</CODE>.  The structure, and its methods, are generated
+using the Bourne shell script <TT>`gdbarch.sh'</TT>.
+
+</P>
+
+
+<H2><A NAME="SEC64" HREF="gdbint_toc.html#TOC64">Operating System ABI Variant Handling</A></H2>
+<P>
+<A NAME="IDX197"></A>
+
+</P>
+<P>
+GDB provides a mechanism for handling variations in OS
+ABIs.  An OS ABI variant may have influence over any number of
+variables in the target architecture definition.  There are two major
+components in the OS ABI mechanism: sniffers and handlers.
+
+</P>
+<P>
+A <STRONG>sniffer</STRONG> examines a file matching a BFD architecture/flavour pair
+(the architecture may be wildcarded) in an attempt to determine the
+OS ABI of that file.  Sniffers with a wildcarded architecture are considered
+to be <STRONG>generic</STRONG>, while sniffers for a specific architecture are
+considered to be <STRONG>specific</STRONG>.  A match from a specific sniffer
+overrides a match from a generic sniffer.  Multiple sniffers for an
+architecture/flavour may exist, in order to differentiate between two
+different operating systems which use the same basic file format.  The
+OS ABI framework provides a generic sniffer for ELF-format files which
+examines the <CODE>EI_OSABI</CODE> field of the ELF header, as well as note
+sections known to be used by several operating systems.
+
+</P>
+<P>
+<A NAME="IDX198"></A>
+A <STRONG>handler</STRONG> is used to fine-tune the <CODE>gdbarch</CODE> structure for the
+selected OS ABI.  There may be only one handler for a given OS ABI
+for each BFD architecture.
+
+</P>
+<P>
+The following OS ABI variants are defined in <TT>`osabi.h'</TT>:
+
+</P>
+<DL COMPACT>
+
+<DT><CODE>GDB_OSABI_UNKNOWN</CODE>
+<DD>
+<A NAME="IDX199"></A>
+ 
+The ABI of the inferior is unknown.  The default <CODE>gdbarch</CODE>
+settings for the architecture will be used.
+
+<A NAME="IDX200"></A>
+<DT><CODE>GDB_OSABI_SVR4</CODE>
+<DD>
+UNIX System V Release 4
+
+<A NAME="IDX201"></A>
+<DT><CODE>GDB_OSABI_HURD</CODE>
+<DD>
+GNU using the Hurd kernel
+
+<A NAME="IDX202"></A>
+<DT><CODE>GDB_OSABI_SOLARIS</CODE>
+<DD>
+Sun Solaris
+
+<A NAME="IDX203"></A>
+<DT><CODE>GDB_OSABI_OSF1</CODE>
+<DD>
+OSF/1, including Digital UNIX and Compaq Tru64 UNIX
+
+<A NAME="IDX204"></A>
+<DT><CODE>GDB_OSABI_LINUX</CODE>
+<DD>
+GNU using the Linux kernel
+
+<A NAME="IDX205"></A>
+<DT><CODE>GDB_OSABI_FREEBSD_AOUT</CODE>
+<DD>
+FreeBSD using the a.out executable format
+
+<A NAME="IDX206"></A>
+<DT><CODE>GDB_OSABI_FREEBSD_ELF</CODE>
+<DD>
+FreeBSD using the ELF executable format
+
+<A NAME="IDX207"></A>
+<DT><CODE>GDB_OSABI_NETBSD_AOUT</CODE>
+<DD>
+NetBSD using the a.out executable format
+
+<A NAME="IDX208"></A>
+<DT><CODE>GDB_OSABI_NETBSD_ELF</CODE>
+<DD>
+NetBSD using the ELF executable format
+
+<A NAME="IDX209"></A>
+<DT><CODE>GDB_OSABI_WINCE</CODE>
+<DD>
+Windows CE
+
+<A NAME="IDX210"></A>
+<DT><CODE>GDB_OSABI_GO32</CODE>
+<DD>
+DJGPP
+
+<A NAME="IDX211"></A>
+<DT><CODE>GDB_OSABI_NETWARE</CODE>
+<DD>
+Novell NetWare
+
+<A NAME="IDX212"></A>
+<DT><CODE>GDB_OSABI_ARM_EABI_V1</CODE>
+<DD>
+ARM Embedded ABI version 1
+
+<A NAME="IDX213"></A>
+<DT><CODE>GDB_OSABI_ARM_EABI_V2</CODE>
+<DD>
+ARM Embedded ABI version 2
+
+<A NAME="IDX214"></A>
+<DT><CODE>GDB_OSABI_ARM_APCS</CODE>
+<DD>
+Generic ARM Procedure Call Standard
+
+</DL>
+
+<P>
+Here are the functions that make up the OS ABI framework:
+
+</P>
+<P>
+<DL>
+<DT><U>Function:</U> const <B>char</B> <I>*gdbarch_osabi_name (enum gdb_osabi <VAR>osabi</VAR>)</I>
+<DD><A NAME="IDX215"></A>
+Return the name of the OS ABI corresponding to <VAR>osabi</VAR>.
+</DL>
+
+</P>
+<P>
+<DL>
+<DT><U>Function:</U> void <B>gdbarch_register_osabi</B> <I>(enum bfd_architecture <VAR>arch</VAR>, unsigned long <VAR>machine</VAR>, enum gdb_osabi <VAR>osabi</VAR>, void (*<VAR>init_osabi</VAR>)(struct gdbarch_info <VAR>info</VAR>, struct gdbarch *<VAR>gdbarch</VAR>))</I>
+<DD><A NAME="IDX216"></A>
+Register the OS ABI handler specified by <VAR>init_osabi</VAR> for the
+architecture, machine type and OS ABI specified by <VAR>arch</VAR>,
+<VAR>machine</VAR> and <VAR>osabi</VAR>.  In most cases, a value of zero for the
+machine type, which implies the architecture's default machine type,
+will suffice.
+</DL>
+
+</P>
+<P>
+<DL>
+<DT><U>Function:</U> void <B>gdbarch_register_osabi_sniffer</B> <I>(enum bfd_architecture <VAR>arch</VAR>, enum bfd_flavour <VAR>flavour</VAR>, enum gdb_osabi (*<VAR>sniffer</VAR>)(bfd *<VAR>abfd</VAR>))</I>
+<DD><A NAME="IDX217"></A>
+Register the OS ABI file sniffer specified by <VAR>sniffer</VAR> for the
+BFD architecture/flavour pair specified by <VAR>arch</VAR> and <VAR>flavour</VAR>.
+If <VAR>arch</VAR> is <CODE>bfd_arch_unknown</CODE>, the sniffer is considered to
+be generic, and is allowed to examine <VAR>flavour</VAR>-flavoured files for
+any architecture.
+</DL>
+
+</P>
+<P>
+<DL>
+<DT><U>Function:</U> enum <B>gdb_osabi</B> <I>gdbarch_lookup_osabi (bfd *<VAR>abfd</VAR>)</I>
+<DD><A NAME="IDX218"></A>
+Examine the file described by <VAR>abfd</VAR> to determine its OS ABI.
+The value <CODE>GDB_OSABI_UNKNOWN</CODE> is returned if the OS ABI cannot
+be determined.
+</DL>
+
+</P>
+<P>
+<DL>
+<DT><U>Function:</U> void <B>gdbarch_init_osabi</B> <I>(struct gdbarch info <VAR>info</VAR>, struct gdbarch *<VAR>gdbarch</VAR>, enum gdb_osabi <VAR>osabi</VAR>)</I>
+<DD><A NAME="IDX219"></A>
+Invoke the OS ABI handler corresponding to <VAR>osabi</VAR> to fine-tune the
+<CODE>gdbarch</CODE> structure specified by <VAR>gdbarch</VAR>.  If a handler
+corresponding to <VAR>osabi</VAR> has not been registered for <VAR>gdbarch</VAR>'s
+architecture, a warning will be issued and the debugging session will continue
+with the defaults already established for <VAR>gdbarch</VAR>.
+</DL>
+
+</P>
+
+
+<H2><A NAME="SEC65" HREF="gdbint_toc.html#TOC65">Registers and Memory</A></H2>
+
+<P>
+GDB's model of the target machine is rather simple.
+GDB assumes the machine includes a bank of registers and a
+block of memory.  Each register may have a different size.
+
+</P>
+<P>
+GDB does not have a magical way to match up with the
+compiler's idea of which registers are which; however, it is critical
+that they do match up accurately.  The only way to make this work is
+to get accurate information about the order that the compiler uses,
+and to reflect that in the <CODE>REGISTER_NAME</CODE> and related macros.
+
+</P>
+<P>
+GDB can handle big-endian, little-endian, and bi-endian architectures.
+
+</P>
+
+
+<H2><A NAME="SEC66" HREF="gdbint_toc.html#TOC66">Pointers Are Not Always Addresses</A></H2>
+<P>
+<A NAME="IDX220"></A>
+<A NAME="IDX221"></A>
+<A NAME="IDX222"></A>
+<A NAME="IDX223"></A>
+<A NAME="IDX224"></A>
+<A NAME="IDX225"></A>
+<A NAME="IDX226"></A>
+<A NAME="IDX227"></A>
+<A NAME="IDX228"></A>
+
+</P>
+<P>
+On almost all 32-bit architectures, the representation of a pointer is
+indistinguishable from the representation of some fixed-length number
+whose value is the byte address of the object pointed to.  On such
+machines, the words "pointer" and "address" can be used interchangeably.
+However, architectures with smaller word sizes are often cramped for
+address space, so they may choose a pointer representation that breaks this
+identity, and allows a larger code address space.
+
+</P>
+<P>
+For example, the Renesas D10V is a 16-bit VLIW processor whose
+instructions are 32 bits long<A NAME="DOCF3" HREF="gdbint_foot.html#FOOT3">(3)</A>.
+If the D10V used ordinary byte addresses to refer to code locations,
+then the processor would only be able to address 64kb of instructions.
+However, since instructions must be aligned on four-byte boundaries, the
+low two bits of any valid instruction's byte address are always
+zero--byte addresses waste two bits.  So instead of byte addresses,
+the D10V uses word addresses--byte addresses shifted right two bits--to
+refer to code.  Thus, the D10V can use 16-bit words to address 256kb of
+code space.
+
+</P>
+<P>
+However, this means that code pointers and data pointers have different
+forms on the D10V.  The 16-bit word <CODE>0xC020</CODE> refers to byte address
+<CODE>0xC020</CODE> when used as a data address, but refers to byte address
+<CODE>0x30080</CODE> when used as a code address.
+
+</P>
+<P>
+(The D10V also uses separate code and data address spaces, which also
+affects the correspondence between pointers and addresses, but we're
+going to ignore that here; this example is already too long.)
+
+</P>
+<P>
+To cope with architectures like this--the D10V is not the only
+one!---GDB tries to distinguish between <STRONG>addresses</STRONG>, which are
+byte numbers, and <STRONG>pointers</STRONG>, which are the target's representation
+of an address of a particular type of data.  In the example above,
+<CODE>0xC020</CODE> is the pointer, which refers to one of the addresses
+<CODE>0xC020</CODE> or <CODE>0x30080</CODE>, depending on the type imposed upon it.
+GDB provides functions for turning a pointer into an address
+and vice versa, in the appropriate way for the current architecture.
+
+</P>
+<P>
+Unfortunately, since addresses and pointers are identical on almost all
+processors, this distinction tends to bit-rot pretty quickly.  Thus,
+each time you port GDB to an architecture which does
+distinguish between pointers and addresses, you'll probably need to
+clean up some architecture-independent code.
+
+</P>
+<P>
+Here are functions which convert between pointers and addresses:
+
+</P>
+<P>
+<DL>
+<DT><U>Function:</U> CORE_ADDR <B>extract_typed_address</B> <I>(void *<VAR>buf</VAR>, struct type *<VAR>type</VAR>)</I>
+<DD><A NAME="IDX229"></A>
+Treat the bytes at <VAR>buf</VAR> as a pointer or reference of type
+<VAR>type</VAR>, and return the address it represents, in a manner
+appropriate for the current architecture.  This yields an address
+GDB can use to read target memory, disassemble, etc.  Note that
+<VAR>buf</VAR> refers to a buffer in GDB's memory, not the
+inferior's.
+
+</P>
+<P>
+For example, if the current architecture is the Intel x86, this function
+extracts a little-endian integer of the appropriate length from
+<VAR>buf</VAR> and returns it.  However, if the current architecture is the
+D10V, this function will return a 16-bit integer extracted from
+<VAR>buf</VAR>, multiplied by four if <VAR>type</VAR> is a pointer to a function.
+
+</P>
+<P>
+If <VAR>type</VAR> is not a pointer or reference type, then this function
+will signal an internal error.
+</DL>
+
+</P>
+<P>
+<DL>
+<DT><U>Function:</U> CORE_ADDR <B>store_typed_address</B> <I>(void *<VAR>buf</VAR>, struct type *<VAR>type</VAR>, CORE_ADDR <VAR>addr</VAR>)</I>
+<DD><A NAME="IDX230"></A>
+Store the address <VAR>addr</VAR> in <VAR>buf</VAR>, in the proper format for a
+pointer of type <VAR>type</VAR> in the current architecture.  Note that
+<VAR>buf</VAR> refers to a buffer in GDB's memory, not the
+inferior's.
+
+</P>
+<P>
+For example, if the current architecture is the Intel x86, this function
+stores <VAR>addr</VAR> unmodified as a little-endian integer of the
+appropriate length in <VAR>buf</VAR>.  However, if the current architecture
+is the D10V, this function divides <VAR>addr</VAR> by four if <VAR>type</VAR> is
+a pointer to a function, and then stores it in <VAR>buf</VAR>.
+
+</P>
+<P>
+If <VAR>type</VAR> is not a pointer or reference type, then this function
+will signal an internal error.
+</DL>
+
+</P>
+<P>
+<DL>
+<DT><U>Function:</U> CORE_ADDR <B>value_as_address</B> <I>(struct value *<VAR>val</VAR>)</I>
+<DD><A NAME="IDX231"></A>
+Assuming that <VAR>val</VAR> is a pointer, return the address it represents,
+as appropriate for the current architecture.
+
+</P>
+<P>
+This function actually works on integral values, as well as pointers.
+For pointers, it performs architecture-specific conversions as
+described above for <CODE>extract_typed_address</CODE>.
+</DL>
+
+</P>
+<P>
+<DL>
+<DT><U>Function:</U> CORE_ADDR <B>value_from_pointer</B> <I>(struct type *<VAR>type</VAR>, CORE_ADDR <VAR>addr</VAR>)</I>
+<DD><A NAME="IDX232"></A>
+Create and return a value representing a pointer of type <VAR>type</VAR> to
+the address <VAR>addr</VAR>, as appropriate for the current architecture.
+This function performs architecture-specific conversions as described
+above for <CODE>store_typed_address</CODE>.
+</DL>
+
+</P>
+<P>
+Here are some macros which architectures can define to indicate the
+relationship between pointers and addresses.  These have default
+definitions, appropriate for architectures on which all pointers are
+simple unsigned byte addresses.
+
+</P>
+<P>
+<DL>
+<DT><U>Target Macro:</U> CORE_ADDR <B>POINTER_TO_ADDRESS</B> <I>(struct type *<VAR>type</VAR>, char *<VAR>buf</VAR>)</I>
+<DD><A NAME="IDX233"></A>
+Assume that <VAR>buf</VAR> holds a pointer of type <VAR>type</VAR>, in the
+appropriate format for the current architecture.  Return the byte
+address the pointer refers to.
+
+</P>
+<P>
+This function may safely assume that <VAR>type</VAR> is either a pointer or a
+C<TT>++</TT> reference type.
+</DL>
+
+</P>
+<P>
+<DL>
+<DT><U>Target Macro:</U> void <B>ADDRESS_TO_POINTER</B> <I>(struct type *<VAR>type</VAR>, char *<VAR>buf</VAR>, CORE_ADDR <VAR>addr</VAR>)</I>
+<DD><A NAME="IDX234"></A>
+Store in <VAR>buf</VAR> a pointer of type <VAR>type</VAR> representing the address
+<VAR>addr</VAR>, in the appropriate format for the current architecture.
+
+</P>
+<P>
+This function may safely assume that <VAR>type</VAR> is either a pointer or a
+C<TT>++</TT> reference type.
+</DL>
+
+</P>
+
+
+<H2><A NAME="SEC67" HREF="gdbint_toc.html#TOC67">Address Classes</A></H2>
+<P>
+<A NAME="IDX235"></A>
+<A NAME="IDX236"></A>
+<A NAME="IDX237"></A>
+
+</P>
+<P>
+Sometimes information about different kinds of addresses is available
+via the debug information.  For example, some programming environments
+define addresses of several different sizes.  If the debug information
+distinguishes these kinds of address classes through either the size
+info (e.g, <CODE>DW_AT_byte_size</CODE> in DWARF 2) or through an explicit
+address class attribute (e.g, <CODE>DW_AT_address_class</CODE> in DWARF 2), the
+following macros should be defined in order to disambiguate these
+types within GDB as well as provide the added information to
+a GDB user when printing type expressions.
+
+</P>
+<P>
+<DL>
+<DT><U>Target Macro:</U> int <B>ADDRESS_CLASS_TYPE_FLAGS</B> <I>(int <VAR>byte_size</VAR>, int <VAR>dwarf2_addr_class</VAR>)</I>
+<DD><A NAME="IDX238"></A>
+Returns the type flags needed to construct a pointer type whose size
+is <VAR>byte_size</VAR> and whose address class is <VAR>dwarf2_addr_class</VAR>.
+This function is normally called from within a symbol reader.  See
+<TT>`dwarf2read.c'</TT>.
+</DL>
+
+</P>
+<P>
+<DL>
+<DT><U>Target Macro:</U> char <B>*ADDRESS_CLASS_TYPE_FLAGS_TO_NAME</B> <I>(int <VAR>type_flags</VAR>)</I>
+<DD><A NAME="IDX239"></A>
+Given the type flags representing an address class qualifier, return
+its name.
+</DL>
+<DL>
+<DT><U>Target Macro:</U> int <B>ADDRESS_CLASS_NAME_to_TYPE_FLAGS</B> <I>(int <VAR>name</VAR>, int *var{type_flags_ptr})</I>
+<DD><A NAME="IDX240"></A>
+Given an address qualifier name, set the <CODE>int</CODE> refererenced by <VAR>type_flags_ptr</VAR> to the type flags
+for that address class qualifier.
+</DL>
+
+</P>
+<P>
+Since the need for address classes is rather rare, none of
+the address class macros defined by default.  Predicate
+macros are provided to detect when they are defined.
+
+</P>
+<P>
+Consider a hypothetical architecture in which addresses are normally
+32-bits wide, but 16-bit addresses are also supported.  Furthermore,
+suppose that the DWARF 2 information for this architecture simply
+uses a <CODE>DW_AT_byte_size</CODE> value of 2 to indicate the use of one
+of these "short" pointers.  The following functions could be defined
+to implement the address class macros:
+
+</P>
+
+<PRE>
+somearch_address_class_type_flags (int byte_size,
+                                   int dwarf2_addr_class)
+{
+  if (byte_size == 2)
+    return TYPE_FLAG_ADDRESS_CLASS_1;
+  else
+    return 0;
+}
+
+static char *
+somearch_address_class_type_flags_to_name (int type_flags)
+{
+  if (type_flags &#38; TYPE_FLAG_ADDRESS_CLASS_1)
+    return "short";
+  else
+    return NULL;
+}
+
+int
+somearch_address_class_name_to_type_flags (char *name,
+                                           int *type_flags_ptr)
+{
+  if (strcmp (name, "short") == 0)
+    {
+      *type_flags_ptr = TYPE_FLAG_ADDRESS_CLASS_1;
+      return 1;
+    }
+  else
+    return 0;
+}
+</PRE>
+
+<P>
+The qualifier <CODE>@short</CODE> is used in GDB's type expressions
+to indicate the presence of one of these "short" pointers.  E.g, if
+the debug information indicates that <CODE>short_ptr_var</CODE> is one of these
+short pointers, GDB might show the following behavior:
+
+</P>
+
+<PRE>
+(gdb) ptype short_ptr_var
+type = int * @short
+</PRE>
+
+
+
+<H2><A NAME="SEC68" HREF="gdbint_toc.html#TOC68">Raw and Virtual Register Representations</A></H2>
+<P>
+<A NAME="IDX241"></A>
+<A NAME="IDX242"></A>
+<A NAME="IDX243"></A>
+
+</P>
+<P>
+<EM>Maintainer note: This section is pretty much obsolete.  The
+functionality described here has largely been replaced by
+pseudo-registers and the mechanisms described in section <A HREF="gdbint_9.html#SEC63">Target Architecture Definition</A>.  See also @uref{http://www.gnu.org/software/gdb/bugs/,
+Bug Tracking Database</EM> and
+@uref{http://sources.redhat.com/gdb/current/ari/, ARI Index} for more
+up-to-date information.}
+
+</P>
+<P>
+Some architectures use one representation for a value when it lives in a
+register, but use a different representation when it lives in memory.
+In GDB's terminology, the <STRONG>raw</STRONG> representation is the one used in
+the target registers, and the <STRONG>virtual</STRONG> representation is the one
+used in memory, and within GDB <CODE>struct value</CODE> objects.
+
+</P>
+<P>
+<EM>Maintainer note: Notice that the same mechanism is being used to
+both convert a register to a <CODE>struct value</CODE> and alternative
+register forms.</EM>
+
+</P>
+<P>
+For almost all data types on almost all architectures, the virtual and
+raw representations are identical, and no special handling is needed.
+However, they do occasionally differ.  For example:
+
+</P>
+
+<UL>
+<LI>
+
+The x86 architecture supports an 80-bit <CODE>long double</CODE> type.  However, when
+we store those values in memory, they occupy twelve bytes: the
+floating-point number occupies the first ten, and the final two bytes
+are unused.  This keeps the values aligned on four-byte boundaries,
+allowing more efficient access.  Thus, the x86 80-bit floating-point
+type is the raw representation, and the twelve-byte loosely-packed
+arrangement is the virtual representation.
+
+<LI>
+
+Some 64-bit MIPS targets present 32-bit registers to GDB as 64-bit
+registers, with garbage in their upper bits.  GDB ignores the top 32
+bits.  Thus, the 64-bit form, with garbage in the upper 32 bits, is the
+raw representation, and the trimmed 32-bit representation is the
+virtual representation.
+</UL>
+
+<P>
+In general, the raw representation is determined by the architecture, or
+GDB's interface to the architecture, while the virtual representation
+can be chosen for GDB's convenience.  GDB's register file,
+<CODE>registers</CODE>, holds the register contents in raw format, and the
+GDB remote protocol transmits register values in raw format.
+
+</P>
+<P>
+Your architecture may define the following macros to request
+conversions between the raw and virtual format:
+
+</P>
+<P>
+<DL>
+<DT><U>Target Macro:</U> int <B>REGISTER_CONVERTIBLE</B> <I>(int <VAR>reg</VAR>)</I>
+<DD><A NAME="IDX244"></A>
+Return non-zero if register number <VAR>reg</VAR>'s value needs different raw
+and virtual formats.
+
+</P>
+<P>
+You should not use <CODE>REGISTER_CONVERT_TO_VIRTUAL</CODE> for a register
+unless this macro returns a non-zero value for that register.
+</DL>
+
+</P>
+<P>
+<DL>
+<DT><U>Target Macro:</U> int <B>DEPRECATED_REGISTER_RAW_SIZE</B> <I>(int <VAR>reg</VAR>)</I>
+<DD><A NAME="IDX245"></A>
+The size of register number <VAR>reg</VAR>'s raw value.  This is the number
+of bytes the register will occupy in <CODE>registers</CODE>, or in a GDB
+remote protocol packet.
+</DL>
+
+</P>
+<P>
+<DL>
+<DT><U>Target Macro:</U> int <B>DEPRECATED_REGISTER_VIRTUAL_SIZE</B> <I>(int <VAR>reg</VAR>)</I>
+<DD><A NAME="IDX246"></A>
+The size of register number <VAR>reg</VAR>'s value, in its virtual format.
+This is the size a <CODE>struct value</CODE>'s buffer will have, holding that
+register's value.
+</DL>
+
+</P>
+<P>
+<DL>
+<DT><U>Target Macro:</U> struct <B>type</B> <I>*DEPRECATED_REGISTER_VIRTUAL_TYPE (int <VAR>reg</VAR>)</I>
+<DD><A NAME="IDX247"></A>
+This is the type of the virtual representation of register number
+<VAR>reg</VAR>.  Note that there is no need for a macro giving a type for the
+register's raw form; once the register's value has been obtained, GDB
+always uses the virtual form.
+</DL>
+
+</P>
+<P>
+<DL>
+<DT><U>Target Macro:</U> void <B>REGISTER_CONVERT_TO_VIRTUAL</B> <I>(int <VAR>reg</VAR>, struct type *<VAR>type</VAR>, char *<VAR>from</VAR>, char *<VAR>to</VAR>)</I>
+<DD><A NAME="IDX248"></A>
+Convert the value of register number <VAR>reg</VAR> to <VAR>type</VAR>, which
+should always be <CODE>DEPRECATED_REGISTER_VIRTUAL_TYPE (<VAR>reg</VAR>)</CODE>.  The buffer
+at <VAR>from</VAR> holds the register's value in raw format; the macro should
+convert the value to virtual format, and place it at <VAR>to</VAR>.
+
+</P>
+<P>
+Note that <CODE>REGISTER_CONVERT_TO_VIRTUAL</CODE> and
+<CODE>REGISTER_CONVERT_TO_RAW</CODE> take their <VAR>reg</VAR> and <VAR>type</VAR>
+arguments in different orders.
+
+</P>
+<P>
+You should only use <CODE>REGISTER_CONVERT_TO_VIRTUAL</CODE> with registers
+for which the <CODE>REGISTER_CONVERTIBLE</CODE> macro returns a non-zero
+value.
+</DL>
+
+</P>
+<P>
+<DL>
+<DT><U>Target Macro:</U> void <B>REGISTER_CONVERT_TO_RAW</B> <I>(struct type *<VAR>type</VAR>, int <VAR>reg</VAR>, char *<VAR>from</VAR>, char *<VAR>to</VAR>)</I>
+<DD><A NAME="IDX249"></A>
+Convert the value of register number <VAR>reg</VAR> to <VAR>type</VAR>, which
+should always be <CODE>DEPRECATED_REGISTER_VIRTUAL_TYPE (<VAR>reg</VAR>)</CODE>.  The buffer
+at <VAR>from</VAR> holds the register's value in raw format; the macro should
+convert the value to virtual format, and place it at <VAR>to</VAR>.
+
+</P>
+<P>
+Note that REGISTER_CONVERT_TO_VIRTUAL and REGISTER_CONVERT_TO_RAW take
+their <VAR>reg</VAR> and <VAR>type</VAR> arguments in different orders.
+</DL>
+
+</P>
+
+
+
+<H2><A NAME="SEC69" HREF="gdbint_toc.html#TOC69">Using Different Register and Memory Data Representations</A></H2>
+<P>
+<A NAME="IDX250"></A>
+<A NAME="IDX251"></A>
+<A NAME="IDX252"></A>
+<A NAME="IDX253"></A>
+<A NAME="IDX254"></A>
+
+</P>
+<P>
+<EM>Maintainer's note: The way GDB manipulates registers is undergoing
+significant change.  Many of the macros and functions refered to in this
+section are likely to be subject to further revision.  See
+@uref{http://sources.redhat.com/gdb/current/ari/, A.R. Index</EM> and
+@uref{http://www.gnu.org/software/gdb/bugs, Bug Tracking Database} for
+further information.  cagney/2002-05-06.}
+
+</P>
+<P>
+Some architectures can represent a data object in a register using a
+form that is different to the objects more normal memory representation.
+For example:
+
+</P>
+
+<UL>
+
+<LI>
+
+The Alpha architecture can represent 32 bit integer values in
+floating-point registers.
+
+<LI>
+
+The x86 architecture supports 80-bit floating-point registers.  The
+<CODE>long double</CODE> data type occupies 96 bits in memory but only 80 bits
+when stored in a register.
+
+</UL>
+
+<P>
+In general, the register representation of a data type is determined by
+the architecture, or GDB's interface to the architecture, while
+the memory representation is determined by the Application Binary
+Interface.
+
+</P>
+<P>
+For almost all data types on almost all architectures, the two
+representations are identical, and no special handling is needed.
+However, they do occasionally differ.  Your architecture may define the
+following macros to request conversions between the register and memory
+representations of a data type:
+
+</P>
+<P>
+<DL>
+<DT><U>Target Macro:</U> int <B>CONVERT_REGISTER_P</B> <I>(int <VAR>reg</VAR>)</I>
+<DD><A NAME="IDX255"></A>
+Return non-zero if the representation of a data value stored in this
+register may be different to the representation of that same data value
+when stored in memory.
+
+</P>
+<P>
+When non-zero, the macros <CODE>REGISTER_TO_VALUE</CODE> and
+<CODE>VALUE_TO_REGISTER</CODE> are used to perform any necessary conversion.
+</DL>
+
+</P>
+<P>
+<DL>
+<DT><U>Target Macro:</U> void <B>REGISTER_TO_VALUE</B> <I>(int <VAR>reg</VAR>, struct type *<VAR>type</VAR>, char *<VAR>from</VAR>, char *<VAR>to</VAR>)</I>
+<DD><A NAME="IDX256"></A>
+Convert the value of register number <VAR>reg</VAR> to a data object of type
+<VAR>type</VAR>.  The buffer at <VAR>from</VAR> holds the register's value in raw
+format; the converted value should be placed in the buffer at <VAR>to</VAR>.
+
+</P>
+<P>
+Note that <CODE>REGISTER_TO_VALUE</CODE> and <CODE>VALUE_TO_REGISTER</CODE> take
+their <VAR>reg</VAR> and <VAR>type</VAR> arguments in different orders.
+
+</P>
+<P>
+You should only use <CODE>REGISTER_TO_VALUE</CODE> with registers for which
+the <CODE>CONVERT_REGISTER_P</CODE> macro returns a non-zero value.
+</DL>
+
+</P>
+<P>
+<DL>
+<DT><U>Target Macro:</U> void <B>VALUE_TO_REGISTER</B> <I>(struct type *<VAR>type</VAR>, int <VAR>reg</VAR>, char *<VAR>from</VAR>, char *<VAR>to</VAR>)</I>
+<DD><A NAME="IDX257"></A>
+Convert a data value of type <VAR>type</VAR> to register number <VAR>reg</VAR>'
+raw format.
+
+</P>
+<P>
+Note that <CODE>REGISTER_TO_VALUE</CODE> and <CODE>VALUE_TO_REGISTER</CODE> take
+their <VAR>reg</VAR> and <VAR>type</VAR> arguments in different orders.
+
+</P>
+<P>
+You should only use <CODE>VALUE_TO_REGISTER</CODE> with registers for which
+the <CODE>CONVERT_REGISTER_P</CODE> macro returns a non-zero value.
+</DL>
+
+</P>
+<P>
+<DL>
+<DT><U>Target Macro:</U> void <B>REGISTER_CONVERT_TO_TYPE</B> <I>(int <VAR>regnum</VAR>, struct type *<VAR>type</VAR>, char *<VAR>buf</VAR>)</I>
+<DD><A NAME="IDX258"></A>
+See <TT>`mips-tdep.c'</TT>.  It does not do what you want.
+</DL>
+
+</P>
+
+
+
+<H2><A NAME="SEC70" HREF="gdbint_toc.html#TOC70">Frame Interpretation</A></H2>
+
+
+
+<H2><A NAME="SEC71" HREF="gdbint_toc.html#TOC71">Inferior Call Setup</A></H2>
+
+
+
+<H2><A NAME="SEC72" HREF="gdbint_toc.html#TOC72">Compiler Characteristics</A></H2>
+
+
+
+<H2><A NAME="SEC73" HREF="gdbint_toc.html#TOC73">Target Conditionals</A></H2>
+
+<P>
+This section describes the macros that you can use to define the target
+machine.
+
+</P>
+<DL COMPACT>
+
+<DT><CODE>ADDR_BITS_REMOVE (addr)</CODE>
+<DD>
+<A NAME="IDX259"></A>
+If a raw machine instruction address includes any bits that are not
+really part of the address, then define this macro to expand into an
+expression that zeroes those bits in <VAR>addr</VAR>.  This is only used for
+addresses of instructions, and even then not in all contexts.
+
+For example, the two low-order bits of the PC on the Hewlett-Packard PA
+2.0 architecture contain the privilege level of the corresponding
+instruction.  Since instructions must always be aligned on four-byte
+boundaries, the processor masks out these bits to generate the actual
+address of the instruction.  ADDR_BITS_REMOVE should filter out these
+bits with an expression such as <CODE>((addr) &#38; ~3)</CODE>.
+
+<DT><CODE>ADDRESS_CLASS_NAME_TO_TYPE_FLAGS (<VAR>name</VAR>, <VAR>type_flags_ptr</VAR>)</CODE>
+<DD>
+<A NAME="IDX260"></A>
+If <VAR>name</VAR> is a valid address class qualifier name, set the <CODE>int</CODE>
+referenced by <VAR>type_flags_ptr</VAR> to the mask representing the qualifier
+and return 1.  If <VAR>name</VAR> is not a valid address class qualifier name,
+return 0.
+
+The value for <VAR>type_flags_ptr</VAR> should be one of
+<CODE>TYPE_FLAG_ADDRESS_CLASS_1</CODE>, <CODE>TYPE_FLAG_ADDRESS_CLASS_2</CODE>, or
+possibly some combination of these values or'd together.
+See section <A HREF="gdbint_9.html#SEC63">Target Architecture Definition</A>.
+
+<DT><CODE>ADDRESS_CLASS_NAME_TO_TYPE_FLAGS_P ()</CODE>
+<DD>
+<A NAME="IDX261"></A>
+Predicate which indicates whether <CODE>ADDRESS_CLASS_NAME_TO_TYPE_FLAGS</CODE>
+has been defined.
+
+<DT><CODE>ADDRESS_CLASS_TYPE_FLAGS (<VAR>byte_size</VAR>, <VAR>dwarf2_addr_class</VAR>)</CODE>
+<DD>
+<A NAME="IDX262"></A>
+Given a pointers byte size (as described by the debug information) and
+the possible <CODE>DW_AT_address_class</CODE> value, return the type flags
+used by GDB to represent this address class.  The value
+returned should be one of <CODE>TYPE_FLAG_ADDRESS_CLASS_1</CODE>,
+<CODE>TYPE_FLAG_ADDRESS_CLASS_2</CODE>, or possibly some combination of these
+values or'd together.
+See section <A HREF="gdbint_9.html#SEC63">Target Architecture Definition</A>.
+
+<DT><CODE>ADDRESS_CLASS_TYPE_FLAGS_P ()</CODE>
+<DD>
+<A NAME="IDX263"></A>
+Predicate which indicates whether <CODE>ADDRESS_CLASS_TYPE_FLAGS</CODE> has
+been defined.
+
+<DT><CODE>ADDRESS_CLASS_TYPE_FLAGS_TO_NAME (<VAR>type_flags</VAR>)</CODE>
+<DD>
+<A NAME="IDX264"></A>
+Return the name of the address class qualifier associated with the type
+flags given by <VAR>type_flags</VAR>.
+
+<DT><CODE>ADDRESS_CLASS_TYPE_FLAGS_TO_NAME_P ()</CODE>
+<DD>
+<A NAME="IDX265"></A>
+Predicate which indicates whether <CODE>ADDRESS_CLASS_TYPE_FLAGS_TO_NAME</CODE> has
+been defined.
+See section <A HREF="gdbint_9.html#SEC63">Target Architecture Definition</A>.
+
+<DT><CODE>ADDRESS_TO_POINTER (<VAR>type</VAR>, <VAR>buf</VAR>, <VAR>addr</VAR>)</CODE>
+<DD>
+<A NAME="IDX266"></A>
+Store in <VAR>buf</VAR> a pointer of type <VAR>type</VAR> representing the address
+<VAR>addr</VAR>, in the appropriate format for the current architecture.
+This macro may safely assume that <VAR>type</VAR> is either a pointer or a
+C<TT>++</TT> reference type.
+See section <A HREF="gdbint_9.html#SEC63">Target Architecture Definition</A>.
+
+<DT><CODE>BELIEVE_PCC_PROMOTION</CODE>
+<DD>
+<A NAME="IDX267"></A>
+Define if the compiler promotes a <CODE>short</CODE> or <CODE>char</CODE>
+parameter to an <CODE>int</CODE>, but still reports the parameter as its
+original type, rather than the promoted type.
+
+<DT><CODE>BITS_BIG_ENDIAN</CODE>
+<DD>
+<A NAME="IDX268"></A>
+Define this if the numbering of bits in the targets does <STRONG>not</STRONG> match the
+endianness of the target byte order.  A value of 1 means that the bits
+are numbered in a big-endian bit order, 0 means little-endian.
+
+<DT><CODE>BREAKPOINT</CODE>
+<DD>
+<A NAME="IDX269"></A>
+This is the character array initializer for the bit pattern to put into
+memory where a breakpoint is set.  Although it's common to use a trap
+instruction for a breakpoint, it's not required; for instance, the bit
+pattern could be an invalid instruction.  The breakpoint must be no
+longer than the shortest instruction of the architecture.
+
+<CODE>BREAKPOINT</CODE> has been deprecated in favor of
+<CODE>BREAKPOINT_FROM_PC</CODE>.
+
+<DT><CODE>BIG_BREAKPOINT</CODE>
+<DD>
+<DT><CODE>LITTLE_BREAKPOINT</CODE>
+<DD>
+<A NAME="IDX270"></A>
+<A NAME="IDX271"></A>
+Similar to BREAKPOINT, but used for bi-endian targets.
+
+<CODE>BIG_BREAKPOINT</CODE> and <CODE>LITTLE_BREAKPOINT</CODE> have been deprecated in
+favor of <CODE>BREAKPOINT_FROM_PC</CODE>.
+
+<DT><CODE>DEPRECATED_REMOTE_BREAKPOINT</CODE>
+<DD>
+<DT><CODE>DEPRECATED_LITTLE_REMOTE_BREAKPOINT</CODE>
+<DD>
+<DT><CODE>DEPRECATED_BIG_REMOTE_BREAKPOINT</CODE>
+<DD>
+<A NAME="IDX272"></A>
+<A NAME="IDX273"></A>
+<A NAME="IDX274"></A>
+Specify the breakpoint instruction sequence for a remote target.
+<CODE>DEPRECATED_REMOTE_BREAKPOINT</CODE>,
+<CODE>DEPRECATED_BIG_REMOTE_BREAKPOINT</CODE> and
+<CODE>DEPRECATED_LITTLE_REMOTE_BREAKPOINT</CODE> have been deprecated in
+favor of <CODE>BREAKPOINT_FROM_PC</CODE> (@xref{BREAKPOINT_FROM_PC}).
+
+<DT><CODE>BREAKPOINT_FROM_PC (<VAR>pcptr</VAR>, <VAR>lenptr</VAR>)</CODE>
+<DD>
+<A NAME="IDX275"></A>
+@anchor{BREAKPOINT_FROM_PC} Use the program counter to determine the
+contents and size of a breakpoint instruction.  It returns a pointer to
+a string of bytes that encode a breakpoint instruction, stores the
+length of the string to <CODE>*<VAR>lenptr</VAR></CODE>, and adjusts the program
+counter (if necessary) to point to the actual memory location where the
+breakpoint should be inserted.
+
+Although it is common to use a trap instruction for a breakpoint, it's
+not required; for instance, the bit pattern could be an invalid
+instruction.  The breakpoint must be no longer than the shortest
+instruction of the architecture.
+
+Replaces all the other <VAR>BREAKPOINT</VAR> macros.
+
+<DT><CODE>MEMORY_INSERT_BREAKPOINT (<VAR>addr</VAR>, <VAR>contents_cache</VAR>)</CODE>
+<DD>
+<DT><CODE>MEMORY_REMOVE_BREAKPOINT (<VAR>addr</VAR>, <VAR>contents_cache</VAR>)</CODE>
+<DD>
+<A NAME="IDX276"></A>
+<A NAME="IDX277"></A>
+Insert or remove memory based breakpoints.  Reasonable defaults
+(<CODE>default_memory_insert_breakpoint</CODE> and
+<CODE>default_memory_remove_breakpoint</CODE> respectively) have been
+provided so that it is not necessary to define these for most
+architectures.  Architectures which may want to define
+<CODE>MEMORY_INSERT_BREAKPOINT</CODE> and <CODE>MEMORY_REMOVE_BREAKPOINT</CODE> will
+likely have instructions that are oddly sized or are not stored in a
+conventional manner.
+
+It may also be desirable (from an efficiency standpoint) to define
+custom breakpoint insertion and removal routines if
+<CODE>BREAKPOINT_FROM_PC</CODE> needs to read the target's memory for some
+reason.
+
+<DT><CODE>ADJUST_BREAKPOINT_ADDRESS (<VAR>address</VAR>)</CODE>
+<DD>
+<A NAME="IDX278"></A>
+<A NAME="IDX279"></A>
+Given an address at which a breakpoint is desired, return a breakpoint
+address adjusted to account for architectural constraints on
+breakpoint placement.  This method is not needed by most targets.
+
+The FR-V target (see <TT>`frv-tdep.c'</TT>) requires this method.
+The FR-V is a VLIW architecture in which a number of RISC-like
+instructions are grouped (packed) together into an aggregate
+instruction or instruction bundle.  When the processor executes
+one of these bundles, the component instructions are executed
+in parallel.
+
+In the course of optimization, the compiler may group instructions
+from distinct source statements into the same bundle.  The line number
+information associated with one of the latter statements will likely
+refer to some instruction other than the first one in the bundle.  So,
+if the user attempts to place a breakpoint on one of these latter
+statements, GDB must be careful to <EM>not</EM> place the break
+instruction on any instruction other than the first one in the bundle.
+(Remember though that the instructions within a bundle execute
+in parallel, so the <EM>first</EM> instruction is the instruction
+at the lowest address and has nothing to do with execution order.)
+
+The FR-V's <CODE>ADJUST_BREAKPOINT_ADDRESS</CODE> method will adjust a
+breakpoint's address by scanning backwards for the beginning of
+the bundle, returning the address of the bundle.
+
+Since the adjustment of a breakpoint may significantly alter a user's
+expectation, GDB prints a warning when an adjusted breakpoint
+is initially set and each time that that breakpoint is hit.
+
+<DT><CODE>CALL_DUMMY_LOCATION</CODE>
+<DD>
+<A NAME="IDX280"></A>
+See the file <TT>`inferior.h'</TT>.
+
+This method has been replaced by <CODE>push_dummy_code</CODE>
+(@xref{push_dummy_code}).
+
+<DT><CODE>CANNOT_FETCH_REGISTER (<VAR>regno</VAR>)</CODE>
+<DD>
+<A NAME="IDX281"></A>
+A C expression that should be nonzero if <VAR>regno</VAR> cannot be fetched
+from an inferior process.  This is only relevant if
+<CODE>FETCH_INFERIOR_REGISTERS</CODE> is not defined.
+
+<DT><CODE>CANNOT_STORE_REGISTER (<VAR>regno</VAR>)</CODE>
+<DD>
+<A NAME="IDX282"></A>
+A C expression that should be nonzero if <VAR>regno</VAR> should not be
+written to the target.  This is often the case for program counters,
+status words, and other special registers.  If this is not defined,
+GDB will assume that all registers may be written.
+
+<DT><CODE>int CONVERT_REGISTER_P(<VAR>regnum</VAR>)</CODE>
+<DD>
+<A NAME="IDX283"></A>
+Return non-zero if register <VAR>regnum</VAR> can represent data values in a
+non-standard form.
+See section <A HREF="gdbint_9.html#SEC63">Target Architecture Definition</A>.
+
+<DT><CODE>DECR_PC_AFTER_BREAK</CODE>
+<DD>
+<A NAME="IDX284"></A>
+Define this to be the amount by which to decrement the PC after the
+program encounters a breakpoint.  This is often the number of bytes in
+<CODE>BREAKPOINT</CODE>, though not always.  For most targets this value will be 0.
+
+<DT><CODE>DISABLE_UNSETTABLE_BREAK (<VAR>addr</VAR>)</CODE>
+<DD>
+<A NAME="IDX285"></A>
+If defined, this should evaluate to 1 if <VAR>addr</VAR> is in a shared
+library in which breakpoints cannot be set and so should be disabled.
+
+<DT><CODE>PRINT_FLOAT_INFO()</CODE>
+<DD>
+<A NAME="IDX286"></A>
+If defined, then the <SAMP>`info float'</SAMP> command will print information about
+the processor's floating point unit.
+
+<DT><CODE>print_registers_info (<VAR>gdbarch</VAR>, <VAR>frame</VAR>, <VAR>regnum</VAR>, <VAR>all</VAR>)</CODE>
+<DD>
+<A NAME="IDX287"></A>
+If defined, pretty print the value of the register <VAR>regnum</VAR> for the
+specified <VAR>frame</VAR>.  If the value of <VAR>regnum</VAR> is -1, pretty print
+either all registers (<VAR>all</VAR> is non zero) or a select subset of
+registers (<VAR>all</VAR> is zero).
+
+The default method prints one register per line, and if <VAR>all</VAR> is
+zero omits floating-point registers.
+
+<DT><CODE>PRINT_VECTOR_INFO()</CODE>
+<DD>
+<A NAME="IDX288"></A>
+If defined, then the <SAMP>`info vector'</SAMP> command will call this function
+to print information about the processor's vector unit.
+
+By default, the <SAMP>`info vector'</SAMP> command will print all vector
+registers (the register's type having the vector attribute).
+
+<DT><CODE>DWARF_REG_TO_REGNUM</CODE>
+<DD>
+<A NAME="IDX289"></A>
+Convert DWARF register number into GDB regnum.  If not defined,
+no conversion will be performed.
+
+<DT><CODE>DWARF2_REG_TO_REGNUM</CODE>
+<DD>
+<A NAME="IDX290"></A>
+Convert DWARF2 register number into GDB regnum.  If not
+defined, no conversion will be performed.
+
+<DT><CODE>ECOFF_REG_TO_REGNUM</CODE>
+<DD>
+<A NAME="IDX291"></A>
+Convert ECOFF register number into GDB regnum.  If not defined,
+no conversion will be performed.
+
+<DT><CODE>END_OF_TEXT_DEFAULT</CODE>
+<DD>
+<A NAME="IDX292"></A>
+This is an expression that should designate the end of the text section.
+
+<DT><CODE>EXTRACT_RETURN_VALUE(<VAR>type</VAR>, <VAR>regbuf</VAR>, <VAR>valbuf</VAR>)</CODE>
+<DD>
+<A NAME="IDX293"></A>
+Define this to extract a function's return value of type <VAR>type</VAR> from
+the raw register state <VAR>regbuf</VAR> and copy that, in virtual format,
+into <VAR>valbuf</VAR>.
+ 
+This method has been deprecated in favour of <CODE>gdbarch_return_value</CODE>
+(@xref{gdbarch_return_value}).
+
+<DT><CODE>DEPRECATED_EXTRACT_STRUCT_VALUE_ADDRESS(<VAR>regbuf</VAR>)</CODE>
+<DD>
+<A NAME="IDX294"></A>
+@anchor{DEPRECATED_EXTRACT_STRUCT_VALUE_ADDRESS}
+When defined, extract from the array <VAR>regbuf</VAR> (containing the raw
+register state) the <CODE>CORE_ADDR</CODE> at which a function should return
+its structure value.
+
+@xref{gdbarch_return_value}.
+
+<DT><CODE>DEPRECATED_EXTRACT_STRUCT_VALUE_ADDRESS_P()</CODE>
+<DD>
+<A NAME="IDX295"></A>
+Predicate for <CODE>DEPRECATED_EXTRACT_STRUCT_VALUE_ADDRESS</CODE>.
+
+<DT><CODE>DEPRECATED_FP_REGNUM</CODE>
+<DD>
+<A NAME="IDX296"></A>
+If the virtual frame pointer is kept in a register, then define this
+macro to be the number (greater than or equal to zero) of that register.
+
+This should only need to be defined if <CODE>DEPRECATED_TARGET_READ_FP</CODE>
+is not defined.
+
+<DT><CODE>DEPRECATED_FRAMELESS_FUNCTION_INVOCATION(<VAR>fi</VAR>)</CODE>
+<DD>
+<A NAME="IDX297"></A>
+Define this to an expression that returns 1 if the function invocation
+represented by <VAR>fi</VAR> does not have a stack frame associated with it.
+Otherwise return 0.
+
+<DT><CODE>frame_align (<VAR>address</VAR>)</CODE>
+<DD>
+@anchor{frame_align}
+<A NAME="IDX298"></A>
+Define this to adjust <VAR>address</VAR> so that it meets the alignment
+requirements for the start of a new stack frame.  A stack frame's
+alignment requirements are typically stronger than a target processors
+stack alignment requirements (@xref{DEPRECATED_STACK_ALIGN}).
+
+This function is used to ensure that, when creating a dummy frame, both
+the initial stack pointer and (if needed) the address of the return
+value are correctly aligned.
+
+Unlike <CODE>DEPRECATED_STACK_ALIGN</CODE>, this function always adjusts the
+address in the direction of stack growth.
+
+By default, no frame based stack alignment is performed.
+
+<DT><CODE>int frame_red_zone_size</CODE>
+<DD>
+The number of bytes, beyond the innermost-stack-address, reserved by the
+ABI.  A function is permitted to use this scratch area (instead of
+allocating extra stack space).
+
+When performing an inferior function call, to ensure that it does not
+modify this area, GDB adjusts the innermost-stack-address by
+<VAR>frame_red_zone_size</VAR> bytes before pushing parameters onto the
+stack.
+
+By default, zero bytes are allocated.  The value must be aligned
+(@xref{frame_align}).
+
+The AMD64 (nee x86-64) ABI documentation refers to the
+<EM>red zone</EM> when describing this scratch area.
+<A NAME="IDX299"></A>
+
+<DT><CODE>DEPRECATED_FRAME_CHAIN(<VAR>frame</VAR>)</CODE>
+<DD>
+<A NAME="IDX300"></A>
+Given <VAR>frame</VAR>, return a pointer to the calling frame.
+
+<DT><CODE>DEPRECATED_FRAME_CHAIN_VALID(<VAR>chain</VAR>, <VAR>thisframe</VAR>)</CODE>
+<DD>
+<A NAME="IDX301"></A>
+Define this to be an expression that returns zero if the given frame is an
+outermost frame, with no caller, and nonzero otherwise.  Most normal
+situations can be handled without defining this macro, including <CODE>NULL</CODE>
+chain pointers, dummy frames, and frames whose PC values are inside the
+startup file (e.g. <TT>`crt0.o'</TT>), inside <CODE>main</CODE>, or inside
+<CODE>_start</CODE>.
+
+<DT><CODE>DEPRECATED_FRAME_INIT_SAVED_REGS(<VAR>frame</VAR>)</CODE>
+<DD>
+<A NAME="IDX302"></A>
+See <TT>`frame.h'</TT>.  Determines the address of all registers in the
+current stack frame storing each in <CODE>frame-&#62;saved_regs</CODE>.  Space for
+<CODE>frame-&#62;saved_regs</CODE> shall be allocated by
+<CODE>DEPRECATED_FRAME_INIT_SAVED_REGS</CODE> using
+<CODE>frame_saved_regs_zalloc</CODE>.
+
+<CODE>FRAME_FIND_SAVED_REGS</CODE> is deprecated.
+
+<DT><CODE>FRAME_NUM_ARGS (<VAR>fi</VAR>)</CODE>
+<DD>
+<A NAME="IDX303"></A>
+For the frame described by <VAR>fi</VAR> return the number of arguments that
+are being passed.  If the number of arguments is not known, return
+<CODE>-1</CODE>.
+
+<DT><CODE>DEPRECATED_FRAME_SAVED_PC(<VAR>frame</VAR>)</CODE>
+<DD>
+<A NAME="IDX304"></A>
+@anchor{DEPRECATED_FRAME_SAVED_PC} Given <VAR>frame</VAR>, return the pc
+saved there.  This is the return address.
+
+This method is deprecated. @xref{unwind_pc}.
+
+<DT><CODE>CORE_ADDR unwind_pc (struct frame_info *<VAR>this_frame</VAR>)</CODE>
+<DD>
+<A NAME="IDX305"></A>
+@anchor{unwind_pc} Return the instruction address, in <VAR>this_frame</VAR>'s
+caller, at which execution will resume after <VAR>this_frame</VAR> returns.
+This is commonly refered to as the return address.
+
+The implementation, which must be frame agnostic (work with any frame),
+is typically no more than:
+
+
+<PRE>
+ULONGEST pc;
+frame_unwind_unsigned_register (this_frame, D10V_PC_REGNUM, &#38;pc);
+return d10v_make_iaddr (pc);
+</PRE>
+
+@xref{DEPRECATED_FRAME_SAVED_PC}, which this method replaces.
+
+<DT><CODE>CORE_ADDR unwind_sp (struct frame_info *<VAR>this_frame</VAR>)</CODE>
+<DD>
+<A NAME="IDX306"></A>
+@anchor{unwind_sp} Return the frame's inner most stack address.  This is
+commonly refered to as the frame's <STRONG>stack pointer</STRONG>.
+
+The implementation, which must be frame agnostic (work with any frame),
+is typically no more than:
+
+
+<PRE>
+ULONGEST sp;
+frame_unwind_unsigned_register (this_frame, D10V_SP_REGNUM, &#38;sp);
+return d10v_make_daddr (sp);
+</PRE>
+
+@xref{TARGET_READ_SP}, which this method replaces.
+
+<DT><CODE>FUNCTION_EPILOGUE_SIZE</CODE>
+<DD>
+<A NAME="IDX307"></A>
+For some COFF targets, the <CODE>x_sym.x_misc.x_fsize</CODE> field of the
+function end symbol is 0.  For such targets, you must define
+<CODE>FUNCTION_EPILOGUE_SIZE</CODE> to expand into the standard size of a
+function's epilogue.
+
+<DT><CODE>DEPRECATED_FUNCTION_START_OFFSET</CODE>
+<DD>
+<A NAME="IDX308"></A>
+An integer, giving the offset in bytes from a function's address (as
+used in the values of symbols, function pointers, etc.), and the
+function's first genuine instruction.
+
+This is zero on almost all machines: the function's address is usually
+the address of its first instruction.  However, on the VAX, for
+example, each function starts with two bytes containing a bitmask
+indicating which registers to save upon entry to the function.  The
+VAX <CODE>call</CODE> instructions check this value, and save the
+appropriate registers automatically.  Thus, since the offset from the
+function's address to its first instruction is two bytes,
+<CODE>DEPRECATED_FUNCTION_START_OFFSET</CODE> would be 2 on the VAX.
+
+<DT><CODE>GCC_COMPILED_FLAG_SYMBOL</CODE>
+<DD>
+<DT><CODE>GCC2_COMPILED_FLAG_SYMBOL</CODE>
+<DD>
+<A NAME="IDX309"></A>
+<A NAME="IDX310"></A>
+If defined, these are the names of the symbols that GDB will
+look for to detect that GCC compiled the file.  The default symbols
+are <CODE>gcc_compiled.</CODE> and <CODE>gcc2_compiled.</CODE>,
+respectively.  (Currently only defined for the Delta 68.)
+
+<DT><CODE>GDB_MULTI_ARCH</CODE>
+<DD>
+<A NAME="IDX311"></A>
+If defined and non-zero, enables support for multiple architectures
+within GDB.
+
+This support can be enabled at two levels.  At level one, only
+definitions for previously undefined macros are provided; at level two,
+a multi-arch definition of all architecture dependent macros will be
+defined.
+
+<DT><CODE>GDB_TARGET_IS_HPPA</CODE>
+<DD>
+<A NAME="IDX312"></A>
+This determines whether horrible kludge code in <TT>`dbxread.c'</TT> and
+<TT>`partial-stab.h'</TT> is used to mangle multiple-symbol-table files from
+HPPA's.  This should all be ripped out, and a scheme like <TT>`elfread.c'</TT>
+used instead.
+
+<DT><CODE>GET_LONGJMP_TARGET</CODE>
+<DD>
+<A NAME="IDX313"></A>
+For most machines, this is a target-dependent parameter.  On the
+DECstation and the Iris, this is a native-dependent parameter, since
+the header file <TT>`setjmp.h'</TT> is needed to define it.
+
+This macro determines the target PC address that <CODE>longjmp</CODE> will jump to,
+assuming that we have just stopped at a <CODE>longjmp</CODE> breakpoint.  It takes a
+<CODE>CORE_ADDR *</CODE> as argument, and stores the target PC value through this
+pointer.  It examines the current state of the machine as needed.
+
+<DT><CODE>DEPRECATED_GET_SAVED_REGISTER</CODE>
+<DD>
+<A NAME="IDX314"></A>
+Define this if you need to supply your own definition for the function
+<CODE>DEPRECATED_GET_SAVED_REGISTER</CODE>.
+
+<DT><CODE>DEPRECATED_IBM6000_TARGET</CODE>
+<DD>
+<A NAME="IDX315"></A>
+Shows that we are configured for an IBM RS/6000 system.  This
+conditional should be eliminated (FIXME) and replaced by
+feature-specific macros.  It was introduced in a haste and we are
+repenting at leisure.
+
+<DT><CODE>I386_USE_GENERIC_WATCHPOINTS</CODE>
+<DD>
+An x86-based target can define this to use the generic x86 watchpoint
+support; see section <A HREF="gdbint_3.html#SEC6">Algorithms</A>.
+
+<DT><CODE>SYMBOLS_CAN_START_WITH_DOLLAR</CODE>
+<DD>
+<A NAME="IDX316"></A>
+Some systems have routines whose names start with <SAMP>`$'</SAMP>.  Giving this
+macro a non-zero value tells GDB's expression parser to check for such
+routines when parsing tokens that begin with <SAMP>`$'</SAMP>.
+
+On HP-UX, certain system routines (millicode) have names beginning with
+<SAMP>`$'</SAMP> or <SAMP>`$$'</SAMP>.  For example, <CODE>$$dyncall</CODE> is a millicode
+routine that handles inter-space procedure calls on PA-RISC.
+
+<DT><CODE>DEPRECATED_INIT_EXTRA_FRAME_INFO (<VAR>fromleaf</VAR>, <VAR>frame</VAR>)</CODE>
+<DD>
+<A NAME="IDX317"></A>
+If additional information about the frame is required this should be
+stored in <CODE>frame-&#62;extra_info</CODE>.  Space for <CODE>frame-&#62;extra_info</CODE>
+is allocated using <CODE>frame_extra_info_zalloc</CODE>.
+
+<DT><CODE>DEPRECATED_INIT_FRAME_PC (<VAR>fromleaf</VAR>, <VAR>prev</VAR>)</CODE>
+<DD>
+<A NAME="IDX318"></A>
+This is a C statement that sets the pc of the frame pointed to by
+<VAR>prev</VAR>.  [By default...]
+
+<DT><CODE>INNER_THAN (<VAR>lhs</VAR>, <VAR>rhs</VAR>)</CODE>
+<DD>
+<A NAME="IDX319"></A>
+Returns non-zero if stack address <VAR>lhs</VAR> is inner than (nearer to the
+stack top) stack address <VAR>rhs</VAR>. Define this as <CODE>lhs &#60; rhs</CODE> if
+the target's stack grows downward in memory, or <CODE>lhs &#62; rsh</CODE> if the
+stack grows upward.
+
+<DT><CODE>gdbarch_in_function_epilogue_p (<VAR>gdbarch</VAR>, <VAR>pc</VAR>)</CODE>
+<DD>
+<A NAME="IDX320"></A>
+Returns non-zero if the given <VAR>pc</VAR> is in the epilogue of a function.
+The epilogue of a function is defined as the part of a function where
+the stack frame of the function already has been destroyed up to the
+final `return from function call' instruction.
+
+<DT><CODE>DEPRECATED_SIGTRAMP_START (<VAR>pc</VAR>)</CODE>
+<DD>
+<A NAME="IDX321"></A>
+<DT><CODE>DEPRECATED_SIGTRAMP_END (<VAR>pc</VAR>)</CODE>
+<DD>
+<A NAME="IDX322"></A>
+Define these to be the start and end address of the <CODE>sigtramp</CODE> for the
+given <VAR>pc</VAR>.  On machines where the address is just a compile time
+constant, the macro expansion will typically just ignore the supplied
+<VAR>pc</VAR>.
+
+<DT><CODE>IN_SOLIB_CALL_TRAMPOLINE (<VAR>pc</VAR>, <VAR>name</VAR>)</CODE>
+<DD>
+<A NAME="IDX323"></A>
+Define this to evaluate to nonzero if the program is stopped in the
+trampoline that connects to a shared library.
+
+<DT><CODE>IN_SOLIB_RETURN_TRAMPOLINE (<VAR>pc</VAR>, <VAR>name</VAR>)</CODE>
+<DD>
+<A NAME="IDX324"></A>
+Define this to evaluate to nonzero if the program is stopped in the
+trampoline that returns from a shared library.
+
+<DT><CODE>IN_SOLIB_DYNSYM_RESOLVE_CODE (<VAR>pc</VAR>)</CODE>
+<DD>
+<A NAME="IDX325"></A>
+Define this to evaluate to nonzero if the program is stopped in the
+dynamic linker.
+
+<DT><CODE>SKIP_SOLIB_RESOLVER (<VAR>pc</VAR>)</CODE>
+<DD>
+<A NAME="IDX326"></A>
+Define this to evaluate to the (nonzero) address at which execution
+should continue to get past the dynamic linker's symbol resolution
+function.  A zero value indicates that it is not important or necessary
+to set a breakpoint to get through the dynamic linker and that single
+stepping will suffice.
+
+<DT><CODE>INTEGER_TO_ADDRESS (<VAR>type</VAR>, <VAR>buf</VAR>)</CODE>
+<DD>
+<A NAME="IDX327"></A>
+<A NAME="IDX328"></A>
+Define this when the architecture needs to handle non-pointer to address
+conversions specially.  Converts that value to an address according to
+the current architectures conventions.
+
+<EM>Pragmatics: When the user copies a well defined expression from
+their source code and passes it, as a parameter, to GDB's
+<CODE>print</CODE> command, they should get the same value as would have been
+computed by the target program.  Any deviation from this rule can cause
+major confusion and annoyance, and needs to be justified carefully.  In
+other words, GDB doesn't really have the freedom to do these
+conversions in clever and useful ways.  It has, however, been pointed
+out that users aren't complaining about how GDB casts integers
+to pointers; they are complaining that they can't take an address from a
+disassembly listing and give it to <CODE>x/i</CODE>.  Adding an architecture
+method like <CODE>INTEGER_TO_ADDRESS</CODE> certainly makes it possible for
+GDB to "get it right" in all circumstances.</EM>
+
+See section <A HREF="gdbint_9.html#SEC63">Target Architecture Definition</A>.
+
+<DT><CODE>NO_HIF_SUPPORT</CODE>
+<DD>
+<A NAME="IDX329"></A>
+(Specific to the a29k.)
+
+<DT><CODE>POINTER_TO_ADDRESS (<VAR>type</VAR>, <VAR>buf</VAR>)</CODE>
+<DD>
+<A NAME="IDX330"></A>
+Assume that <VAR>buf</VAR> holds a pointer of type <VAR>type</VAR>, in the
+appropriate format for the current architecture.  Return the byte
+address the pointer refers to.
+See section <A HREF="gdbint_9.html#SEC63">Target Architecture Definition</A>.
+
+<DT><CODE>REGISTER_CONVERTIBLE (<VAR>reg</VAR>)</CODE>
+<DD>
+<A NAME="IDX331"></A>
+Return non-zero if <VAR>reg</VAR> uses different raw and virtual formats.
+See section <A HREF="gdbint_9.html#SEC63">Target Architecture Definition</A>.
+
+<DT><CODE>REGISTER_TO_VALUE(<VAR>regnum</VAR>, <VAR>type</VAR>, <VAR>from</VAR>, <VAR>to</VAR>)</CODE>
+<DD>
+<A NAME="IDX332"></A>
+Convert the raw contents of register <VAR>regnum</VAR> into a value of type
+<VAR>type</VAR>.
+See section <A HREF="gdbint_9.html#SEC63">Target Architecture Definition</A>.
+
+<DT><CODE>DEPRECATED_REGISTER_RAW_SIZE (<VAR>reg</VAR>)</CODE>
+<DD>
+<A NAME="IDX333"></A>
+Return the raw size of <VAR>reg</VAR>; defaults to the size of the register's
+virtual type.
+See section <A HREF="gdbint_9.html#SEC63">Target Architecture Definition</A>.
+
+<DT><CODE>register_reggroup_p (<VAR>gdbarch</VAR>, <VAR>regnum</VAR>, <VAR>reggroup</VAR>)</CODE>
+<DD>
+<A NAME="IDX334"></A>
+<A NAME="IDX335"></A>
+Return non-zero if register <VAR>regnum</VAR> is a member of the register
+group <VAR>reggroup</VAR>.
+
+By default, registers are grouped as follows:
+
+<DL COMPACT>
+
+<DT><CODE>float_reggroup</CODE>
+<DD>
+Any register with a valid name and a floating-point type.
+<DT><CODE>vector_reggroup</CODE>
+<DD>
+Any register with a valid name and a vector type.
+<DT><CODE>general_reggroup</CODE>
+<DD>
+Any register with a valid name and a type other than vector or
+floating-point.  <SAMP>`float_reggroup'</SAMP>.
+<DT><CODE>save_reggroup</CODE>
+<DD>
+<DT><CODE>restore_reggroup</CODE>
+<DD>
+<DT><CODE>all_reggroup</CODE>
+<DD>
+Any register with a valid name.
+</DL>
+
+<DT><CODE>DEPRECATED_REGISTER_VIRTUAL_SIZE (<VAR>reg</VAR>)</CODE>
+<DD>
+<A NAME="IDX336"></A>
+Return the virtual size of <VAR>reg</VAR>; defaults to the size of the
+register's virtual type.
+Return the virtual size of <VAR>reg</VAR>.
+See section <A HREF="gdbint_9.html#SEC63">Target Architecture Definition</A>.
+
+<DT><CODE>DEPRECATED_REGISTER_VIRTUAL_TYPE (<VAR>reg</VAR>)</CODE>
+<DD>
+<A NAME="IDX337"></A>
+Return the virtual type of <VAR>reg</VAR>.
+See section <A HREF="gdbint_9.html#SEC63">Target Architecture Definition</A>.
+
+<DT><CODE>struct type *register_type (<VAR>gdbarch</VAR>, <VAR>reg</VAR>)</CODE>
+<DD>
+<A NAME="IDX338"></A>
+If defined, return the type of register <VAR>reg</VAR>.  This function
+superseeds <CODE>DEPRECATED_REGISTER_VIRTUAL_TYPE</CODE>.  See section <A HREF="gdbint_9.html#SEC63">Target Architecture Definition</A>.
+
+<DT><CODE>REGISTER_CONVERT_TO_VIRTUAL(<VAR>reg</VAR>, <VAR>type</VAR>, <VAR>from</VAR>, <VAR>to</VAR>)</CODE>
+<DD>
+<A NAME="IDX339"></A>
+Convert the value of register <VAR>reg</VAR> from its raw form to its virtual
+form.
+See section <A HREF="gdbint_9.html#SEC63">Target Architecture Definition</A>.
+
+<DT><CODE>REGISTER_CONVERT_TO_RAW(<VAR>type</VAR>, <VAR>reg</VAR>, <VAR>from</VAR>, <VAR>to</VAR>)</CODE>
+<DD>
+<A NAME="IDX340"></A>
+Convert the value of register <VAR>reg</VAR> from its virtual form to its raw
+form.
+See section <A HREF="gdbint_9.html#SEC63">Target Architecture Definition</A>.
+
+<DT><CODE>const struct regset *regset_from_core_section (struct gdbarch * <VAR>gdbarch</VAR>, const char * <VAR>sect_name</VAR>, size_t <VAR>sect_size</VAR>)</CODE>
+<DD>
+<A NAME="IDX341"></A>
+Return the appropriate register set for a core file section with name
+<VAR>sect_name</VAR> and size <VAR>sect_size</VAR>.
+
+<DT><CODE>SOFTWARE_SINGLE_STEP_P()</CODE>
+<DD>
+<A NAME="IDX342"></A>
+Define this as 1 if the target does not have a hardware single-step
+mechanism.  The macro <CODE>SOFTWARE_SINGLE_STEP</CODE> must also be defined.
+
+<DT><CODE>SOFTWARE_SINGLE_STEP(<VAR>signal</VAR>, <VAR>insert_breapoints_p</VAR>)</CODE>
+<DD>
+<A NAME="IDX343"></A>
+A function that inserts or removes (depending on
+<VAR>insert_breapoints_p</VAR>) breakpoints at each possible destinations of
+the next instruction. See <TT>`sparc-tdep.c'</TT> and <TT>`rs6000-tdep.c'</TT>
+for examples.
+
+<DT><CODE>SOFUN_ADDRESS_MAYBE_MISSING</CODE>
+<DD>
+<A NAME="IDX344"></A>
+Somebody clever observed that, the more actual addresses you have in the
+debug information, the more time the linker has to spend relocating
+them.  So whenever there's some other way the debugger could find the
+address it needs, you should omit it from the debug info, to make
+linking faster.
+
+<CODE>SOFUN_ADDRESS_MAYBE_MISSING</CODE> indicates that a particular set of
+hacks of this sort are in use, affecting <CODE>N_SO</CODE> and <CODE>N_FUN</CODE>
+entries in stabs-format debugging information.  <CODE>N_SO</CODE> stabs mark
+the beginning and ending addresses of compilation units in the text
+segment.  <CODE>N_FUN</CODE> stabs mark the starts and ends of functions.
+
+<CODE>SOFUN_ADDRESS_MAYBE_MISSING</CODE> means two things:
+
+
+<UL>
+<LI>
+
+<CODE>N_FUN</CODE> stabs have an address of zero.  Instead, you should find the
+addresses where the function starts by taking the function name from
+the stab, and then looking that up in the minsyms (the
+linker/assembler symbol table).  In other words, the stab has the
+name, and the linker/assembler symbol table is the only place that carries
+the address.
+
+<LI>
+
+<CODE>N_SO</CODE> stabs have an address of zero, too.  You just look at the
+<CODE>N_FUN</CODE> stabs that appear before and after the <CODE>N_SO</CODE> stab,
+and guess the starting and ending addresses of the compilation unit from
+them.
+</UL>
+
+<DT><CODE>PC_LOAD_SEGMENT</CODE>
+<DD>
+<A NAME="IDX345"></A>
+If defined, print information about the load segment for the program
+counter.  (Defined only for the RS/6000.)
+
+<DT><CODE>PC_REGNUM</CODE>
+<DD>
+<A NAME="IDX346"></A>
+If the program counter is kept in a register, then define this macro to
+be the number (greater than or equal to zero) of that register.
+
+This should only need to be defined if <CODE>TARGET_READ_PC</CODE> and
+<CODE>TARGET_WRITE_PC</CODE> are not defined.
+
+<DT><CODE>PARM_BOUNDARY</CODE>
+<DD>
+<A NAME="IDX347"></A>
+If non-zero, round arguments to a boundary of this many bits before
+pushing them on the stack.
+
+<DT><CODE>stabs_argument_has_addr (<VAR>gdbarch</VAR>, <VAR>type</VAR>)</CODE>
+<DD>
+<A NAME="IDX348"></A>
+<A NAME="IDX349"></A>
+@anchor{stabs_argument_has_addr} Define this to return nonzero if a
+function argument of type <VAR>type</VAR> is passed by reference instead of
+value.
+
+This method replaces <CODE>DEPRECATED_REG_STRUCT_HAS_ADDR</CODE>
+(@xref{DEPRECATED_REG_STRUCT_HAS_ADDR}).
+
+<DT><CODE>PROCESS_LINENUMBER_HOOK</CODE>
+<DD>
+<A NAME="IDX350"></A>
+A hook defined for XCOFF reading.
+
+<DT><CODE>PROLOGUE_FIRSTLINE_OVERLAP</CODE>
+<DD>
+<A NAME="IDX351"></A>
+(Only used in unsupported Convex configuration.)
+
+<DT><CODE>PS_REGNUM</CODE>
+<DD>
+<A NAME="IDX352"></A>
+If defined, this is the number of the processor status register.  (This
+definition is only used in generic code when parsing "$ps".)
+
+<DT><CODE>DEPRECATED_POP_FRAME</CODE>
+<DD>
+<A NAME="IDX353"></A>
+<A NAME="IDX354"></A>
+If defined, used by <CODE>frame_pop</CODE> to remove a stack frame.  This
+method has been superseeded by generic code.
+
+<DT><CODE>push_dummy_call (<VAR>gdbarch</VAR>, <VAR>function</VAR>, <VAR>regcache</VAR>, <VAR>pc_addr</VAR>, <VAR>nargs</VAR>, <VAR>args</VAR>, <VAR>sp</VAR>, <VAR>struct_return</VAR>, <VAR>struct_addr</VAR>)</CODE>
+<DD>
+<A NAME="IDX355"></A>
+<A NAME="IDX356"></A>
+@anchor{push_dummy_call} Define this to push the dummy frame's call to
+the inferior function onto the stack.  In addition to pushing
+<VAR>nargs</VAR>, the code should push <VAR>struct_addr</VAR> (when
+<VAR>struct_return</VAR>), and the return address (<VAR>bp_addr</VAR>).
+
+<VAR>function</VAR> is a pointer to a <CODE>struct value</CODE>; on architectures that use
+function descriptors, this contains the function descriptor value.
+
+Returns the updated top-of-stack pointer.
+
+This method replaces <CODE>DEPRECATED_PUSH_ARGUMENTS</CODE>.
+
+<DT><CODE>CORE_ADDR push_dummy_code (<VAR>gdbarch</VAR>, <VAR>sp</VAR>, <VAR>funaddr</VAR>, <VAR>using_gcc</VAR>, <VAR>args</VAR>, <VAR>nargs</VAR>, <VAR>value_type</VAR>, <VAR>real_pc</VAR>, <VAR>bp_addr</VAR>)</CODE>
+<DD>
+<A NAME="IDX357"></A>
+@anchor{push_dummy_code} Given a stack based call dummy, push the
+instruction sequence (including space for a breakpoint) to which the
+called function should return.
+
+Set <VAR>bp_addr</VAR> to the address at which the breakpoint instruction
+should be inserted, <VAR>real_pc</VAR> to the resume address when starting
+the call sequence, and return the updated inner-most stack address.
+
+By default, the stack is grown sufficient to hold a frame-aligned
+(@xref{frame_align}) breakpoint, <VAR>bp_addr</VAR> is set to the address
+reserved for that breakpoint, and <VAR>real_pc</VAR> set to <VAR>funaddr</VAR>.
+
+This method replaces <CODE>CALL_DUMMY_LOCATION</CODE>,
+<CODE>DEPRECATED_REGISTER_SIZE</CODE>.
+
+<DT><CODE>REGISTER_NAME(<VAR>i</VAR>)</CODE>
+<DD>
+<A NAME="IDX358"></A>
+Return the name of register <VAR>i</VAR> as a string.  May return <CODE>NULL</CODE>
+or <CODE>NUL</CODE> to indicate that register <VAR>i</VAR> is not valid.
+
+<DT><CODE>DEPRECATED_REG_STRUCT_HAS_ADDR (<VAR>gcc_p</VAR>, <VAR>type</VAR>)</CODE>
+<DD>
+<A NAME="IDX359"></A>
+@anchor{DEPRECATED_REG_STRUCT_HAS_ADDR}Define this to return 1 if the
+given type will be passed by pointer rather than directly.
+
+This method has been replaced by <CODE>stabs_argument_has_addr</CODE>
+(@xref{stabs_argument_has_addr}).
+
+<DT><CODE>SAVE_DUMMY_FRAME_TOS (<VAR>sp</VAR>)</CODE>
+<DD>
+<A NAME="IDX360"></A>
+@anchor{SAVE_DUMMY_FRAME_TOS} Used in <SAMP>`call_function_by_hand'</SAMP> to
+notify the target dependent code of the top-of-stack value that will be
+passed to the the inferior code.  This is the value of the <CODE>SP</CODE>
+after both the dummy frame and space for parameters/results have been
+allocated on the stack.  @xref{unwind_dummy_id}.
+
+<DT><CODE>SDB_REG_TO_REGNUM</CODE>
+<DD>
+<A NAME="IDX361"></A>
+Define this to convert sdb register numbers into GDB regnums.  If not
+defined, no conversion will be done.
+
+<DT><CODE>enum return_value_convention gdbarch_return_value (struct gdbarch *<VAR>gdbarch</VAR>, struct type *<VAR>valtype</VAR>, struct regcache *<VAR>regcache</VAR>, void *<VAR>readbuf</VAR>, const void *<VAR>writebuf</VAR>)</CODE>
+<DD>
+<A NAME="IDX362"></A>
+@anchor{gdbarch_return_value} Given a function with a return-value of
+type <VAR>rettype</VAR>, return which return-value convention that function
+would use.
+
+GDB currently recognizes two function return-value conventions:
+<CODE>RETURN_VALUE_REGISTER_CONVENTION</CODE> where the return value is found
+in registers; and <CODE>RETURN_VALUE_STRUCT_CONVENTION</CODE> where the return
+value is found in memory and the address of that memory location is
+passed in as the function's first parameter.
+
+If the register convention is being used, and <VAR>writebuf</VAR> is
+non-<CODE>NULL</CODE>, also copy the return-value in <VAR>writebuf</VAR> into
+<VAR>regcache</VAR>.
+
+If the register convention is being used, and <VAR>readbuf</VAR> is
+non-<CODE>NULL</CODE>, also copy the return value from <VAR>regcache</VAR> into
+<VAR>readbuf</VAR> (<VAR>regcache</VAR> contains a copy of the registers from the
+just returned function).
+
+@xref{DEPRECATED_EXTRACT_STRUCT_VALUE_ADDRESS}, for a description of how
+return-values that use the struct convention are handled.
+
+<EM>Maintainer note: This method replaces separate predicate, extract,
+store methods.  By having only one method, the logic needed to determine
+the return-value convention need only be implemented in one place.  If
+GDB were written in an OO language, this method would
+instead return an object that knew how to perform the register
+return-value extract and store.</EM>
+
+<EM>Maintainer note: This method does not take a <VAR>gcc_p</VAR>
+parameter, and such a parameter should not be added.  If an architecture
+that requires per-compiler or per-function information be identified,
+then the replacement of <VAR>rettype</VAR> with <CODE>struct value</CODE>
+<VAR>function</VAR> should be persued.</EM>
+
+<EM>Maintainer note: The <VAR>regcache</VAR> parameter limits this methods
+to the inner most frame.  While replacing <VAR>regcache</VAR> with a
+<CODE>struct frame_info</CODE> <VAR>frame</VAR> parameter would remove that
+limitation there has yet to be a demonstrated need for such a change.</EM>
+
+<DT><CODE>SKIP_PERMANENT_BREAKPOINT</CODE>
+<DD>
+<A NAME="IDX363"></A>
+Advance the inferior's PC past a permanent breakpoint.  GDB normally
+steps over a breakpoint by removing it, stepping one instruction, and
+re-inserting the breakpoint.  However, permanent breakpoints are
+hardwired into the inferior, and can't be removed, so this strategy
+doesn't work.  Calling <CODE>SKIP_PERMANENT_BREAKPOINT</CODE> adjusts the processor's
+state so that execution will resume just after the breakpoint.  This
+macro does the right thing even when the breakpoint is in the delay slot
+of a branch or jump.
+
+<DT><CODE>SKIP_PROLOGUE (<VAR>pc</VAR>)</CODE>
+<DD>
+<A NAME="IDX364"></A>
+A C expression that returns the address of the "real" code beyond the
+function entry prologue found at <VAR>pc</VAR>.
+
+<DT><CODE>SKIP_TRAMPOLINE_CODE (<VAR>pc</VAR>)</CODE>
+<DD>
+<A NAME="IDX365"></A>
+If the target machine has trampoline code that sits between callers and
+the functions being called, then define this macro to return a new PC
+that is at the start of the real function.
+
+<DT><CODE>SP_REGNUM</CODE>
+<DD>
+<A NAME="IDX366"></A>
+If the stack-pointer is kept in a register, then define this macro to be
+the number (greater than or equal to zero) of that register, or -1 if
+there is no such register.
+
+<DT><CODE>STAB_REG_TO_REGNUM</CODE>
+<DD>
+<A NAME="IDX367"></A>
+Define this to convert stab register numbers (as gotten from `r'
+declarations) into GDB regnums.  If not defined, no conversion will be
+done.
+
+<DT><CODE>DEPRECATED_STACK_ALIGN (<VAR>addr</VAR>)</CODE>
+<DD>
+@anchor{DEPRECATED_STACK_ALIGN}
+<A NAME="IDX368"></A>
+Define this to increase <VAR>addr</VAR> so that it meets the alignment
+requirements for the processor's stack.
+
+Unlike @xref{frame_align}, this function always adjusts <VAR>addr</VAR>
+upwards.
+
+By default, no stack alignment is performed.
+
+<DT><CODE>STEP_SKIPS_DELAY (<VAR>addr</VAR>)</CODE>
+<DD>
+<A NAME="IDX369"></A>
+Define this to return true if the address is of an instruction with a
+delay slot.  If a breakpoint has been placed in the instruction's delay
+slot, GDB will single-step over that instruction before resuming
+normally.  Currently only defined for the Mips.
+
+<DT><CODE>STORE_RETURN_VALUE (<VAR>type</VAR>, <VAR>regcache</VAR>, <VAR>valbuf</VAR>)</CODE>
+<DD>
+<A NAME="IDX370"></A>
+A C expression that writes the function return value, found in
+<VAR>valbuf</VAR>, into the <VAR>regcache</VAR>.  <VAR>type</VAR> is the type of the
+value that is to be returned.
+
+This method has been deprecated in favour of <CODE>gdbarch_return_value</CODE>
+(@xref{gdbarch_return_value}).
+
+<DT><CODE>SYMBOL_RELOADING_DEFAULT</CODE>
+<DD>
+<A NAME="IDX371"></A>
+The default value of the "symbol-reloading" variable.  (Never defined in
+current sources.)
+
+<DT><CODE>TARGET_CHAR_BIT</CODE>
+<DD>
+<A NAME="IDX372"></A>
+Number of bits in a char; defaults to 8.
+
+<DT><CODE>TARGET_CHAR_SIGNED</CODE>
+<DD>
+<A NAME="IDX373"></A>
+Non-zero if <CODE>char</CODE> is normally signed on this architecture; zero if
+it should be unsigned.
+
+The ISO C standard requires the compiler to treat <CODE>char</CODE> as
+equivalent to either <CODE>signed char</CODE> or <CODE>unsigned char</CODE>; any
+character in the standard execution set is supposed to be positive.
+Most compilers treat <CODE>char</CODE> as signed, but <CODE>char</CODE> is unsigned
+on the IBM S/390, RS6000, and PowerPC targets.
+
+<DT><CODE>TARGET_COMPLEX_BIT</CODE>
+<DD>
+<A NAME="IDX374"></A>
+Number of bits in a complex number; defaults to <CODE>2 * TARGET_FLOAT_BIT</CODE>.
+
+At present this macro is not used.
+
+<DT><CODE>TARGET_DOUBLE_BIT</CODE>
+<DD>
+<A NAME="IDX375"></A>
+Number of bits in a double float; defaults to <CODE>8 * TARGET_CHAR_BIT</CODE>.
+
+<DT><CODE>TARGET_DOUBLE_COMPLEX_BIT</CODE>
+<DD>
+<A NAME="IDX376"></A>
+Number of bits in a double complex; defaults to <CODE>2 * TARGET_DOUBLE_BIT</CODE>.
+
+At present this macro is not used.
+
+<DT><CODE>TARGET_FLOAT_BIT</CODE>
+<DD>
+<A NAME="IDX377"></A>
+Number of bits in a float; defaults to <CODE>4 * TARGET_CHAR_BIT</CODE>.
+
+<DT><CODE>TARGET_INT_BIT</CODE>
+<DD>
+<A NAME="IDX378"></A>
+Number of bits in an integer; defaults to <CODE>4 * TARGET_CHAR_BIT</CODE>.
+
+<DT><CODE>TARGET_LONG_BIT</CODE>
+<DD>
+<A NAME="IDX379"></A>
+Number of bits in a long integer; defaults to <CODE>4 * TARGET_CHAR_BIT</CODE>.
+
+<DT><CODE>TARGET_LONG_DOUBLE_BIT</CODE>
+<DD>
+<A NAME="IDX380"></A>
+Number of bits in a long double float;
+defaults to <CODE>2 * TARGET_DOUBLE_BIT</CODE>.
+
+<DT><CODE>TARGET_LONG_LONG_BIT</CODE>
+<DD>
+<A NAME="IDX381"></A>
+Number of bits in a long long integer; defaults to <CODE>2 * TARGET_LONG_BIT</CODE>.
+
+<DT><CODE>TARGET_PTR_BIT</CODE>
+<DD>
+<A NAME="IDX382"></A>
+Number of bits in a pointer; defaults to <CODE>TARGET_INT_BIT</CODE>.
+
+<DT><CODE>TARGET_SHORT_BIT</CODE>
+<DD>
+<A NAME="IDX383"></A>
+Number of bits in a short integer; defaults to <CODE>2 * TARGET_CHAR_BIT</CODE>.
+
+<DT><CODE>TARGET_READ_PC</CODE>
+<DD>
+<A NAME="IDX384"></A>
+<DT><CODE>TARGET_WRITE_PC (<VAR>val</VAR>, <VAR>pid</VAR>)</CODE>
+<DD>
+<A NAME="IDX385"></A>
+@anchor{TARGET_WRITE_PC}
+<DT><CODE>TARGET_READ_SP</CODE>
+<DD>
+<A NAME="IDX386"></A>
+<DT><CODE>TARGET_READ_FP</CODE>
+<DD>
+<A NAME="IDX387"></A>
+<A NAME="IDX388"></A>
+<A NAME="IDX389"></A>
+<A NAME="IDX390"></A>
+<A NAME="IDX391"></A>
+@anchor{TARGET_READ_SP} These change the behavior of <CODE>read_pc</CODE>,
+<CODE>write_pc</CODE>, and <CODE>read_sp</CODE>.  For most targets, these may be
+left undefined.  GDB will call the read and write register
+functions with the relevant <CODE>_REGNUM</CODE> argument.
+
+These macros are useful when a target keeps one of these registers in a
+hard to get at place; for example, part in a segment register and part
+in an ordinary register.
+
+@xref{unwind_sp}, which replaces <CODE>TARGET_READ_SP</CODE>.
+
+<DT><CODE>TARGET_VIRTUAL_FRAME_POINTER(<VAR>pc</VAR>, <VAR>regp</VAR>, <VAR>offsetp</VAR>)</CODE>
+<DD>
+<A NAME="IDX392"></A>
+Returns a <CODE>(register, offset)</CODE> pair representing the virtual frame
+pointer in use at the code address <VAR>pc</VAR>.  If virtual frame pointers
+are not used, a default definition simply returns
+<CODE>DEPRECATED_FP_REGNUM</CODE>, with an offset of zero.
+
+<DT><CODE>TARGET_HAS_HARDWARE_WATCHPOINTS</CODE>
+<DD>
+If non-zero, the target has support for hardware-assisted
+watchpoints.  See section <A HREF="gdbint_3.html#SEC6">Algorithms</A>, for more details and
+other related macros.
+
+<DT><CODE>TARGET_PRINT_INSN (<VAR>addr</VAR>, <VAR>info</VAR>)</CODE>
+<DD>
+<A NAME="IDX393"></A>
+This is the function used by GDB to print an assembly
+instruction.  It prints the instruction at address <VAR>addr</VAR> in
+debugged memory and returns the length of the instruction, in bytes.  If
+a target doesn't define its own printing routine, it defaults to an
+accessor function for the global pointer
+<CODE>deprecated_tm_print_insn</CODE>.  This usually points to a function in
+the <CODE>opcodes</CODE> library (see section <A HREF="gdbint_12.html#SEC98">Support Libraries</A>).
+<VAR>info</VAR> is a structure (of type <CODE>disassemble_info</CODE>) defined in
+<TT>`include/dis-asm.h'</TT> used to pass information to the instruction
+decoding routine.
+
+<DT><CODE>struct frame_id unwind_dummy_id (struct frame_info *<VAR>frame</VAR>)</CODE>
+<DD>
+<A NAME="IDX394"></A>
+@anchor{unwind_dummy_id} Given <VAR>frame</VAR> return a @code{struct
+frame_id} that uniquely identifies an inferior function call's dummy
+frame.  The value returned must match the dummy frame stack value
+previously saved using <CODE>SAVE_DUMMY_FRAME_TOS</CODE>.
+@xref{SAVE_DUMMY_FRAME_TOS}.
+
+<DT><CODE>DEPRECATED_USE_STRUCT_CONVENTION (<VAR>gcc_p</VAR>, <VAR>type</VAR>)</CODE>
+<DD>
+<A NAME="IDX395"></A>
+If defined, this must be an expression that is nonzero if a value of the
+given <VAR>type</VAR> being returned from a function must have space
+allocated for it on the stack.  <VAR>gcc_p</VAR> is true if the function
+being considered is known to have been compiled by GCC; this is helpful
+for systems where GCC is known to use different calling convention than
+other compilers.
+
+This method has been deprecated in favour of <CODE>gdbarch_return_value</CODE>
+(@xref{gdbarch_return_value}).
+
+<DT><CODE>VALUE_TO_REGISTER(<VAR>type</VAR>, <VAR>regnum</VAR>, <VAR>from</VAR>, <VAR>to</VAR>)</CODE>
+<DD>
+<A NAME="IDX396"></A>
+Convert a value of type <VAR>type</VAR> into the raw contents of register
+<VAR>regnum</VAR>'s.
+See section <A HREF="gdbint_9.html#SEC63">Target Architecture Definition</A>.
+
+<DT><CODE>VARIABLES_INSIDE_BLOCK (<VAR>desc</VAR>, <VAR>gcc_p</VAR>)</CODE>
+<DD>
+<A NAME="IDX397"></A>
+For dbx-style debugging information, if the compiler puts variable
+declarations inside LBRAC/RBRAC blocks, this should be defined to be
+nonzero.  <VAR>desc</VAR> is the value of <CODE>n_desc</CODE> from the
+<CODE>N_RBRAC</CODE> symbol, and <VAR>gcc_p</VAR> is true if GDB has noticed the
+presence of either the <CODE>GCC_COMPILED_SYMBOL</CODE> or the
+<CODE>GCC2_COMPILED_SYMBOL</CODE>.  By default, this is 0.
+
+<DT><CODE>OS9K_VARIABLES_INSIDE_BLOCK (<VAR>desc</VAR>, <VAR>gcc_p</VAR>)</CODE>
+<DD>
+<A NAME="IDX398"></A>
+Similarly, for OS/9000.  Defaults to 1.
+</DL>
+
+<P>
+Motorola M68K target conditionals.
+
+</P>
+<DL COMPACT>
+
+<DT><CODE>BPT_VECTOR</CODE>
+<DD>
+<A NAME="IDX399"></A>
+Define this to be the 4-bit location of the breakpoint trap vector.  If
+not defined, it will default to <CODE>0xf</CODE>.
+
+<DT><CODE>REMOTE_BPT_VECTOR</CODE>
+<DD>
+<A NAME="IDX400"></A>
+Defaults to <CODE>1</CODE>.
+
+<DT><CODE>NAME_OF_MALLOC</CODE>
+<DD>
+<A NAME="IDX401"></A>
+<A NAME="IDX402"></A>
+A string containing the name of the function to call in order to
+allocate some memory in the inferior. The default value is "malloc".
+
+</DL>
+
+
+
+<H2><A NAME="SEC74" HREF="gdbint_toc.html#TOC74">Adding a New Target</A></H2>
+
+<P>
+<A NAME="IDX403"></A>
+The following files add a target to GDB:
+
+</P>
+<DL COMPACT>
+
+<DT><TT>`gdb/config/<VAR>arch</VAR>/<VAR>ttt</VAR>.mt'</TT>
+<DD>
+<A NAME="IDX404"></A>
+ 
+Contains a Makefile fragment specific to this target.  Specifies what
+object files are needed for target <VAR>ttt</VAR>, by defining
+<SAMP>`TDEPFILES=...'</SAMP> and <SAMP>`TDEPLIBS=...'</SAMP>.  Also specifies
+the header file which describes <VAR>ttt</VAR>, by defining <SAMP>`TM_FILE=
+tm-<VAR>ttt</VAR>.h'</SAMP>.
+
+You can also define <SAMP>`TM_CFLAGS'</SAMP>, <SAMP>`TM_CLIBS'</SAMP>, <SAMP>`TM_CDEPS'</SAMP>,
+but these are now deprecated, replaced by autoconf, and may go away in
+future versions of GDB.
+
+<DT><TT>`gdb/<VAR>ttt</VAR>-tdep.c'</TT>
+<DD>
+Contains any miscellaneous code required for this target machine.  On
+some machines it doesn't exist at all.  Sometimes the macros in
+<TT>`tm-<VAR>ttt</VAR>.h'</TT> become very complicated, so they are implemented
+as functions here instead, and the macro is simply defined to call the
+function.  This is vastly preferable, since it is easier to understand
+and debug.
+
+<DT><TT>`gdb/<VAR>arch</VAR>-tdep.c'</TT>
+<DD>
+<DT><TT>`gdb/<VAR>arch</VAR>-tdep.h'</TT>
+<DD>
+This often exists to describe the basic layout of the target machine's
+processor chip (registers, stack, etc.).  If used, it is included by
+<TT>`<VAR>ttt</VAR>-tdep.h'</TT>.  It can be shared among many targets that use
+the same processor.
+
+<DT><TT>`gdb/config/<VAR>arch</VAR>/tm-<VAR>ttt</VAR>.h'</TT>
+<DD>
+(<TT>`tm.h'</TT> is a link to this file, created by <CODE>configure</CODE>).  Contains
+macro definitions about the target machine's registers, stack frame
+format and instructions.
+
+New targets do not need this file and should not create it.
+
+<DT><TT>`gdb/config/<VAR>arch</VAR>/tm-<VAR>arch</VAR>.h'</TT>
+<DD>
+This often exists to describe the basic layout of the target machine's
+processor chip (registers, stack, etc.).  If used, it is included by
+<TT>`tm-<VAR>ttt</VAR>.h'</TT>.  It can be shared among many targets that use the
+same processor.
+
+New targets do not need this file and should not create it.
+
+</DL>
+
+<P>
+If you are adding a new operating system for an existing CPU chip, add a
+<TT>`config/tm-<VAR>os</VAR>.h'</TT> file that describes the operating system
+facilities that are unusual (extra symbol table info; the breakpoint
+instruction needed; etc.).  Then write a <TT>`<VAR>arch</VAR>/tm-<VAR>os</VAR>.h'</TT>
+that just <CODE>#include</CODE>s <TT>`tm-<VAR>arch</VAR>.h'</TT> and
+<TT>`config/tm-<VAR>os</VAR>.h'</TT>.
+
+</P>
+
+
+
+<H2><A NAME="SEC75" HREF="gdbint_toc.html#TOC75">Converting an existing Target Architecture to Multi-arch</A></H2>
+<P>
+<A NAME="IDX405"></A>
+
+</P>
+<P>
+This section describes the current accepted best practice for converting
+an existing target architecture to the multi-arch framework.
+
+</P>
+<P>
+The process consists of generating, testing, posting and committing a
+sequence of patches.  Each patch must contain a single change, for
+instance:
+
+</P>
+
+<UL>
+
+<LI>
+
+Directly convert a group of functions into macros (the conversion does
+not change the behavior of any of the functions).
+
+<LI>
+
+Replace a non-multi-arch with a multi-arch mechanism (e.g.,
+<CODE>FRAME_INFO</CODE>).
+
+<LI>
+
+Enable multi-arch level one.
+
+<LI>
+
+Delete one or more files.
+
+</UL>
+
+<P>
+There isn't a size limit on a patch, however, a developer is strongly
+encouraged to keep the patch size down.
+
+</P>
+<P>
+Since each patch is well defined, and since each change has been tested
+and shows no regressions, the patches are considered <EM>fairly</EM>
+obvious.  Such patches, when submitted by developers listed in the
+<TT>`MAINTAINERS'</TT> file, do not need approval.  Occasional steps in the
+process may be more complicated and less clear.  The developer is
+expected to use their judgment and is encouraged to seek advice as
+needed.
+
+</P>
+
+
+<H3><A NAME="SEC76" HREF="gdbint_toc.html#TOC76">Preparation</A></H3>
+
+<P>
+The first step is to establish control.  Build (with @option{-Werror}
+enabled) and test the target so that there is a baseline against which
+the debugger can be compared.
+
+</P>
+<P>
+At no stage can the test results regress or GDB stop compiling
+with @option{-Werror}.
+
+</P>
+
+
+<H3><A NAME="SEC77" HREF="gdbint_toc.html#TOC77">Add the multi-arch initialization code</A></H3>
+
+<P>
+The objective of this step is to establish the basic multi-arch
+framework.  It involves
+
+</P>
+
+<UL>
+
+<LI>
+
+The addition of a <CODE><VAR>arch</VAR>_gdbarch_init</CODE> function<A NAME="DOCF4" HREF="gdbint_foot.html#FOOT4">(4)</A> that creates
+the architecture:
+
+<PRE>
+static struct gdbarch *
+d10v_gdbarch_init (info, arches)
+     struct gdbarch_info info;
+     struct gdbarch_list *arches;
+{
+  struct gdbarch *gdbarch;
+  /* there is only one d10v architecture */
+  if (arches != NULL)
+    return arches-&#62;gdbarch;
+  gdbarch = gdbarch_alloc (&#38;info, NULL);
+  return gdbarch;
+}
+</PRE>
+
+<EM></EM>
+
+<LI>
+
+A per-architecture dump function to print any architecture specific
+information:
+
+<PRE>
+static void
+mips_dump_tdep (struct gdbarch *current_gdbarch,
+                struct ui_file *file)
+{
+   ... code to print architecture specific info ...
+}
+</PRE>
+
+<LI>
+
+A change to <CODE>_initialize_<VAR>arch</VAR>_tdep</CODE> to register this new
+architecture:
+
+<PRE>
+void
+_initialize_mips_tdep (void)
+{
+  gdbarch_register (bfd_arch_mips, mips_gdbarch_init,
+                    mips_dump_tdep);
+</PRE>
+
+<LI>
+
+Add the macro <CODE>GDB_MULTI_ARCH</CODE>, defined as 0 (zero), to the file<BR>
+<TT>`config/<VAR>arch</VAR>/tm-<VAR>arch</VAR>.h'</TT>.
+
+</UL>
+
+
+
+<H3><A NAME="SEC78" HREF="gdbint_toc.html#TOC78">Update multi-arch incompatible mechanisms</A></H3>
+
+<P>
+Some mechanisms do not work with multi-arch.  They include:
+
+</P>
+<DL COMPACT>
+
+<DT><CODE>FRAME_FIND_SAVED_REGS</CODE>
+<DD>
+Replaced with <CODE>DEPRECATED_FRAME_INIT_SAVED_REGS</CODE>
+</DL>
+
+<P>
+At this stage you could also consider converting the macros into
+functions.
+
+</P>
+
+
+<H3><A NAME="SEC79" HREF="gdbint_toc.html#TOC79">Prepare for multi-arch level to one</A></H3>
+
+<P>
+Temporally set <CODE>GDB_MULTI_ARCH</CODE> to <CODE>GDB_MULTI_ARCH_PARTIAL</CODE>
+and then build and start GDB (the change should not be
+committed).  GDB may not build, and once built, it may die with
+an internal error listing the architecture methods that must be
+provided.
+
+</P>
+<P>
+Fix any build problems (patch(es)).
+
+</P>
+<P>
+Convert all the architecture methods listed, which are only macros, into
+functions (patch(es)).
+
+</P>
+<P>
+Update <CODE><VAR>arch</VAR>_gdbarch_init</CODE> to set all the missing
+architecture methods and wrap the corresponding macros in <CODE>#if
+!GDB_MULTI_ARCH</CODE> (patch(es)).
+
+</P>
+
+
+<H3><A NAME="SEC80" HREF="gdbint_toc.html#TOC80">Set multi-arch level one</A></H3>
+
+<P>
+Change the value of <CODE>GDB_MULTI_ARCH</CODE> to GDB_MULTI_ARCH_PARTIAL (a
+single patch).
+
+</P>
+<P>
+Any problems with throwing "the switch" should have been fixed
+already.
+
+</P>
+
+
+<H3><A NAME="SEC81" HREF="gdbint_toc.html#TOC81">Convert remaining macros</A></H3>
+
+<P>
+Suggest converting macros into functions (and setting the corresponding
+architecture method) in small batches.
+
+</P>
+
+
+<H3><A NAME="SEC82" HREF="gdbint_toc.html#TOC82">Set multi-arch level to two</A></H3>
+
+<P>
+This should go smoothly.
+
+</P>
+
+
+<H3><A NAME="SEC83" HREF="gdbint_toc.html#TOC83">Delete the TM file</A></H3>
+
+<P>
+The <TT>`tm-<VAR>arch</VAR>.h'</TT> can be deleted.  <TT>`<VAR>arch</VAR>.mt'</TT> and
+<TT>`configure.in'</TT> updated.
+
+</P>
+
+<P><HR><P>
+Go to the <A HREF="gdbint_1.html">first</A>, <A HREF="gdbint_8.html">previous</A>, <A HREF="gdbint_10.html">next</A>, <A HREF="gdbint_20.html">last</A> section, <A HREF="gdbint_toc.html">table of contents</A>.
+</BODY>
+</HTML>

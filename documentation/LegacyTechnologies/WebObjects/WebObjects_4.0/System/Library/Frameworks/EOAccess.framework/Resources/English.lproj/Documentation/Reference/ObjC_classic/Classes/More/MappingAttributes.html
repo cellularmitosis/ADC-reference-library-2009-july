@@ -1,0 +1,109 @@
+<html><head>
+<script language="JavaScript" src="../../../../../../../../../../../frametest_more.js"></script>
+<title>Mapping Attributes</title></head>
+<body bgcolor=#ffffff>
+
+<!-- start of header -->
+<!--#include virtual="/includes/framesetheader" -->
+<!-- end of header -->
+
+<!--start of path -->
+<font face="Geneva,Helvetica,Arial" size="1">
+<b>PATH<spacer type="horizontal" size="5">&nbsp;</b>
+ <a href="../../../../../../../../../../../webobjects.html" target="_top">WebObjects 4.0 Documentation</a> <b>&gt;</b>
+ <a href="../../frameset.html" target="_top">EOAccess Reference</a>
+</font>
+<br><br>
+<!--end of path -->
+
+<!-- start of navigation -->
+<a href="CreatingAttributes.html"><img src="../../../../../../../../../../../images/previous.gif" border="0"></a> 
+<a href="SQLStatementFormats.html"><img src="../../../../../../../../../../../images/next.gif" border="0"></a> 
+
+<!-- insert Show/Hide frames -->
+<a href="javascript:testFrame()">
+<script>
+<!--
+ document.write(frameLink);
+//-->
+</script><!-- end Show/Hide frames --></a>
+<!-- end of navigation -->
+
+
+<hr><br>
+ 
+<a name="3532">
+<h1> Mapping Attributes</h1>
+</a><a name="3539">
+<hr width=50% align=left>
+<h2> Mapping from Database to Objects</h2>
+</a>Every EOAttribute has an external type, which is the type used by the database to store its associated data, and an Objective-C class used as the type for that data in the client application. The type used by the database is accessed with the <a href="../EOAttribute.html#910"><code>setExternalType:</code></a> and <a href="../EOAttribute.html#828"><code>externalType</code></a> methods. The class type used by the application is accessed with the <a href="../EOAttribute.html#990"><code>valueClassName</code></a> method. You can map database types to a set of standard value classes, which includes:<p>
+<ul><li>NSString
+<li>NSNumber
+<li>NSDecimalNumber
+<li>NSData
+<li>NSDate
+</ul>Database-specific adaptors automatically handle value conversions for these classes. You can also create your own custom value class, so long as you define a format that it uses to interpret data. Your value class must also implement the EOCustomClassArchiving protocol to work as a customvalue; see that protocol specification for more information. For more information on using EOAttribute methods to work with custom data types, see the next section, "<a href="MappingAttributes.html#3573">Working with Custom Data Types</a>."<p>
+The handling of dates assumes by default that both the database server and the client application are running in the same, local, time zone. You can alter the server time zone with the <a href="../EOAttribute.html#945"><code>setServerTimeZone:</code></a> method. If you alter the server time zone, the adaptor automatically converts dates as they pass into and out of the server.<p>
+<a name="3573">
+<hr width=50% align=left>
+<h2> Working with Custom Data Types</h2>
+</a>When you create a new model, EOModeler maps each attribute in your model to one of the primitive data types the adaptor knows how to manipulate: NSString, NSNumber, NSDecimalNumber, NSData, and NSDate. For example, suppose you have a <code>photo</code> attribute that's stored in the database as a LONG RAW. When you create a new model, this attribute is mapped to NSData. However, NSData is just an object wrapper for binary data-for instance, it doesn't have any methods for operating on images, which would limit what you'd be able to do with the image in your application. This is a case in which you'd probably choose to use a custom data type, such as NSImage.<p>
+For a custom data type to be usable in Enterprise Objects Framework, it must supply methods for importing and exporting itself as one of the primitive types so that it can be read from and written to the database. Specifically, to use a custom data type you need to do the following:<p>
+<ul><li>Set the attribute's value class using the method <a href="../EOAttribute.html#4208"><code>setValueClassName:</code></a>. 
+<li>Set the factory method that will be used to create instances of your class from raw data using the method <a href="../EOAttribute.html#958"><code>setValueFactoryMethodName:</code></a>.
+<li>Set the type of the argument that should be passed to the factory method using the method <a href="../EOAttribute.html#914"><code>setFactoryMethodArgumentType:</code></a>.
+<li>Set the conversion method that is used to convert your data back into one of the primitive data types the adaptor can work with using the method <a href="../EOAttribute.html#891"><code>setAdaptorValueConversionMethodName:</code></a>; this enables the data to be stored in the database.
+</ul>If an EOAttribute represents a binary column in the database, the factory method argument type can be either <a href="../EOAttribute.html#832">EOFactoryMethodArgumentIsNSData</a> or EOFactoryMethodArgumentIsBytes, indicating that the method takes an NSData object or raw bytes as an argument. If the EOAttribute represents a string or character column, the factory method argument type can be either EOFactoryMethodArgumentIsNSString or EOFactoryMethodArgumentIsBytes, indicating that the method takes an NSString object or raw bytes as an argument. These types apply when fetching custom values, as described below.<p>
+The following code excerpt demonstrates how these methods work together. The example shows two custom data types: an image that's initialized with an NSData, and a custom zip code that's initialized with a string.<p>
+<blockquote><pre>    [imageAttribute setValueClassName:@"NSImage"];
+</pre></blockquote><p>
+<blockquote><pre>    [imageAttribute setFactoryMethodArgumentType:EOFactoryMethodArgumentIsNSData];
+</pre></blockquote><p>
+<blockquote><pre>    [imageAttribute setValueFactoryMethodName:@"imageWithData:"];
+</pre></blockquote><p>
+<blockquote><pre>    [imageAttribute setAdaptorValueConversionMethodName:@"TIFFRepresentation"];
+</pre></blockquote><p>
+<blockquote><pre>    [zipCodeAttribute setValueClassName:@"MyZipCodeClass"];
+</pre></blockquote><p>
+<blockquote><pre>    [zipCodeAttribute setFactoryMethodArgumentType:EOFactoryMethodArgumentIsBytes];
+</pre></blockquote><p>
+<blockquote><pre>    [zipCodeAttribute setValueFactoryMethodName:@"zipCodeWithBytes:length:"];
+</pre></blockquote><p>
+<blockquote><pre>    [zipCodeAttribute setAdaptorValueConversionMethodName:@"zipCodeString"];
+</pre></blockquote><p>
+Instead of setting the class information programmatically, you can use the Attributes Inspector in EOModeler, which is more common. For more information, see the chapter "Advanced Modeling Techniques" in the <em>Enterprise Objects Framework Developer's Guide</em>.<p>
+<a name="3619">
+<hr width=25% align=left>
+<h3> Fetching Custom Values</h3>
+</a>Custom values are created during fetching in EOAdaptorChannel's <a href="../EOAdaptorChannel.html#6395"><code>fetchRowWithZone:</code></a> method. This method fetches data in the external (server) type and converts it to a value object. For scalar database types such as numbers and dates, the EOAdaptorChannel converts the value itself. For binary and string database types, it calls upon the EOAttribute being fetched to perform the conversion, into either a standard or custom value class. EOAttribute's methods for performing this conversion are <a href="../EOAttribute.html#17177"><code>newValueForBytes:length:</code></a> for binary data and <a href="../EOAttribute.html#17183"><code>newValueForBytes:length:encoding:</code></a> for strings. These methods either convert the raw data directly into an NSData or NSString, or apply the custom value factory method to convert it into the custom class. Once the value is converted, the EOAdaptorChannel puts it into the dictionary for the row being fetched.<p>
+<code>newValueForBytes:length:</code> can handle NSData and raw bytes (<code>void *</code>). It converts the raw bytes into an NSData if the custom value argument type is <a href="../EOAttribute.html#832">EOFactoryMethodArgumentIsNSData</a>, then invokes the custom value factory method with the NSData or bytes. If the EOAttribute has no custom value factory method, this method simply returns an NSData object containing the bytes.<p>
+<code>newValueForBytes:length:encoding:</code> can handle NSString and raw bytes. It converts the raw bytes into an NSString if the custom value argument type is EOFactoryMethodArgumentIsNSString, then it invokes the custom value factory method with the string or bytes. If the EOAttribute has no custom value factory method, this method simply returns an NSString object created from the bytes.<p>
+<a name="3647">
+<hr width=25% align=left>
+<h3> Converting Custom Values</h3>
+</a>Custom values are converted back to binary or character data in EOAdaptorChannel's <a href="../EOAdaptorChannel.html#1009"><code>evaluateExpression:</code></a> method. For each value in the EOSQLExpression to be evaluated, the EOAdaptorChannel sends the appropriate EOAttribute an <a href="../EOAttribute.html#5057"><code>adaptorValueByConvertingAttributeValue:</code></a> message to convert it. If the value is any of the standard value classes, it's returned unchanged. If the value is of a custom class, though, it's converted by applying the conversion method (<a href="../EOAttribute.html#5000"><code>adaptorValueConversionMethod</code></a>) specified in the EOAttribute.<p>
+<dl><dt>
+</dl>
+<hr><br>
+<a href="CreatingAttributes.html"><img src="../../../../../../../../../../../images/previous.gif" border="0"></a> 
+<a href="SQLStatementFormats.html"><img src="../../../../../../../../../../../images/next.gif" border="0"></a> 
+
+<!-- insert Show/Hide frames -->
+<a href="javascript:testFrame()">
+<script>
+<!--
+ document.write(frameLink);
+//-->
+</script><!-- end Show/Hide frames --></a>
+<hr><br>
+ 
+
+
+<i>Copyright &#169; 1998, Apple Computer, Inc.   All rights
+reserved.</i>
+
+<!-- Last updated: 09/17/98 17:39:29 -->
+
+</body>
+</html>

@@ -1,0 +1,94 @@
+<html><head><title>What's New in WebObjects 4.0</title></head>
+<body bgcolor="#ffffff">
+
+<!--start of banner -->
+<!--#include virtual="/includes/framesetheader" -->
+<!-- end of banner -->
+
+<!--start of path -->
+<font face="Geneva,Helvetica,Arial" size="1">
+<b>PATH<spacer type="horizontal" size="5">&nbsp;</b>
+ <a href="../../../../../webobjects.html" target="_top">WebObjects 4.0 Documentation</a> <b>&gt;</b>
+ <a href="NewInWO4TOC.html" target="_top">What's New in WebObjects 4.0</a>
+</font>
+<br><br>
+<!--end of path -->
+ 
+<a href="NewInWO4TOC.html"><IMG SRC="ArrowUp.gif">Table of Contents</a> <a href="NewInWO4.04.html"><IMG SRC="ArrowLeft.gif">Previous Section</a>
+ 
+<a name="21081">
+<h2> Troubleshooting WebObjects 4.0 Request Handling</h2>
+</a><a name="21082">
+In previous WebObjects releases, the application, session, request component, and all of the dynamic elements in the request component got a chance to perform the <strong>takeValuesFromRequest:inContext:</strong> and <strong>invokeActionForRequest:inContext:</strong> methods during each cycle of the request-response loop. In WebObjects 4.0, there are some performance enhancements to this request-handling scheme:<p>
+</a><ul><a name="21083">
+<p><li>The take values phase is not always performed.
+</a><a name="21084">
+<p>In release 4.0 if the request has no form values to use as input, the take values phase of the request-response loop (in which the application, the session, the request component, and the component's dynamic elements are sent takeValuesFromRequest:inContext:) is not performed.<p>
+</a><a name="21085">
+<p>If you have overridden takeValuesFromRequest:inContext: at the application, session, or component level and your method needs to be invoked even when there are no input values, you must either change your logic or disable 4.0 request handling at the application level. To disable 4.0 request handling, implement the following method in your application class:<p>
+</a><pre><a name="21086">//WARNING! Put this method in Application class, not component.
+</a><a name="21087">//Java implementation
+</a><a name="21088">public boolean requiresWOF35RequestHandling() {
+</a><a name="21089">	return true;
+</a><a name="21090">}
+</a><a name="21091">//WebScript implementation
+</a><a name="21092">- requiresWOF35RequestHandling {
+</a><a name="21093">	return YES;
+</a><a name="21094">}
+</a></pre><a name="21095">
+<p>It is the application object that makes the decision to perform the take values phase of the request-response loop; therefore, you must disable 4.0 request handling in the application class if you want to ensure that the take values phase always occurs.<p>
+</a><a name="21096">
+<p><li>The take values phase does not iterate through WOBrowser and WOPopUpButton lists. 
+</a><a name="21097">
+<p>In previous releases, WebObjects would iterate through the <strong>list</strong> attribute of the WOBrowser and WOPopUpButton looking for the item that the user selected. In release 4.0, this is no longer necessary because WebObjects can directly access the selected item without iterating. WebObjects is able to do this because the use of the <strong>value</strong> attribute has changed so that by default it is set to the index of the item. <p>
+</a><a name="21099">
+-	 Use of the <strong>item</strong> attribute as the selection. <p>
+</a><a name="21100">
+ The <strong>item</strong> attribute is intended to point to the current item, and it is updated upon each iteration through the list. Because WebObjects used to iterate through the list until it found a selection, the <strong>item</strong> attribute ended up pointing to the selected item. <p>
+</a><a name="21101">
+ If you need to refer to the selected item, use the <strong>selection</strong> attribute instead of <strong>item</strong>. Make sure <strong>selection</strong> is bound to a variable in your component's code and then use that variable instead of the one bound to <strong>item</strong>. <p>
+</a><a name="21102">
+-	 Use of the <strong>value</strong> attribute.<p>
+</a><a name="21103">
+ The <strong>value</strong> attribute was previously used as the string displayed in the browser or pop-up button. It also set the HTML value attribute for the <strong>&lt;OPTION&gt;</strong> tag. In WebObjects 4.0, this attribute still sets the value in HTML, but it no longer specifies the display string. By default, it is set to an index value, which allows WebObjects to find the selection without iterating through the list.<p>
+</a><a name="21104">
+ If you have a binding for the <strong>value</strong> attribute, change it to <strong>displayString</strong>, which is a new attribute that specifies the display string. Change this:<p>
+</a><a name="21105">
+ value = aCollege.name;<p>
+</a><a name="21106">
+ to this:<p>
+</a><a name="21107">
+ displayString = aCollege.name;<p>
+</a><a name="21108">
+ Use <strong>value</strong> only if you really want to set the HTML value in the <strong>&lt;OPTION&gt;</strong> tag.<p>
+</a><a name="21109">
+-	 An <strong>item</strong> attribute bound to a method.<p>
+</a><a name="21110">
+ If you bound the <strong>item</strong> attribute to a method, your method used to be invoked several times during the take values phase, and now it is invoked only once (for the selected item). If your component depends upon the previous behavior, you either need to change your logic or use WOApplication's request-handling compatibility flag as described above. <p>
+</a><a name="21111">
+<p><li>The invoke action phase does not iterate through a WORepetition's list.
+</a><a name="21112">
+<p>When a repetition's list is iterated upon, the <strong>item</strong> and <strong>index</strong> attribute values are updated at each iteration. In previous releases, list iteration occurred during the take values phase and during the invoke action phase of the request-response loop. In WebObjects 4.0, WORepetition list iteration occurs during take values only if the request has input values, and it doesn't occur during the invoke action phase. (WebObjects is able to forgo iterating during the invoke action phase because by default it sets the <strong>identifier</strong> attribute to the item's element ID so that it is able to navigate directly to the list item that responds to the requested action. If you already declare a binding for the <strong>identifier</strong> attribute, your binding is used instead of the element ID, and the invoke action phase does iterate through the list.)<p>
+</a><a name="21113">
+<p>If you've bound the <strong>item</strong> or <strong>index</strong> attribute to a method, your method used to be invoked several times during the take values phase, and then again several more times during the invoke action phase. In WebObjects 4.0, your method will only be invoked during the take values phase if there are input values in the request, and it won't be invoked during the invoke action phase (unless you specify a non-default binding for the <strong>identifier</strong> attribute). <p>
+</a><a name="21114">
+<p>If your component depends upon the previous behavior, you either need to change your logic or use the component's request-handling compatibility flag. To set the component's request handling compatibility flag, implement this method in the component:<p>
+</a><pre><a name="21115">// Java implementation
+</a><a name="21116">public boolean requiresWOF35RequestHandling() {
+</a><a name="21117">	return true;
+</a><a name="21118">}
+</a><a name="21119">// WebScript implementation
+</a><a name="21120">- requiresWOF35RequestHandling {
+</a><a name="21121">	return YES;
+</a><a name="21122">}
+</a></pre><a name="21123">
+<p>When you implement this method at the component level, WebObjects uses the old behavior for invoke action on that component only. All other components use the new behavior for the invoke action phase.<p>
+</a></ul>
+<P>
+ 
+<a href="NewInWO4TOC.html"><IMG SRC="ArrowUp.gif">Table of Contents</a> <a href="NewInWO4.06.html"><IMG SRC="ArrowRight.gif">Next Section</a>
+<P>
+
+
+</body>
+</html>

@@ -1,0 +1,978 @@
+<html><head><title></title></head>
+
+<body bgcolor="#ffffff">
+
+ 
+
+ 
+
+<h2><a name="//apple_ref/occ/cl/EOAdaptorChannel">EOAdaptorChannel</a>
+
+ <BR>
+
+</h2>
+
+<p><B>Inherits From:</B><BR>  
+
+NSObject
+
+
+
+<p><B>Conforms To:</B>
+
+NSObject (NSObject)
+
+
+
+<p><B>Declared in:</B>
+
+EOAccess/EOAdaptorChannel.h
+
+
+
+<p><h3>Class At a Glance:</h3>
+
+<p><dl><dt><h4>Purpose</h4>
+
+</dl>EOAdaptorChannel is an abstract class that defines how an Enterprise Objects Framework application performs operations on a database server. Concrete subclasses of EOAdaptorChannel override many of its methods in terms of the client libraries for a specific RDBMS. You typically don't interact with adaptor channels directly; rather, the Enterprise Objects Framework creates instances of a concrete adaptor channel subclass automatically and handles all the necessary interactions with those instances. If you're not creating a concrete adaptor channel subclass, there aren't very many methods you need to use, and you'll rarely invoke them directly.<p>
+
+<dl><dt><h4>Principle Attributes</h4>
+
+</dl><li>Adaptor context	
+
+
+
+
+
+<li>Delegate
+
+
+
+
+
+<dl><dt><h4>Creation</h4>
+
+<dl><dt>Other framework classes create them.
+
+<dt>Adaptor channels are generally created automatically.	
+
+<dt>- createAdaptorChannel (EOAdaptorContext)
+
+<dt>)	Creates an adaptor channel and assigns its context.
+
+</dl><dt><h4>Commonly Used Methods</h4>
+
+<dl><dt><a href="#//apple_ref/occ/instm/EOAdaptorChannel/openChannel">- openChannel</a>
+
+<dt>	Opens the channel so it can perform database operations.
+
+<dt><a href="#//apple_ref/occ/instm/EOAdaptorChannel/closeChannel">- closeChannel</a>
+
+<dt>	Close the channel.
+
+<dt><a href="#//apple_ref/occ/instm/EOAdaptorChannel/selectAttributes:fetchSpecification:lock:entity:">- selectAttributes:fetchSpecification:lock:entity:</a>
+
+<dt>	Selects rows matching the specified qualifier.
+
+<dt><a href="#//apple_ref/occ/instm/EOAdaptorChannel/fetchRowWithZone:">- fetchRowWithZone:</a>
+
+<dt>	Fetches a row resulting from the last <B>select... </B>, 
+
+<B>executeStoredProcedure... </B>, or <B>evaluateExpression: </B>.
+
+<dt><a href="#//apple_ref/occ/instm/EOAdaptorChannel/insertRow:forEntity:">- insertRow:forEntity:</a>
+
+<dt>	Inserts the specified row.
+
+<dt><a href="#//apple_ref/occ/instm/EOAdaptorChannel/updateValues:inRowDescribedByQualifier:entity:">- updateValues:inRowDescribedByQualifier:entity:</a>
+
+<dt>	Updates the row described by the specified qualifier.
+
+<dt><a href="#//apple_ref/occ/instm/EOAdaptorChannel/deleteRowDescribedByQualifier:entity:">- deleteRowDescribedByQualifier:entity:</a>
+
+<dt>	Deletes the row described by the specified qualifier.
+
+<dt><a href="#//apple_ref/occ/instm/EOAdaptorChannel/executeStoredProcedure:withValues:">- executeStoredProcedure:withValues:</a>
+
+<dt>	Performs the specified stored procedure.
+
+<dt><a href="#//apple_ref/occ/instm/EOAdaptorChannel/evaluateExpression:">- evaluateExpression:</a>
+
+<dt>	Sends the specified expression to the database.
+
+<dt><a href="#//apple_ref/occ/instm/EOAdaptorChannel/performAdaptorOperation:">- performAdaptorOperation:</a>
+
+<dt>	Performs an adaptor operation by invoking the 
+
+EOAdaptorChannel method appropriate for performing 
+
+the specified operation.	
+
+</dl></dl><p>
+
+<dl><dt><h4></h4>
+
+</dl><a name="814">
+
+<a name="description"></a>
+
+<h3>Class Description  </h3>
+
+</a>EOAdaptorChannel is an abstract class that provides concrete subclasses with a structure for performing database operations. It's associated with EOAdaptor and EOAdaptorContext, which, together with EOAdaptorChannel, form the <em>adaptor level</em> of Enterprise Objects Framework's access layer. See the EOAdaptor class specification for more information about accessing, creating, and using adaptor level objects.<p>
+
+A concrete subclass of EOAdaptorChannel provides database-specific method implementations and represents an independent communication channel to the database server to which its EOAdaptor object is connected. You never interact with instances of the EOAdaptorChannel class, rather your Enterprise Objects Framework applications use instances of concrete subclasses that are written to interface with a specific database or other persistent storage system. To create an instance of a concrete EOAdaptorChannel subclass, you send a <code>createAdaptorChannel</code> message to an instance of the corresponding EOAdaptorContext subclass. You rarely create adaptor channels yourself. They are generally created automatically by other framework objects.<p>
+
+You use an adaptor channel to manipulate rows (records) by selecting, fetching, inserting, deleting, and updating them. An adaptor channel also gives you access to some of the metadata on the server, such as what stored procedures exist, what tables exist, and what their basic attributes and relationships are.<p>
+
+All of an adaptor channel's operations take place within the context of transactions controlled or tracked by its EOAdaptorContext. An adaptor context may manage several channels (though not all can), but a channel is associated with only one context.<p>
+
+<a name="817">
+
+<h3> Connecting to the Database</h3>
+
+</a>Before you can begin a transaction or perform a database operation, you need to form a connection to the database server. An EOAdaptorContext holds the connection, but it isn't actually formed until one of the context's channels is <em>opened</em>. Using the EOAdaptorChannel method <a href="#1062"><B>openChannel </B></a>, you prepare the adaptor channel, its adaptor context, and its adaptor to communicate with the database server. If the adaptor channel is the first of a context's channels to be opened, preparing to communicate entails creating a database connection. Whether or not a channel's adaptor context is holding a database connection, you can't use an adaptor channel to interact with the server until you open the channel.<p>
+
+When you're done performing operations, you close an adaptor channel by sending a <a href="#971"><B>closeChannel </B></a> message to the channel. An adaptor channel's context can have many channels. The connection to the database isn't actually closed until the last open channel is closed.<p>
+
+<a name="820">
+
+<h3> Performing Database Operations</h3>
+
+</a>An adaptor channel operates on database rows represented by NSDictionary objects. The keys of the dictionary represent the names of attributes (columns), the values for those keys are the values for the attributes. It's important to note that the table and column names in the database server are not the same as the entity and attribute names that the Enterprise Objects Framework uses (though an application can set them to be identical).<p>
+
+Once you've set up a suite of adaptor objects, opened the adaptor channel, and begun a transaction, you can use the adaptor channel to operate on data in the server (see the EOAdaptor class specification for information on accessing and creating the adaptor level objects). To insert a new row for a particular entity, for example, you create a dictionary object containing all the key-value pairs for the entity's properties, and send the channel an <a href="#1031"><B>insertRow:forEntity: </B></a> message.<p>
+
+The other database operations-delete and update-require an EOQualifier object to specify which rows to affect. An EOQualifier describes specific rows for a single entity based on the values of properties; for example, rows whose salary attribute is greater than 40,000. See the EOQualifier class specification for more information on creating qualifiers.<p>
+
+Fetching rows with an adaptor channel is a two-stage process. First, you select the rows with a <a href="#1090"><B>selectAttributes:fetchSpecification:lock:entity: </B></a> message. This establishes one or more result sets of records to be fetched. If the selection succeeds, you then send <a href="#1020"><B>fetchRowWithZone: </B></a> messages to retrieve individual rows until there are no more. This code template displays the highlights of the process:<p>
+
+<blockquote><pre>EOAdaptorChannel *myChannel;            /* Assume this exists. */
+
+</pre></blockquote><p>
+
+<blockquote><pre>EOEntity *employeeEntity;               /* Assume this exists. */
+
+</pre></blockquote><p>
+
+<blockquote><pre>EOFetchSpecification *myFetchSpec;      /* Assume this exists. */
+
+</pre></blockquote><p>
+
+<blockquote><pre>NSDictionary *theRow;
+
+</pre></blockquote><p>
+
+<blockquote><pre>NS_DURING
+
+</pre></blockquote><p>
+
+<blockquote><pre>if (![myChannel isOpen]) {
+
+</pre></blockquote><p>
+
+<blockquote><pre>[myChannel openChannel];
+
+</pre></blockquote><p>
+
+<blockquote><pre>}
+
+</pre></blockquote><p>
+
+<blockquote><pre>[myChannel selectAttributes:[employeeEntity attributes]
+
+</pre></blockquote><p>
+
+<blockquote><pre>fetchSpecification:myFetchSpec
+
+</pre></blockquote><p>
+
+<blockquote><pre>lock:NO
+
+</pre></blockquote><p>
+
+<blockquote><pre>entity:employeeEntity];
+
+</pre></blockquote><p>
+
+<blockquote><pre>while (theRow = [myChannel fetchRowWithZone:NULL]) {
+
+</pre></blockquote><p>
+
+<blockquote><pre>/* Process theRow. */
+
+</pre></blockquote><p>
+
+<blockquote><pre>}
+
+</pre></blockquote><p>
+
+<blockquote><pre>NS_HANDLER
+
+</pre></blockquote><p>
+
+<blockquote><pre>/* Handle the exception. */
+
+</pre></blockquote><p>
+
+<blockquote><pre>NS_ENDHANDLER
+
+</pre></blockquote><p>
+
+The adaptor layer classes-EOAdaptor, EOAdaptorContext, and EOAdaptorChannel-notify you when an error occurs by raising an exception, particularly when the error can occur in the database server. Therefore, the <B>openChannel </B>, <B>selectAttributes:fetchSpecification:lock:entity: </B>, and <B>fetchRowWithZone: </B> messages above can all raise exceptions if an error occurs. The code between the NS_HANDLER and NS_ENDHANDLER macros should find out what exception was raised and handle it appropriately. See the NSException class specification for more information on handling exceptions.<p>
+
+After you open the adaptor channel and begin a transaction, you use the method <a href="#1090"><B>selectAttributes:fetchSpecification:lock:entity: </B></a> to select records in preparation for fetching. This method requires you to specify the attributes you're interested in and a fetch specification. You can ask the EOEntity object that represents a table for any of its attributes by name, or you can ask it for all its attributes as the excerpt does above. The <B>fetchSpecification: </B> argument is an EOFetchSpecification object that provides a qualifier, a fetch order, and other specifications for the select. See the EOFetchSpecification class specification for more information on creating fetch specifications. Once you've selected a set of records, you use a loop to fetch each one individually with <a href="#1020"><B>fetchRowWithZone: </B></a>.<p>
+
+<a name="851">
+
+<h3> Getting Basic Schema Information</h3>
+
+</a>You can use the adaptor-level objects without loading an EOModel file by having the adaptor channel read a minimal model from the database server's system dictionary. To build such a model you use the "describe" methods:<p>
+
+<ul><li><a href="#1002">- describeTableNames</a><br><li><a href="#991">- describeModelWithTableNames:</a><br><li><a href="#999">- describeStoredProcedureNames</a><br></ul><p><B>describeTableNames </B> reads and returns an array of table names from the database. <B>describeModelWithTableNames: </B> constructs a default model out of the database's metadata, and assigns the adaptor name and connection dictionary to the new model. You generally invoke <B>describeModelWithTableNames: </B> with the array of table names (or a subset) returned from <B>describeTableNames </B>. <B><a href="#960">addStoredProceduresNamed:toModel:</a> </B> reads an array of stored procedure names from the database.<p>
+
+<a name="857">
+
+<h3> Sending SQL Statements Directly to the Server</h3>
+
+</a>An EOAdaptorChannel allows you to send SQL directly to the database server with its <a href="#1009"><B>evaluateExpression: </B></a> method. This gives you access to database-specific features not made available by the adaptor channel itself, but can cause state changes on the server that aren't noted by objects in your application. If you cause state changes in evaluating SQL, you're responsible for notifying the appropriate objects of the changes; the classes of the Enterprise Objects Framework that are affected by evaluation of SQL typically describe the kinds of notifications they require.<p>
+
+If the expression you evaluate returns results, you fetch them with the method <a href="#1020"><B>fetchRowWithZone: </B></a> as you would had you used <a href="#1090"><B>selectAttributes:fetchSpecification:lock:entity: </B></a>. If your adaptor doesn't have a model set, you can use <a href="#995"><B>describeResults </B></a> to determine the attributes selected by the expression. Even if you perform the selection by sending raw SQL to the server, this method returns usable attributes that allow you to fetch rows. The code snippet below outlines the steps:<p>
+
+<blockquote><pre>EOAdaptorChannel *channel;               /* Assume this exists and it's open */
+
+</pre></blockquote><p>
+
+<blockquote><pre>NSString *sqlString;                     /* Assume this exists */
+
+</pre></blockquote><p>
+
+<blockquote><pre>EOAdaptor *adaptor;
+
+</pre></blockquote><p>
+
+<blockquote><pre>EOSQLExpression *expression;
+
+</pre></blockquote><p>
+
+<blockquote><pre>NSDictionary *row;
+
+</pre></blockquote><p>
+
+<blockquote><pre>adaptor = [[channel adaptorContext] adaptor];
+
+</pre></blockquote><p>
+
+<blockquote><pre>expression = [[adaptor expressionClass] expressionForString:sqlString];
+
+</pre></blockquote><p>
+
+<blockquote><pre>NS_DURING
+
+</pre></blockquote><p>
+
+<blockquote><pre>[channel evaluateExpression:expression];
+
+</pre></blockquote><p>
+
+<blockquote><pre>do {
+
+</pre></blockquote><p>
+
+<blockquote><pre>    [channel setAttributesToFetch:[channel describeResults]];
+
+</pre></blockquote><p>
+
+<blockquote><pre>    while (row = [channel fetchRowWithZone:nil]) {
+
+</pre></blockquote><p>
+
+<blockquote><pre>/* Process the row. */
+
+</pre></blockquote><p>
+
+<blockquote><pre>    }
+
+</pre></blockquote><p>
+
+<blockquote><pre>} while ([channel isFetchInProgress]); /* Loop to process the next result set. */
+
+</pre></blockquote><p>
+
+<blockquote><pre>[[myChannel adaptorContext] commitTransaction];
+
+</pre></blockquote><p>
+
+<blockquote><pre>NS_HANDLER
+
+</pre></blockquote><p>
+
+<blockquote><pre>    /* Handle the exception. */
+
+</pre></blockquote><p>
+
+<blockquote><pre>NS_ENDHANDLER
+
+</pre></blockquote><p>
+
+When you evaluate a raw SQL statement, you must set the channel's <B>attributesToFetch </B> so it knows how to construct the fetched row. The attributes returned from <B>describeResults </B> are appropriate for use with <a href="#1097"><B>setAttributesToFetch: </B></a>.<p>
+
+Some expressions may return multiple result sets in which rows have different types and numbers of attributes.<B> fetchRowWithZone: </B> returns <B>nil </B> if there are no more rows in the current result set, but there may be more result sets to fetch from. The <B>while </B> statement containing the <B><a href="#1042">isFetchInProgress</a> </B> message ensures that the code will continue fetching through all result sets.<p>
+
+EOAdaptorChannel also provides a method for executing stored procedures: <a href="#1016"><B>executeStoredProcedure:withValues: </B></a>. Similar to <B>evaluateExpression: </B>, you can fetch rows resulting from a stored procedure using <code>fetchRowWithZone:</code>. In addition, you can get stored procedure return values and in/out parameters with the method <a href="#1086"><B>returnValuesForLastStoredProcedureInvocation </B></a>.<p>
+
+<a name="883">
+
+<h3> Notifying the Adaptor Channel's Delegate</h3>
+
+</a>You can assign a delegate to an adaptor channel. The EOAdaptorChannel sends certain messages directly to the delegate, and the delegate responds to these messages on the channel's behalf. Many of the adaptor channel methods notify the channel's delegate before and after an operation is performed. Some delegate methods, such as <a href="#1148"><B>adaptorChannel:shouldEvaluateExpression: </B></a>, let the delegate determine whether the channel should perform an operation. Others, such as <a href="#1127"><B>adaptorChannel:didEvaluateExpression: </B></a>, are simply notifications that an operation has occurred. The delegate has an opportunity to respond by implementing the delegate methods. If the delegate wants to intervene, it implements <B>adaptorChannel:shouldEvaluateExpression: </B>. If it simply wants notification when a transaction has begun, it implements <B>adaptorChannel:didEvaluateExpression: </B>.<p>
+
+<a name="885">
+
+<h3> Creating an EOAdaptorChannel Subclass</h3>
+
+</a>EOAdaptorChannel provides many default method implementations that are sufficient for concrete subclasses:<p>
+
+<ul><li><a href="#956">- adaptorContext</a><br><li><a href="#976">- delegate</a><br><li><a href="#980">- deleteRowDescribedByQualifier:entity:</a><br><li><a href="#1038">- isDebugEnabled</a><br><li><a href="#1055">- lockRowComparingAttributes:entity:qualifier:snapshot:</a><br><li><a href="#1066">- performAdaptorOperation:</a><br><li><a href="#1071">- performAdaptorOperations:</a><br><li><a href="#1111">- updateValues:inRowDescribedByQualifier:entity:</a><br></ul><p>The following methods establish structure and conventions that other Enterprise Objects Framework classes depend on and should be overridden with caution:<p>
+
+<ul><li><a href="#1006">- dictionaryWithObjects:forAttributes:zone:</a><br><li><a href="#1025">- initWithAdaptorContext:</a><br><li><a href="#1102">- setDebugEnabled:</a><br><li><a href="#1107">- setDelegate:</a><br></ul><p>If you override any of the above methods, your implementations should incorporate the superclass's implementation through a message to <B>super </B>.<p>
+
+The remaining EOAdaptorChannel methods must be overridden by concrete subclasses in terms of the persistent storage system to which it interfaces:<p>
+
+<ul><li><a href="#963">- attributesToFetch</a><br><li><a href="#967">- cancelFetch</a><br><li><a href="#971">- closeChannel</a><br><li><a href="#983">- deleteRowsDescribedByQualifier:entity:</a><br><li><a href="#991">- describeModelWithTableNames:</a><br><li><a href="#995">- describeResults</a><br><li><a href="#999">- describeStoredProcedureNames</a><br><li><a href="#1002">- describeTableNames</a><br><li><a href="#1009">- evaluateExpression:</a><br><li><a href="#1016">- executeStoredProcedure:withValues:</a><br><li><a href="#1020">- fetchRowWithZone:</a><br><li><a href="#1031">- insertRow:forEntity:</a><br><li><a href="#1042">- isFetchInProgress</a><br><li><a href="#1051">- isOpen</a><br><li><a href="#1062">- openChannel</a><br><li><a href="#1084">- primaryKeyForNewRowWithEntity:</a><br><li><a href="#1086">- returnValuesForLastStoredProcedureInvocation</a><br><li><a href="#1090">- selectAttributes:fetchSpecification:lock:entity:</a><br><li><a href="#1097">- setAttributesToFetch:</a><br><li><a href="#1115">- updateValues:inRowsDescribedByQualifier:entity:</a><br></ul><p><dl><dt>Creating an EOAdaptorChannel
+
+<dl><dt><a href="#//apple_ref/occ/instm/EOAdaptorChannel/initWithAdaptorContext:"><a href="#1025">- initWithAdaptorContext:</a></a>
+
+</dl><dt>Getting the adaptor context
+
+<dl><dt><a href="#//apple_ref/occ/instm/EOAdaptorChannel/adaptorContext"><a href="#956">- adaptorContext</a></a>
+
+</dl><dt>Opening and closing a channel
+
+<dl><dt><a href="#//apple_ref/occ/instm/EOAdaptorChannel/openChannel"><a href="#1062">- openChannel</a></a>
+
+<dt><a href="#//apple_ref/occ/instm/EOAdaptorChannel/closeChannel"><a href="#971">- closeChannel</a></a>
+
+<dt><a href="#//apple_ref/occ/instm/EOAdaptorChannel/isOpen"><a href="#1051">- isOpen</a></a>
+
+</dl><dt>Modifying rows
+
+<dl><dt><a href="#//apple_ref/occ/instm/EOAdaptorChannel/insertRow:forEntity:"><a href="#1031">- insertRow:forEntity:</a></a>
+
+<dt><a href="#//apple_ref/occ/instm/EOAdaptorChannel/updateValues:inRowDescribedByQualifier:entity:"><a href="#1111">- updateValues:inRowDescribedByQualifier:entity:</a></a>
+
+<dt><a href="#//apple_ref/occ/instm/EOAdaptorChannel/updateValues:inRowsDescribedByQualifier:entity:"><a href="#1115">- updateValues:inRowsDescribedByQualifier:entity:</a></a>
+
+<dt><a href="#//apple_ref/occ/instm/EOAdaptorChannel/deleteRowDescribedByQualifier:entity:"><a href="#980">- deleteRowDescribedByQualifier:entity:</a></a>
+
+<dt><a href="#//apple_ref/occ/instm/EOAdaptorChannel/deleteRowsDescribedByQualifier:entity:"><a href="#983">- deleteRowsDescribedByQualifier:entity:</a></a>
+
+</dl><dt>Fetching rows
+
+<dl><dt><a href="#//apple_ref/occ/instm/EOAdaptorChannel/selectAttributes:fetchSpecification:lock:entity:"><a href="#1090">- selectAttributes:fetchSpecification:lock:entity:</a></a>
+
+<dt><a href="#//apple_ref/occ/instm/EOAdaptorChannel/describeResults"><a href="#995">- describeResults</a></a>
+
+<dt><a href="#//apple_ref/occ/instm/EOAdaptorChannel/setAttributesToFetch:"><a href="#1097">- setAttributesToFetch:</a></a>
+
+<dt><a href="#//apple_ref/occ/instm/EOAdaptorChannel/attributesToFetch"><a href="#963">- attributesToFetch</a></a>
+
+<dt><a href="#//apple_ref/occ/instm/EOAdaptorChannel/fetchRowWithZone:"><a href="#1020">- fetchRowWithZone:</a></a>
+
+<dt><a href="#//apple_ref/occ/instm/EOAdaptorChannel/dictionaryWithObjects:forAttributes:zone:"><a href="#1006">- dictionaryWithObjects:forAttributes:zone:</a></a>
+
+<dt><a href="#//apple_ref/occ/instm/EOAdaptorChannel/cancelFetch"><a href="#967">- cancelFetch</a></a>
+
+<dt><a href="#//apple_ref/occ/instm/EOAdaptorChannel/isFetchInProgress"><a href="#1042">- isFetchInProgress</a></a>
+
+</dl><dt>Invoking stored procedures
+
+<dl><dt><a href="#//apple_ref/occ/instm/EOAdaptorChannel/executeStoredProcedure:withValues:"><a href="#1016">- executeStoredProcedure:withValues:</a></a>
+
+<dt><a href="#//apple_ref/occ/instm/EOAdaptorChannel/returnValuesForLastStoredProcedureInvocation"><a href="#1086">- returnValuesForLastStoredProcedureInvocation</a></a>
+
+</dl><dt>Assigning primary keys
+
+<dl><dt><a href="#//apple_ref/occ/instm/EOAdaptorChannel/primaryKeyForNewRowWithEntity:"><a href="#1084">- primaryKeyForNewRowWithEntity:</a></a>
+
+</dl><dt>Sending SQL to the server
+
+<dl><dt><a href="#//apple_ref/occ/instm/EOAdaptorChannel/evaluateExpression:"><a href="#1009">- evaluateExpression:</a></a>
+
+</dl><dt>Batch processing operations
+
+<dl><dt><a href="#//apple_ref/occ/instm/EOAdaptorChannel/performAdaptorOperation:"><a href="#1066">- performAdaptorOperation:</a></a>
+
+<dt><a href="#//apple_ref/occ/instm/EOAdaptorChannel/performAdaptorOperations:"><a href="#1071">- performAdaptorOperations:</a></a>
+
+</dl><dt>Getting schema information
+
+<dl><dt><a href="#//apple_ref/occ/instm/EOAdaptorChannel/describeTableNames"><a href="#1002">- describeTableNames</a></a>
+
+<dt><a href="#//apple_ref/occ/instm/EOAdaptorChannel/describeStoredProcedureNames"><a href="#999">- describeStoredProcedureNames</a></a>
+
+<dt><a href="#//apple_ref/occ/instm/EOAdaptorChannel/addStoredProceduresNamed:toModel:"><a href="#960">- addStoredProceduresNamed:toModel:</a></a>
+
+<dt><a href="#//apple_ref/occ/instm/EOAdaptorChannel/describeModelWithTableNames:"><a href="#991">- describeModelWithTableNames:</a></a>
+
+</dl><dt>Debugging
+
+<dl><dt><a href="#//apple_ref/occ/instm/EOAdaptorChannel/setDebugEnabled:"><a href="#1102">- setDebugEnabled:</a></a>
+
+<dt><a href="#//apple_ref/occ/instm/EOAdaptorChannel/isDebugEnabled"><a href="#1038">- isDebugEnabled</a></a>
+
+</dl><dt>Setting the delegate
+
+<dl><dt><a href="#//apple_ref/occ/instm/EOAdaptorChannel/delegate"><a href="#976">- delegate</a></a>
+
+<dt><a href="#//apple_ref/occ/instm/EOAdaptorChannel/setDelegate:"><a href="#1107">- setDelegate:</a></a>
+
+</dl></dl><a name="955">
+
+<a name="instm"></a>
+
+<h3>Instance Methods  </h3>
+
+</a><a name="956">
+
+<h4> <a name="//apple_ref/occ/instm/EOAdaptorChannel/adaptorContext">adaptorContext</a></h4>
+
+</a>- (EOAdaptorContext *)<code>adaptorContext</code> <p>
+
+Returns the receiver's EOAdaptorContext. A subclass of EOAdaptorChannel doesn't need to override this method.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOAdaptorChannel/initWithAdaptorContext:">- initWithAdaptorContext:</a>
+
+ </B><p><a name="960">
+
+<h4> <a name="//apple_ref/occ/instm/EOAdaptorChannel/addStoredProceduresNamed:toModel:">addStoredProceduresNamed:toModel:</a></h4>
+
+</a>- (void)<code>addStoredProceduresNamed:</code>(NSArray *)<em>storedProcedureNames</em> <br><code>toModel:</code>(EOModel *)<em>model</em><p>
+
+Overridden by subclasses to create EOStoredProcedure objects for the stored procedures named in <em>storedProcedureNames</em> and then to add them to <em>model</em>. This method is used in conjunction with <code><a href="#999"></code><B>describeStoredProcedureNames </B><code></a></code> to build a default model in EOModeler. Raises an exception if an error occurs.<p>
+
+<a name="963">
+
+<h4> <a name="//apple_ref/occ/instm/EOAdaptorChannel/attributesToFetch">attributesToFetch</a></h4>
+
+</a>- (NSArray *)<code>attributesToFetch</code> <p>
+
+Implemented by subclasses to return the set of attributes to retrieve when <a href="#1020"><B>fetchRowWithZone: </B></a> is next invoked. An adaptor channel subclass should override this method without invoking EOAdaptorChannel's implementation.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOAdaptorChannel/setAttributesToFetch:">- setAttributesToFetch:</a>
+
+ </B><p><a name="967">
+
+<h4> <a name="//apple_ref/occ/instm/EOAdaptorChannel/cancelFetch">cancelFetch</a></h4>
+
+</a>- (void)<code>cancelFetch</code> <p>
+
+Implemented by subclasses to clear all result sets established by the last <B><a href="#1090">selectAttributes:fetchSpecification:lock:entity:</a> </B>, <a href="#1016"><B>executeStoredProcedure:withValues: </B></a>, or <a href="#1009"><B>evaluateExpression: </B></a> message and terminate the current fetch, so that <B>isFetchInProgress </B> returns NO.<p>
+
+An adaptor channel subclass should override this method without invoking EOAdaptorChannel's implementation.<p>
+
+<a name="971">
+
+<h4> <a name="//apple_ref/occ/instm/EOAdaptorChannel/closeChannel">closeChannel</a></h4>
+
+</a>- (void)<code>closeChannel</code> <p>
+
+Implemented by subclasses to close the EOAdaptorChannel so that it can't perform operations with the server. Any fetch in progress is canceled. If the receiver is the last open channel in an adaptor context and if the channel's adaptor context has outstanding transactions, closing the channel has server-dependent results: some database servers roll back all outstanding transactions but others do nothing. Regardless of whether outstanding transactions are rolled back, this method has the side effect of closing the receiver's adaptor context's connection with the database if the receiver is its adaptor context's last open channel.<p>
+
+An adaptor channel subclass should override this method without invoking EOAdaptorChannel's implementation.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOAdaptorChannel/cancelFetch">- cancelFetch</a> </B>, <B><a href="../EOAdaptorContext/EOAdaptorContext.html#//apple_ref/occ/instm/EOAdaptorContext/transactionNestingLevel" target="_top">- transactionNestingLevel </B> (EOAdaptorContext)</a>
+
+<p><a name="976">
+
+<h4> <a name="//apple_ref/occ/instm/EOAdaptorChannel/delegate">delegate</a></h4>
+
+</a>- (id)<code>delegate</code> <p>
+
+Returns the receiver's delegate, or <B>nil </B> if the receiver doesn't have a delegate. A subclass of EOAdaptorChannel doesn't need to override this method.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOAdaptorChannel/setDelegate:">- setDelegate:</a>
+
+ </B><p><a name="980">
+
+<h4> <a name="//apple_ref/occ/instm/EOAdaptorChannel/deleteRowDescribedByQualifier:entity:">deleteRowDescribedByQualifier:entity:</a></h4>
+
+</a>- (void)<code>deleteRowDescribedByQualifier:</code>(EOQualifier *)<em>qualifier </em><code>entity:</code>(EOEntity *)<em>entity</em> <p>
+
+Deletes the row described by <em>qualifier</em> from the database table corresponding to <em>entity</em>. Invokes <B><a href="#983">deleteRowsDescribedByQualifier:entity:</a> </B> and raises an exception unless exactly one row is deleted. A subclass of EOAdaptorChannel doesn't need to override this method.<p>
+
+<a name="983">
+
+<h4> <a name="//apple_ref/occ/instm/EOAdaptorChannel/deleteRowsDescribedByQualifier:entity:">deleteRowsDescribedByQualifier:entity:</a></h4>
+
+</a>- (unsigned int)<code>deleteRowsDescribedByQualifier:</code>(EOQualifier *)<em>qualifier </em><code>entity:</code>(EOEntity *)<em>entity</em> <p>
+
+Implemented by subclasses to delete the rows described by <em>qualifier</em> from the database table corresponding to <em>entity</em>. Returns the number of rows deleted. Raises an exception on failure. Some possible reasons for failure are:<p>
+
+<ul><li>The adaptor channel isn't open<br><li>The adaptor channel is in an invalid state (for example, it's fetching).<br><li>An error occurs in the database server<br></ul><p>An adaptor channel subclass should override this method without invoking EOAdaptorChannel's implementation.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOAdaptorChannel/deleteRowDescribedByQualifier:entity:">- deleteRowDescribedByQualifier:entity:</a> </B>, <a href="#//apple_ref/occ/instm/EOAdaptorChannel/isOpen"><B>- isOpen</a> </B>, <a href="#//apple_ref/occ/instm/EOAdaptorChannel/isFetchInProgress"><B>- isFetchInProgress</a> </B>, 
+
+<B><a href="../EOAdaptorContext/EOAdaptorContext.html#//apple_ref/occ/instm/EOAdaptorContext/transactionNestingLevel" target="_top">- transactionNestingLevel </B> (EOAdaptorContext)</a>
+
+<p><a name="991">
+
+<h4> <a name="//apple_ref/occ/instm/EOAdaptorChannel/describeModelWithTableNames:">describeModelWithTableNames:</a></h4>
+
+</a>- (EOModel *)<code>describeModelWithTableNames:</code>(NSArray *)<em>tableNames</em> <p>
+
+Overridden by subclasses to create and return a default model containing entities for the tables specified in <em>tableNames</em>. Assigns the adaptor name and connection dictionary to the new model. This method is typically used in conjunction with <B>describeTableNames </B> and <a href="#999"><B>describeStoredProcedureNames </B></a>.<p>
+
+EOAdaptorChannel's implementation does nothing. An adaptor channel subclass should override this method to create a default model from the database's metadata.<p>
+
+<a name="995">
+
+<h4> <a name="//apple_ref/occ/instm/EOAdaptorChannel/describeResults">describeResults</a></h4>
+
+</a>- (NSArray *)<code>describeResults</code> <p>
+
+Implemented by subclasses to return an array of EOAttributes describing the properties available in the current result set, as determined by <B>selectAttributes:describedByQualifier:fetchOrder:lock: </B>, <a href="#1016"><B>executeStoredProcedure:withValues: </B></a>, or a statement evaluated by <B>evaluateExpression: </B>. Only invoke this method if a fetch is in progress as determined by <a href="#1042"><B>isFetchInProgress </B></a>.<p>
+
+An adaptor channel subclass should override this method without invoking EOAdaptorChannel's implementation.<p>
+
+<a name="999">
+
+<h4> <a name="//apple_ref/occ/instm/EOAdaptorChannel/describeStoredProcedureNames">describeStoredProcedureNames</a></h4>
+
+</a>- (NSArray *)<code>describeStoredProcedureNames</code> <p>
+
+Overridden by subclasses to read and return an array of stored procedure names from the database. This method is used in conjunction with <code>addStoredProceduresNamed:toModel:</code> to build a default model in EOModeler. Raises an exception if an error occurs.<p>
+
+<a name="1002">
+
+<h4> <a name="//apple_ref/occ/instm/EOAdaptorChannel/describeTableNames">describeTableNames</a></h4>
+
+</a>- (NSArray *)<code>describeTableNames</code> <p>
+
+Overridden by subclasses to read and return an array of table names from the database. This method in conjunction with <a href="#991"><B>describeModelWithTableNames: </B></a> is used to build a default model.<p>
+
+EOAdaptorChannel's implementation simply returns <B>nil </B>. An adaptor channel subclass should override this method to construct an array of table names from database metadata.<p>
+
+<a name="1006">
+
+<h4> <a name="//apple_ref/occ/instm/EOAdaptorChannel/dictionaryWithObjects:forAttributes:zone:">dictionaryWithObjects:forAttributes:zone:</a></h4>
+
+</a>- (NSMutableDictionary *)<code>dictionaryWithObjects:</code>(id *)<em>objects<br></em><code>forAttributes:</code>(NSArray *)<em>attributes<br></em><code>zone:</code>(NSZone *)<em>zone</em> <p>
+
+Used by EOAdaptorChannel subclasses to create dictionaries that can be returned from <B><a href="#1020">fetchRowWithZone:</a> </B>. You don't ordinarily invoke this method unless you are writing your own concrete adaptor. If you are writing a concrete adaptor, use of this method is optional but strongly recommended because it enables performance optimizations. The objects in <em>objects</em> are the values for the row that correspond to the EOAttribute objects in <em>attributes</em>. The dictionary representation of the row is created from <em>zone</em>.<p>
+
+A subclass of EOAdaptorChannel shouldn't override this method.<p>
+
+<a name="1009">
+
+<h4> <a name="//apple_ref/occ/instm/EOAdaptorChannel/evaluateExpression:">evaluateExpression:</a></h4>
+
+</a>- (void)<code>evaluateExpression:</code>(EOSQLExpression *)<em>expression</em> <p>
+
+Implemented by subclasses to send <em>expression</em> to the database server for evaluation, beginning a transaction first and committing it after evaluation if a transaction isn't already in progress. Raises an exception if an error occurs. An EOAdaptorChannel uses this method to send SQL expressions to the database.<p>
+
+If <em>expression</em> results in a select operation being performed, you can fetch the results as you would if you had sent a <a href="#1090"><B>selectAttributes:fetchSpecification:lock:entity: </B></a>. You must use the method <a href="#1097"><B>setAttributesToFetch: </B></a> before you begin fetching. Also, if <em>expression</em> evaluates to multiple result sets, you must invoke <B>setAttributesToFetch: </B> before you begin fetching each subsequent set.<p>
+
+<B>evaluateExpression: </B> invokes the delegate methods <B><a href="#1148">adaptorChannel:shouldEvaluateExpression:</a> </B> and <B><a href="#1127">adaptorChannel:didEvaluateExpression:</a> </B>.<p>
+
+An adaptor channel subclass should override this method without invoking EOAdaptorChannel's implementation. Note, however, that the upper layers of the Framework never invoke <a href="#1009"><B>evaluateExpression: </B></a> directly. Thus, adaptors for data stores that don't naturally support an expression language (for example, flat file adaptors) don't need to implement this method to work with the Framework.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOAdaptorChannel/fetchRowWithZone:">- fetchRowWithZone:</a>
+
+ </B><p><a name="1016">
+
+<h4> <a name="//apple_ref/occ/instm/EOAdaptorChannel/executeStoredProcedure:withValues:">executeStoredProcedure:withValues:</a></h4>
+
+</a>- (void)<code>executeStoredProcedure:</code>(EOStoredProcedure *)<em>storedProcedure<br></em><code>withValues:</code>(NSDictionary *)<em>values</em><p>
+
+Implemented by subclasses to execute <em>storedProcedure</em>. Any arguments to the stored procedure are in <em>values</em>, a dictionary whose keys are the argument names. Use <a href="#1020"><B>fetchRowWithZone: </B></a> to get result rows and <a href="#1086"><B>returnValuesForLastStoredProcedureInvocation </B></a> to get return arguments and result status, if any. Raises an exception if an error occurs.<p>
+
+An adaptor channel subclass should override this method without invoking EOAdaptorChannel's implementation. Note, however, that the upper layers of the Framework never invoke <a href="#1016"><B>executeStoredProcedure:withValues: </B></a> directly. Thus, adaptors for data stores that don't support stored procedures (for example, flat file adaptors) don't need to implement this method to work with the Framework<p>
+
+<a name="1020">
+
+<h4> <a name="//apple_ref/occ/instm/EOAdaptorChannel/fetchRowWithZone:">fetchRowWithZone:</a></h4>
+
+</a>- (NSMutableDictionary *)<code>fetchRowWithZone:</code>(NSZone *)<em>zone</em> <p>
+
+Implemented by subclasses to fetch the next row from the result set of the last <a href="#1090"><B>selectAttributes:fetchSpecification:lock:entity: </B></a>, <a href="#1016"><B>executeStoredProcedure:withValues: </B></a>, or <a href="#1009"><B>evaluateExpression: </B></a> message sent to the receiver. Returns values for the receiver's <a href="#963"><B>attributesToFetch </B></a> in a dictionary whose keys are the attribute names. When there are no more rows in the current result set, this method returns <B>nil </B>, and invokes the delegate method <a href="#1124"><B>adaptorChannelDidChangeResultSet: </B></a> if there are more results sets. When there are no more rows or result sets, this method returns <B>nil </B>, ends the fetch, and invokes <a href="#1136"><B>adaptorChannelDidFinishFetching: </B></a>. <a href="#1042"><B>isFetchInProgress </B></a> returns YES until the fetch is canceled or until this method exhausts all result sets and returns <B>nil </B>. This method also invoke the delegate methods <a href="#1160"><B>adaptorChannelWillFetchRow: </B></a> and <a href="#1133"><B>adaptorChannel:didFetchRow: </B></a>. Raises an exception if an error occurs.<p>
+
+An adaptor channel subclass should override this method without invoking EOAdaptorChannel's implementation.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOAdaptorChannel/setAttributesToFetch:">- setAttributesToFetch:</a>
+
+ </B><p><a name="1025">
+
+<h4> <a name="//apple_ref/occ/instm/EOAdaptorChannel/initWithAdaptorContext:">initWithAdaptorContext:</a></h4>
+
+</a>- <code>initWithAdaptorContext:</code>(EOAdaptorContext *)<em>adaptorContext</em> <p>
+
+The designated initializer for the EOAdaptorChannel class, this method is overridden by subclasses to initialize a newly allocated EOAdaptorChannel subclass and retain <em>adaptorContext</em>. Returns <B>self </B>.<p>
+
+You never invoke this method directly unless you are implementing a concrete adaptor context. It is invoked automatically from <B><a href="../EOAdaptorContext/EOAdaptorContext.html#//apple_ref/occ/instm/EOAdaptorContext/createAdaptorChannel" target="_top">createAdaptorChannel</a>- </B>the EOAdaptorContext method you use to create a new adaptor channel.<p>
+
+A subclass of EOAdaptorChannel doesn't need to override this method, but may override it to perform additional initialization. A subclass that does override this method must incorporate the superclass's version through a message to <B>super </B>.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOAdaptorChannel/adaptorContext">- adaptorContext</a>
+
+ </B><p><a name="1031">
+
+<h4> <a name="//apple_ref/occ/instm/EOAdaptorChannel/insertRow:forEntity:">insertRow:forEntity:</a></h4>
+
+</a>- (void)<code>insertRow:</code>(NSDictionary *)<em>row </em><code>forEntity:</code>(EOEntity *)<em>entity</em> <p>
+
+Implemented by subclasses to insert the values of <em>row</em> into the table in the database that corresponds to <em>entity</em>. <em>row</em> is an NSDictionary whose keys are attribute names and whose values are the values to insert. Raises an exception on failure. Some possible reasons for failure are:<p>
+
+<ul><li>The user logged in to the database doesn't have permission to insert a new row.<br><li>The adaptor channel is in an invalid state (for example, fetching).<br><li>The row fails to satisfy a constraint defined in the database server.<br></ul><p>An adaptor channel subclass should override this method without invoking EOAdaptorChannel's implementation.<p>
+
+<a name="1038">
+
+<h4> <a name="//apple_ref/occ/instm/EOAdaptorChannel/isDebugEnabled">isDebugEnabled</a></h4>
+
+</a>- (BOOL)<code>isDebugEnabled</code> <p>
+
+Returns YES if the adaptor channel logs evaluated SQL and other useful information to the console (or to the standard error stream), NO if not. A subclass of EOAdaptorChannel doesn't need to override this method.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOAdaptorChannel/setDebugEnabled:">- setDebugEnabled:</a> </B>, <B><a href="../EOAdaptorContext/EOAdaptorContext.html#//apple_ref/occ/instm/EOAdaptorContext/setDebugEnabled:" target="_top">- setDebugEnabled: </B> (EOAdaptorContext)</a>
+
+<p><a name="1042">
+
+<h4> <a name="//apple_ref/occ/instm/EOAdaptorChannel/isFetchInProgress">isFetchInProgress</a></h4>
+
+</a>- (BOOL)<code>isFetchInProgress</code> <p>
+
+Implemented by subclasses to return YES if the receiver is fetching, NO otherwise. An adaptor channel is fetching if:<p>
+
+<ul><li>It's been sent a successful <B>selectAttributes:describedByQualifier:fetchOrder:lock: </B> message.<br><li>A stored procedure that returns rows has been successfully executed using <a href="#1016"><B>executeStoredProcedure:withValues: </B></a>.<br><li>An expression sent through <B>evaluateExpression: </B> resulted in a select operation being performed.<br></ul><p>An adaptor channel stops fetching when there are no more records to fetch or when it's sent a <B>cancelFetch </B> message.<p>
+
+An adaptor channel subclass should override this method without invoking EOAdaptorChannel's implementation.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOAdaptorChannel/fetchRowWithZone:">- fetchRowWithZone:</a>
+
+ </B><p><a name="1051">
+
+<h4> <a name="//apple_ref/occ/instm/EOAdaptorChannel/isOpen">isOpen</a></h4>
+
+</a>- (BOOL)<code>isOpen</code> <p>
+
+Implemented by subclasses to return YES if the channel has been opened with <B>openChannel </B>, NO if not. An adaptor channel subclass should override this method without invoking EOAdaptorChannel's implementation.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOAdaptorChannel/closeChannel">- closeChannel</a>
+
+ </B><p><a name="1055">
+
+<h4> <a name="//apple_ref/occ/instm/EOAdaptorChannel/lockRowComparingAttributes:entity:qualifier:snapshot:">lockRowComparingAttributes:entity:qualifier:snapshot:</a></h4>
+
+</a>- (void)<B>lockRowComparingAttributes: </B>(NSArray *)<em>attributes<br></em><B>entity: </B>(EOEntity *)<em>entity<br></em><B>qualifier: </B>(EOQualifier *)<em>qualifier<br></em><B>snapshot: </B>(NSDictionary *)<em>snapshot</em><p>
+
+Attempts to lock a row in the database by selecting it with locking on. The lock operation succeeds if a select statement generated with <em>qualifier</em> retrieves exactly one row and the values in the row match the values in <em>snapshot</em>, a dictionary whose keys are attribute names and whose values are the values that were last fetched from the database.<p>
+
+<B>lockRowComparingAttributes:entity:qualifier:snapshot: </B> invokes <a href="#1090"><B>selectAttributes:fetchSpecification:lock:entity: </B></a> with <em>attributes</em> as the attributes to select, a fetch specification built from <em>qualifier</em>, locking on, and <em>entity</em> as the entity. If the select returns no rows or more than one row, the method raises an EOGeneralAdaptorException. It also raises an EOGeneralAdaptorException if the values in the returned row don't match the corresponding values in <em>snapshot</em>.<p>
+
+The Framework uses this method whenever it needs to lock a row. When the Framework invokes it, <em>qualifier</em> specifies the primary key of the row to be locked and attributes used for locking to be compared in the database server. If any of the values specified in <em>qualifier</em> are different from the values in the database row, the select operation will not retrieve or lock the row. When this happens, the row to be locked has been updated in the database since it was last retrieved, and it isn't safe to update it.<p>
+
+Some attributes (such as BLOB types) can't be compared in the database. <em>attributes</em> should specify any such attributes. (If the row doesn't contain any such attributes, <em>attributes</em> can be <B>nil </B>.) If <em>qualifier</em> generates a select statement that returns and locks a single row, this method performs an in-memory comparison between the value in the retrieved row and the value in <em>snapshot</em> for each attribute in <em>attributes</em>. Therefore, <em>snapshot</em> must contain an entry for each attribute in <em>attributes</em>. In addition, it must contain an entry for the row's primary key.<p>
+
+A subclass of EOAdaptorChannel doesn't need to override this method.<p>
+
+<a name="1062">
+
+<h4> <a name="//apple_ref/occ/instm/EOAdaptorChannel/openChannel">openChannel</a></h4>
+
+</a>- (void)<code>openChannel</code> <p>
+
+Implemented by subclasses to put the channel and both its context and adaptor into a state where they are ready to perform database operations. Raises an exception if an error occurs. An adaptor channel subclass should override this method without invoking EOAdaptorChannel's implementation.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOAdaptorChannel/isOpen">- isOpen</a> </B>, <a href="#//apple_ref/occ/instm/EOAdaptorChannel/closeChannel"><B>- closeChannel</a>
+
+ </B><p><a name="1066">
+
+<h4> <a name="//apple_ref/occ/instm/EOAdaptorChannel/performAdaptorOperation:">performAdaptorOperation:</a></h4>
+
+</a>- (void)<code>performAdaptorOperation:</code>(EOAdaptorOperation *)<em>adaptorOperation</em> <p>
+
+Performs <em>adaptorOperation</em> by invoking the adaptor channel method appropriate for performing the specified operation. For example, if the adaptor operator for <em>adaptorOperation</em> is EOAdaptorInsertOperator, this method invokes <a href="#1031"><B>insertRow:forEntity: </B></a> using information in <em>adaptorOperation</em> to supply the arguments. Raises an exception if an error occurs.<p>
+
+A subclass of EOAdaptorChannel doesn't need to override this method.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOAdaptorChannel/performAdaptorOperations:">- performAdaptorOperations:</a>
+
+ </B><p><a name="1071">
+
+<h4> <a name="//apple_ref/occ/instm/EOAdaptorChannel/performAdaptorOperations:">performAdaptorOperations:</a></h4>
+
+</a>- (void)<code>performAdaptorOperations:</code>(NSArray *)<em>adaptorOperations</em> <p>
+
+Performs adaptor operations by invoking <a href="#1066"><B>performAdaptorOperation: </B></a> with each EOAdaptorOperation object in the array <em>adaptorOperations</em>. An adaptor channel subclass may be able to override this method to take advantage of database-specific batch processing capabilities. Invokes the delegate methods <a href="#1163"><B>adaptorChannel:willPerformOperations: </B></a> and <a href="#1139"><B>adaptorChannel:didPerformOperations:exception: </B></a>.<p>
+
+This method raises an exception if an error occurs. The exception's userInfo dictionary contains these keys:<p>
+
+<ul><li>EOAdaptorOperationsKey<p>Corresponds to the array of adaptor operations that's being executed.<p><li>EOFailedAdaptorOperationKey<p>Corresponds to the particular adaptor operation that failed.<p><li>EOAdaptorFailureKey<p>If present, offers additional information on the type of error that occurred. Currently, the only possible value for this key is EOAdaptorOptimisticLockingFailure, which indicates that an update or lock operation failed because the row found in the database did not match the snapshot taken when the row was last fetched into the application.<p></ul>A subclass of EOAdaptorChannel doesn't need to override the <code>performAdaptorOperations:</code> method.<p>
+
+<a name="1084">
+
+<h4> <a name="//apple_ref/occ/instm/EOAdaptorChannel/primaryKeyForNewRowWithEntity:">primaryKeyForNewRowWithEntity:</a></h4>
+
+</a>- (NSDictionary *)<code>primaryKeyForNewRowWithEntity:</code>(EOEntity *)<em>entity</em> <p>
+
+Overridden by subclasses to return a primary key for a new row in the database table that corresponds to <em>entity</em>. The primary key returned from this method is a dictionary whose keys are the primary key attribute names. For example, suppose you've got a table MOVIE with primary key MOVIE_ID, and the corresponding Movie Entity's primary key attribute is <B>movieID </B>. In this scenario, the dictionary returned from <a href="#1084"><B>primaryKeyForNewRowWithEntity: </B></a> has one entry whose key is <B>movieID </B> and whose value is the unique value to assign. If the primary key is compound (made up of more than one attribute), the dictionary should contain an entry for each primary key attribute. Note, however, that the Enterprise Objects Frameworks adaptors don't handle compound primary keys; they return <B>nil </B> from <a href="#1084"><B>primaryKeyForNewRowWithEntity: </B></a> if the primary key is compound.<p>
+
+If information in <em>entity</em> specifies an adaptor-specific means to assign a new primary key (for example, a sequence name or stored procedure), then this method returns a new primary key. Otherwise, if the key is a simple integer, the method tries to fetch a new primary key from the database using an adaptor-specific scheme. Otherwise, the method returns <B>nil </B>.<p>
+
+EOAdaptorChannel's implementation simply returns <B>nil </B>. See your adaptor channel's documentation for information on how it generates primary keys.<p>
+
+A subclass of EOAdaptorChannel must override this method. For example, to return a value generated by a sequence, you'd create the proper SQL statement (using EOSQLExpression's <B>expressionForString: </B> method) and evaluate it (using the <a href="#1009"><B>evaluateExpression: </B></a> method).<p>
+
+<a name="1086">
+
+<h4> <a name="//apple_ref/occ/instm/EOAdaptorChannel/returnValuesForLastStoredProcedureInvocation">returnValuesForLastStoredProcedureInvocation</a></h4>
+
+</a>- (NSDictionary *)<code>returnValuesForLastStoredProcedureInvocation</code> <p>
+
+Implemented by subclasses to return stored procedure parameter and return values. Used in conjunction with <a href="#1016"><B>executeStoredProcedure:withValues: </B></a>. The dictionary returned by this method has entries whose keys are stored procedure parameter names and whose values are the parameter values. The dictionary also contains a special entry for the stored procedures return value with the key "returnValue". Returns an empty dictionary for stored procedures that have void return types. Returns <B>nil </B> if the stored procedure has results to fetch. In this case, you must use <a href="#1020"><B>fetchRowWithZone: </B></a> until there are no more results to fetch before the return value will be available.<p>
+
+An adaptor channel subclass should override this method without invoking EOAdaptorChannel's implementation.<p>
+
+<a name="1090">
+
+<h4> <a name="//apple_ref/occ/instm/EOAdaptorChannel/selectAttributes:fetchSpecification:lock:entity:">selectAttributes:fetchSpecification:lock:entity:</a></h4>
+
+</a>- (void)<code>selectAttributes:</code>(NSArray *)<em>attributes<br></em><code>fetchSpecification:</code>(EOFetchSpecification *)<em>fetchSpecification<br></em><code>lock:</code>(BOOL)<em>flag<br></em><code>entity:</code>(EOEntity *)<em>entity</em> <p>
+
+Implemented by subclasses to select <em>attributes</em> in rows matching the qualifier in <em>fetchSpecification</em> and set the receiver's attributes to fetch. The selected rows compose one or more result sets, each row of which will be returned by subsequent <a href="#1020"><B>fetchRowWithZone: </B></a> messages according to <em>fetchSpecification</em>'s sort orderings. If <em>flag</em> is YES, the rows are locked if possible so that no other user can modify them (the lock specification in <em>fetchSpecification</em> is ignored). Raises an exception if an error occurs. Some possible reasons for failure are:<p>
+
+<ul><li>The adaptor channel is in an invalid state (for example, fetching).<br><li>The database failed to lock the specified rows.<br></ul><p>An adaptor channel subclass should override this method without invoking EOAdaptorChannel's implementation.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOAdaptorChannel/setAttributesToFetch:">- setAttributesToFetch:</a>
+
+ </B><p><a name="1097">
+
+<h4> <a name="//apple_ref/occ/instm/EOAdaptorChannel/setAttributesToFetch:">setAttributesToFetch:</a></h4>
+
+</a>- (void)<code>setAttributesToFetch:</code>(NSArray *)<em>attributes</em> <p>
+
+Implemented by subclasses to specify the set of attributes used to describe fetch data from a corresponding select. <em>attributes</em> is an array the EOAttributes to fetch. This method is invoked after <a href="#1009"><B>evaluateExpression: </B></a> but before the first call to <a href="#1020"><B>fetchRowWithZone: </B></a>. For more information on using this method, see "<a href="#857">Sending SQL Statements Directly to the Server</a>" in the class description. This method raises if invoked when there is no fetch in progress.<p>
+
+An adaptor channel subclass should override this method without invoking EOAdaptorChannel's implementation.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOAdaptorChannel/attributesToFetch">- attributesToFetch</a> </B>, <a href="#//apple_ref/occ/instm/EOAdaptorChannel/selectAttributes:fetchSpecification:lock:entity:"><B>- selectAttributes:fetchSpecification:lock:entity:</a>
+
+ </B><p><a name="1102">
+
+<h4> <a name="//apple_ref/occ/instm/EOAdaptorChannel/setDebugEnabled:">setDebugEnabled:</a></h4>
+
+</a>- (void)<code>setDebugEnabled:</code>(BOOL)<em>flag</em> <p>
+
+Enables debugging in the receiver and all its channels. If <em>flag</em> is YES, enables debugging; otherwise, disables debugging. When debugging is enabled, the adaptor channel logs evaluated SQL and other useful debugging information to the console (or to the standard error stream). The information provided may vary from adaptor to adaptor and may change from release to release.<p>
+
+A subclass of EOAdaptorChannel doesn't need to override this method. A subclass that does override it must incorporate the superclass's version through a message to <B>super </B>.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOAdaptorChannel/isDebugEnabled">- isDebugEnabled</a> </B>, <B><a href="../EOAdaptorContext/EOAdaptorContext.html#//apple_ref/occ/instm/EOAdaptorContext/setDebugEnabled:" target="_top">- setDebugEnabled: </B> (EOAdaptorContext)</a>
+
+<p><a name="1107">
+
+<h4> <a name="//apple_ref/occ/instm/EOAdaptorChannel/setDelegate:">setDelegate:</a></h4>
+
+</a>- (void)<code>setDelegate:</code>(id)<em>delegate</em> <p>
+
+Sets the receiver's delegate to <em>delegate</em>, or removes its delegate if <em>delegate</em> is <B>nil </B>. The receiver does not retain its delegate. A subclass of EOAdaptorChannel doesn't need to override this method. A subclass that does override it must incorporate the superclass's version through a message to <B>super </B>.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOAdaptorChannel/delegate">- delegate</a>
+
+ </B><p><a name="1111">
+
+<h4> <a name="//apple_ref/occ/instm/EOAdaptorChannel/updateValues:inRowDescribedByQualifier:entity:">updateValues:inRowDescribedByQualifier:entity:</a></h4>
+
+</a>- (void)<code>updateValues:</code>(NSDictionary *)<em>values<br></em><code>inRowDescribedByQualifier:</code>(EOQualifier *)<em>qualifier<br></em><code>entity:</code>(EOEntity *)<em>entity</em> <p>
+
+Updates the row described by <em>qualifier</em>. Invokes <B><a href="#1115">updateValues:inRowsDescribedByQualifier:entity:</a> </B> and raises an exception unless exactly one row is updated.<p>
+
+A subclass of EOAdaptorChannel doesn't need to override this method.<p>
+
+<a name="1115">
+
+<h4> <a name="//apple_ref/occ/instm/EOAdaptorChannel/updateValues:inRowsDescribedByQualifier:entity:">updateValues:inRowsDescribedByQualifier:entity:</a></h4>
+
+</a>- (unsigned int)<code>updateValues:</code>(NSDictionary *)<em>values<br></em><code>inRowsDescribedByQualifier:</code>(EOQualifier *)<em>qualifier<br></em><code>entity:</code>(EOEntity *)<em>entity</em><p>
+
+Implemented by subclasses to update the rows described by <em>qualifier</em> with the values in <em>values</em>. <em>values</em> is an NSDictionary whose keys are attribute names and whose values are the new values for those attributes (the dictionary need only contain entries for the attributes being changed). Returns the number of updated rows. Raises an exception if an error occurs. Some possible reasons for failure are:<p>
+
+<ul><li>The user logged in to the database doesn't have permission to update.<br><li>The adaptor channel is in an invalid state (for example, fetching).<br><li>The new values fail to satisfy a constraint defined in the database server.<br></ul><p>An adaptor channel subclass should override this method without invoking EOAdaptorChannel's implementation.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOAdaptorChannel/updateValues:inRowDescribedByQualifier:entity:">- updateValues:inRowDescribedByQualifier:entity:</a>
+
+ </B><p><a name="1123">
+
+<h3>Methods Implemented By the Delegate </h3>
+
+</a><a name="1124">
+
+<h4> <a name="//apple_ref/occ/instm/NSObject/adaptorChannelDidChangeResultSet:">adaptorChannelDidChangeResultSet:</a></h4>
+
+</a>- (void)<B>adaptorChannelDidChangeResultSet: </B>(id)<em>channel</em><p>
+
+Invoked from <a href="#1020"><B>fetchRowWithZone: </B></a> when a select operation resulted in multiple result sets. This method tells the delegate that the next invocation of <B>fetchRowWithZone: </B> will fetch from the next result set. This method is invoked when <a href="#1020"><B>fetchRowWithZone: </B></a> returns <B>nil </B> and<B>  </B>there are still result sets left to fetch. The delegate can invoke <a href="#1097"><B>setAttributesToFetch: </B></a> to prepare for fetching the new rows.<p>
+
+<a name="1127">
+
+<h4> <a name="//apple_ref/occ/instm/NSObject/adaptorChannel:didEvaluateExpression:">adaptorChannel:didEvaluateExpression:</a></h4>
+
+</a>- (void)<B>adaptorChannel: </B>(id)<em>channel<br></em><B>didEvaluateExpression: </B>(EOSQLExpression *)<em>expression</em><p>
+
+Invoked from <a href="#1009"><B>evaluateExpression: </B></a> to tell the delegate that a query language expression has been evaluated by the database server.<p>
+
+<a name="1130">
+
+<h4> <a name="//apple_ref/occ/instm/NSObject/adaptorChannel:didExecuteStoredProcedure:withValues:">adaptorChannel:didExecuteStoredProcedure:withValues:</a></h4>
+
+</a>- (void)<B>adaptorChannel: </B>(id)<em>channel<br></em><B>didExecuteStoredProcedure: </B>(EOStoredProcedure *)<em>procedure<br></em><B>withValues: </B>(NSDictionary *)<em>values</em><p>
+
+Invoked from <a href="#1016"><B>executeStoredProcedure:withValues: </B></a> after <em>procedure</em> is executed successfully.<p>
+
+<a name="1133">
+
+<h4> <a name="//apple_ref/occ/instm/NSObject/adaptorChannel:didFetchRow:">adaptorChannel:didFetchRow:</a></h4>
+
+</a>- (void)<B>adaptorChannel: </B>(id)<em>channel</em> <B>didFetchRow: </B>(NSMutableDictionary *)<em>row</em><p>
+
+Invoked from <a href="#1020"><B>fetchRowWithZone: </B></a> after a row is fetched successfully. This method is not invoked if an exception occurs during the fetch or if the same returns <B>nil </B> because there are no more rows in the current result set. The delegate may modify <em>row</em>, which will be returned from <B>fetchRowWithZone: </B>.<p>
+
+<a name="1136">
+
+<h4> <a name="//apple_ref/occ/instm/NSObject/adaptorChannelDidFinishFetching:">adaptorChannelDidFinishFetching:</a></h4>
+
+</a>- (void)<B>adaptorChannelDidFinishFetching: </B>(id)<em>channel</em><p>
+
+Invoked from <a href="#1020"><B>fetchRowWithZone: </B></a> to tell the delegate that fetching is finished for the current select operation. This method is invoked when a fetch ends in <B>fetchRowWithZone: </B> because there are no more result sets.<p>
+
+<a name="1139">
+
+<h4> <a name="//apple_ref/occ/instm/NSObject/adaptorChannel:didPerformOperations:exception:">adaptorChannel:didPerformOperations:exception:</a></h4>
+
+</a>- (NSException *)<B>adaptorChannel: </B>(id)<em>channel<br></em><B>didPerformOperations: </B>(NSArray *)<em>operations<br></em><B>exception: </B>(NSException *)<em>exception</em><p>
+
+Invoked from <a href="#1071"><B>performAdaptorOperations: </B></a>. <em>exception</em> is <B>nil </B> if no exception was raised while <em>operations</em> were performed. Otherwise, <em>exception</em> is the raised exception. The delegate can return the same or a different exception, which is re-raised by <B>performAdaptorOperations: </B>, or it can return <B>nil </B> to prevent the adaptor channel from raising an exception.<p>
+
+<a name="1142">
+
+<h4> <a name="//apple_ref/occ/instm/NSObject/adaptorChannel:didSelectAttributes:fetchSpecification:lock:entity:">adaptorChannel:didSelectAttributes:fetchSpecification:lock:entity:</a></h4>
+
+</a>- (void)<B>adaptorChannel: </B>(id)<em>channel<br></em><B>didSelectAttributes: </B>(NSArray *)<em>attributes<br></em><B>fetchSpecification: </B>(EOFetchSpecification *)<em>fetchSpecification<br></em><B>lock: </B>(BOOL)<em>flag<br></em><B>entity: </B>(EOEntity *)<em>entity</em><p>
+
+Invoked from <a href="#1090"><B>selectAttributes:fetchSpecification:lock:entity: </B></a> to tell the delegate that rows have been selected in the database server.<p>
+
+<a name="1145">
+
+<h4> <a name="//apple_ref/occ/instm/NSObject/adaptorChannelShouldConstructStoredProcedureReturnValues:">adaptorChannelShouldConstructStoredProcedureReturnValues:</a></h4>
+
+</a>- (NSDictionary *)<B>adaptorChannelShouldConstructStoredProcedureReturnValues: </B>(id)<em>channel</em><p>
+
+Invoked from <a href="#1086"><B>returnValuesForLastStoredProcedureInvocation </B></a> to tell the delegate that channel is constructing return values for the last stored procedure evaluated. If the delegate returns a value other than <B>nil </B>, that value will be returned immediately from <B>returnValuesForLastStoredProcedureInvocation </B>.<p>
+
+<a name="1148">
+
+<h4> <a name="//apple_ref/occ/instm/NSObject/adaptorChannel:shouldEvaluateExpression:">adaptorChannel:shouldEvaluateExpression:</a></h4>
+
+</a>- (BOOL)<B>adaptorChannel: </B>(id)<em>channel<br></em><B>shouldEvaluateExpression: </B>(EOSQLExpression *)<em>expression</em><p>
+
+Invoked from <a href="#1009"><B>evaluateExpression: </B></a> to tell the delegate that <em>channel</em> is sending an expression to the database server. The delegate returns YES to permit the adaptor channel to send <em>expression</em> to the server. If the delegate returns NO, the adaptor channel does not send the expression and returns immediately. When the delegate returns NO, the adaptor channel expects that the implementor of the delegate has done the work that <code>evaluateExpression:</code> would have done. The delegate can create a new EOSQLExpression and send the expression itself before returning NO.<p>
+
+<a name="1151">
+
+<h4> <a name="//apple_ref/occ/instm/NSObject/adaptorChannel:shouldExecuteStoredProcedure:withValues:">adaptorChannel:shouldExecuteStoredProcedure:withValues:</a></h4>
+
+</a>- (NSDictionary *)<B>adaptorChannel: </B>(id)<em>channel<br></em><B>shouldExecuteStoredProcedure: </B>(EOStoredProcedure *)<em>procedure<br></em><B>withValues: </B>(NSDictionary *)<em>values</em><p>
+
+Invoked from <a href="#1016"><B>executeStoredProcedure:withValues: </B></a> to tell the delegate that <em>channel</em> is executing a stored procedure. If the delegate returns a value other than <B>nil </B>, that value is used as the arguments to the stored procedure instead of <em>values</em>.<p>
+
+<a name="1154">
+
+<h4> <a name="//apple_ref/occ/instm/NSObject/adaptorChannel:shouldReturnValuesForStoredProcedure:">adaptorChannel:shouldReturnValuesForStoredProcedure:</a></h4>
+
+</a>- (NSDictionary *)<B>adaptorChannel: </B>(id)<em>channel<br></em><B>shouldReturnValuesForStoredProcedure: </B>(NSDictionary *)<em>returnValues</em><p>
+
+Invoked from <a href="#1086"><B>returnValuesForLastStoredProcedureInvocation </B></a> to tell the delegate that <em>channel</em> is returning values for a stored procedure. If the delegate returns a value other than <B>nil </B>, that value is returned from <B>returnValuesForLastStoredProcedureInvocation </B> instead of <em>returnValues</em>.<p>
+
+<a name="1157">
+
+<h4> <a name="//apple_ref/occ/instm/NSObject/adaptorChannel:shouldSelectAttributes:fetchSpecification:lock:entity:">adaptorChannel:shouldSelectAttributes:fetchSpecification:lock:entity:</a></h4>
+
+</a>- (BOOL)<B>adaptorChannel: </B>(id)<em>channel<br></em><B>shouldSelectAttributes: </B>(NSArray *)<em>attributes<br></em><B>fetchSpecification: </B>(EOFetchSpecification *)<em>fetchSpecification<br></em><B>lock: </B>(BOOL)<em>flag<br></em><B>entity: </B>(EOEntity *)<em>entity</em><p>
+
+Invoked from <a href="#1090"><B>selectAttributes:fetchSpecification:lock:entity: </B></a> to ask the delegate whether a select operation should be performed. The delegate should not modify <em>fetchSpecification</em>. Instead, if the delegate wants to perform a different select it should invoke <a href="#1090"><B>selectAttributes:fetchSpecification:lock:entity: </B></a> itself with a new fetch specification, and return NO (indicating that the adaptor channel should not perform the select itself).<p>
+
+<a name="1160">
+
+<h4> <a name="//apple_ref/occ/instm/NSObject/adaptorChannelWillFetchRow:">adaptorChannelWillFetchRow:</a></h4>
+
+</a>- (void)<B>adaptorChannelWillFetchRow: </B>(id)<em>channel</em><p>
+
+Invoked from <a href="#1020"><B>fetchRowWithZone: </B></a> to tell the delegate that a single row will be fetched. The delegate can determine the attributes used by the fetch by sending <a href="#963"><B>attributesToFetch </B></a> to <em>channel</em>, and can change the set of attributes to fetch by sending <a href="#1097"><B>setAttributesToFetch: </B></a> to <em>channel</em>. The adaptor channel performs the actual fetch.<p>
+
+<a name="1163">
+
+<h4> <a name="//apple_ref/occ/instm/NSObject/adaptorChannel:willPerformOperations:">adaptorChannel:willPerformOperations:</a></h4>
+
+</a>- (NSArray *)<B>adaptorChannel: </B>(id)<em>channel</em> <B>willPerformOperations: </B>(NSArray *)<em>operations</em><p>
+
+Invoked from <a href="#1071"><B>performAdaptorOperations: </B></a> to tell the delegate that <em>channel</em> is performing the EOAdaptorOperations in <em>operations</em>. The delegate may return <em>operations</em> or a different NSArray for the adaptor channel to perform. If the delegate returns <B>nil </B>, the adaptor channel does not perform the operations and returns from the method immediately.<p>
+
+
+
+ 
+
+ 
+
+
+
+
+
+<i>Copyright &#169; 1997, Apple Computer, Inc.   All rights
+
+reserved.</i>
+
+
+
+<!-- Last updated: 10/22/97 14:18:46 -->
+
+
+
+</body>
+
+</html>
+

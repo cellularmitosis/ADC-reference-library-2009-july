@@ -1,0 +1,1453 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+<head>
+	<title>Mac OS X ABI Mach-O File Format Reference</title>
+	<meta id="Generator" name="Generator" content="Gutenberg"/>
+	<meta id="GeneratorVersion" name="GeneratorVersion" content="v132"/>
+	<meta http-equiv="content-type" content="text/html;charset=utf-8"/>
+	<meta id="Copyright" name="Copyright" content="Copyright 2009 Apple Inc. All Rights Reserved."/>
+	<meta id="IndexTitle" name="IndexTitle" content="Mac OS X ABI Mach-O File Format Reference"/>
+	<meta id="xcode-display" name="xcode-display" content="render"/>
+	<meta id="toc-file" name="toc-file" content="../toc.html"/>
+	<meta id="RESOURCES" content="../../../../Resources" />
+	
+	<link rel="stylesheet" type="text/css" href="../../../../Resources/CSS/frameset_styles.css"/>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/lib/prototype.js"></script>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/lib/scriptaculous.js"></script>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/page.js"></script>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/pedia.js"></script>
+	<!--[if lte IE 6]>
+		<style type="text/css">
+			/*<![CDATA[*/ 
+			html {overflow-x:auto; overflow-y:hidden;  }
+			/*]]>*/
+		</style>
+	<![endif]-->
+</head>    
+<body bgcolor="#ffffff" onload="initialize_page();"><a name="//apple_ref/doc/uid/TP40000895-DontLinkChapterID_1" title="Mac OS X ABI Mach-O File Format Reference"></a>
+    <noscript>
+    <div id="tocMenu">
+        <iframe id="toc_content" name="toc_content" SRC="../toc.html" width="210" height="100%" align="left" frameborder="0">This document set is best viewed in a browser that supports iFrames.</iframe>
+    </div>
+    </noscript>
+    <div id="bodyText">
+        <a name="top"></a>
+        <div class="hideOnPrint hideInXcode">
+        <!-- start of header -->
+        <!--#include virtual="/includes/framesetheader" -->
+        <!-- end of header -->
+        </div>
+        
+        <!-- start of path -->
+<div class="breadcrumb hideOnPrint hideInXcode"><a href="http://developer.apple.com/" target="_top">ADC Home</a> &gt; <a href="../../../../../referencelibrary/index.html#//apple_ref/doc/uid/TP30000943" target="_top">Reference Library</a> &gt; <a href="../../../../../reference/index.html#//apple_ref/doc/uid/TP30001281" target="_top">Reference</a> &gt; <a href="../../../../../reference/DeveloperTools/index.html#//apple_ref/doc/uid/TP30001281-TP30000436" target="_top">Tools</a> &gt; <a href="../../../../../reference/DeveloperTools/idxDarwin-date.html#//apple_ref/doc/uid/TP30001281-TP30000436-TP30000502" target="_top">Darwin</a> &gt; <a href="../index.html" target="_top">Mac OS X ABI Mach-O File Format Reference</a> &gt; </div><br class="hideInXcode"/><!-- end of path -->
+        
+        <div class="mini_nav_text" align="left">
+        <span class="navButtons">
+        <!-- Previous button --><span style="margin-left: 8px"><a href="../9-Revision-5.1/history.html">Next Page &gt;</a></span>
+        </span>
+        <span id="showHideTOCUpperSpan">
+        <a href="#" onclick="showHideTOC();"><img src="../../../../Resources/Images/show_toc_icon.gif" width="15" height="14" border="0" style="margin-bottom: -2px;" alt="" hideText="Hide TOC" showText="Show TOC" /></a> <a href="#" onclick="showHideTOC();">Hide TOC</a>
+        </span>
+        </div>
+
+        <hr />
+        
+        
+        <a name="//apple_ref/doc/uid/TP40000895-DontLinkChapterID_1-DontLinkElementID_1" title="Mac OS X ABI Mach-O File Format Reference"></a><h1>Mac OS X ABI Mach-O File Format Reference</h1><div class="spec_sheet_info_box"><table cellspacing="0" class="specbox"><tr><td scope="row"><strong><span style="white-space: nowrap;">Declared in</span></strong></td><td><div style="margin-bottom:1px"><span class="content_text">loader.h</span><br/><span class="content_text">machine.h</span><br/><span class="content_text">fat.h</span><br/><span class="content_text">nlist.h</span><br/><span class="content_text">ranlib.h</span><br/><span class="content_text">reloc.h</span><br/></div></td></tr></table></div><br/><a name="//apple_ref/doc/uid/TP40000895-CH248-SW3" title="Overview"></a><h2>Overview</h2>
+<p>This document describes the structure of the Mach-O (Mach object) file format, which is the standard used to store programs and libraries on disk in the Mac OS X application binary interface (ABI). To understand how the Xcode tools work with Mach-O files, and to perform low-level debugging tasks, you need to understand this information.</p>
+<p>The Mach-O file format provides both intermediate (during the build process) and final (after linking the final product) storage of machine code and data. It was designed as a flexible replacement for the BSD <code>a.out</code> format, to be used by the compiler and the static linker and to contain statically linked executable code at runtime. Features for dynamic linking were added as the goals of Mac OS X evolved, resulting in a single file format for both statically linked and dynamically linked code.</p>
+
+<a name="//apple_ref/doc/uid/TP40000895-CH248-95536" title="Basic Structure"></a><h3>Basic Structure</h3>
+<p>A Mach-O file contains three major regions (as shown in <span class="content_text">Figure 1</span>):</p>
+<ul class="spaceabove"><li class="li"><p>At the beginning of every Mach-O file is a <strong>header structure</strong> that identifies the file as a Mach-O file. The header also contains other basic file type information, indicates the target architecture, and contains flags specifying options that affect the interpretation of the rest of the file.</p></li>
+<li class="li"><p>Directly following the header are a series of variable-size <strong>load commands</strong> that specify the layout and linkage characteristics of the file. Among other information, the load commands can specify:</p><ul class="nested">
+<li class="nested li"><p>The initial layout of the file in virtual memory</p></li>
+<li class="nested li"><p>The location of the symbol table (used for dynamic linking)</p></li>
+<li class="nested li"><p>The initial execution state of the main thread of the program</p></li>
+<li class="nested li"><p>The names of shared libraries that contain definitions for the main executable’s imported symbols</p></li></ul></li>
+<li class="li"><p>Following the load commands, all Mach-O files contain the data of one or more segments. Each <strong>segment</strong> contains zero or more sections. Each <strong>section</strong> of a segment contains code or data of some particular type. Each segment defines a region of virtual memory that the dynamic linker maps into the address space of the process. The exact number and layout of segments and sections is specified by the load commands and the file type.</p></li>
+<li class="li"><p>In user-level fully linked Mach-O files, the last segment is the <strong>link edit</strong> segment. This segment contains the tables of link edit information, such as the symbol table, string table, and so forth, used by the dynamic loader to link an executable file or Mach-O bundle to its dependent libraries.</p></li></ul>
+<br/><div><a name="//apple_ref/doc/uid/TP40000895-CH248-95621" title="Figure 1Mach-O file format basic structure"></a><a name="//apple_ref/doc/uid/TP40000895-CH248-CJBEEDJB" title="Figure 1Mach-O file format basic structure"></a><p><strong>Figure 1&nbsp;&nbsp;</strong>Mach-O file format basic structure</p>
+<img src = "../art/mach_o_segments.gif" alt = "Mach-O file format basic structure" width="261" height="285"></div><br/><p>Various tables within a Mach-O file refer to sections by number. Section numbering begins at 1 (not 0) and continues across segment boundaries. Thus, the first segment in a file may contain sections 1 and 2 and the second segment may contain sections 3 and 4.</p>
+<p>When using the Stabs debugging format, the symbol table also holds debugging information. When using DWARF, debugging information is stored in the image’s corresponding dSYM file, specified by the <code><a href="reference.html#//apple_ref/c/tag/uuid_command" target="_self">uuid_command</a></code> structure</p>
+<a name="//apple_ref/doc/uid/TP40000895-CH248-95651" title="Header Structure and Load Commands"></a><h3>Header Structure and Load Commands</h3>
+<p>A Mach-O file contains code and data for one architecture. The header structure of a Mach-O file specifies the target architecture, which allows the kernel to ensure that, for example, code intended for PowerPC-based Macintosh computers is not executed on Intel-based Macintosh computers.</p>
+<p>You can group multiple Mach-O files (one for each architecture you want to support) in one binary using the format described in <span class="content_text"><a href="reference.html#//apple_ref/doc/uid/20001298-154889">“Universal Binaries and 32-bit/64-bit PowerPC Binaries.”</a></span></p>
+<div class="notebox"><a name="//apple_ref/doc/uid/TP40000895-CH248-SW4" title="Note"></a><p><strong>Note:</strong>&nbsp;Binaries that contain object files for more than one architecture are not Mach-O files. They archive one or more Mach-O files.</p></div>
+<p>Segments and sections are normally accessed by name. Segments, by convention, are named using all uppercase letters preceded by two underscores (for example, <code>__TEXT</code>); sections should be named using all lowercase letters preceded by two underscores (for example, <code>__text</code>). This naming convention is standard, although not required for the tools to operate correctly.</p>
+<a name="//apple_ref/doc/uid/TP40000895-CH248-95693" title="Segments"></a><h3>Segments</h3>
+<p>A segment defines a range of bytes in a Mach-O file and the addresses and memory protection attributes at which those bytes are mapped into virtual memory when the dynamic linker loads the application. As such, segments are always virtual memory page aligned. A segment contains zero or more sections.</p>
+<p>Segments that require more memory at runtime than they do at build time can specify a larger in-memory size than they actually have on disk. For example, the <code><!--a  -->__PAGEZERO<!--/a--></code> segment generated by the linker for PowerPC executable files has a virtual memory size of one page but an on-disk size of 0. Because <code><!--a  -->__PAGEZERO<!--/a--></code> contains no data, there is no need for it to occupy any space in the executable file.</p>
+<div class="notebox"><a name="//apple_ref/doc/uid/TP40000895-CH248-SW5" title="Note"></a><p><strong>Note:</strong>&nbsp;Sections that are to be filled with zeros must always be placed at the end of the segment. Otherwise, the standard tools will not be able to successfully manipulate the Mach-O file.</p></div>
+<p>For compactness, an intermediate object file contains only one segment. This segment has no name; it contains all the sections destined ultimately for different segments in the final object file. The data structure that defines a <code><a href="reference.html#//apple_ref/c/tag/section">section</a></code> contains the name of the segment the section is intended for, and the static linker places each section in the final object file accordingly.</p>
+<p>For best performance, segments should be aligned on virtual memory page boundaries—4096 bytes for PowerPC and x86 processors. To calculate the size of a segment, add up the size of each section, then round up the sum to the next virtual memory page boundary (4096 bytes, or 4 kilobytes). Using this algorithm, the minimum size of a segment is 4 kilobytes, and thereafter it is sized at 4 kilobyte increments.</p>
+<p>The header and load commands are considered part of the first segment of the file for paging purposes. In an executable file, this generally means that the headers and load commands live at the start of the <code>__TEXT</code> segment because that is the first segment that contains data. The <code>__PAGEZERO</code> segment contains no data on disk, so it’s ignored for this purpose.</p>
+<p>These are the segments the standard Mac OS X development tools (contained in the Xcode Tools CD) may include in a Mac OS X executable:</p>
+<ul class="spaceabove"><li class="li"><p>The static linker creates a <code>__PAGEZERO</code> segment as the first segment of an executable file. This segment is located at virtual memory location 0 and has no protection rights assigned, the combination of which causes accesses to <code>NULL</code>, a common C programming error, to immediately crash. The <code>__PAGEZERO</code> segment is the size of one full VM page for the current architecture (for Intel-based and PowerPC-based Macintosh computers, this is 4096 bytes or 0x1000 in hexadecimal). Because there is no data in the <code>__PAGEZERO</code> segment, it occupies no space in the file (the file size in the segment command is 0).</p></li>
+<li class="li"><p>The <code>__TEXT</code> segment contains executable code and other read-only data. To allow the kernel to map it directly from the executable into sharable memory, the static linker sets this segment’s virtual memory permissions to disallow writing. When the segment is mapped into memory, it can be shared among all processes interested in its contents. (This is primarily used with frameworks, bundles, and shared libraries, but it is possible to run multiple copies of the same executable in Mac OS X, and this applies in that case as well.) The read-only attribute also means that the pages that make up the <code>__TEXT</code> segment never need to be written back to disk. When the kernel needs to free up physical memory<a name="//apple_ref/doc/uid/TP40000895-CH248-DontLinkElementID_2"></a>, it can simply discard one or more <code>__TEXT</code> pages and re-read them from disk when they are next needed.</p></li>
+<li class="li"><p>The <code>__DATA</code> segment contains writable data. The static linker sets the virtual memory permissions of this segment to allow both reading and writing. Because it is writable, the <code>__DATA</code> segment of a framework or other shared library is logically copied for each process linking with the library. When memory pages such as those making up the <code>__DATA</code> segment are readable and writable, the kernel marks them <a name="//apple_ref/doc/uid/TP40000895-CH248-DontLinkElementID_3"></a>copy-on-write; therefore when a process writes to one of these pages, that process receives its own private copy of the page. </p></li>
+<li class="li"><p>The <code>__OBJC</code> segment contains data used by the Objective-C language runtime support library.</p></li><li class="li"><p>The <code>__IMPORT</code> segment contains symbol stubs and non-lazy pointers to symbols not defined in the executable. This segment is generated only for executables targeted for the IA-32 architecture.</p></li>
+<li class="li"><p>The <code>__LINKEDIT</code> segment contains raw data used by the dynamic linker, such as symbol, string, and relocation table entries.</p></li></ul>
+<a name="//apple_ref/doc/uid/TP40000895-CH248-95874" title="Sections"></a><h3>Sections</h3>
+<p>The <code>__TEXT</code> and <code>__DATA</code> segments may contain a number of standard sections, listed in <span class="content_text">Table 1</span>, <span class="content_text"><a href="reference.html#//apple_ref/doc/uid/TP40000895-CH248-95908">Table 2</a></span>, and <span class="content_text"><a href="reference.html#//apple_ref/doc/uid/TP40000895-CH248-SW2">Table 3</a></span>. The <code>__OBJC</code> segment contains a number of sections that are private to the Objective-C compiler. Note that the static linker and file analysis tools use the section type and attributes (instead of the section name) to determine how they should treat the section. The section name, type and attributes are explained further in the description of the <code><a href="reference.html#//apple_ref/c/tag/section">section</a></code> data type.</p><a name="//apple_ref/doc/uid/TP40000895-CH248-CJBIIIJH" title="Table 1The sections of a __TEXT segment"></a><div class="tableholder"><table class="graybox" border = "0" cellspacing="0" cellpadding="5">
+<caption class="tablecaption"><strong>Table 1&nbsp;&nbsp;</strong>The sections of a <code>__TEXT</code> segment</caption>
+
+<tr>
+<th scope="col" align="left" style="font-weight: bold" bgcolor="#CCCCCC"><p>Segment and section name</p></th>
+<th scope="col" align="left" style="font-weight: bold" bgcolor="#CCCCCC"><p>Contents</p></th>
+</tr>
+
+
+<tr>
+<td  scope="row"><p><code>__TEXT,__text</code></p></td>
+<td ><p>Executable machine code. The compiler generally places only executable code in this section, no tables or data of any sort.</p></td>
+</tr>
+<tr>
+<td  scope="row"><p><code>__TEXT,__cstring</code></p></td>
+<td ><p>Constant C strings. A C string is a sequence of non-null bytes that ends with a null byte (<code>'\0'</code>). The static linker coalesces constant C string values, removing duplicates, when building the final product.</p></td>
+</tr>
+<tr>
+<td  scope="row"><p><code>__TEXT,__picsymbol_stub</code></p></td>
+<td ><p>Position-independent indirect symbol stubs. See “<span class="content_text"><a href="../../MachOTopics/1-Articles/dynamic_code.html#//apple_ref/doc/uid/TP40002528" target="_top">Position-Independent Code</a></span>” in <em><a href="../../MachOTopics/index.html#//apple_ref/doc/uid/TP40001519" target="_top">Mach-O Programming Topics</a></em> for more information.</p></td>
+</tr>
+<tr>
+<td  scope="row"><p><code>__TEXT,__symbol_stub</code></p></td>
+<td ><p>Indirect symbol stubs. See “<span class="content_text"><a href="../../MachOTopics/1-Articles/dynamic_code.html#//apple_ref/doc/uid/TP40002528" target="_top">Position-Independent Code</a></span>” in <em><a href="../../MachOTopics/index.html#//apple_ref/doc/uid/TP40001519" target="_top">Mach-O Programming Topics</a></em> for more information.</p></td>
+</tr>
+<tr>
+<td  scope="row"><p><code>__TEXT,__const</code></p></td>
+<td ><p>Initialized constant variables. The compiler places all nonrelocatable data declared <code>const</code> in this section. (The compiler typically places uninitialized constant variables in a zero-filled section.)</p></td>
+</tr>
+<tr>
+<td  scope="row"><p><code>__TEXT,__literal4</code></p></td>
+<td ><p>4-byte literal values. The compiler places single-precision floating point constants in this section. The static linker coalesces these values, removing duplicates, when building the final product. With some architectures, it’s more efficient for the compiler to use immediate load instructions rather than adding to this section.</p></td>
+</tr>
+<tr>
+<td  scope="row"><p><code>__TEXT,__literal8</code></p></td>
+<td ><p>8-byte literal values. The compiler places double-precision floating point constants in this section. The static linker coalesces these values, removing duplicates, when building the final product. With some architectures, it’s more efficient for the compiler to use immediate load instructions rather than adding to this section.</p></td>
+</tr>
+
+</table></div><a name="//apple_ref/doc/uid/TP40000895-CH248-95908" title="Table 2The sections of a __DATA segment"></a><a name="//apple_ref/doc/uid/TP40000895-CH248-SW1" title="Table 2The sections of a __DATA segment"></a><div class="tableholder"><table class="graybox" border = "0" cellspacing="0" cellpadding="5"><caption class="tablecaption"><strong>Table 2&nbsp;&nbsp;</strong>The sections of a <code>__DATA</code> segment</caption><tr><th scope="col" align="left" style="font-weight: bold" bgcolor="#CCCCCC"><p>Segment and section name</p></th><th scope="col" align="left" style="font-weight: bold" bgcolor="#CCCCCC"><p>Contents</p></th></tr><tr><td  scope="row"><p><code>__DATA,__data</code></p></td><td ><p>Initialized mutable variables, such as writable C strings and data arrays.</p></td></tr><tr><td  scope="row"><p><code>__DATA,__la_symbol_ptr</code></p></td><td ><p>Lazy symbol pointers, which are indirect references to functions imported from a different file. See “<span class="content_text"><a href="../../MachOTopics/1-Articles/dynamic_code.html#//apple_ref/doc/uid/TP40002528" target="_top">Position-Independent Code</a></span>” in <em><a href="../../MachOTopics/index.html#//apple_ref/doc/uid/TP40001519" target="_top">Mach-O Programming Topics</a></em> for more information.</p></td></tr><tr><td  scope="row"><p><code>__DATA,__nl_symbol_ptr</code></p></td><td ><p>Non-lazy symbol pointers, which are indirect references to data items imported from a different file. See “<span class="content_text"><a href="../../MachOTopics/1-Articles/dynamic_code.html#//apple_ref/doc/uid/TP40002528" target="_top">Position-Independent Code</a></span>” in <em><a href="../../MachOTopics/index.html#//apple_ref/doc/uid/TP40001519" target="_top">Mach-O Programming Topics</a></em> for more information.</p></td></tr><tr><td  scope="row"><p><code>__DATA,__dyld</code></p></td><td ><p>Placeholder section used by the dynamic linker.</p></td></tr><tr><td  scope="row"><p><code>__DATA,__const</code></p></td><td ><p>Initialized relocatable constant variables.</p></td></tr><tr><td  scope="row"><p><code>__DATA,__mod_init_func</code></p></td><td ><p>Module initialization functions. The C++ compiler places static constructors here.</p></td></tr><tr><td  scope="row"><p><code>__DATA,__mod_term_func</code></p></td><td ><p>Module termination functions.</p></td></tr><tr><td  scope="row"><p><code>__DATA,__bss</code></p></td><td ><p>Data for uninitialized static variables (for example, <code>static int i;</code>).</p></td></tr><tr><td  scope="row"><p><code>__DATA,__common</code></p></td><td ><p>Uninitialized imported symbol definitions (for example, <code>int i;</code>) located in the global scope (outside of a function declaration).</p></td></tr></table></div><a name="//apple_ref/doc/uid/TP40000895-CH248-SW2" title="Table 3The sections of a __IMPORT segment"></a><div class="tableholder"><table class="graybox" border = "0" cellspacing="0" cellpadding="5"><caption class="tablecaption"><strong>Table 3&nbsp;&nbsp;</strong>The sections of a <code>__IMPORT</code> segment</caption><tr><th scope="col" align="left" style="font-weight: bold" bgcolor="#CCCCCC"><p>Segment and section name</p></th><th scope="col" align="left" style="font-weight: bold" bgcolor="#CCCCCC"><p>Contents</p></th></tr><tr><td  scope="row"><p><code>__IMPORT,__jump_table</code></p></td><td ><p>Stubs for calls to functions in a dynamic library.</p></td></tr><tr><td  scope="row"><p><code>__IMPORT,__pointers</code></p></td><td ><p>Non-lazy symbol pointers, which are direct references to functions imported from a different file.</p></td></tr></table></div>
+<div class="notebox"><a name="//apple_ref/doc/uid/TP40000895-CH248-SW6" title="Note"></a><p><strong>Note:</strong>&nbsp;Compilers or any tools that create Mach-O files are free to define additional section names. These additional names do not appear in <span class="content_text">Table 1</span>.</p></div><a name="//apple_ref/doc/uid/20001298-206788" title="Data Types"></a><a name="//apple_ref/doc/uid/20001298-BAJFFCGF" title="Data Types"></a><h2>Data Types</h2><p>This reference describes the data types that compose a Mach-O file. Values for integer types in all Mach-O data structures are written using the host CPU’s byte ordering scheme, except for <code><a href="reference.html#//apple_ref/c/tag/fat_header">fat_header</a></code> and <code><a href="reference.html#//apple_ref/c/tag/fat_arch">fat_arch</a></code>, which are written in big-endian byte order.</p>
+
+<a name="//apple_ref/doc/uid/20001298-96661" title="Header Data Structure"></a><a name="//apple_ref/doc/uid/20001298-TPXREF103" title="Header Data Structure"></a><h3>Header Data Structure</h3>
+<a name="//apple_ref/c/tag/mach_header" title="mach_header"></a><a name="//apple_ref/doc/c_ref/mach_header" title="mach_header"></a><a name="//apple_ref/doc/uid/20001298-BAJHHFFF" title="mach_header"></a>
+<a name="//apple_ref/doc/uid/20001298-DontLinkElementID_4"></a><h3 class="tight">mach_header</h3>
+<p class="spaceabove">Specifies the general attributes of a file. Appears at the beginning of object files targeted to 32-bit architectures. Declared in <code>/usr/include/mach-o/loader.h</code>. See also <code><a href="reference.html#//apple_ref/c/tag/mach_header_64">mach_header_64</a></code>.</p>
+<p class="spaceabove"><pre>
+struct mach_header
+   {
+   uint32_t magic;
+   cpu_type_t cputype;
+   cpu_subtype_t cpusubtype;
+   uint32_t filetype;
+   uint32_t ncmds;
+   uint32_t sizeofcmds;
+   uint32_t flags;
+};
+</pre></p>
+<h5 class="tight">Fields</h5><dl class="termdef">
+<dt><code>magic</code></dt>
+<dd><p>An integer containing a value identifying this file as a 32-bit Mach-O file. Use the constant <code>MH_MAGIC</code> if the file is intended for use on a CPU with the same endianness as the computer on which the compiler is running. The constant <code>MH_CIGAM</code> can be used when the byte ordering scheme of the target machine is the reverse of the host CPU.</p></dd>
+<dt><code>cputype</code></dt>
+<dd><p>An integer indicating the architecture you intend to use the file on. Appropriate values include:</p><ul class="termdef"><li class="termdef"><p><code><!--a  -->CPU_TYPE_POWERPC<!--/a--></code> to target PowerPC-based Macintosh computers</p></li>
+<li class="termdef"><p><code><!--a  -->CPU_TYPE_I386<!--/a--></code> to target the Intel-based Macintosh computers</p></li></ul></dd>
+<dt><code>cpusubtype</code></dt>
+<dd><p>An integer specifying the exact model of the CPU. To run on all PowerPC or x86 processors supported by the Mac OS X kernel, this should be set to <code>CPU_SUBTYPE_POWERPC_ALL</code> or <code>CPU_SUBTYPE_I386_ALL</code>.</p></dd>
+<dt><code>filetype</code></dt>
+<dd><p>An integer indicating the usage and alignment of the file. Valid values for this field include:</p><ul class="termdef"><a name="//apple_ref/doc/uid/20001298-95908"></a><li class="termdef"><p>The <code><!--a  -->MH_OBJECT<!--/a--></code> file type is the format used for intermediate object files. It is a very compact format containing all its sections in one segment. The compiler and assembler usually create one <code><!--a  -->MH_OBJECT<!--/a--></code> file for each source code file. By convention, the file name extension for this format is <code>.o</code>.</p></li>
+<li class="termdef"><p>The <code><!--a  -->MH_EXECUTE<!--/a--></code> file type is the format used by standard executable programs.</p></li>
+<li class="termdef"><p>The <code>MH_BUNDLE</code> file type is the type typically used by code that you load at runtime (typically called bundles or plug-ins). By convention, the file name extension for this format is <code>.bundle</code>.</p></li>
+<li class="termdef"><p>The <code>MH_DYLIB</code> file type is for dynamic shared libraries. It contains some additional tables to support multiple modules. By convention, the file name extension for this format is <code>.dylib</code>, except for the main shared library of a framework, which does not usually have a file name extension.</p></li>
+<li class="termdef"><p>The <code><!--a  -->MH_PRELOAD<!--/a--></code> file type is an executable format used for special-purpose programs that are not loaded by the Mac OS X kernel, such as programs burned into programmable ROM chips. Do not confuse this file type with the <code>MH_PREBOUND</code> flag, which is a flag that the static linker sets in the header structure to mark a prebound image.</p></li>
+<li class="termdef"><p>The <code><!--a  -->MH_CORE<!--/a--></code> file type is used to store core files, which are traditionally created when a program crashes. Core files store the entire address space of a process at the time it crashed. You can later run <code>gdb</code> on the core file to figure out why the crash occurred.</p></li>
+<li class="termdef"><p>The <code>MH_DYLINKER</code> file type is the type of a dynamic linker shared library. This is the type of the <code>dyld</code> file.</p></li><li class="termdef"><p>The <code>MH_DSYM</code> file type designates files that store symbol information for a corresponding binary file.</p></li></ul></dd>
+<dt><code>ncmds</code></dt>
+<dd><p>An integer indicating the number of load commands following the header structure.</p></dd>
+<dt><code>sizeofcmds</code></dt>
+<dd><p>An integer indicating the number of bytes occupied by the load commands following the header structure.</p></dd>
+<dt><code>flags</code></dt>
+<dd><p>An integer containing a set of bit flags that indicate the state of certain optional features of the Mach-O file format. These are the masks you can use to manipulate this field:</p><ul class="termdef">
+<li class="termdef"><p><code><!--a  -->MH_NOUNDEFS<!--/a--></code>—The object file contained no undefined references when it was built.</p></li>
+<li class="termdef"><p><code><!--a  -->MH_INCRLINK<!--/a--></code>—The object file is the output of an incremental link against a base file and cannot be linked again.</p></li>
+<li class="termdef"><p><code><!--a  -->MH_DYLDLINK<!--/a--></code>—The file is input for the dynamic linker and cannot be statically linked again.</p></li>
+<li class="termdef"><p><code><!--a  -->MH_TWOLEVEL<!--/a--></code>—The image is using two-level namespace bindings.</p></li>
+<li class="termdef"><p><code><!--a  -->MH_BINDATLOAD<!--/a--></code>—The dynamic linker should bind the undefined references when the file is loaded.</p></li>
+<li class="termdef"><p><code><!--a  -->MH_PREBOUND<!--/a--></code>—The file’s undefined references are prebound.</p></li>
+<li class="termdef"><p><code><!--a  -->MH_PREBINDABLE<!--/a--></code>—This file is not prebound but can have its prebinding redone. Used only when <code><!--a  -->MH_PREBEOUND<!--/a--></code> is not set.</p></li>
+<li class="termdef"><p><code><!--a  -->MH_NOFIXPREBINDING<!--/a--></code>—The dynamic linker doesn’t notify the prebinding agent about this executable.</p></li>
+<li class="termdef"><p><code><!--a  -->MH_ALLMODSBOUND<!--/a--></code>—Indicates that this binary binds to all two-level namespace modules of its dependent libraries. Used only when <code><!--a  -->MH_PREBINDABLE<!--/a--></code> and <code><!--a  -->MH_TWOLEVEL<!--/a--></code> are set.</p></li>
+<li class="termdef"><p><code><!--a  -->MH_CANONICAL<!--/a--></code>—This file has been canonicalized by unprebinding—clearing prebinding information from the file. See the <code>redo_prebinding</code> man page for details.</p></li>
+<li class="termdef"><p><code><!--a  -->MH_SPLIT_SEGS<!--/a--></code>—The file has its read-only and read-write segments split.</p></li>
+<li class="termdef"><p><code><!--a  -->MH_FORCE_FLAT<!--/a--></code>—The executable is forcing all images to use flat namespace bindings.</p></li>
+<li class="termdef"><p><code><!--a  -->MH_SUBSECTIONS_VIA_SYMBOLS<!--/a--></code>—The sections of the object file can be divided into individual blocks. These blocks are dead-stripped if they are not used by other code. See <span class="content_text"><a href="../../XcodeBuildSystem/500-Linking/bs_linking.html#//apple_ref/doc/uid/TP40002694" target="_top">Linking</a></span> for details.</p></li>
+<li class="termdef"><p><code><!--a  -->MH_NOMULTIDEFS<!--/a--></code>—This umbrella guarantees there are no multiple definitions of symbols in its subimages. As a result, the two-level namespace hints can always be used.</p></li></ul></dd></dl>
+<h5 class="tight">Special Considerations</h5>
+<p>For all file types, except <code><!--a  -->MH_OBJECT<!--/a--></code>, segments must be aligned on page boundaries for the given CPU architecture: 4096 bytes for PowerPC and x86 processors. This allows the kernel to page virtual memory directly from the segment into the address space of the process. The header and load commands must be aligned as part of the data of the first segment stored on disk (which would be the <code>__TEXT</code> segment, in the file types described in <code>filetype</code>).</p>
+<a name="//apple_ref/c/tag/mach_header_64" title="mach_header_64"></a><a name="//apple_ref/doc/c_ref/mach_header_64" title="mach_header_64"></a><a name="//apple_ref/doc/uid/20001298-CJBFDCEH" title="mach_header_64"></a>
+<a name="//apple_ref/doc/uid/20001298-DontLinkElementID_5"></a><h3 class="tight">mach_header_64</h3>
+<p class="spaceabove">Defines the general attributes of a file targeted for a 64-bit architecture. Declared in <code>/usr/include/mach-o/loader.h</code>.</p>
+<p class="spaceabove"><pre>
+struct mach_header_64
+   {
+   uint32_t magic;
+   cpu_type_t cputype;
+   cpu_subtype_t cpusubtype;
+   uint32_t filetype;
+   uint32_t ncmds;
+   uint32_t sizeofcmds;
+   uint32_t flags;
+   uint32_t reserved;
+};
+</pre></p>
+<h5 class="tight">Fields</h5><dl class="termdef">
+<dt><code>magic</code></dt>
+<dd><p>An integer containing a value identifying this file as a 64-bit Mach-O file. Use the constant <code>MH_MAGIC_64</code> if the file is intended for use on a CPU with the same endianness as the computer on which the compiler is running. The constant <code>MH_CIGAM_64</code> can be used when the byte ordering scheme of the target machine is the reverse of the host CPU.</p></dd>
+<dt><code>cputype</code></dt>
+<dd><p>An integer indicating the architecture you intend to use the file on. The only appropriate value for this structure is:</p><ul class="termdef"><li class="termdef"><p><code><!--a  -->CPU_TYPE_x86-64<!--/a--></code> to target 64-bit Intel-based Macintosh computers.</p></li><li class="termdef"><p><code><!--a  -->CPU_TYPE_POWERPC64<!--/a--></code> to target 64-bit PowerPC–based Macintosh computers.</p></li></ul></dd>
+<dt><code>cpusubtype</code></dt>
+<dd><p>An integer specifying the exact model of the CPU. To run on all PowerPC processors supported by the Mac OS X kernel, this should be set to <code>CPU_SUBTYPE_POWERPC_ALL</code>.</p></dd>
+<dt><code>filetype</code></dt>
+<dd><p>An integer indicating the usage and alignment of the file. Valid values for this field include:</p><ul class="termdef"><li class="termdef"><p>The <code><!--a  -->MH_OBJECT<!--/a--></code> file type is the format used for intermediate object files. It is a very compact format containing all its sections in one segment. The compiler and assembler usually create one <code><!--a  -->MH_OBJECT<!--/a--></code> file for each source code file. By convention, the file name extension for this format is <code>.o</code>.</p></li>
+<li class="termdef"><p>The <code><!--a  -->MH_EXECUTE<!--/a--></code> file type is the format used by standard executable programs.</p></li>
+<li class="termdef"><p>The <code>MH_BUNDLE</code> file type is the type typically used by code that you load at runtime (typically called bundles or plug-ins). By convention, the file name extension for this format is <code>.bundle</code>.</p></li>
+<li class="termdef"><p>The <code>MH_DYLIB</code> file type is for dynamic shared libraries. It contains some additional tables to support multiple modules. By convention, the file name extension for this format is <code>.dylib</code>, except for the main shared library of a framework, which does not usually have a file name extension.</p></li>
+<li class="termdef"><p>The <code><!--a  -->MH_PRELOAD<!--/a--></code> file type is an executable format used for special-purpose programs that are not loaded by the Mac OS X kernel, such as programs burned into programmable ROM chips. Do not confuse this file type with the <code>MH_PREBOUND</code> flag, which is a flag that the static linker sets in the header structure to mark a prebound image.</p></li>
+<li class="termdef"><p>The <code><!--a  -->MH_CORE<!--/a--></code> file type is used to store core files, which are traditionally created when a program crashes. Core files store the entire address space of a process at the time it crashed. You can later run <code>gdb</code> on the core file to figure out why the crash occurred.</p></li>
+<li class="termdef"><p>The <code>MH_DYLINKER</code> file type is the type of a dynamic linker shared library. This is the type of the <code>dyld</code> file.</p></li><li class="termdef"><p>The <code>MH_DSYM</code> file type designates files that store symbol information for a corresponding binary file.</p></li></ul></dd>
+<dt><code>ncmds</code></dt>
+<dd><p>An integer indicating the number of load commands following the header structure.</p></dd>
+<dt><code>sizeofcmds</code></dt>
+<dd><p>An integer indicating the number of bytes occupied by the load commands following the header structure.</p></dd>
+<dt><code>flags</code></dt>
+<dd><p>An integer containing a set of bit flags that indicate the state of certain optional features of the Mach-O file format. These are the masks you can use to manipulate this field:</p><ul class="termdef">
+<li class="termdef"><p><code><!--a  -->MH_NOUNDEFS<!--/a--></code>—The object file contained no undefined references when it was built.</p></li>
+<li class="termdef"><p><code><!--a  -->MH_INCRLINK<!--/a--></code>—The object file is the output of an incremental link against a base file and cannot be linked again.</p></li>
+<li class="termdef"><p><code><!--a  -->MH_DYLDLINK<!--/a--></code>—The file is input for the dynamic linker and cannot be statically linked again.</p></li>
+<li class="termdef"><p><code><!--a  -->MH_TWOLEVEL<!--/a--></code>—The image is using two-level namespace bindings.</p></li>
+<li class="termdef"><p><code><!--a  -->MH_BINDATLOAD<!--/a--></code>—The dynamic linker should bind the undefined references when the file is loaded.</p></li>
+<li class="termdef"><p><code><!--a  -->MH_PREBOUND<!--/a--></code>—The file’s undefined references are prebound.</p></li>
+<li class="termdef"><p><code><!--a  -->MH_PREBINDABLE<!--/a--></code>—This file is not prebound but can have its prebinding redone. Used only when <code><!--a  -->MH_PREBEOUND<!--/a--></code> is not set.</p></li>
+<li class="termdef"><p><code><!--a  -->MH_NOFIXPREBINDING<!--/a--></code>—The dynamic linker doesn’t notify the prebinding agent about this executable.</p></li>
+<li class="termdef"><p><code><!--a  -->MH_ALLMODSBOUND<!--/a--></code>—Indicates that this binary binds to all two-level namespace modules of its dependent libraries. Used only when <code><!--a  -->MH_PREBINDABLE<!--/a--></code> and <code><!--a  -->MH_TWOLEVEL<!--/a--></code> are set.</p></li>
+<li class="termdef"><p><code><!--a  -->MH_CANONICAL<!--/a--></code>—This file has been canonicalized by unprebinding—clearing prebinding information from the file. See the <code>redo_prebinding</code> man page for details.</p></li>
+<li class="termdef"><p><code><!--a  -->MH_SPLIT_SEGS<!--/a--></code>—The file has its read-only and read-write segments split.</p></li>
+<li class="termdef"><p><code><!--a  -->MH_FORCE_FLAT<!--/a--></code>—The executable is forcing all images to use flat namespace bindings.</p></li>
+<li class="termdef"><p><code><!--a  -->MH_SUBSECTIONS_VIA_SYMBOLS<!--/a--></code>—The sections of the object file can be divided into individual blocks. These blocks are dead-stripped if they are not used by other code. See “<span class="content_text"><a href="../../XcodeBuildSystem/500-Linking/bs_linking.html#//apple_ref/doc/uid/TP40002694" target="_top">Linking</a></span>” for details.</p></li>
+<li class="termdef"><p><code><!--a  -->MH_NOMULTIDEFS<!--/a--></code>—This umbrella guarantees there are no multiple definitions of symbols in its subimages. As a result, the two-level namespace hints can always be used.</p></li></ul></dd>
+<dt><code>reserved</code></dt>
+<dd><p>Reserved for future use.</p></dd></dl>
+<h5 class="tight">Special Considerations</h5>
+<p>See comment in <code><a href="reference.html#//apple_ref/c/tag/mach_header">mach_header</a></code></p>
+<a name="//apple_ref/doc/uid/20001298-89026" title="Load Command Data Structures"></a><a name="//apple_ref/doc/uid/20001298-TPXREF114" title="Load Command Data Structures"></a><h3>Load Command Data Structures</h3>
+<p>The load command structures are located directly after the header of the object file, and they specify both the logical structure of the file and the layout of the file in virtual memory. Each load command begins with fields that specify the command type and the size of the command data.</p>
+<a name="//apple_ref/c/tag/load_command" title="load_command"></a><a name="//apple_ref/doc/c_ref/load_command" title="load_command"></a><a name="//apple_ref/doc/uid/20001298-load_command" title="load_command"></a><a name="//apple_ref/doc/uid/20001298-DontLinkElementID_6"></a><h3 class="tight">load_command</h3>
+<p class="spaceabove">Contains fields that are common to all load commands.</p>
+<p class="spaceabove"><pre>
+struct load_command
+   {
+   uint32_t cmd;
+   uint32_t cmdsize;
+};
+</pre></p>
+<h5 class="tight">Fields</h5><dl class="termdef">
+<dt><code>cmd</code></dt>
+<dd><p>An integer indicating the type of load command. <span class="content_text">Table 4</span> lists the valid load command types.</p></dd>
+<dt><code>cmdsize</code></dt>
+<dd><p>An integer specifying the total size in bytes of the load command data structure. Each load command structure contains a different set of data, depending on the load command type, so each might have a different size. In 32-bit architectures, the size must always be a multiple of 4; in 64-bit architectures, the size must always be a multiple of 8. If the load command data does not divide evenly by 4 or 8 (depending on whether the target architecture is 32-bit or 64-bit, respectively), add bytes containing zeros to the end until it does.</p></dd></dl>
+<h5 class="tight">Discussion</h5>
+<p><span class="content_text">Table 4</span> lists the valid load command types, with links to the full data structures for each type.</p><a name="//apple_ref/doc/uid/20001298-183586" title="Table 4Mach-O load commands"></a><a name="//apple_ref/doc/uid/20001298-CJBCGIJD" title="Table 4Mach-O load commands"></a><div class="tableholder"><table class="graybox" border = "0" cellspacing="0" cellpadding="5">
+<caption class="tablecaption"><strong>Table 4&nbsp;&nbsp;</strong>Mach-O load commands</caption>
+
+<tr>
+<th scope="col" align="left" style="font-weight: bold" bgcolor="#CCCCCC"><p>Commands</p></th>
+<th scope="col" align="left" style="font-weight: bold" bgcolor="#CCCCCC"><p>Data structures</p></th>
+<th scope="col" align="left" style="font-weight: bold" bgcolor="#CCCCCC"><p>Purpose</p></th>
+</tr>
+
+<tr><td  scope="row"><p><code>LC_UUID</code></p></td><td ><p><code><a href="reference.html#//apple_ref/c/tag/uuid_command">uuid_command</a></code></p></td><td ><p>Specifies the 128-bit UUID for an image or its corresponding dSYM file.</p></td></tr>
+<tr>
+<td  scope="row"><p><code>LC_SEGMENT</code></p></td>
+<td ><p><code><a href="reference.html#//apple_ref/c/tag/segment_command">segment_command</a></code></p></td>
+<td ><p>Defines a segment of this file to be mapped into the address space of the process that loads this file. It also includes all the sections contained by the segment.</p></td>
+</tr>
+<tr>
+<td  scope="row"><p><code>LC_SEGMENT_64</code></p></td>
+<td ><p><code><a href="reference.html#//apple_ref/c/tag/segment_command_64">segment_command_64</a></code></p></td>
+<td ><p>Defines a 64-bit segment of this file to be mapped into the address space of the process that loads this file. It also includes all the sections contained by the segment.</p></td>
+</tr>
+<tr>
+<td  scope="row"><p><code>LC_SYMTAB</code></p></td>
+<td ><p><code><a href="reference.html#//apple_ref/c/tag/symtab_command">symtab_command</a></code></p></td>
+<td ><p>Specifies the symbol table for this file. This information is used by both static and dynamic linkers when linking the file, and also by debuggers to map symbols to the original source code files from which the symbols were generated.</p></td>
+</tr>
+<tr>
+<td  scope="row"><p><code>LC_DYSYMTAB</code></p></td>
+<td ><p><code><a href="reference.html#//apple_ref/c/tag/dysymtab_command">dysymtab_command</a></code></p></td>
+<td ><p>Specifies additional symbol table information used by the dynamic linker.</p></td>
+</tr>
+<tr>
+<td  scope="row"><p><code>LC_THREAD</code>
+<code>LC_UNIXTHREAD</code></p></td>
+<td ><p><code><a href="reference.html#//apple_ref/c/tag/thread_command">thread_command</a></code></p></td>
+<td ><p>For an executable file, the <code><!--a  -->LC_UNIXTHREAD<!--/a--></code> command defines the initial thread state of the main thread of the process. <code><!--a  -->LC_THREAD<!--/a--></code> is similar to <code>LC_UNIXTHREAD</code> but does not cause the kernel to allocate a stack.</p></td>
+</tr>
+<tr>
+<td  scope="row"><p><code>LC_LOAD_DYLIB</code></p></td>
+<td ><p><code><a href="reference.html#//apple_ref/c/tag/dylib_command">dylib_command</a></code></p></td>
+<td ><p>Defines the name of a dynamic shared library that this file links against.</p></td>
+</tr>
+<tr>
+<td  scope="row"><p><code>LC_ID_DYLIB</code></p></td>
+<td ><p><code><a href="reference.html#//apple_ref/c/tag/dylib_command">dylib_command</a></code></p></td>
+<td ><p>Specifies the install name of a dynamic shared library.</p></td>
+</tr>
+<tr>
+<td  scope="row"><p><code>LC_PREBOUND_DYLIB</code></p></td>
+<td ><p><code><a href="reference.html#//apple_ref/c/tag/prebound_dylib_command">prebound_dylib_command</a></code></p></td>
+<td ><p>For a shared library that this executable is linked prebound against, specifies the modules in the shared library that are used.</p></td>
+</tr>
+<tr>
+<td  scope="row"><p><code>LC_LOAD_DYLINKER</code></p></td>
+<td ><p><code><a href="reference.html#//apple_ref/c/tag/dylinker_command">dylinker_command</a></code></p></td>
+<td ><p>Specifies the dynamic linker that the kernel executes to load this file.</p></td>
+</tr>
+<tr>
+<td  scope="row"><p><code>LC_ID_DYLINKER</code></p></td>
+<td ><p><code><a href="reference.html#//apple_ref/c/tag/dylinker_command">dylinker_command</a></code></p></td>
+<td ><p>Identifies this file as a dynamic linker.</p></td>
+</tr>
+<tr>
+<td  scope="row"><p><code>LC_ROUTINES</code></p></td>
+<td ><p><code><a href="reference.html#//apple_ref/c/tag/routines_command">routines_command</a></code></p></td>
+<td ><p>Contains the address of the shared library initialization routine (specified by the linker’s <code>-init</code> option).</p></td>
+</tr>
+<tr>
+<td  scope="row"><p><code>LC_ROUTINES_64</code></p></td>
+<td ><p><code><a href="reference.html#//apple_ref/c/tag/routines_command_64">routines_command_64</a></code></p></td>
+<td ><p>Contains the address of the shared library 64-bit initialization routine (specified by the linker’s <code>-init</code> option).</p></td>
+</tr>
+<tr>
+<td  scope="row"><p><code>LC_TWOLEVEL_HINTS</code></p></td>
+<td ><p><code><a href="reference.html#//apple_ref/c/tag/twolevel_hints_command">twolevel_hints_command</a></code></p></td>
+<td ><p>Contains the two-level namespace lookup hint table.</p></td>
+</tr>
+<tr>
+<td  scope="row"><p><code>LC_SUB_FRAMEWORK</code></p></td>
+<td ><p><code><a href="reference.html#//apple_ref/c/tag/sub_framework_command">sub_framework_command</a></code></p></td>
+<td ><p>Identifies this file as the implementation of a subframework of an umbrella framework. The name of the umbrella framework is stored in the string parameter.</p></td>
+</tr>
+<tr>
+<td  scope="row"><p><code>LC_SUB_UMBRELLA</code></p></td>
+<td ><p><code><a href="reference.html#//apple_ref/c/tag/sub_umbrella_command">sub_umbrella_command</a></code></p></td>
+<td ><p>Specifies a file that is a subumbrella of this umbrella framework.</p></td>
+</tr>
+<tr>
+<td  scope="row"><p><code>LC_SUB_LIBRARY</code></p></td>
+<td ><p><code><a href="reference.html#//apple_ref/c/tag/sub_library_command">sub_library_command</a></code></p></td>
+<td ><p>Defines the attributes of the <code>LC_SUB_LIBRARY</code> load command. Identifies a sublibrary of this framework and marks this framework as an umbrella framework.</p></td>
+</tr>
+<tr>
+<td  scope="row"><p><code>LC_SUB_CLIENT</code></p></td>
+<td ><p><code><a href="reference.html#//apple_ref/c/tag/sub_client_command">sub_client_command</a></code></p></td>
+<td ><p>A subframework can explicitly allow another framework or bundle to link against it by including an <code>LC_SUB_CLIENT</code> load command containing the name of the framework or a client name for a bundle.</p></td>
+</tr>
+
+</table></div><h5 class="tight">Declared In</h5><code>/usr/include/mach-o/loader.h</code><a name="//apple_ref/c/tag/uuid_command" title="uuid_command"></a><a name="//apple_ref/doc/c_ref/uuid_command" title="uuid_command"></a><a name="//apple_ref/doc/uid/20001298-SW1" title="uuid_command"></a><a name="//apple_ref/doc/uid/20001298-DontLinkElementID_7"></a><h3 class="tight">uuid_command</h3><p class="spaceabove">Specifies the 128-bit universally unique identifier (UUID) for an image or for its corresponding dSYM file.</p><p class="spaceabove"><pre>
+struct uuid_command
+   {
+   uint32_t cmd;
+   uint32_t cmdsize;
+   uint8_t uuid[16];
+};
+</pre></p><h5 class="tight">Fields</h5><dl class="termdef"><dt><code>cmd</code></dt><dd><p>Set to <code>LC_UUID</code> for this structure.</p></dd><dt><code>cmdsize</code></dt><dd><p>Set to <code>sizeof(uuid_command)</code>.</p></dd><dt><code>uuid</code></dt><dd><p>128-bit unique identifier.</p></dd></dl><h5 class="tight">Declared In</h5><code>/usr/include/mach-o/loader.h</code>
+<a name="//apple_ref/c/tag/segment_command" title="segment_command"></a><a name="//apple_ref/doc/c_ref/segment_command" title="segment_command"></a><a name="//apple_ref/doc/uid/20001298-segment_command" title="segment_command"></a><a name="//apple_ref/doc/uid/20001298-DontLinkElementID_8"></a><h3 class="tight">segment_command</h3>
+<p class="spaceabove">Specifies the range of bytes in a 32-bit Mach-O file that make up a segment. Those bytes are mapped by the loader into the address space of a program. Declared in <code>/usr/include/mach-o/loader.h</code>. See also <code><a href="reference.html#//apple_ref/c/tag/segment_command_64">segment_command_64</a></code>.</p>
+<p class="spaceabove"><pre>
+struct segment_command
+   {
+   uint32_t cmd;
+   uint32_t cmdsize;
+   char segname[16];
+   uint32_t vmaddr;
+   uint32_t vmsize;
+   uint32_t fileoff;
+   uint32_t filesize;
+   vm_prot_t maxprot;
+   vm_prot_t initprot;
+   uint32_t nsects;
+   uint32_t flags;
+};
+</pre></p>
+<h5 class="tight">Fields</h5><dl class="termdef">
+<dt><code>cmd</code></dt>
+<dd><p>Common to all load command structures. Set to <code>LC_SEGMENT</code> for this structure.</p></dd>
+<dt><code>cmdsize</code></dt>
+<dd><p>Common to all load command structures. For this structure, set this field to <code>sizeof(segment_command)</code> plus the size of all the section data structures that follow (<code>sizeof(segment_command + (sizeof(section) * segment->nsect))</code>).</p></dd>
+<dt><code>segname</code></dt>
+<dd><p>A C string specifying the name of the segment. The value of this field can be any sequence of ASCII characters, although segment names defined by Apple begin with two underscores and consist of capital letters (as in <code>__TEXT</code> and <code>__DATA</code>). This field is fixed at 16 bytes in length.</p></dd>
+<dt><code>vmaddr</code></dt>
+<dd><p>Indicates the starting virtual memory address of this segment.</p></dd>
+<dt><code>vmsize</code></dt>
+<dd><p>Indicates the number of bytes of virtual memory occupied by this segment. See also the description of <code>filesize</code>, below.</p></dd>
+<dt><code>fileoff</code></dt>
+<dd><p>Indicates the offset in this file of the data to be mapped at <code>vmaddr</code>.</p></dd>
+<dt><code>filesize</code></dt>
+<dd><p>Indicates the number of bytes occupied by this segment on disk. For segments that require more memory at runtime than they do at build time, <code>vmsize</code> can be larger than <code>filesize</code>. For example, the <code>__PAGEZERO</code> segment generated by the linker for <code>MH_EXECUTABLE</code> files has a <code>vmsize</code> of 0x1000 but a <code>filesize</code> of 0. Because <code>__PAGEZERO</code> contains no data, there is no need for it to occupy any space until runtime. Also, the static linker often allocates uninitialized data at the end of the <code>__DATA</code> segment; in this case, the <code>vmsize</code> is larger than the <code>filesize</code>. The loader guarantees that any memory of this sort is initialized with zeros.</p></dd>
+<dt><code>maxprot</code></dt>
+<dd><p>Specifies the maximum permitted virtual memory protections of this segment.</p></dd>
+<dt><code>initprot</code></dt>
+<dd><p>Specifies the initial virtual memory protections of this segment.</p></dd>
+<dt><code>nsects</code></dt>
+<dd><p>Indicates the number of section data structures following this load command.</p></dd>
+<dt><code>flags</code></dt>
+<dd><p>Defines a set of flags that affect the loading of this segment:</p><ul class="termdef"><li class="termdef"><p><code><!--a  -->SG_HIGHVM<!--/a--></code>—The file contents for this segment are for   the high part of the virtual memory space; the low part is zero filled (for stacks in core files).</p></li>
+<li class="termdef"><p><code><!--a  -->SG_NORELOC<!--/a--></code>—This segment has nothing that was relocated in it and nothing relocated to it. It may be safely replaced without relocation.</p></li></ul></dd></dl>
+<h5 class="tight">Special Considerations</h5>
+<p>Segments with sections of type <code><!--a  -->S_GB_ZEROFILL<!--/a--></code> are placed after all other segments. See <code><a href="reference.html#//apple_ref/c/tag/section">section</a></code> for additional information.</p>
+<a name="//apple_ref/c/tag/segment_command_64" title="segment_command_64"></a><a name="//apple_ref/doc/c_ref/segment_command_64" title="segment_command_64"></a><a name="//apple_ref/doc/uid/20001298-CJBDHJGA" title="segment_command_64"></a>
+<a name="//apple_ref/doc/uid/20001298-DontLinkElementID_9"></a><h3 class="tight">segment_command_64</h3>
+<p class="spaceabove">Specifies the range of bytes in a 64-bit Mach-O file that make up a segment. Those bytes are mapped by the loader into the address space of a program. If the 64-bit segment has sections, they are defined by <code><a href="reference.html#//apple_ref/c/tag/section_64">section_64</a></code> structures. Declared in <code>/usr/include/mach-o/loader.h</code>.</p>
+<p class="spaceabove"><pre>
+struct segment_command_64
+   {
+   uint32_t cmd;
+   uint32_t cmdsize;
+   char segname[16];
+   uint64_t vmaddr;
+   uint64_t vmsize;
+   uint64_t fileoff;
+   uint64_t filesize;
+   vm_prot_t maxprot;
+   vm_prot_t initprot;
+   uint32_t nsects;
+   uint32_t flags;
+};
+</pre></p>
+<h5 class="tight">Fields</h5><dl class="termdef">
+<dt><code>cmd</code></dt>
+<dd><p>See description in <code><a href="reference.html#//apple_ref/c/tag/segment_command">segment_command</a></code>. Set to <code>LC_SEGMENT_64</code> for this structure.</p></dd>
+<dt><code>cmdsize</code></dt>
+<dd><p>Common to all load command structures. For this structure, set this field to <code>sizeof(segment_command_64)</code> plus the size of all the section data structures that follow (<code>sizeof(segment_command_64 + (sizeof(section_64) * segment->nsect))</code>).</p></dd>
+<dt><code>segname</code></dt>
+<dd><p>A C string specifying the name of the segment. The value of this field can be any sequence of ASCII characters, although segment names defined by Apple begin with two underscores and consist of capital letters (as in <code>__TEXT</code> and <code>__DATA</code>). This field is fixed at 16 bytes in length.</p></dd>
+<dt><code>vmaddr</code></dt>
+<dd><p>Indicates the starting virtual memory address of this segment.</p></dd>
+<dt><code>vmsize</code></dt>
+<dd><p>Indicates the number of bytes of virtual memory occupied by this segment. See also the description of <code>filesize</code>, below.</p></dd>
+<dt><code>fileoff</code></dt>
+<dd><p>Indicates the offset in this file of the data to be mapped at <code>vmaddr</code>.</p></dd>
+<dt><code>filesize</code></dt>
+<dd><p>Indicates the number of bytes occupied by this segment on disk. For segments that require more memory at runtime than they do at build time, <code>vmsize</code> can be larger than <code>filesize</code>. For example, the <code>__PAGEZERO</code> segment generated by the linker for <code>MH_EXECUTABLE</code> files has a <code>vmsize</code> of 0x1000 but a <code>filesize</code> of 0. Because <code>__PAGEZERO</code> contains no data, there is no need for it to occupy any space until runtime. Also, the static linker often allocates uninitialized data at the end of the <code>__DATA</code> segment; in this case, the <code>vmsize</code> is larger than the <code>filesize</code>. The loader guarantees that any memory of this sort is initialized with zeros.</p></dd>
+<dt><code>maxprot</code></dt>
+<dd><p>Specifies the maximum permitted virtual memory protections of this segment.</p></dd>
+<dt><code>initprot</code></dt>
+<dd><p>Specifies the initial virtual memory protections of this segment.</p></dd>
+<dt><code>nsects</code></dt>
+<dd><p>Indicates the number of section data structures following this load command.</p></dd>
+<dt><code>flags</code></dt>
+<dd><p>Defines a set of flags that affect the loading of this segment:</p><ul class="termdef"><li class="termdef"><p><code><!--a  -->SG_HIGHVM<!--/a--></code>—The file contents for this segment are for   the high part of the virtual memory space; the low part is zero filled (for stacks in core files).</p></li>
+<li class="termdef"><p><code><!--a  -->SG_NORELOC<!--/a--></code>—This segment has nothing that was relocated in it and nothing relocated to it. It may be safely replaced without relocation.</p></li></ul></dd></dl>
+<a name="//apple_ref/c/tag/section" title="section"></a><a name="//apple_ref/doc/c_ref/section" title="section"></a><a name="//apple_ref/doc/uid/20001298-section" title="section"></a>
+<a name="//apple_ref/doc/uid/20001298-DontLinkElementID_10"></a><h3 class="tight">section</h3>
+<p class="spaceabove">Defines the elements used by a 32-bit section. Directly following a <code>segment_command</code> data structure is an array of <code>section</code> data structures, with the exact count determined by the <code>nsects</code> field of the <code><a href="reference.html#//apple_ref/c/tag/segment_command">segment_command</a></code> structure. Declared in <code>/usr/include/mach-o/loader.h</code>. See also <code><a href="reference.html#//apple_ref/c/tag/section_64">section_64</a></code>.</p>
+<p class="spaceabove"><pre>
+struct section
+   {
+   char sectname[16];
+   char segname[16];
+   uint32_t addr;
+   uint32_t size;
+   uint32_t offset;
+   uint32_t align;
+   uint32_t reloff;
+   uint32_t nreloc;
+   uint32_t flags;
+   uint32_t reserved1;
+   uint32_t reserved2;
+};
+</pre></p>
+<h5 class="tight">Fields</h5><dl class="termdef">
+<dt><code>sectname</code></dt>
+<dd><p>A string specifying the name of this section. The value of this field can be any sequence of ASCII characters, although section names defined by Apple begin with two underscores and consist of lowercase letters (as in <code>__text</code> and <code>__data</code>). This field is fixed at 16 bytes in length.</p></dd>
+<dt><code>segname</code></dt>
+<dd><p>A string specifying the name of the segment that should eventually contain this section. For compactness, intermediate object files—files of type <code>MH_OBJECT</code>—contain only one segment, in which all sections are placed. The static linker places each section in the named segment when building the final product (any file that is not of type <code>MH_OBJECT</code>).</p></dd>
+<dt><code>addr</code></dt>
+<dd><p>An integer specifying the virtual memory address of this section.</p></dd>
+<dt><code>size</code></dt>
+<dd><p>An integer specifying the size in bytes of the virtual memory occupied by this section.</p></dd>
+<dt><code>offset</code></dt>
+<dd><p>An integer specifying the offset to this section in the file.</p></dd>
+<dt><code>align</code></dt>
+<dd><p>An integer specifying the section’s byte alignment. Specify this as a power of two; for example, a section with 8-byte alignment would have an align value of 3 (2 to the 3rd power equals 8).</p></dd>
+<dt><code>reloff</code></dt>
+<dd><p>An integer specifying the file offset of the first relocation entry for this section.</p></dd>
+<dt><code>nreloc</code></dt>
+<dd><p>An integer specifying the number of relocation entries located at <code>reloff</code> for this section.</p></dd>
+<dt><code>flags</code></dt>
+<dd><p>An integer divided into two parts. The least significant 8 bits contain the section type, while the most significant 24 bits contain a set of flags that specify other attributes of the section. These types and flags are primarily used by the static linker and file analysis tools, such as <code>otool</code>, to determine how to modify or display the section. These are the possible types:</p><ul class="termdef"><li class="termdef"><p><code><!--a  -->S_REGULAR<!--/a--></code>—This section has no particular type. The standard tools create a <code>__TEXT,__text</code> section of this type.</p></li>
+<li class="termdef"><p><code><!--a  -->S_ZEROFILL<!--/a--></code>—Zero-fill-on-demand section—when this section is first read from or written to, each page within is automatically filled with bytes containing zero.</p></li>
+<li class="termdef"><p><code><!--a  -->S_CSTRING_LITERALS<!--/a--></code>—This section contains only constant C strings. The standard tools create a <code>__TEXT,__cstring</code> section of this type.</p></li>
+<li class="termdef"><p><code><!--a  -->S_4BYTE_LITERALS<!--/a--></code>—This section contains only constant values that are 4 bytes long. The standard tools create a <code>__TEXT,__literal4</code> section of this type.</p></li>
+<li class="termdef"><p><code><!--a  -->S_8BYTE_LITERALS<!--/a--></code>—This section contains only constant values that are 8 bytes long. The standard tools create a <code>__TEXT,__literal8</code> section of this type.</p></li>
+<li class="termdef"><p><code><!--a  -->S_LITERAL_POINTERS<!--/a--></code>—This section contains only pointers to constant values.</p></li>
+<li class="termdef"><p><code><!--a  -->S_NON_LAZY_SYMBOL_POINTERS<!--/a--></code>—This section contains only non-lazy pointers to symbols. The standard tools create a section of the <code>__DATA,__nl_symbol_ptrs</code> section of this type.</p></li>
+<li class="termdef"><p><code><!--a  -->S_LAZY_SYMBOL_POINTERS<!--/a--></code>—This section contains only lazy pointers to symbols. The standard tools create a <code>__DATA,__la_symbol_ptrs</code> section of this type.</p></li>
+<li class="termdef"><p><code><!--a  -->S_SYMBOL_STUBS<!--/a--></code>——This section contains symbol stubs. The standard tools create <code>__TEXT,__symbol_stub</code> and <code>__TEXT,__picsymbol_stub</code> sections of this type. See “<span class="content_text"><a href="../../MachOTopics/1-Articles/dynamic_code.html#//apple_ref/doc/uid/TP40002528" target="_top">Position-Independent Code</a></span>” in <em><a href="../../MachOTopics/index.html#//apple_ref/doc/uid/TP40001519" target="_top">Mach-O Programming Topics</a></em> for more information.</p></li>
+<li class="termdef"><p><code><!--a  -->S_MOD_INIT_FUNC_POINTERS<!--/a--></code>—This section contains pointers to module initialization functions. The standard tools create <code>__DATA,__mod_init_func</code> sections of this type.</p></li>
+<li class="termdef"><p><code><!--a  -->S_MOD_TERM_FUNC_POINTERS<!--/a--></code>—This section contains pointers to module termination functions. The standard tools create <code>__DATA,__mod_term_func</code> sections of this type.</p></li>
+<li class="termdef"><p><code><!--a  -->S_COALESCED<!--/a--></code>—This section contains symbols that are coalesced by the static linker and possibly the dynamic linker. More than one file may contain coalesced definitions of the same symbol without causing multiple-defined-symbol errors.</p></li>
+<li class="termdef"><p><code><!--a  -->S_GB_ZEROFILL<!--/a--></code>—This is a zero-filled on-demand section. It can be larger than 4 GB. This section must be placed in a segment containing only zero-filled sections. If you place a zero-filled section in a segment with non–zero-filled sections, you may cause those sections to be unreachable with a 31-bit offset. That outcome stems from the fact that the size of a zero-filled section can be larger than 4 GB (in a 32-bit address space). As a result of this, the static linker would be unable to build the output file. See <code><a href="reference.html#//apple_ref/c/tag/segment_command">segment_command</a></code> for more information.</p></li></ul><p>The following are the possible attributes of a section:</p><ul class="termdef">
+<li class="termdef"><p><code><!--a  -->S_ATTR_PURE_INSTRUCTIONS<!--/a--></code>—This section contains only executable machine instructions. The standard tools set this flag for the sections <code>__TEXT,__text</code>, <code>__TEXT,__symbol_stub</code>, and <code>__TEXT,__picsymbol_stub</code>.</p></li>
+<li class="termdef"><p><code><!--a  -->S_ATTR_SOME_INSTRUCTIONS<!--/a--></code>—This section contains executable machine instructions.</p></li>
+<li class="termdef"><p><code><!--a  -->S_ATTR_NO_TOC<!--/a--></code>—This section contains coalesced symbols that must not be placed in the table of contents (<code>SYMDEF</code> member) of a static archive library.</p></li>
+<li class="termdef"><p><code><!--a  -->S_ATTR_EXT_RELOC<!--/a--></code>—This section contains references that must be relocated. These references refer to data that exists in other files (undefined symbols). To support external relocation, the maximum virtual memory protections of the segment that contains this section must allow both reading and writing.</p></li>
+<li class="termdef"><p><code><!--a  -->S_ATTR_LOC_RELOC<!--/a--></code>—This section contains references that must be relocated. These references refer to data within this file.</p></li>
+<li class="termdef"><p><code><!--a  -->S_ATTR_STRIP_STATIC_SYMS<!--/a--></code>—The static symbols in this section can be stripped if the <code><!--a  -->MH_DYLDLINK<!--/a--></code> flag of the image’s <code><a href="reference.html#//apple_ref/c/tag/mach_header">mach_header</a></code> header structure is set.</p></li>
+<li class="termdef"><p><code><!--a  -->S_ATTR_NO_DEAD_STRIP<!--/a--></code>—This section must not be dead-stripped. See “<span class="content_text"><a href="../../XcodeBuildSystem/500-Linking/bs_linking.html#//apple_ref/doc/uid/TP40002694" target="_top">Linking</a></span>” for details.</p></li>
+<li class="termdef"><p><code><!--a  -->S_ATTR_LIVE_SUPPORT<!--/a--></code>—This section must not be dead-stripped if they reference code that is live, but the reference is undetectable.</p></li></ul></dd>
+<dt><code>reserved1</code></dt>
+<dd><p>An integer reserved for use with certain section types. For symbol pointer sections and symbol stubs sections that refer to indirect symbol table entries, this is the index into the indirect table for this section’s entries. The number of entries is based on the section size divided by the size of the symbol pointer or stub. Otherwise, this field is set to 0.</p></dd>
+<dt><code>reserved2</code></dt>
+<dd><p>For sections of type <code>S_SYMBOL_STUBS</code>, an integer specifying the size (in bytes) of the symbol stub entries contained in the section. Otherwise, this field is reserved for future use and should be set to 0.</p></dd></dl>
+<h5 class="tight">Discussion</h5>
+<p>Each section in a Mach-O file has both a type and a set of attribute flags. In intermediate object files, the type and attributes determine how the static linker copies the sections into the final product. Object file analysis tools (such as <code>otool</code>) use the type and attributes to determine how to read and display the sections. Some section types and attributes are used by the dynamic linker.</p>
+<p>These are important static-linking variants of the symbol type and attributes:</p>
+<ul class="ul"><li class="li"><p><strong>Regular sections</strong>. In a regular section, only one definition of an external symbol may exist in intermediate object files. The static linker returns an error if it finds any duplicate external symbol definitions.</p></li>
+<li class="li"><p><strong>Coalesced sections</strong>. In the final product, the static linker retains only one instance of each symbol defined in coalesced sections. To support complex language features (such as C++ vtables and RTTI) the compiler may create a definition of a particular symbol in every intermediate object file. The static linker and the dynamic linker would then reduce the duplicate definitions to the single definition used by the program.</p></li>
+<li class="li"><p><strong>Coalesced sections with weak definitions</strong> Weak symbol definitions may appear only in coalesced sections. When the static linker finds duplicate definitions for a symbol, it discards any coalesced symbol definition that has the weak definition attribute set (see <code><a href="reference.html#//apple_ref/c/tag/nlist">nlist</a></code>). If there are no non-weak definitions, the first weak definition is used instead. This feature is designed to support C++ templates; it allows explicit template instantiations to override implicit ones. The C++ compiler places explicit definitions in a regular section, and it places implicit definitions in a coalesced section, marked as weak definitions. Intermediate object files (and thus static archive libraries) built with weak definitions can be used only with the static linker in Mac OS X v10.2 and later. Final products (applications and shared libraries) should not contain weak definitions if they are expected to be used on earlier versions of Mac OS X.</p></li></ul>
+<a name="//apple_ref/c/tag/section_64" title="section_64"></a><a name="//apple_ref/doc/c_ref/section_64" title="section_64"></a><a name="//apple_ref/doc/uid/20001298-CJBHDEFA" title="section_64"></a>
+<a name="//apple_ref/doc/uid/20001298-DontLinkElementID_11"></a><h3 class="tight">section_64</h3>
+<p class="spaceabove">Defines the elements used by a 64-bit section. Directly following a <code></code> <code><a href="reference.html#//apple_ref/c/tag/segment_command_64">segment_command_64</a></code> data structure is an array of <code>section_64</code> data structures, with the exact count determined by the <code>nsects</code> field of the segment_command_64 structure. Declared in <code>/usr/include/mach-o/loader.h</code>.</p>
+<p class="spaceabove"><pre>
+struct section_64
+   {
+   char sectname[16];
+   char segname[16];
+   uint64_t addr;
+   uint64_t size;
+   uint32_t offset;
+   uint32_t align;
+   uint32_t reloff;
+   uint32_t nreloc;
+   uint32_t flags;
+   uint32_t reserved1;
+   uint32_t reserved2;
+};
+</pre></p>
+<h5 class="tight">Fields</h5><dl class="termdef">
+<dt><code>sectname</code></dt>
+<dd><p>A string specifying the name of this section. The value of this field can be any sequence of ASCII characters, although section names defined by Apple begin with two underscores and consist of lowercase letters (as in <code>__text</code> and <code>__data</code>). This field is fixed at 16 bytes in length.</p></dd>
+<dt><code>segname</code></dt>
+<dd><p>A string specifying the name of the segment that should eventually contain this section. For compactness, intermediate object files—files of type <code>MH_OBJECT</code>—contain only one segment, in which all sections are placed. The static linker places each section in the named segment when building the final product (any file that is not of type <code>MH_OBJECT</code>).</p></dd>
+<dt><code>addr</code></dt>
+<dd><p>An integer specifying the virtual memory address of this section.</p></dd>
+<dt><code>size</code></dt>
+<dd><p>An integer specifying the size in bytes of the virtual memory occupied by this section.</p></dd>
+<dt><code>offset</code></dt>
+<dd><p>An integer specifying the offset to this section in the file.</p></dd>
+<dt><code>align</code></dt>
+<dd><p>An integer specifying the section’s byte alignment. Specify this as a power of two; for example, a section with 8-byte alignment would have an align value of 3 (2 to the 3rd power equals 8).</p></dd>
+<dt><code>reloff</code></dt>
+<dd><p>An integer specifying the file offset of the first relocation entry for this section.</p></dd>
+<dt><code>nreloc</code></dt>
+<dd><p>An integer specifying the number of relocation entries located at <code>reloff</code> for this section.</p></dd>
+<dt><code>flags</code></dt>
+<dd><p>An integer divided into two parts. The least significant 8 bits contain the section type, while the most significant 24 bits contain a set of flags that specify other attributes of the section. These types and flags are primarily used by the static linker and file analysis tools, such as <code>otool</code>, to determine how to modify or display the section. These are the possible types:</p><ul class="termdef"><li class="termdef"><p><code><!--a  -->S_REGULAR<!--/a--></code>—This section has no particular type. The standard tools create a <code>__TEXT,__text</code> section of this type.</p></li>
+<li class="termdef"><p><code><!--a  -->S_ZEROFILL<!--/a--></code>—Zero-fill-on-demand section—when this section is first read from or written to, each page within is automatically filled with bytes containing zero.</p></li>
+<li class="termdef"><p><code><!--a  -->S_CSTRING_LITERALS<!--/a--></code>—This section contains only constant C strings. The standard tools create a <code>__TEXT,__cstring</code> section of this type.</p></li>
+<li class="termdef"><p><code><!--a  -->S_4BYTE_LITERALS<!--/a--></code>—This section contains only constant values that are 4 bytes long. The standard tools create a <code>__TEXT,__literal4</code> section of this type.</p></li>
+<li class="termdef"><p><code><!--a  -->S_8BYTE_LITERALS<!--/a--></code>—This section contains only constant values that are 8 bytes long. The standard tools create a <code>__TEXT,__literal8</code> section of this type.</p></li>
+<li class="termdef"><p><code><!--a  -->S_LITERAL_POINTERS<!--/a--></code>—This section contains only pointers to constant values.</p></li>
+<li class="termdef"><p><code><!--a  -->S_NON_LAZY_SYMBOL_POINTERS<!--/a--></code>—This section contains only non-lazy pointers to symbols. The standard tools create a section of the <code>__DATA,__nl_symbol_ptrs</code> section of this type.</p></li>
+<li class="termdef"><p><code><!--a  -->S_LAZY_SYMBOL_POINTERS<!--/a--></code>—This section contains only lazy pointers to symbols. The standard tools create a <code>__DATA,__la_symbol_ptrs</code> section of this type.</p></li>
+<li class="termdef"><p><code><!--a  -->S_SYMBOL_STUBS<!--/a--></code>——This section contains symbol stubs. The standard tools create <code>__TEXT,__symbol_stub</code> and <code>__TEXT,__picsymbol_stub</code> sections of this type. See “<span class="content_text"><a href="../../MachOTopics/1-Articles/dynamic_code.html#//apple_ref/doc/uid/TP40002528" target="_top">Position-Independent Code</a></span>” in <em><a href="../../MachOTopics/index.html#//apple_ref/doc/uid/TP40001519" target="_top">Mach-O Programming Topics</a></em> for more information.</p></li>
+<li class="termdef"><p><code><!--a  -->S_MOD_INIT_FUNC_POINTERS<!--/a--></code>—This section contains pointers to module initialization functions. The standard tools create <code>__DATA,__mod_init_func</code> sections of this type.</p></li>
+<li class="termdef"><p><code><!--a  -->S_MOD_TERM_FUNC_POINTERS<!--/a--></code>—This section contains pointers to module termination functions. The standard tools create <code>__DATA,__mod_term_func</code> sections of this type.</p></li>
+<li class="termdef"><p><code><!--a  -->S_COALESCED<!--/a--></code>—This section contains symbols that are coalesced by the static linker and possibly the dynamic linker. More than one file may contain coalesced definitions of the same symbol without causing multiple-defined-symbol errors.</p></li>
+<li class="termdef"><p><code><!--a  -->S_GB_ZEROFILL<!--/a--></code>—This is a zero-filled on-demand section. It can be larger than 4 GB. This section must be placed in a segment containing only zero-filled sections. If you place a zero-filled section in a segment with non–zero-filled sections, you may cause those sections to be unreachable with a 31-bit offset. That outcome stems from the fact that the size of a zero-filled section can be larger than 4 GB (in a 32-bit address space). As a result of this, the static linker would be unable to build the output file. See <code><a href="reference.html#//apple_ref/c/tag/segment_command_64">segment_command_64</a></code> for more information.</p></li></ul><p>The following are the possible attributes of a section:</p><ul class="termdef"><li class="termdef"><p><code><!--a  -->S_ATTR_PURE_INSTRUCTIONS<!--/a--></code>—This section contains only executable machine instructions. The standard tools set this flag for the sections <code>__TEXT,__text</code>, <code>__TEXT,__symbol_stub</code>, and <code>__TEXT,__picsymbol_stub</code>.</p></li>
+<li class="termdef"><p><code><!--a  -->S_ATTR_SOME_INSTRUCTIONS<!--/a--></code>—This section contains executable machine instructions.</p></li>
+<li class="termdef"><p><code><!--a  -->S_ATTR_NO_TOC<!--/a--></code>—This section contains coalesced symbols that must not be placed in the table of contents (<code>SYMDEF</code> member) of a static archive library.</p></li>
+<li class="termdef"><p><code><!--a  -->S_ATTR_EXT_RELOC<!--/a--></code>—This section contains references that must be relocated. These references refer to data that exists in other files (undefined symbols). To support external relocation, the maximum virtual memory protections of the segment that contains this section must allow both reading and writing.</p></li>
+<li class="termdef"><p><code><!--a  -->S_ATTR_LOC_RELOC<!--/a--></code>—This section contains references that must be relocated. These references refer to data within this file.</p></li>
+<li class="termdef"><p><code><!--a  -->S_ATTR_STRIP_STATIC_SYMS<!--/a--></code>—The static symbols in this section can be stripped if the <code><!--a  -->MH_DYLDLINK<!--/a--></code> flag of the image’s <code><a href="reference.html#//apple_ref/c/tag/mach_header">mach_header</a></code> header structure is set.</p></li>
+<li class="termdef"><p><code><!--a  -->S_ATTR_NO_DEAD_STRIP<!--/a--></code>—This section must not be dead-stripped. See “<span class="content_text"><a href="../../XcodeBuildSystem/500-Linking/bs_linking.html#//apple_ref/doc/uid/TP40002694" target="_top">Linking</a></span>” for details.</p></li>
+<li class="termdef"><p><code><!--a  -->S_ATTR_LIVE_SUPPORT<!--/a--></code>—This section must not be dead-stripped if they reference code that is live, but the reference is undetectable.</p></li></ul></dd>
+<dt><code>reserved1</code></dt>
+<dd><p>An integer reserved for use with certain section types. For symbol pointer sections and symbol stubs sections that refer to indirect symbol table entries, this is the index into the indirect table for this section’s entries. The number of entries is based on the section size divided by the size of the symbol pointer or stub. Otherwise, this field is set to 0.</p></dd>
+<dt><code>reserved2</code></dt>
+<dd><p>For sections of type <code>S_SYMBOL_STUBS</code>, an integer specifying the size (in bytes) of the symbol stub entries contained in the section. Otherwise, this field is reserved for future use and should be set to 0.</p></dd></dl>
+<h5 class="tight">Discussion</h5>
+<p>Each section in a Mach-O file has both a type and a set of attribute flags. In intermediate object files, the type and attributes determine how the static linker copies the sections into the final product. Object file analysis tools (such as <code>otool</code>) use the type and attributes to determine how to read and display the sections. Some section types and attributes are used by the dynamic linker.</p>
+<p>These are important static-linking variants of the symbol type and attributes:</p>
+<ul class="ul"><li class="li"><p><strong>Regular sections</strong>. In a regular section, only one definition of an external symbol may exist in intermediate object files. The static linker returns an error if it finds any duplicate external symbol definitions.</p></li>
+<li class="li"><p><strong>Coalesced sections</strong>. In the final product, the static linker retains only one instance of each symbol defined in coalesced sections. To support complex language features (such as C++ vtables and RTTI) the compiler may create a definition of a particular symbol in every intermediate object file. The static linker and the dynamic linker would then reduce the duplicate definitions to the single definition used by the program.</p></li>
+<li class="li"><p><strong>Coalesced sections with weak definitions</strong> Weak symbol definitions may appear only in coalesced sections. When the static linker finds duplicate definitions for a symbol, it discards any coalesced symbol definition that has the weak definition attribute set (see <code><a href="reference.html#//apple_ref/c/tag/nlist">nlist</a></code>). If there are no non-weak definitions, the first weak definition is used instead. This feature is designed to support C++ templates; it allows explicit template instantiations to override implicit ones. The C++ compiler places explicit definitions in a regular section, and it places implicit definitions in a coalesced section, marked as weak definitions. Intermediate object files (and thus static archive libraries) built with weak definitions can be used only with the static linker in Mac OS X v10.2 and later. Final products (applications and shared libraries) should not contain weak definitions if they are expected to be used on earlier versions of Mac OS X.</p></li></ul>
+<a name="//apple_ref/c/tag/twolevel_hints_command" title="twolevel_hints_command"></a><a name="//apple_ref/doc/c_ref/twolevel_hints_command" title="twolevel_hints_command"></a><a name="//apple_ref/doc/uid/20001298-BAJDHAIE" title="twolevel_hints_command"></a>
+<a name="//apple_ref/doc/uid/20001298-DontLinkElementID_12"></a><h3 class="tight">twolevel_hints_command</h3>
+<p class="spaceabove">Defines the attributes of a <code>LC_TWOLEVEL_HINTS</code> load command. Declared in <code>/usr/include/mach-o/loader.h</code>.</p>
+<p class="spaceabove"><pre>
+struct twolevel_hints_command
+   {
+   uint32_t cmd;
+   uint32_t cmdsize;
+   uint32_t offset;
+   uint32_t nhints;
+};
+</pre></p>
+<h5 class="tight">Fields</h5><dl class="termdef">
+<dt><code>cmd</code></dt>
+<dd><p>Common to all load command structures. Set to <code>LC_TWOLEVEL_HINTS</code> for this structure.</p></dd>
+<dt><code>cmdsize</code></dt>
+<dd><p>Common to all load command structures. For this structure, set to <code>sizeof(twolevel_hints_command)</code>.</p></dd>
+<dt><code>offset</code></dt>
+<dd><p>An integer specifying the byte offset from the start of this file to an array of <code><a href="reference.html#//apple_ref/c/tag/twolevel_hint">twolevel_hint</a></code> data structures, known as the two-level namespace hint table.</p></dd>
+<dt><code>nhints</code></dt>
+<dd><p>The number of <code>twolevel_hint</code> data structures located at <code>offset</code>.</p></dd></dl>
+<h5 class="tight">Discussion</h5>
+<p>The static linker adds the <code>LC_TWOLEVEL_HINTS</code> load command and the two-level namespace hint table to the output file when building a two-level namespace image.</p>
+<h5 class="tight">Special Considerations</h5>
+<p>By default, <code>ld</code> does not include the <code>LC_TWOLEVEL_HINTS</code> command or the two-level namespace hint table in an <code>MH_BUNDLE</code> file because the presence of this load command causes the version of the dynamic linker shipped with Mac OS X v10.0 to crash. If you know the code will run only on Mac OS X v10.1 and later, you should explicitly enable the two-level namespace hint table. See <code>-twolevel_namespace_hints</code> in the <code>ld</code> man page for more information.</p>
+<a name="//apple_ref/c/tag/twolevel_hint" title="twolevel_hint"></a><a name="//apple_ref/doc/c_ref/twolevel_hint" title="twolevel_hint"></a><a name="//apple_ref/doc/uid/20001298-twolevel_hint" title="twolevel_hint"></a><a name="//apple_ref/doc/uid/20001298-DontLinkElementID_13"></a><h3 class="tight">twolevel_hint</h3>
+<p class="spaceabove">Specifies an entry in the two-level namespace hint table. Declared in <code>/usr/include/mach-o/loader.h</code>.</p>
+<p class="spaceabove"><pre>
+struct twolevel_hint
+   {
+   uint32_t isub_image:8,
+   itoc:24;
+};
+</pre></p>
+<h5 class="tight">Fields</h5><dl class="termdef">
+<dt><code>isub_image</code></dt>
+<dd><p>The subimage in which the symbol is defined. It is an index into the list of images that make up the umbrella image. If this field is 0, the symbol is in the umbrella image itself. If the image is not an umbrella framework or library, this field is 0.</p></dd>
+<dt><code>itoc</code></dt>
+<dd><p>The symbol index into the table of contents of the image specified by the <code>isub_image</code> field.</p></dd></dl>
+<h5 class="tight">Discussion</h5>
+<p>The two-level namespace hint table provides the dynamic linker with suggested positions to start searching for symbols in the libraries the current image is linked against.</p>
+<p>Every undefined symbol (that is, every symbol of type <code>N_UNDF</code> or <code>N_PBUD</code>) in a two-level namespace image has a corresponding entry in the two-level hint table, at the same index.</p>
+<p>The static linker adds the <code>LC_TWOLEVEL_HINTS</code> load command and the two-level namespace hint table to the output file when building a two-level namespace image.</p>
+<p>By default, the linker does not include the <code>LC_TWOLEVEL_HINTS</code> command or the two-level namespace hint table in an <code>MH_BUNDLE</code> file, because the presence of this load command causes the version of the dynamic linker shipped with Mac OS X v10.0 to crash. If you know the code will run only on Mac OS X v10.1 and later, you should explicitly enable the two-level namespace hints. See the linker documentation for more information.</p>
+<a name="//apple_ref/c/tag/lc_str" title="lc_str"></a><a name="//apple_ref/doc/c_ref/lc_str" title="lc_str"></a><a name="//apple_ref/doc/uid/20001298-BAJEJBII" title="lc_str"></a>
+<a name="//apple_ref/doc/uid/20001298-DontLinkElementID_14"></a><h3 class="tight">lc_str</h3>
+<p class="spaceabove">Defines a variable-length string. Declared in <code>/usr/include/mach-o/loader.h</code>.</p>
+<p class="spaceabove"><pre>
+union lc_str
+   {
+      uint32_t offset;
+      #ifndef __LP64__
+      char *ptr;
+      #endif
+};
+</pre></p>
+<h5 class="tight">Fields</h5><dl class="termdef">
+<dt><code>offset</code></dt>
+<dd><p>A long integer. A byte offset from the start of the load command that contains this string to the start of the string data.</p></dd>
+<dt><code>ptr</code></dt>
+<dd><p>A pointer to an array of bytes. At runtime, this pointer contains the virtual memory address of the string data. The <code>ptr</code> field is not used in Mach-O files.</p></dd></dl>
+<h5 class="tight">Discussion</h5>
+<p>Load commands store variable-length data such as library names using the <code>lc_str</code> data structure. Unless otherwise specified, the data consists of a C string.</p>
+<p>The data pointed to is stored just after the load command, and the size is added to the size of the load command. The string should be null terminated; any extra bytes to round up the size should be null. You can also determine the size of the string by subtracting the size of the load command data structure from the <code>cmdsize</code> field of the load command data structure.</p>
+<a name="//apple_ref/c/tag/dylib" title="dylib"></a><a name="//apple_ref/doc/c_ref/dylib" title="dylib"></a><a name="//apple_ref/doc/uid/20001298-dylib" title="dylib"></a>
+<a name="//apple_ref/doc/uid/20001298-DontLinkElementID_15"></a><h3 class="tight">dylib</h3>
+<p class="spaceabove">Defines the data used by the dynamic linker to match a shared library against the files that have linked to it. Used exclusively in the <code><a href="reference.html#//apple_ref/c/tag/dylib_command">dylib_command</a></code> data structure. Declared in <code>/usr/include/mach-o/loader.h</code>.</p>
+<p class="spaceabove"><pre>
+struct dylib
+   {
+   union <a href="reference.html#//apple_ref/doc/c_ref/lc_str">lc_str</a>  name;
+      <!--a-->uint_32<!--/a--> timestamp;
+      <!--a-->uint_32<!--/a--> current_version;
+      <!--a-->uint_32<!--/a--> compatibility_version;
+   };
+</pre></p>
+<h5 class="tight">Fields</h5><dl class="termdef">
+<dt><code>name</code></dt>
+<dd><p>A data structure of type <code><a href="reference.html#//apple_ref/c/tag/lc_str">lc_str</a></code>. Specifies the name of the shared library.</p></dd>
+<dt><code>timestamp</code></dt>
+<dd><p>The date and time when the shared library was built.</p></dd>
+<dt><code>current_version</code></dt>
+<dd><p>The current version of the shared library.</p></dd>
+<dt><code>compatibility_version</code></dt>
+<dd><p>The compatibility version of the shared library.</p></dd></dl>
+<a name="//apple_ref/c/tag/dylib_command" title="dylib_command"></a><a name="//apple_ref/doc/c_ref/dylib_command" title="dylib_command"></a><a name="//apple_ref/doc/uid/20001298-BAJGBFDF" title="dylib_command"></a>
+<a name="//apple_ref/doc/uid/20001298-DontLinkElementID_16"></a><h3 class="tight">dylib_command</h3>
+<p class="spaceabove">Defines the attributes of the <code>LC_LOAD_DYLIB</code> and <code>LC_ID_DYLIB</code> load commands. Declared in <code>/usr/include/mach-o/loader.h</code>.</p>
+<p class="spaceabove"><pre>
+struct dylib_command
+   {
+   <!--a-->uint_32<!--/a--> cmd;
+   <!--a-->uint_32<!--/a--> cmdsize;
+   struct <a href="reference.html#//apple_ref/doc/c_ref/dylib">dylib</a> dylib;
+   };
+</pre></p>
+<h5 class="tight">Fields</h5><dl class="termdef">
+<dt><code>cmd</code></dt>
+<dd><p>Common to all load command structures. For this structure, set to either <code>LC_LOAD_DYLIB</code>, <code>LC_LOAD_WEAK_DYLIB</code>, or <code>LC_ID_DYLIB</code>.</p></dd>
+<dt><code>cmdsize</code></dt>
+<dd><p>Common to all load command structures. For this structure, set to <code>sizeof(dylib_command)</code> plus the size of the data pointed to by the <code>name</code> field of the <code>dylib</code> field.</p></dd>
+<dt><code>dylib</code></dt>
+<dd><p>A data structure of type <code><a href="reference.html#//apple_ref/c/tag/dylib">dylib</a></code>. Specifies the attributes of the shared library.</p></dd></dl>
+<h5 class="tight">Discussion</h5>
+<p>For each shared library that a file links against, the static linker creates an <code><!--a  -->LC_LOAD_DYLIB<!--/a--></code> command and sets its <code>dylib</code> field to the value of the <code>dylib</code> field of the <code><!--a  -->LC_ID_DYLD<!--/a--></code> load command of the target library. All the <code>LC_LOAD_DYLIB</code> commands together form a list that is ordered according to location in the file, earliest <code>LC_LOAD_DYLIB</code> command first. For two-level namespace files, undefined symbol entries in the symbol table refer to their parent shared libraries by index into this list. The index is called a <em>library ordinal</em>, and it is stored in the <code>n_desc</code> field of the <code><a href="reference.html#//apple_ref/c/tag/nlist">nlist</a></code> data structure.</p>
+<p>At runtime, the dynamic linker uses the name in the <code>dyld</code> field of the <code><!--a  -->LC_LOAD_DYLIB<!--/a--></code> command to locate the shared library. If it finds the library, the dynamic linker compares the version information of the <code><!--a  -->LC_LOAD_DYLIB<!--/a--></code> load command against the library’s version. For the dynamic linker to successfully link the shared library, the compatibility version of the shared library must be less than or equal to the compatibility version in the <code><!--a  -->LC_LOAD_DYLIB<!--/a--></code> command.</p>
+<p>The dynamic linker uses the timestamp to determine whether it can use the prebinding information. The current version is returned by the function <code>NSVersionOfRunTimeLibrary</code> to allow you to determine the version of the library your program is using.</p>
+<a name="//apple_ref/c/tag/dylinker_command" title="dylinker_command"></a><a name="//apple_ref/doc/c_ref/dylinker_command" title="dylinker_command"></a><a name="//apple_ref/doc/uid/20001298-BAJIJIAB" title="dylinker_command"></a>
+<a name="//apple_ref/doc/uid/20001298-DontLinkElementID_17"></a><h3 class="tight">dylinker_command</h3>
+<p class="spaceabove">Defines the attributes of the <code>LC_LOAD_DYLINKER</code> and <code>LC_ID_DYLINKER</code> load commands. Declared in <code>/usr/include/mach-o/loader.h</code>.</p>
+<p class="spaceabove"><pre>
+struct dylinker_command
+   {
+   uint32_t cmd;
+   uint32_t cmdsize;
+   union <a href="reference.html#//apple_ref/doc/c_ref/lc_str">lc_str</a> name;
+   };
+</pre></p>
+<h5 class="tight">Fields</h5><dl class="termdef">
+<dt><code>cmd</code></dt>
+<dd><p>Common to all load command structures. For this structure, set to either <code>LC_ID_DYLINKER</code> or <code>LC_LOAD_DYLINKER</code>.</p></dd>
+<dt><code>cmdsize</code></dt>
+<dd><p>Common to all load command structures. For this structure, set to <code>sizeof(dylinker_command)</code>, plus the size of the data pointed to by the <code>name</code> field.</p></dd>
+<dt><code>name</code></dt>
+<dd><p>A data structure of type <code><a href="reference.html#//apple_ref/c/tag/lc_str">lc_str</a></code>. Specifies the name of the dynamic linker.</p></dd></dl>
+<h5 class="tight">Discussion</h5>
+<p>Every executable file that is dynamically linked contains a <code>LC_LOAD_DYLINKER</code> command that specifies the name of the dynamic linker that the kernel must load in order to execute the file. The dynamic linker itself specifies its name using the <code>LC_ID_DYLINKER</code> load command.</p>
+<a name="//apple_ref/c/tag/prebound_dylib_command" title="prebound_dylib_command"></a><a name="//apple_ref/doc/c_ref/prebound_dylib_command" title="prebound_dylib_command"></a><a name="//apple_ref/doc/uid/20001298-BAJBJHJC" title="prebound_dylib_command"></a>
+<a name="//apple_ref/doc/uid/20001298-DontLinkElementID_18"></a><h3 class="tight">prebound_dylib_command</h3>
+<p class="spaceabove">Defines the attributes of the <code>LC_PREBOUND_DYLIB</code> load command. For every library that a prebound executable file links to, the static linker adds one <code>LC_PREBOUND_DYLIB</code> command. Declared in <code>/usr/include/mach-o/loader.h</code>.</p>
+<p class="spaceabove"><pre>
+struct prebound_dylib_command
+   {
+   uint32_t cmd;
+   uint32_t cmdsize;
+   union <a href="reference.html#//apple_ref/doc/c_ref/lc_str">lc_str</a> name;
+      uint32_t nmodules;
+      union <a href="reference.html#//apple_ref/doc/c_ref/lc_str">lc_str</a> linked_modules;
+      };
+</pre></p>
+<h5 class="tight">Fields</h5><dl class="termdef">
+<dt><code>cmd</code></dt>
+<dd><p>Common to all load command structures. For this structure, set to <code>LC_PREBOUND_DYLIB</code>.</p></dd>
+<dt><code>cmdsize</code></dt>
+<dd><p>Common to all load command structures. For this structure, set to <code>sizeof(prebound_dylib_command)</code> plus the size of the data pointed to by the <code>name</code> and <code>linked_modules</code> fields.</p></dd>
+<dt><code>name</code></dt>
+<dd><p>A data structure of type <code><a href="reference.html#//apple_ref/c/tag/lc_str">lc_str</a></code>. Specifies the name of the prebound shared library.</p></dd>
+<dt><code>nmodules</code></dt>
+<dd><p>An integer. Specifies the number of modules the prebound shared library contains. The size of the <code>linked_modules</code> string is <code>(nmodules / 8) + (nmodules % 8)</code>.</p></dd>
+<dt><code>linked_modules</code></dt>
+<dd><p>A data structure of type <code><a href="reference.html#//apple_ref/c/tag/lc_str">lc_str</a></code>. Usually, this data structure defines the offset of a C string; in this usage, it is a variable-length bitset, containing one bit for each module. Each bit represents whether the corresponding module is linked to a module in the current file, 1 for yes, 0 for no. The bit for the first module is the low bit of the first byte.</p></dd></dl>
+<a name="//apple_ref/c/tag/thread_command" title="thread_command"></a><a name="//apple_ref/doc/c_ref/thread_command" title="thread_command"></a><a name="//apple_ref/doc/uid/20001298-BBCFCJEC" title="thread_command"></a>
+<a name="//apple_ref/doc/uid/20001298-DontLinkElementID_19"></a><h3 class="tight">thread_command</h3>
+<p class="spaceabove">Defines the attributes of the <code>LC_THREAD</code> and <code>LC_UNIXTHREAD</code> load commands. The data of this command is specific to each architecture and appears in <code>thread_status.h</code>, located in the architecture’s directory in <code>/usr/include/mach</code>. Declared in <code>/usr/include/mach-o/loader.h</code>.</p>
+<p class="spaceabove"><pre>
+struct thread_command
+   {
+   uint32_t cmd;
+   uint32_t cmdsize;
+   /* uint32_t flavor;*/
+   /* uint32_t count; */
+   /* struct <!--a-->cpu_thread_state<!--/a--> state;*/
+};
+</pre></p>
+<h5 class="tight">Fields</h5><dl class="termdef">
+<dt><code>cmd</code></dt>
+<dd><p>Common to all load command structures. For this structure, set to <code>LC_THREAD</code> or <code>LC_UNIXTHREAD</code>.</p></dd>
+<dt><code>cmdsize</code></dt>
+<dd><p>Common to all load command structures. For this structure, set to <code>sizeof(thread_command)</code> plus the size of the <code>flavor</code> and <code>count</code> fields plus the size of the CPU-specific thread state data structure.</p></dd>
+<dt><code>flavor</code></dt>
+<dd><p>Integer specifying the particular flavor of the thread state data structure. See the <code>thread_status.h</code> file for your target architecture.</p></dd>
+<dt><code>count</code></dt>
+<dd><p>Size of the thread state data, in number of 32-bit integers. The thread state data structure must be fully padded to 32-bit alignment.</p></dd></dl>
+<a name="//apple_ref/c/tag/routines_command" title="routines_command"></a><a name="//apple_ref/doc/c_ref/routines_command" title="routines_command"></a><a name="//apple_ref/doc/uid/20001298-BAJEJEJF" title="routines_command"></a>
+<a name="//apple_ref/doc/uid/20001298-DontLinkElementID_20"></a><h3 class="tight">routines_command</h3>
+<p class="spaceabove">Defines the attributes of the <code>LC_ROUTINES</code> load command, used in 32-bit architectures. Describes the location of the shared library initialization function, which is a function that the dynamic linker calls before allowing any of the routines in the library to be called. Declared in <code>/usr/include/mach-o/loader.h</code>. See also <code><a href="reference.html#//apple_ref/c/tag/routines_command_64">routines_command_64</a></code>.</p>
+<p class="spaceabove"><pre>
+struct routines_command
+   {
+   uint32_t cmd;
+   uint32_t cmdsize;
+   uint32_t init_address;
+   uint32_t init_module;
+   uint32_t reserved1;
+   uint32_t reserved2;
+   uint32_t reserved3;
+   uint32_t reserved4;
+   uint32_t reserved5;
+   uint32_t reserved6;
+};
+</pre></p>
+<h5 class="tight">Fields</h5><dl class="termdef">
+<dt><code>cmd</code></dt>
+<dd><p>Common to all load command structures. For this structure, set to <code>LC_ROUTINES</code>.</p></dd>
+<dt><code>cmdsize</code></dt>
+<dd><p>Common to all load command structures. For this structure, set to <code>sizeof(routines_command)</code>.</p></dd>
+<dt><code>init_address</code></dt>
+<dd><p>An integer specifying the virtual memory address of the initialization function.</p></dd>
+<dt><code>init_module</code></dt>
+<dd><p>An integer specifying the index into the module table of the module containing the initialization function.</p></dd>
+<dt><code>reserved1</code></dt>
+<dd><p>Reserved for future use. Set this field to <code>0</code>.</p></dd>
+<dt><code>reserved2</code></dt>
+<dd><p>Reserved for future use. Set this field to <code>0</code>.</p></dd>
+<dt><code>reserved3</code></dt>
+<dd><p>Reserved for future use. Set this field to <code>0</code>.</p></dd>
+<dt><code>reserved4</code></dt>
+<dd><p>Reserved for future use. Set this field to <code>0</code>.</p></dd>
+<dt><code>reserved5</code></dt>
+<dd><p>Reserved for future use. Set this field to <code>0</code>.</p></dd>
+<dt><code>reserved6</code></dt>
+<dd><p>Reserved for future use. Set this field to <code>0</code>.</p></dd></dl>
+<h5 class="tight">Discussion</h5>
+<p>The static linker adds an <code>LC_ROUTINES</code> command when you specify a shared library initialization function using the <code>-init</code> option (see the <code>ld</code> man page for more information).</p>
+<a name="//apple_ref/c/tag/routines_command_64" title="routines_command_64"></a><a name="//apple_ref/doc/c_ref/routines_command_64" title="routines_command_64"></a><a name="//apple_ref/doc/uid/20001298-CJBEEEEC" title="routines_command_64"></a>
+<a name="//apple_ref/doc/uid/20001298-DontLinkElementID_21"></a><h3 class="tight">routines_command_64</h3>
+<p class="spaceabove">Defines the attributes of the <code>LC_ROUTINES_64</code> load command, used in 64-bit architectures. Describes the location of the shared library initialization function, which is a function that the dynamic linker calls before allowing any of the routines in the library to be called. Declared in <code>/usr/include/mach-o/loader.h</code>.</p>
+<p class="spaceabove"><pre>
+struct routines_command_64
+   {
+   uint32_t cmd;
+   uint32_t cmdsize;
+   uint64_t init_address;
+   uint64_t init_module;
+   uint64_t reserved1;
+   uint64_t reserved2;
+   uint64_t reserved3;
+   uint64_t reserved4;
+   uint64_t reserved5;
+   uint64_t reserved6;
+};
+</pre></p>
+<h5 class="tight">Fields</h5><dl class="termdef">
+<dt><code>cmd</code></dt>
+<dd><p>Common to all load command structures. For this structure, set to <code>LC_ROUTINES_64</code>.</p></dd>
+<dt><code>cmdsize</code></dt>
+<dd><p>Common to all load command structures. For this structure, set to <code>sizeof(routines_command_64)</code>.</p></dd>
+<dt><code>init_address</code></dt>
+<dd><p>An integer specifying the virtual memory address of the initialization function.</p></dd>
+<dt><code>init_module</code></dt>
+<dd><p>An integer specifying the index into the module table of the module containing the initialization function.</p></dd>
+<dt><code>reserved1</code></dt>
+<dd><p>Reserved for future use. Set this field to <code>0</code>.</p></dd>
+<dt><code>reserved2</code></dt>
+<dd><p>Reserved for future use. Set this field to <code>0</code>.</p></dd>
+<dt><code>reserved3</code></dt>
+<dd><p>Reserved for future use. Set this field to <code>0</code>.</p></dd>
+<dt><code>reserved4</code></dt>
+<dd><p>Reserved for future use. Set this field to <code>0</code>.</p></dd>
+<dt><code>reserved5</code></dt>
+<dd><p>Reserved for future use. Set this field to <code>0</code>.</p></dd>
+<dt><code>reserved6</code></dt>
+<dd><p>Reserved for future use. Set this field to <code>0</code>.</p></dd></dl>
+<h5 class="tight">Discussion</h5>
+<p>The static linker adds an <code>LC_ROUTINES_64</code> command when you specify a shared library initialization function using the <code>-init</code> option (see the <code>ld</code> man page for more information).</p>
+<a name="//apple_ref/c/tag/sub_framework_command" title="sub_framework_command"></a><a name="//apple_ref/doc/c_ref/sub_framework_command" title="sub_framework_command"></a><a name="//apple_ref/doc/uid/20001298-sub_framework_command" title="sub_framework_command"></a><a name="//apple_ref/doc/uid/20001298-DontLinkElementID_22"></a><h3 class="tight">sub_framework_command</h3>
+<p class="spaceabove">Defines the attributes of the <code>LC_SUB_FRAMEWORK</code> load command. Identifies the umbrella framework of which this file is a subframework. Declared in <code>/usr/include/mach-o/loader.h</code>.</p>
+<p class="spaceabove"><pre>
+struct sub_framework_command
+   {
+   uint32_t cmd;
+   uint32_t cmdsize;
+   union <a href="reference.html#//apple_ref/doc/c_ref/lc_str">lc_str</a> umbrella;
+   };
+</pre></p>
+<h5 class="tight">Fields</h5><dl class="termdef">
+<dt><code>cmd</code></dt>
+<dd><p>Common to all load command structures. For this structure, set to <code>LC_SUB_FRAMEWORK</code>.</p></dd>
+<dt><code>cmdsize</code></dt>
+<dd><p>Common to all load command structures. For this structure, set to <code>sizeof(sub_framework_command)</code> plus the size of the data pointed to by the <code>umbrella</code> field.</p></dd>
+<dt><code>umbrella</code></dt>
+<dd><p>A data structure of type <code><a href="reference.html#//apple_ref/c/tag/lc_str">lc_str</a></code>. Specifies the name of the umbrella framework of which this file is a member.</p></dd></dl>
+<a name="//apple_ref/c/tag/sub_umbrella_command" title="sub_umbrella_command"></a><a name="//apple_ref/doc/c_ref/sub_umbrella_command" title="sub_umbrella_command"></a><a name="//apple_ref/doc/uid/20001298-sub_umbrella_command" title="sub_umbrella_command"></a><a name="//apple_ref/doc/uid/20001298-DontLinkElementID_23"></a><h3 class="tight">sub_umbrella_command</h3>
+<p class="spaceabove">Defines the attributes of the <code>LC_SUB_UMBRELLA</code> load command. Identifies the named framework as a subumbrella of this framework. Unlike a subframework, any client may link to a subumbrella. Declared in <code>/usr/include/mach-o/loader.h</code>.</p>
+<p class="spaceabove"><pre>
+struct sub_umbrella_command
+   {
+   uint32_t cmd;
+   uint32_t cmdsize;
+   union <a href="reference.html#//apple_ref/doc/c_ref/lc_str">lc_str</a> sub_umbrella;
+   };
+</pre></p>
+<h5 class="tight">Fields</h5><dl class="termdef">
+<dt><code>cmd</code></dt>
+<dd><p>Common to all load command structures. For this structure, set to <code>LC_SUB_UMBRELLA</code>.</p></dd>
+<dt><code>cmdsize</code></dt>
+<dd><p>Common to all load command structures. For this structure, set to <code>sizeof(sub_umbrella_command)</code> plus the size of the data pointed to by the <code>sub_umbrella</code> field.</p></dd>
+<dt><code>sub_umbrella</code></dt>
+<dd><p>A data structure of type <code><a href="reference.html#//apple_ref/c/tag/lc_str">lc_str</a></code>. Specifies the name of the umbrella framework of which this file is a member.</p></dd></dl>
+<a name="//apple_ref/c/tag/sub_library_command" title="sub_library_command"></a><a name="//apple_ref/doc/c_ref/sub_library_command" title="sub_library_command"></a><a name="//apple_ref/doc/uid/20001298-sub_library_command" title="sub_library_command"></a><a name="//apple_ref/doc/uid/20001298-DontLinkElementID_24"></a><h3 class="tight">sub_library_command</h3>
+<p class="spaceabove">Defines the attributes of the <code>LC_SUB_LIBRARY</code> load command. Identifies a sublibrary of this framework and marks this framework as an umbrella framework. Unlike a subframework, any client may link to a sublibrary. Declared in <code>/usr/include/mach-o/loader.h</code>.</p>
+<p class="spaceabove"><pre>
+struct sub_library_command
+   {
+   uint32_t cmd;
+   uint32_t cmdsize;
+   union <a href="reference.html#//apple_ref/doc/c_ref/lc_str">lc_str</a> sub_library;
+   };
+</pre></p>
+<h5 class="tight">Fields</h5><dl class="termdef">
+<dt><code>cmd</code></dt>
+<dd><p>Common to all load command structures. For this structure, set to <code>LC_SUB_LIBRARY</code>.</p></dd>
+<dt><code>cmdsize</code></dt>
+<dd><p>Common to all load command structures. For this structure, set to <code>sizeof(sub_library_command)</code> plus the size of the data pointed to by the <code>sub_library</code> field.</p></dd>
+<dt><code>sub_library</code></dt>
+<dd><p>A data structure of type <code><a href="reference.html#//apple_ref/c/tag/lc_str">lc_str</a></code>. Specifies the name of the sublibrary of which this file is a member.</p></dd></dl>
+<a name="//apple_ref/c/tag/sub_client_command" title="sub_client_command"></a><a name="//apple_ref/doc/c_ref/sub_client_command" title="sub_client_command"></a><a name="//apple_ref/doc/uid/20001298-sub_client_command" title="sub_client_command"></a><a name="//apple_ref/doc/uid/20001298-DontLinkElementID_25"></a><h3 class="tight">sub_client_command</h3>
+<p class="spaceabove">Defines the attributes of the <code>LC_SUB_CLIENT</code> load command. Specifies the name of a file that is allowed to link to this subframework. This file would otherwise be required to link to the umbrella framework of which this file is a component. Declared in <code>/usr/include/mach-o/loader.h</code>.</p>
+<p class="spaceabove"><pre>
+struct sub_client_command
+   {
+   uint32_t cmd;
+   uint32_t cmdsize;
+   union <a href="reference.html#//apple_ref/doc/c_ref/lc_str">lc_str</a> client;
+   };
+</pre></p>
+<h5 class="tight">Fields</h5><dl class="termdef">
+<dt><code>cmd</code></dt>
+<dd><p>Common to all load command structures. For this structure, set to <code>LC_SUB_CLIENT</code>.</p></dd>
+<dt><code>cmdsize</code></dt>
+<dd><p>Common to all load command structures. For this structure, set to <code>sizeof(sub_client_command)</code> plus the size of the data pointed to by the <code>client</code> field.</p></dd>
+<dt><code>client</code></dt>
+<dd><p>A data structure of type <code><a href="reference.html#//apple_ref/c/tag/lc_str">lc_str</a></code>. Specifies the name of a client authorized to link to this library.</p></dd></dl>
+<h5 class="tight">Special Considerations</h5>
+<p>The <code>ld</code> tool generates a <code>sub_client_command</code> load command in the built product if you pass the option <code>-allowable_client &lt;name></code>, where <code>&lt;name></code> is the install name of a framework or the client name of a bundle. See the <code>ld</code> man page, specifically about the options <code>-allowable_client</code> and <code>-client_name</code>, for more information.</p>
+<a name="//apple_ref/doc/uid/20001298-91877" title="Symbol Table and Related Data Structures"></a><a name="//apple_ref/doc/uid/20001298-BAJIHABI" title="Symbol Table and Related Data Structures"></a><h3><a name="//apple_ref/doc/uid/20001298-TPXREF115" title="Symbol Table and Related Data Structures"></a>Symbol Table and Related Data Structures</h3>
+<p>Two load commands, <code><!--a  -->LC_SYMTAB<!--/a--></code> and <code><!--a  -->LC_DYSYMTAB<!--/a--></code>, describe the size and location of the symbol tables, along with additional metadata. The other data structures listed in this section represent the symbol tables themselves.</p>
+<a name="//apple_ref/c/tag/symtab_command" title="symtab_command"></a><a name="//apple_ref/doc/c_ref/symtab_command" title="symtab_command"></a><a name="//apple_ref/doc/uid/20001298-symtab_command" title="symtab_command"></a><a name="//apple_ref/doc/uid/20001298-DontLinkElementID_26"></a><h3 class="tight">symtab_command</h3>
+<p class="spaceabove">Defines the attributes of the <code>LC_SYMTAB</code> load command. Describes the size and location of the symbol table data structures. Declared in <code>/usr/include/mach-o/loader.h</code>.</p>
+<p class="spaceabove"><pre>
+struct symtab_command
+   {
+   <!--a-->uint_32<!--/a--> cmd;
+   <!--a-->uint_32<!--/a--> cmdsize;
+   <!--a-->uint_32<!--/a--> symoff;
+   <!--a-->uint_32<!--/a--> nsyms;
+   <!--a-->uint_32<!--/a--> stroff;
+   <!--a-->uint_32<!--/a--> strsize;
+};
+</pre></p>
+<h5 class="tight">Fields</h5><dl class="termdef">
+<dt><code>cmd</code></dt>
+<dd><p>Common to all load command structures. For this structure, set to <code>LC_SYMTAB</code>.</p></dd>
+<dt><code>cmdsize</code></dt>
+<dd><p>Common to all load command structures. For this structure, set to <code>sizeof(symtab_command)</code>.</p></dd>
+<dt><code>symoff</code></dt>
+<dd><p>An integer containing the byte offset from the start of the file to the location of the symbol table entries. The symbol table is an array of <code><a href="reference.html#//apple_ref/c/tag/nlist">nlist</a></code> data structures.</p></dd>
+<dt><code>nsyms</code></dt>
+<dd><p>An integer indicating the number of entries in the symbol table.</p></dd>
+<dt><code>stroff</code></dt>
+<dd><p>An integer containing the byte offset from the start of the image to the location of the string table.</p></dd>
+<dt><code>strsize</code></dt>
+<dd><p>An integer indicating the size (in bytes) of the string table.</p></dd></dl>
+<h5 class="tight">Discussion</h5>
+<p><code>LC_SYMTAB</code> should exist in both statically linked and dynamically linked file types.</p>
+<a name="//apple_ref/c/tag/nlist" title="nlist"></a><a name="//apple_ref/doc/c_ref/nlist" title="nlist"></a><a name="//apple_ref/doc/uid/20001298-BAJECHFH" title="nlist"></a>
+<a name="//apple_ref/doc/uid/20001298-DontLinkElementID_27"></a><h3 class="tight">nlist</h3>
+<p class="spaceabove">Describes an entry in the symbol table for 32-bit architectures. Declared in <code>/usr/include/mach-o/nlist.h</code>. See also <code><a href="reference.html#//apple_ref/c/tag/nlist_64">nlist_64</a></code>.</p>
+<p class="spaceabove"><pre>
+struct nlist
+   {
+   union {
+      #ifndef __LP64__
+      char *n_name;
+      #endif
+      int32_t n_strx;
+   } n_un;
+   uint8_t n_type;
+   uint8_t n_sect;
+   int16_t n_desc;
+   uint32_t n_value;
+};
+</pre></p>
+<h5 class="tight">Fields</h5><dl class="termdef">
+<dt><code>n_un</code></dt>
+<dd><p>A union that holds an index into the string table, <code>n_strx</code>. To specify an empty string (<code>""</code>), set this value to 0. The <code>n_name</code> field is not used in Mach-O files.</p></dd>
+<dt><code>n_type</code></dt>
+<dd><p>A byte value consisting of data accessed using four bit masks:</p><ul class="termdef"><li class="termdef"><p><code><!--a  -->N_STAB<!--/a--></code>  (0xe0)—If any of these 3 bits are set, the symbol is a symbolic debugging table (<code>stab</code>) entry. In that case, the entire <code>n_type</code> field is interpreted as a <code>stab</code> value. See <code>/usr/include/mach-o/stab.h</code> for valid stab values.</p></li>
+<li class="termdef"><p><code><!--a  -->N_PEXT<!--/a--></code>  (0x10)—If this bit is on, this symbol is marked as having limited global scope. When the file is fed to the static linker, it clears the <code>N_EXT</code> bit for each symbol with the <code><!--a  -->N_PEXT<!--/a--></code> bit set. (The <code>ld</code> option <code>-keep_private_externs</code> turns off this behavior.) With Mac OS X GCC, you can use the <code>__private_extern__</code> function attribute to set this bit.</p></li>
+<li class="termdef"><p><code><!--a  -->N_TYPE<!--/a--></code>  (0x0e)—These bits define the type of the symbol.</p></li>
+<li class="termdef"><p><code><!--a  -->N_EXT<!--/a--></code> (0x01)—If this bit is on, this symbol is an external symbol, a symbol that is either defined outside this file or that is defined in this file but can be referenced by other files.</p></li></ul><p>Values for the <code>N_TYPE</code> field include:</p><ul class="termdef">
+<li class="termdef"><p><code>N_UNDF</code>  (0x0)—The symbol   is undefined. Undefined symbols are symbols referenced in this module but defined in a different module. The <code>n_sect</code> field is set to <code>NO_SECT</code>.</p></li>
+<li class="termdef"><p><code><!--a  -->N_ABS<!--/a--></code>  (0x2)—The symbol is absolute. The linker does not change the value of an absolute symbol. The <code>n_sect</code> field is set to <code>NO_SECT</code>.</p></li>
+<li class="termdef"><p><code><!--a  -->N_SECT<!--/a--></code> (0xe)—The symbol is defined in the section number given in <code>n_sect</code>.</p></li>
+<li class="termdef">	<p><code><!--a  -->N_PBUD<!--/a--></code>  (0xc)—The symbol is undefined and the image is using a prebound value for the symbol. The <code>n_sect</code> field is set to <code>NO_SECT</code>.</p></li>
+<li class="termdef"><p><code><!--a  -->N_INDR<!--/a--></code> ( 0xa)—The symbol is defined to be the same as another symbol. The <code>n_value</code> field is an index into the string table specifying the name of the other symbol. When that symbol is linked, both this and the other symbol have the same defined type and value.</p></li></ul></dd>
+<dt><code>n_sect</code></dt>
+<dd><p>An integer specifying the number of the section that this symbol can be found in, or <code>NO_SECT</code> if the symbol is not to be found in any section of this image. The sections are contiguously numbered across segments, starting from 1, according to the order they appear in the <code>LC_SEGMENT</code> load commands.</p></dd>
+<dt><code>n_desc</code></dt>
+<dd><p>A 16-bit value providing additional information about the nature of this symbol for non-stab symbols. The reference flags can be accessed using the <code>REFERENCE_TYPE</code> mask (0xF) and are defined as follows:</p><ul class="termdef"><li class="termdef"><p><code>REFERENCE_FLAG_UNDEFINED_NON_LAZY</code> (0x0)—This symbol is a reference to an external non-lazy (data) symbol.</p></li>
+<li class="termdef"><p><code>REFERENCE_FLAG_UNDEFINED_LAZY</code> (0x1)—This symbol is a reference to an external lazy symbol—that is, to a function call.</p></li>
+<li class="termdef"><p><code>REFERENCE_FLAG_DEFINED</code> (0x2)—This symbol is defined in this module.</p></li>
+<li class="termdef"><p><code>REFERENCE_FLAG_PRIVATE_DEFINED</code> (0x3)—This symbol is defined in this module and is visible only to modules within this shared library.</p></li>
+<li class="termdef"><p><code>REFERENCE_FLAG_PRIVATE_UNDEFINED_NON_LAZY</code> (0x4)—This symbol is defined in another module in this file, is a non-lazy (data) symbol, and is visible only to modules within this shared library.</p></li>
+<li class="termdef"><p><code>REFERENCE_FLAG_PRIVATE_UNDEFINED_LAZY</code> (0x5)—This symbol is defined in another module in this file, is a lazy (function) symbol, and is visible only to modules within this shared library.</p></li></ul><p>Additionally, the following bits might also be set:</p><ul class="termdef"><li class="termdef"><p><code>REFERENCED_DYNAMICALLY</code> (0x10)—Must be set for any defined symbol that is referenced by dynamic-loader APIs (such as <code><a href="../../../Reference/MachOReference/Reference/reference.html#//apple_ref/c/func/dlsym" target="_top">dlsym</a></code><code></code> and <code><a href="../../../Reference/MachOReference/Reference/reference.html#//apple_ref/c/func/NSLookupSymbolInImage" target="_top">NSLookupSymbolInImage</a></code><code></code>) and not ordinary undefined symbol references. The <code>strip</code> tool uses this bit to avoid removing symbols that must exist: If the symbol has this bit set, <code>strip</code> does not strip it.</p></li>
+<li class="termdef">	<p><code>N_DESC_DISCARDED</code> (0x20)—Sometimes used by the dynamic linker at runtime in a fully linked image. Do not set this bit in a fully linked image.</p></li>
+<li class="termdef"><p><code>N_NO_DEAD_STRIP</code>(0x20)—When set in a relocatable object file (file type <code>MH_OBJECT</code>) on a defined symbol, indicates to the static linker to never dead-strip the symbol. (Note that the same bit (0x20) is used for two nonoverlapping purposes.)</p></li>
+<li class="termdef"><p><code>N_WEAK_REF</code> (0x40)—Indicates that this undefined symbol is a weak reference. If the dynamic linker cannot find a definition for this symbol, it sets the address of this symbol to 0. The static linker sets this symbol given the appropriate weak-linking flags.</p></li>
+<li class="termdef"><p><code>N_WEAK_DEF</code> (0x80)—Indicates that this symbol is a weak definition. If the static linker or the dynamic linker finds another (non-weak) definition for this symbol, the weak definition is ignored. Only symbols in a coalesced <code><a href="reference.html#//apple_ref/c/tag/section">section</a></code> can be marked as a weak definition.</p></li></ul><p>If this file is a two-level namespace image (that is, if the <code>MH_TWOLEVEL</code> flag of the <code>mach_header</code> structure is set), the high 8 bits of <code>n_desc</code> specify the number of the library in which this undefined symbol is defined. Use the macro <code>GET_LIBRARY_ORDINAL</code> to obtain this value and the macro <code>SET_LIBRARY_ORDINAL</code> to set it. Zero specifies the current image. 1 through 253 specify the library number according to the order of <code>LC_LOAD_DYLIB</code> commands in the file. The value 254 is used for undefined symbols that are to be dynamically looked up (supported only in Mac OS X v10.3 and later). For plug–ins that load symbols from the executable program they are linked against, 255 specifies the executable image. For flat namespace images, the high 8 bits must be 0.</p></dd>
+<dt><code>n_value</code></dt>
+<dd><p>An integer that contains the value of the symbol. The format of this value is different for each type of symbol table entry (as specified by the <code>n_type</code> field). For the <code>N_SECT</code> symbol type, <code>n_value</code> is the address of the symbol. See the description of the <code>n_type</code> field for information on other possible values.</p></dd></dl>
+<h5 class="tight">Discussion</h5>
+<p>Common symbols must be of type <code>N_UNDF</code> and must have the <code>N_EXT</code> bit set. The <code>n_value</code> for a common symbol is the size (in bytes) of the data of the symbol. In C, a common symbol is a variable that is declared but not initialized in this file. Common symbols can appear only in <code>MH_OBJECT</code> Mach-O files.</p>
+<a name="//apple_ref/c/tag/nlist_64" title="nlist_64"></a><a name="//apple_ref/doc/c_ref/nlist_64" title="nlist_64"></a><a name="//apple_ref/doc/uid/20001298-CJBDFJFA" title="nlist_64"></a>
+<a name="//apple_ref/doc/uid/20001298-DontLinkElementID_28"></a><h3 class="tight">nlist_64</h3>
+<p class="spaceabove">Describes an entry in the symbol table for 64-bit architectures. Declared in <code>/usr/include/mach-o/nlist.h</code>.</p>
+<p class="spaceabove"><pre>
+struct nlist_64
+   {
+   union {
+      uint32_t n_strx;
+   } n_un;
+   uint8_t n_type;
+   uint8_t n_sect;
+   uint16_t n_desc;
+   uint64_t n_value;
+};
+</pre></p>
+<h5 class="tight">Fields</h5><dl class="termdef">
+<dt><code>n_un</code></dt>
+<dd><p>A union that holds an index into the string table, <code>n_strx</code>. To specify an empty string (<code>""</code>), set this value to 0.</p></dd>
+<dt><code>n_type</code></dt>
+<dd><p>A byte value consisting of data accessed using four bit masks:</p><ul class="termdef"><li class="termdef"><p><code><!--a  -->N_STAB<!--/a--></code>  (0xe0)—If any of these 3 bits are set, the symbol is a symbolic debugging table (<code>stab</code>) entry. In that case, the entire <code>n_type</code> field is interpreted as a <code>stab</code> value. See <code>/usr/include/mach-o/stab.h</code> for valid stab values.</p></li>
+<li class="termdef"><p><code><!--a  -->N_PEXT<!--/a--></code>  (0x10)—If this bit is on, this symbol is marked as having limited global scope. When the file is fed to the static linker, it clears the <code>N_EXT</code> bit for each symbol with the <code><!--a  -->N_PEXT<!--/a--></code> bit set. (The <code>ld</code> option <code>-keep_private_externs</code> turns off this behavior.) With Mac OS X GCC, you can use the <code>__private_extern__</code> function attribute to set this bit.</p></li>
+<li class="termdef"><p><code><!--a  -->N_TYPE<!--/a--></code>  (0x0e)—These bits define the type of the symbol.</p></li>
+<li class="termdef"><p><code><!--a  -->N_EXT<!--/a--></code> (0x01)—If this bit is on, this symbol is an external symbol, a symbol that is either defined outside this file or that is defined in this file but can be referenced by other files.</p></li></ul><p>Values for the <code>N_TYPE</code> field include:</p><ul class="termdef">
+<li class="termdef"><p><code>N_UNDF</code>  (0x0)—The symbol   is undefined. Undefined symbols are symbols referenced in this module but defined in a different module. Set the <code>n_sect</code> field to <code>NO_SECT</code>.</p></li>
+<li class="termdef"><p><code><!--a  -->N_ABS<!--/a--></code>  (0x2)—The symbol is absolute. The linker does not update the value of an absolute symbol. Set the <code>n_sect</code> field to <code>NO_SECT</code>.</p></li>
+<li class="termdef"><p><code><!--a  -->N_SECT<!--/a--></code> (0xe)—The symbol is defined in the section number given in <code>n_sect</code>.</p></li>
+<li class="termdef">	<p><code><!--a  -->N_PBUD<!--/a--></code>  (0xc)—The symbol is undefined and the image is using a prebound value for the symbol. Set the <code>n_sect</code> field to <code>NO_SECT</code>.</p></li>
+<li class="termdef"><p><code><!--a  -->N_INDR<!--/a--></code> ( 0xa)—The symbol is defined to be the same as another symbol. The <code>n_value</code> field is an index into the string table specifying the name of the other symbol. When that symbol is linked, both this and the other symbol point to the same defined type and value.</p></li></ul></dd>
+<dt><code>n_sect</code></dt>
+<dd><p>An integer specifying the number of the section that this symbol can be found in, or <code>NO_SECT</code> if the symbol is not to be found in any section of this image. The sections are contiguously numbered across segments, starting from 1, according to the order they appear in the <code>LC_SEGMENT</code> load commands.</p></dd>
+<dt><code>n_desc</code></dt>
+<dd><p>A 16-bit value providing additional information about the nature of this symbol. The reference flags can be accessed using the <code>REFERENCE_TYPE</code> mask (0xF) and are defined as follows:</p><ul class="termdef"><li class="termdef"><p><code>REFERENCE_FLAG_UNDEFINED_NON_LAZY</code> (0x0)—This symbol is a reference to an external non-lazy (data) symbol.</p></li>
+<li class="termdef"><p><code>REFERENCE_FLAG_UNDEFINED_LAZY</code> (0x1)—This symbol is a reference to an external lazy symbol—that is, to a function call.</p></li>
+<li class="termdef"><p><code>REFERENCE_FLAG_DEFINED</code> (0x2)—This symbol is defined in this module.</p></li>
+<li class="termdef"><p><code>REFERENCE_FLAG_PRIVATE_DEFINED</code> (0x3)—This symbol is defined in this module and is visible only to modules within this shared library.</p></li>
+<li class="termdef"><p><code>REFERENCE_FLAG_PRIVATE_UNDEFINED_NON_LAZY</code> (0x4)—This symbol is defined in another module in this file, is a non-lazy (data) symbol, and is visible only to modules within this shared library.</p></li>
+<li class="termdef"><p><code>REFERENCE_FLAG_PRIVATE_UNDEFINED_LAZY</code> (0x5)—This symbol is defined in another module in this file, is a lazy (function) symbol, and is visible only to modules within this shared library.</p></li></ul><p>Additionally, the following bits might also be set:</p><ul class="termdef"><li class="termdef"><p><code>REFERENCED_DYNAMICALLY</code> (0x10)—Must be set for any defined symbol that is referenced by dynamic-loader APIs (such as <code><a href="../../../Reference/MachOReference/Reference/reference.html#//apple_ref/c/func/dlsym" target="_top">dlsym</a></code><code></code> and <code><a href="../../../Reference/MachOReference/Reference/reference.html#//apple_ref/c/func/NSLookupSymbolInImage" target="_top">NSLookupSymbolInImage</a></code><code></code>) and not ordinary undefined symbol references. The <code>strip</code> tool uses this bit to avoid removing symbols that must exist: If the symbol has this bit set, <code>strip</code> does not strip it.</p></li>
+<li class="termdef">	<p><code>N_DESC_DISCARDED</code> (0x20)—Used by the dynamic linker at runtime. Do not set this bit.</p></li>
+<li class="termdef"><p><code>N_WEAK_REF</code> (0x40)—Indicates that this symbol is a weak reference. If the dynamic linker cannot find a definition for this symbol, it sets the address of this symbol to 0. The static linker sets this symbol given the appropriate weak-linking flags.</p></li>
+<li class="termdef"><p><code>N_WEAK_DEF</code> (0x80)—Indicates that this symbol is a weak definition. If the static linker or the dynamic linker finds another (non-weak) definition for this symbol, the weak definition is ignored. Only symbols in a coalesced <code><a href="reference.html#//apple_ref/c/tag/section">section</a></code> can be marked as a weak definition.</p></li></ul><p>If this file is a two-level namespace image (that is, if the <code>MH_TWOLEVEL</code> flag of the <code>mach_header</code> structure is set), the high 8 bits of <code>n_desc</code> specify the number of the library in which this symbol is defined. Use the macro <code>GET_LIBRARY_ORDINAL</code> to obtain this value and the macro <code>SET_LIBRARY_ORDINAL</code> to set it. Zero specifies the current image. 1 through 254 specify the library number according to the order of <code>LC_LOAD_DYLIB</code> commands in the file. For plug–ins that load symbols from the executable program they are linked against, 255 specifies the executable image. For flat namespace images, the high 8 bits must be 0.</p></dd>
+<dt><code>n_value</code></dt>
+<dd><p>An integer that contains the value of the symbol. The format of this value is different for each type of symbol table entry (as specified by the <code>n_type</code> field). For the <code>N_SECT</code> symbol type, <code>n_value</code> is the address of the symbol. See the description of the <code>n_type</code> field for information on other possible values.</p></dd></dl>
+<h5 class="tight">Discussion</h5>
+<p>See discussion in <code><a href="reference.html#//apple_ref/c/tag/nlist">nlist</a></code>.</p>
+<a name="//apple_ref/c/tag/dysymtab_command" title="dysymtab_command"></a><a name="//apple_ref/doc/c_ref/dysymtab_command" title="dysymtab_command"></a><a name="//apple_ref/doc/uid/20001298-dysymtab_commandforLC_DYSYMTAB" title="dysymtab_command"></a><a name="//apple_ref/doc/uid/20001298-DontLinkElementID_29"></a><h3 class="tight">dysymtab_command</h3>
+<p class="spaceabove">The data structure for the <code>LC_DYSYMTAB</code> load command. It describes the sizes and locations of the parts of the symbol table used for dynamic linking. Declared in <code>/usr/include/mach-o/loader.h</code>.</p>
+<p class="spaceabove"><pre>
+struct dysymtab_command
+   {
+   uint32_t cmd;
+   uint32_t cmdsize;
+   uint32_t ilocalsym;
+   uint32_t nlocalsym;
+   uint32_t iextdefsym;
+   uint32_t nextdefsym;
+   uint32_t iundefsym;
+   uint32_t nundefsym;
+   uint32_t tocoff;
+   uint32_t ntoc;
+   uint32_t modtaboff;
+   uint32_t nmodtab;
+   uint32_t extrefsymoff;
+   uint32_t nextrefsyms;
+   uint32_t indirectsymoff;
+   uint32_t nindirectsyms;
+   uint32_t extreloff;
+   uint32_t nextrel;
+   uint32_t locreloff;
+   uint32_t nlocrel;
+};
+</pre></p>
+<h5 class="tight">Fields</h5><dl class="termdef">
+<dt><code>cmd</code></dt>
+<dd><p>Common to all load command structures. For this structure, set to <code>LC_DYSYMTAB</code>.</p></dd>
+<dt><code>cmdsize</code></dt>
+<dd><p>Common to all load command structures. For this structure, set to <code>sizeof(dysymtab_command)</code>.</p></dd>
+<dt><code>ilocalsym</code></dt>
+<dd><p>An integer indicating the index of the first symbol in the group of local symbols.</p></dd>
+<dt><code>nlocalsym</code></dt>
+<dd><p>An integer indicating the total number of symbols in the group of local symbols.</p></dd>
+<dt><code>iextdefsym</code></dt>
+<dd><p>An integer indicating the index of the first symbol in the group of defined external symbols.</p></dd>
+<dt><code>nextdefsym</code></dt>
+<dd><p>An integer indicating the total number of symbols in the group of defined external symbols.</p></dd>
+<dt><code>iundefsym</code></dt>
+<dd><p>An integer indicating the index of the first symbol in the group of undefined external symbols.</p></dd>
+<dt><code>nundefsym</code></dt>
+<dd><p>An integer indicating the total number of symbols in the group of undefined external symbols.</p></dd>
+<dt><code>tocoff</code></dt>
+<dd><p>An integer indicating the byte offset from the start of the file to the table of contents data.</p></dd>
+<dt><code>ntoc</code></dt>
+<dd><p>An integer indicating the number of entries in the table of contents.</p></dd>
+<dt><code>modtaboff</code></dt>
+<dd><p>An integer indicating the byte offset from the start of the file to the module table data.</p></dd>
+<dt><code>nmodtab</code></dt>
+<dd><p>An integer indicating the number of entries in the module table.</p></dd>
+<dt><code>extrefsymoff</code></dt>
+<dd><p>An integer indicating the byte offset from the start of the file to the external reference table data.</p></dd>
+<dt><code>nextrefsyms</code></dt>
+<dd><p>An integer indicating the number of entries in the external reference table.</p></dd>
+<dt><code>indirectsymoff</code></dt>
+<dd><p>An integer indicating the byte offset from the start of the file to the indirect symbol table data.</p></dd>
+<dt><code>nindirectsyms</code></dt>
+<dd><p>An integer indicating the number of entries in the indirect symbol table.</p></dd>
+<dt><code>extreloff</code></dt>
+<dd><p>An integer indicating the byte offset from the start of the file to the external relocation table data.</p></dd>
+<dt><code>nextrel</code></dt>
+<dd><p>An integer indicating the number of entries in the external relocation table.</p></dd>
+<dt><code>locreloff</code></dt>
+<dd><p>An integer indicating the byte offset from the start of the file to the local relocation table data.</p></dd>
+<dt><code>nlocrel</code></dt>
+<dd><p>An integer indicating the number of entries in the local relocation table.</p></dd></dl>
+<h5 class="tight">Discussion</h5>
+<p>The <code>LC_DYSYMTAB</code> load command contains a set of indexes into the symbol table and a set of file offsets that define the location of several other tables. Fields for tables not used in the file should be set to 0. These tables are described in “<span class="content_text"><a href="../../MachOTopics/1-Articles/dynamic_code.html#//apple_ref/doc/uid/TP40002528" target="_top">Position-Independent Code</a></span>” in <em><a href="../../MachOTopics/index.html#//apple_ref/doc/uid/TP40001519" target="_top">Mach-O Programming Topics</a></em>.</p>
+<a name="//apple_ref/c/tag/dylib_table_of_contents" title="dylib_table_of_contents"></a><a name="//apple_ref/doc/c_ref/dylib_table_of_contents" title="dylib_table_of_contents"></a><a name="//apple_ref/doc/uid/20001298-dylib_table_of_contents" title="dylib_table_of_contents"></a><a name="//apple_ref/doc/uid/20001298-DontLinkElementID_30"></a><h3 class="tight">dylib_table_of_contents</h3>
+<p class="spaceabove">Describes an entry in the table of contents of a dynamic shared library. Declared in <code>/usr/include/mach-o/loader.h</code>.</p>
+<p class="spaceabove"><pre>
+struct dylib_table_of_contents
+   {
+   uint32_t symbol_index;
+   uint32_t module_index;
+};
+</pre></p>
+<h5 class="tight">Fields</h5><dl class="termdef">
+<dt><code>symbol_index</code></dt>
+<dd><p>An index into the symbol table indicating the defined external symbol to which this entry refers.</p></dd>
+<dt><code>module_index</code></dt>
+<dd><p>An index into the module table indicating the module in which this defined external symbol is defined.</p></dd></dl>
+<a name="//apple_ref/c/tag/dylib_module" title="dylib_module"></a><a name="//apple_ref/doc/c_ref/dylib_module" title="dylib_module"></a><a name="//apple_ref/doc/uid/20001298-dylib_module" title="dylib_module"></a><a name="//apple_ref/doc/uid/20001298-DontLinkElementID_31"></a><h3 class="tight">dylib_module</h3>
+<p class="spaceabove">Describes a module table entry for a dynamic shared library for 32-bit architectures. Declared in <code>/usr/include/mach-o/loader.h</code>. See also <code><a href="reference.html#//apple_ref/c/tag/dylib_module_64">dylib_module_64</a></code>.</p>
+<p class="spaceabove"><pre>
+struct dylib_module
+   {
+   uint32_t module_name;
+   uint32_t iextdefsym;
+   uint32_t nextdefsym;
+   uint32_t irefsym;
+   uint32_t nrefsym;
+   uint32_t ilocalsym;
+   uint32_t nlocalsym;
+   uint32_t iextrel;
+   uint32_t nextrel;
+   uint32_t iinit_iterm;
+   uint32_t ninit_nterm;
+   uint32_t objc_module_info_addr;
+   uint32_t objc_module_info_size;
+};
+</pre></p>
+<h5 class="tight">Fields</h5><dl class="termdef">
+<dt><code>module_name</code></dt>
+<dd><p>An index to an entry in the string table indicating the name of the module.</p></dd>
+<dt><code>iextdefsym</code></dt>
+<dd><p>The index into the symbol table of the first defined external symbol provided by this module.</p></dd>
+<dt><code>nextdefsym</code></dt>
+<dd><p>The number of defined external symbols provided by this module.</p></dd>
+<dt><code>irefsym</code></dt>
+<dd><p>The index into the external reference table of the first entry provided by this module.</p></dd>
+<dt><code>nrefsym</code></dt>
+<dd><p>The number of external reference entries provided by this module.</p></dd>
+<dt><code>ilocalsym</code></dt>
+<dd><p>The index into the symbol table of the first local symbol provided by this module.</p></dd>
+<dt><code>nlocalsym</code></dt>
+<dd><p>The number of local symbols provided by this module.</p></dd>
+<dt><code>iextrel</code></dt>
+<dd><p>The index into the external relocation table of the first entry provided by this module.</p></dd>
+<dt><code>nextrel</code></dt>
+<dd><p>The number of entries in the external relocation table that are provided by this module.</p></dd>
+<dt><code>iinit_iterm</code></dt>
+<dd><p>Contains both the index into the module initialization section (the low 16 bits) and the index into the module termination section (the high 16 bits) to the pointers for this module.</p></dd>
+<dt><code>ninit_nterm</code></dt>
+<dd><p>Contains both the number of pointers in the module initialization (the low 16 bits) and the number of pointers in the module termination section (the high 16 bits) for this module.</p></dd>
+<dt><code>objc_module_info_addr</code></dt>
+<dd><p>The statically linked address of the start of the data for this module in the <code>__module_info</code> section in the <code>__OBJC</code> segment.</p></dd>
+<dt><code>objc_module_info_size</code></dt>
+<dd><p>The number of bytes of data for this module that are used in the <code>__module_info</code> section in the <code>__OBJC</code> segment.</p></dd></dl>
+<a name="//apple_ref/c/tag/dylib_module_64" title="dylib_module_64"></a><a name="//apple_ref/doc/c_ref/dylib_module_64" title="dylib_module_64"></a><a name="//apple_ref/doc/uid/20001298-CJBIIBHF" title="dylib_module_64"></a>
+<a name="//apple_ref/doc/uid/20001298-DontLinkElementID_32"></a><h3 class="tight">dylib_module_64</h3>
+<p class="spaceabove">Describes a module table entry for a dynamic shared library for 64-bit architectures. Declared in <code>/usr/include/mach-o/loader.h</code>.</p>
+<p class="spaceabove"><pre>
+struct dylib_module_64
+   {
+   uint32_t module_name;
+   uint32_t iextdefsym;
+   uint32_t nextdefsym;
+   uint32_t irefsym;
+   uint32_t nrefsym;
+   uint32_t ilocalsym;
+   uint32_t nlocalsym;
+   uint32_t iextrel;
+   uint32_t nextrel;
+   uint32_t iinit_iterm;
+   uint32_t ninit_nterm;
+   uint32_t objc_module_info_size;
+   uint64_t objc_module_info_addr;
+};
+</pre></p>
+<h5 class="tight">Fields</h5><dl class="termdef">
+<dt><code>module_name</code></dt>
+<dd><p>An index to an entry in the string table indicating the name of the module.</p></dd>
+<dt><code>iextdefsym</code></dt>
+<dd><p>The index into the symbol table of the first defined external symbol provided by this module.</p></dd>
+<dt><code>nextdefsym</code></dt>
+<dd><p>The number of defined external symbols provided by this module.</p></dd>
+<dt><code>irefsym</code></dt>
+<dd><p>The index into the external reference table of the first entry provided by this module.</p></dd>
+<dt><code>nrefsym</code></dt>
+<dd><p>The number of external reference entries provided by this module.</p></dd>
+<dt><code>ilocalsym</code></dt>
+<dd><p>The index into the symbol table of the first local symbol provided by this module.</p></dd>
+<dt><code>nlocalsym</code></dt>
+<dd><p>The number of local symbols provided by this module.</p></dd>
+<dt><code>iextrel</code></dt>
+<dd><p>The index into the external relocation table of the first entry provided by this module.</p></dd>
+<dt><code>nextrel</code></dt>
+<dd><p>The number of entries in the external relocation table that are provided by this module.</p></dd>
+<dt><code>iinit_iterm</code></dt>
+<dd><p>Contains both the index into the module initialization section (the low 16 bits) and the index into the module termination section (the high 16 bits) to the pointers for this module.</p></dd>
+<dt><code>ninit_nterm</code></dt>
+<dd><p>Contains both the number of pointers in the module initialization (the low 16 bits) and the number of pointers in the module termination section (the high 16 bits) for this module.</p></dd>
+<dt><code>objc_module_info_addr</code></dt>
+<dd><p>The statically linked address of the start of the data for this module in the <code>__module_info</code> section in the <code>__OBJC</code> segment.</p></dd>
+<dt><code>objc_module_info_size</code></dt>
+<dd><p>The number of bytes of data for this module that are used in the <code>__module_info</code> section in the <code>__OBJC</code> segment.</p></dd></dl>
+<a name="//apple_ref/c/tag/dylib_reference" title="dylib_reference"></a><a name="//apple_ref/doc/c_ref/dylib_reference" title="dylib_reference"></a><a name="//apple_ref/doc/uid/20001298-dylib_reference" title="dylib_reference"></a><a name="//apple_ref/doc/uid/20001298-DontLinkElementID_33"></a><h3 class="tight">dylib_reference</h3>
+<p class="spaceabove">Defines the attributes of an external reference table entry for the external reference entries provided by a module in a shared library. Declared in <code>/usr/include/mach-o/loader.h</code>.</p>
+<p class="spaceabove"><pre>
+struct dylib_reference
+   {
+   uint32_t isym:24,
+   flags:8;
+};
+</pre></p>
+<h5 class="tight">Fields</h5><dl class="termdef">
+<dt><code>isym</code></dt>
+<dd><p>An index into the symbol table for the symbol being referenced.</p></dd>
+<dt><code>flags</code></dt>
+<dd><p>A constant for the type of reference being made. Use the same <code>REFERENCE_FLAG</code> constants as described in the <code><a href="reference.html#//apple_ref/c/tag/nlist">nlist</a></code> structure description.</p></dd></dl>
+<a name="//apple_ref/doc/uid/20001298-97383" title="Relocation Data Structures"></a><a name="//apple_ref/doc/uid/20001298-CJBBIHFB" title="Relocation Data Structures"></a><h3><a name="//apple_ref/doc/uid/20001298-TPXREF104" title="Relocation Data Structures"></a>Relocation Data Structures</h3>
+<p><strong>Relocation</strong> is the process of moving symbols to a different address. When the static linker moves a symbol (a function or an item of data) to a different address, it needs to change all the references to that symbol to use the new address. The <strong>relocation entries</strong><a name="//apple_ref/doc/uid/20001298-DontLinkElementID_34"></a> in a Mach-O file contain offsets in the file to addresses that need to be relocated when the contents of the file are relocated. The addresses stored in CPU instructions can be absolute or relative. Each relocation entry specifies the exact format of the address. When creating the intermediate object file, the compiler generates one or more relocation entries for every instruction that contains an address. Because relocation to symbols at fixed addresses, and to relative addresses for position independent references, does not occur at runtime, the static linker typically removes some or all the relocation entries when building the final product.</p><div class="notebox"><a name="//apple_ref/doc/uid/20001298-SW2" title="Note"></a><p><strong>Note:</strong>&nbsp;In the Mac OS X x86-64 environment scattered relocations are not used. Compiler-generated code uses mostly external relocations, in which the <code>r_extern</code> bit is set to 1 and the <code>r_symbolnum</code> field contains the symbol-table index of the target label.</p></div>
+<a name="//apple_ref/c/tag/relocation_info" title="relocation_info"></a><a name="//apple_ref/doc/c_ref/relocation_info" title="relocation_info"></a><a name="//apple_ref/doc/uid/20001298-relocation_info" title="relocation_info"></a><a name="//apple_ref/doc/uid/20001298-DontLinkElementID_35"></a><h3 class="tight">relocation_info</h3>
+<p class="spaceabove">Describes an item in the file that uses an address that needs to be updated when the address is changed. Declared in <code>/usr/include/mach-o/reloc.h</code>.</p>
+<p class="spaceabove"><pre>
+struct relocation_info
+   {
+   int32_t r_address;
+   uint32_t r_symbolnum:24,
+   r_pcrel:1,
+   r_length:2,
+   r_extern:1,
+   r_type:4;
+};
+</pre></p>
+<h5 class="tight">Fields</h5><dl class="termdef">
+<dt><code>r_address</code></dt>
+<dd><p>In <code>MH_OBJECT</code> files, this is an offset from the start of the section to the item containing the address requiring relocation. If the high bit of this field is set (which you can check using the <code>R_SCATTERED</code> bit mask), the <code>relocation_info</code> structure is actually a <code><a href="reference.html#//apple_ref/c/tag/scattered_relocation_info">scattered_relocation_info</a></code> structure.</p><p>In images used by the dynamic linker, this is an offset from the virtual memory address of the data of the first <code><a href="reference.html#//apple_ref/c/tag/segment_command">segment_command</a></code> that appears in the file (not necessarily the one with the lowest address). For images with the <code>MH_SPLIT_SEGS</code> flag set, this is an offset from the virtual memory address of data of the first read/write <code><a href="reference.html#//apple_ref/c/tag/segment_command">segment_command</a></code>.</p></dd>
+<dt><code>r_symbolnum</code></dt>
+<dd><p>Indicates either an index into the symbol table (when the <code>r_extern</code> field is set to 1) or a section number (when the <code>r_extern</code> field is set to 0). As previously mentioned, sections are ordered from 1 to 255 in the order in which they appear in the <code>LC_SEGMENT</code> load commands. This field is set to <code>R_ABS</code> for relocation entries for absolute symbols, which need no relocation.</p></dd>
+<dt><code>r_pcrel</code></dt>
+<dd><p>Indicates whether the item containing the address to be relocated is part of a CPU instruction that uses PC-relative addressing.</p><p>For addresses contained in PC-relative instructions, the CPU adds the address of the instruction to the address contained in the instruction.</p></dd>
+<dt><code>r_length</code></dt>
+<dd><p>Indicates the length of the item containing the address to be relocated. The following table lists r_length values and the corresponding address length.</p><div class="tableholder"><table class="graybox" border = "0" cellspacing="0" cellpadding="5">
+
+<tr>
+<th scope="col" align="left" style="font-weight: bold" bgcolor="#CCCCCC"><p>Value</p></th>
+<th scope="col" align="left" style="font-weight: bold" bgcolor="#CCCCCC"><p>Address length</p></th>
+</tr>
+
+
+<tr>
+<td  scope="row"><p>0</p></td>
+<td ><p>1 byte</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>1</p></td>
+<td ><p>2 bytes</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>2</p></td>
+<td ><p>4 bytes</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>3</p></td>
+<td ><p>4 bytes. See description for the <code><!--a  -->PPC_RELOC_BR14<!--/a--></code> <code>r_type</code> in <code><a href="reference.html#//apple_ref/c/tag/scattered_relocation_info">scattered_relocation_info</a></code>.</p></td>
+</tr>
+
+</table></div></dd>
+<dt><code>r_extern</code></dt>
+<dd><p>Indicates whether the <code>r_symbolnum</code> field is an index into the symbol table (1) or a section number (0).</p></dd>
+<dt><code>r_type</code></dt><dd><p>For the x86 environment, the <code>r_type</code> field may contain any of these values:</p><ul class="termdef"><li class="termdef"><p><code>GENERIC_RELOC_VANILLA</code>—A generic relocation entry for both addresses contained in data and addresses contained in CPU instructions.</p></li><li class="termdef"><p><code>GENERIC_RELOC_PAIR</code>—The second relocation entry of a pair.</p></li><li class="termdef"><p><code>GENERIC_RELOC_SECTDIFF</code>—A relocation entry for an item that contains the difference of two section addresses. This is generally used for position-independent code generation. <code>GENERIC_RELOC_SECTDIFF</code> contains the address from which to subtract; it must be followed by a <code>GENERIC_RELOC_PAIR</code> containing the address to subtract.</p></li><li class="termdef"><p><code>GENERIC_RELOC_LOCAL_SECTDIFF</code>—Similar to <code>GENERIC_RELOC_SECTDIFF</code> except that this entry refers specifically to the address in this item. If the address is that of a globally visible coalesced symbol, this relocation entry does not change if the symbol is overridden.  This is used to associate stack unwinding information with the object code this relocation entry describes.</p></li><li class="termdef"><p><code>GENERIC_RELOC_PB_LA_PTR</code>—A relocation entry for a prebound lazy pointer. This is always a scattered relocation entry. The <code>r_value</code> field contains the non-prebound value of the lazy pointer.</p></li></ul><p>For the x86-64 environment, the <code>r_type</code> field may contain any of these values:</p><ul class="termdef"><li class="termdef"><p><code>X86_64_RELOC_BRANCH</code>—A CALL/JMP instruction with 32-bit displacement.</p></li><li class="termdef"><p><code>X86_64_RELOC_GOT_LOAD</code>—A MOVQ load of a GOT entry.</p></li><li class="termdef"><p><code>X86_64_RELOC_GOT</code>—Other GOT references.</p></li><li class="termdef"><p><code>X86_64_RELOC_SIGNED</code>—Signed 32-bit displacement.</p></li><li class="termdef"><p><code>X86_64_RELOC_UNSIGNED</code>—Absolute address.</p></li><li class="termdef"><p><code>X86_64_RELOC_SUBTRACTOR</code>—Must be followed by a <code>X86_64_RELOC_UNSIGNED</code> relocation.</p></li></ul><p>For PowerPC environments, the <code>r_type</code> field is usually <code>PPC_RELOC_VANILLA</code> for addresses contained in data. Relocation entries for addresses contained in CPU instructions are described by other <code>r_type</code> values:</p><ul class="termdef"><li class="termdef"><p><code>PPC_RELOC_PAIR</code>—The second relocation entry of a pair. A <code>PPC_RELOC_PAIR</code> entry must follow each of the other relocation entry types, except for <code>PPC_RELOC_VANILLA</code>, <code>PPC_RELOC_BR14</code>, <code>PPC_RELOC_BR24</code>, and <code>PPC_RELOC_PB_LA_PTR</code>.</p></li><li class="termdef"><p><code>PPC_RELOC_BR14</code>—The instruction contains a 14-bit branch displacement. If the <code>r_length</code> is <code>3</code>, the branch was statically predicted by setting or clearing the Y bit depending on the sign of the displacement or the opcode.</p></li><li class="termdef"><p><code>PPC_RELOC_BR24</code>—The instruction contains a 24-bit branch displacement.</p></li><li class="termdef"><p><code>PPC_RELOC_HI16</code>—The instruction contains the high 16 bits of a relocatable expression. The next relocation entry must be a <code>PPC_RELOC_PAIR</code> specifying the low 16 bits of the expression in the low 16 bits of the <code>r_value</code> field.</p></li><li class="termdef"><p><code>PPC_RELOC_LO16</code>—The instruction contains the low 16 bits of an address. The next relocation entry must be a <code>PPC_RELOC_PAIR</code> specifying the high 16 bits of the expression in the low (<em>not</em> the high) 16 bits of the <code>r_value</code> field.</p></li><li class="termdef"><p><code>PPC_RELOC_HA16</code>—Same as the <code>PPC_RELOC_HI16</code> except the low 16 bits and the high 16 bits are added together with the low 16 bits sign-extended first. This means if bit 15 of the low 16 bits is set, the high 16 bits stored in the instruction are adjusted.</p></li><li class="termdef"><p><code>PPC_RELOC_LO14</code>—Same as <code>PPC_RELOC_LO16</code> except that the low 2 bits are not stored in the CPU instruction and are always 0. <code>PPC_RELOC_LO14</code> is used in 64-bit load/store instructions.</p></li><li class="termdef"><p><code>PPC_RELOC_SECTDIFF</code>—A relocation entry for an item that contains the difference of two section addresses. This is generally used for position-independent code generation. <code>PPC_RELOC_SECTDIFF</code> contains the address from which to subtract; it must be followed by a <code>PPC_RELOC_PAIR</code> containing the section address to subtract.</p></li><li class="termdef"><p><code>PPC_RELOC_LOCAL_SECTDIFF</code>—Similar to PPC_RELOC_SECTDIFF except that this entry refers specifically to the address in this item. If the address is that of a globally visible coalesced symbol, this relocation entry does not change if the symbol is overridden.  This is used to associate stack unwinding information with the object code this relocation entry describes</p></li><li class="termdef"><p><code>PPC_RELOC_PB_LA_PTR</code>—A relocation entry for a prebound lazy pointer. This is always a scattered relocation entry. The <code>r_value</code> field contains the non-prebound value of the lazy pointer.</p></li><li class="termdef"><p><code>PPC_RELOC_HI16_SECTDIFF</code>—Section difference form of <code>PPC_RELOC_HI16</code>.</p></li><li class="termdef"><p><code>PPC_RELOC_LO16_SECTDIFF</code>—Section difference form of <code>PPC_RELOC_LO16</code>.</p></li><li class="termdef"><p><code>PPC_RELOC_HA16_SECTDIFF</code>—Section difference form of <code>PPC_RELOC_HA16</code>.</p></li><li class="termdef"><p><code>PPC_RELOC_JBSR</code>—A relocation entry for the assembler synthetic opcode <code>jbsr</code>, which is a 24-bit branch-and-link instruction using a branch island. The branch displacement is assembled to the branch island address and the relocation entry indicates the actual target symbol. If the linker is able to make the branch reach the actual target symbol, it does. Otherwise, the branch is relocated to the branch island.</p></li><li class="termdef"><p><code><!--a  -->PPC_RELOC_LO14_SECTDIFF<!--/a--></code>—Section difference form of <code>PPC_RELOC_LO14</code>.</p></li></ul></dd></dl>
+<a name="//apple_ref/c/tag/scattered_relocation_info" title="scattered_relocation_info"></a><a name="//apple_ref/doc/c_ref/scattered_relocation_info" title="scattered_relocation_info"></a><a name="//apple_ref/doc/uid/20001298-scattered_relocation_entry" title="scattered_relocation_info"></a><a name="//apple_ref/doc/uid/20001298-DontLinkElementID_36"></a><h3 class="tight">scattered_relocation_info</h3>
+<p class="spaceabove"> Describes an item in the file—using a nonzero constant in its relocatable expression or two addresses in its relocatable expression—that needs to be updated if the addresses that it uses are changed. This information is needed to reconstruct the addresses that make up the relocatable expression’s value in order to change the addresses independently of each other. Declared in <code>/usr/include/mach-o/reloc.h</code>.</p>
+<p class="spaceabove"><pre>
+struct scattered_relocation_info
+   {
+   #ifdef __BIG_ENDIAN__
+   uint32_t r_scattered:1,
+   r_pcrel:1,
+   r_length:2,
+   r_type:4,
+   r_address:24;
+   int32_t r_value;
+   #endif /* __BIG_ENDIAN__ */
+   #ifdef __LITTLE_ENDIAN__
+   uint32_t r_address:24,
+   r_type:4,
+   r_length:2,
+   r_pcrel:1,
+   r_scattered:1;
+   int32_t r_value;
+   #endif /* __LITTLE_ENDIAN__ */
+};
+</pre></p>
+<h5 class="tight">Fields</h5><dl class="termdef">
+<dt><code>r_scattered</code></dt>
+<dd><p>If this bit is 0, this structure is actually a <code><a href="reference.html#//apple_ref/c/tag/relocation_info">relocation_info</a></code> structure.</p></dd>
+<dt><code>r_address</code></dt>
+<dd><p>In <code>MH_OBJECT</code> files, this is an offset from the start of the section to the item containing the address requiring relocation. If the high bit of this field is clear (which you can check using the <code>R_SCATTERED</code> bit mask), this structure is actually a <code><a href="reference.html#//apple_ref/c/tag/relocation_info">relocation_info</a></code> structure.</p><p>In images used by the dynamic linker, this is an offset from the virtual memory address of the data of the first <code><a href="reference.html#//apple_ref/c/tag/segment_command">segment_command</a></code> that appears in the file (not necessarily the one with the lowest address). For images with the <code>MH_SPLIT_SEGS</code> flag set, this is an offset from the virtual memory address of data of the first read/write <code><a href="reference.html#//apple_ref/c/tag/segment_command">segment_command</a></code>.</p><p>Since this field is only 24 bits long, the offset in this field can never be larger than 0x00FFFFFF, thus limiting the size of the relocatable contents of this image to 16 megabytes.</p></dd>
+<dt><code>r_pcrel</code></dt>
+<dd><p>Indicates whether the item containing the address to be relocated is part of a CPU instruction that uses PC-relative addressing.</p><p>For addresses contained in PC-relative instructions, the CPU adds the address of the instruction to the address contained in the instruction.</p></dd>
+<dt><code>r_length</code></dt>
+<dd><p>Indicates the length of the item containing the address to be relocated. A value of 0 indicates a single byte; a value of 1 indicates a 2-byte address, and a value of 2 indicates a 4-byte address.</p></dd>
+<dt><code>r_type</code></dt><dd><p>Indicates the type of relocation to be performed. Possible values for this field are shared between this structure and the <code>relocation_info</code> data structure; see the description of the <code>r_type</code> field in the <code><a href="reference.html#//apple_ref/c/tag/relocation_info">relocation_info</a></code> data structure for more details.</p></dd>
+<dt><code>r_value</code></dt>
+<dd><p>The address of the relocatable expression for the item in the file that needs to be updated if the address is changed. For relocatable expressions with the difference of two section addresses, the address from which to subtract (in mathematical terms, the minuend) is contained in the first relocation entry and the address to subtract (the subtrahend) is contained in the second relocation entry.</p></dd></dl>
+<h5 class="tight">Discussion</h5>
+<p>Mach-O relocation data structures support two types of relocatable expressions in machine code and data:</p>
+<ul class="ul"><li class="li"><p><strong>Symbol address + constant</strong>. The most typical form of relocation is referencing a symbol’s address with no constant added. In this case, the value of the constant expression is 0.</p></li>
+<li class="li"><p><strong>Address of section y – address of section x + constant</strong>. The section difference form of relocation. This form of relocation supports position-independent code.</p></li></ul>
+<a name="//apple_ref/doc/uid/20001298-101888" title="Static Archive Libraries"></a><a name="//apple_ref/doc/uid/20001298-CJBCCFEF" title="Static Archive Libraries"></a><h3><a name="//apple_ref/doc/uid/20001298-BAJCJHGG" title="Static Archive Libraries"></a>Static Archive Libraries</h3>
+<p>This section describes the file format used for static archive libraries. Mac OS X uses a format derived from the original BSD static archive library format, with a few minor additions. See the discussion for the <code>ranlib</code> data structure for more information.</p>
+<a name="//apple_ref/c/tag/ranlib" title="ranlib"></a><a name="//apple_ref/doc/c_ref/ranlib" title="ranlib"></a><a name="//apple_ref/doc/uid/20001298-BAJIJJAI" title="ranlib"></a>
+<a name="//apple_ref/doc/uid/20001298-DontLinkElementID_37"></a><h3 class="tight">ranlib</h3>
+<p class="spaceabove">Defines the attributes of a static archive library symbol table entry. Declared in <code>/usr/include/mach-o/ranlib.h</code>.</p>
+<p class="spaceabove"><pre>
+struct ranlib
+   {
+   union
+      {
+      uint32_t ran_strx;
+      #ifndef __LP64__
+      char *ran_name;
+      #<!--a-->endif<!--/a-->
+   } ran_un;
+   uint32_t ran_off;
+};
+</pre></p>
+<h5 class="tight">Fields</h5><dl class="termdef">
+<dt><code>ran_strx</code></dt>
+<dd><p>The index number (zero-based) of the string in the string table that follows the array of <code>ranlib</code> data structures.</p></dd>
+<dt><code>ran_name</code></dt>
+<dd><p>The byte offset, from the start of the file, at which the symbol name can be found. This field is not used in Mach-O files.</p></dd>
+<dt><code>ran_off</code></dt>
+<dd><p>The byte offset, from the start of the file, at which the header line for the member containing this symbol can be found.</p></dd></dl>
+<h5 class="tight">Discussion</h5>
+<p>A static archive library begins with the file identifier string <code>!&lt;arch></code>, followed by a newline character (ASCII value 0x0A). The file identifier string is followed by a series of member files. Each member consists of a fixed-length header line followed by the file data. The header line is 60 bytes long and is divided into five fixed-length fields, as shown in this example header line:</p>
+<div class="codesample"><table><tr><td scope="row"><pre>grapple.c       999514211   501   20    100644  167       `<span></span></pre></td></tr></table></div>
+<p>The last 2 bytes of the header line are a grave accent (<code>`</code>) character (ASCII value 0x60) and a newline character. All header fields are defined in ASCII and padded with spaces to the full length of the field. All fields are defined in decimal notation, except for the file mode field, which is defined in octal. These are the descriptions for each field:</p>
+<ul class="ul"><li class="li"><p>The name field (16 bytes) contains the name of the file. If the name is either longer than 16 bytes or contains a space character, the actual name should be written directly after the header line and the name field should contain the string <code>#1/</code> followed by the length. To keep the archive entries aligned to 8 byte boundaries, the length of the name that follows the <code>#1/</code> is rounded to 8 bytes and the name that follows the header is padded with null bytes.</p></li>
+<li class="li"><p>The modified date field (12 bytes) is taken from the <code>st_time</code> field returned by the <code>stat</code> system call.</p></li>
+<li class="li"><p>The user ID field (6 bytes) is taken from the <code>st_uid</code> field returned by the <code>stat</code> system call.</p></li>
+<li class="li"><p>The group ID field (6 bytes) is taken from the <code>st_gid</code> field returned by the <code>stat</code> system call.</p></li>
+<li class="li"><p>The file mode field (8 bytes) is taken from the <code>st_mode</code> field returned by the <code>stat</code> system call. This field is written in octal notation.</p></li>
+<li class="li"><p>The file size field (8 bytes) is taken from the <code>st_size</code> field returned by the <code>stat</code> system call.</p></li></ul>
+<p>The first member in a static archive library is always the symbol table describing the contents of the rest of the member files. This member is always called either <code>__.SYMDEF</code> or <code>__.SYMDEF SORTED</code> (note the two leading underscores and the period). The name used depends on the sort order of the symbol table. The older variant—<code>__.SYMDEF</code>—contains entries in the same order that they appear in the object files. The newer variant—<code>__.SYMDEF SORTED</code>— contains entries in alphabetical order, which allows the static linker to load the symbols faster.</p>
+<p>The <code>__.SYMDEF</code> and <code>.__SORTED SYMDEF</code> archive members contain an array of <code>ranlib</code> data structures preceded by the length in bytes (a long integer, 4 bytes) of the number of items in the array. The array is followed by a string table of null-terminated strings, which are preceded by the length in bytes of the entire string table (again, a 4-byte long integer).</p>
+<p>The string table is an array of C strings, each terminated by a null byte.</p>
+<p>The <code>ranlib</code> declarations can be found in <code>/usr/include/mach-o/ranlib.h</code>.</p>
+<h5 class="tight">Special Considerations</h5>
+<p>Prior to the advent of <code><a href="../../../../Darwin/Reference/ManPages/man1/libtool.1.html#//apple_ref/doc/man/1/libtool" target="_top">libtool</a></code>, a tool called <code>ranlib</code> was used to generate the symbol table. <code>ranlib</code> has since been integrated into <code>libtool</code>.</p>
+<a name="//apple_ref/doc/uid/20001298-154889" title="Universal Binaries and 32-bit/64-bit PowerPC Binaries"></a><a name="//apple_ref/doc/uid/20001298-CJBCFJGH" title="Universal Binaries and 32-bit/64-bit PowerPC Binaries"></a><h3><a name="//apple_ref/doc/uid/20001298-TPXREF130" title="Universal Binaries and 32-bit/64-bit PowerPC Binaries"></a>Universal Binaries and 32-bit/64-bit PowerPC Binaries</h3>
+<p>The standard development tools accept as parameters two kinds of binaries:</p>
+<ul class="ul"><li class="li"><p>Object files targeted at one architecture. These include Mach-O files, static libraries, and dynamic libraries.</p></li>
+<li class="li"><p>Binaries targeted at more than one architecture. These binaries contain compiled code and data for one of these system types:</p><ul class="nested"><li class="nested li"><p>PowerPC-based (32-bit and 64-bit) Macintosh computers. Binaries that contain code for both 32-bit and 64-bit PowerPC-based Macintosh computers are are known as <strong>PPC/PPC64 binaries</strong>.</p></li>
+<li class="nested li"><p>Intel-based and PowerPC-based (32-bit, 64-bit, or both) Macintosh computers. Binaries that contain code for both Intel-based and PowerPC-based Macintosh computers are known as <strong>universal binaries</strong>.</p></li></ul><p>Each object file is stored as a continuous set of bytes at an offset from the beginning of the binary. They use a simple archive format to store the two object files with a special header at the beginning of the file to allow the various runtime tools to quickly find the code appropriate for the current architecture.</p></li></ul>
+<p>A binary that contains code for more than one architecture always begins with a <code><a href="reference.html#//apple_ref/c/tag/fat_header">fat_header</a></code> data structure, followed by two <code><a href="reference.html#//apple_ref/c/tag/fat_arch">fat_arch</a></code> data structures and the actual data for the architectures contained in the file. All data in these data structures is stored in big-endian byte order.</p>
+<a name="//apple_ref/c/tag/fat_header" title="fat_header"></a><a name="//apple_ref/doc/c_ref/fat_header" title="fat_header"></a><a name="//apple_ref/doc/uid/20001298-BAJGGDDH" title="fat_header"></a>
+<a name="//apple_ref/doc/uid/20001298-DontLinkElementID_38"></a><h3 class="tight">fat_header</h3>
+<p class="spaceabove">Defines the layout of a binary that contains code for more than one architecture. Declared in the header <code>/usr/include/mach-o/fat.h</code>.</p>
+<p class="spaceabove"><pre>
+struct fat_header
+   {
+   uint32_t magic;
+   uint32_t nfat_arch;
+};
+</pre></p>
+<h5 class="tight">Fields</h5><dl class="termdef">
+<dt><code>magic</code></dt>
+<dd><p>An integer containing the value <code>0xCAFEBABE</code> in big-endian byte order format. On a big-endian host CPU, this can be validated using the constant <code>FAT_MAGIC</code>; on a little-endian host CPU, it can be validated using the constant <code>FAT_CIGAM</code>.</p></dd>
+<dt><code>nfat_arch</code></dt>
+<dd><p>An integer specifying the number of <code><a href="reference.html#//apple_ref/c/tag/fat_arch">fat_arch</a></code> data structures that follow. This is the number of architectures contained in this binary.</p></dd></dl>
+<h5 class="tight">Discussion</h5>
+<p>The <code>fat_header</code> data structure is placed at the start of a binary that contains code for multiple architectures. Directly following the <code>fat_header</code> data structure is a set of <code><a href="reference.html#//apple_ref/c/tag/fat_arch">fat_arch</a></code> data structures, one for each architecture included in the binary.</p>
+<p>Regardless of the content this data structure describes, all its fields are stored in big-endian byte order.</p>
+<a name="//apple_ref/c/tag/fat_arch" title="fat_arch"></a><a name="//apple_ref/doc/c_ref/fat_arch" title="fat_arch"></a><a name="//apple_ref/doc/uid/20001298-BAJDIFJH" title="fat_arch"></a>
+<a name="//apple_ref/doc/uid/20001298-DontLinkElementID_39"></a><h3 class="tight">fat_arch</h3>
+<p class="spaceabove">Describes the location within the binary of an object file targeted at a single architecture. Declared in <code>/usr/include/mach-o/fat.h</code>.</p>
+<p class="spaceabove"><pre>
+struct fat_arch
+   {
+   cpu_type_t cputype;
+   cpu_subtype_t cpusubtype;
+   uint32_t offset;
+   uint32_t size;
+   uint32_t align;
+};
+</pre></p>
+<h5 class="tight">Fields</h5><dl class="termdef">
+<dt><code>cputype</code></dt>
+<dd><p>An enumeration value of type <code>cpu_type_t</code>. Specifies the CPU family.</p></dd>
+<dt><code>cpusubtype</code></dt>
+<dd><p>An enumeration value of type <code>cpu_subtype_t</code>. Specifies the specific member of the CPU family on which this entry may be used or a constant specifying all members.</p></dd>
+<dt><code>offset</code></dt>
+<dd><p>Offset to the beginning of the data for this CPU.</p></dd>
+<dt><code>size</code></dt>
+<dd><p>Size of the data for this CPU.</p></dd>
+<dt><code>align</code></dt>
+<dd><p>The power of 2 alignment for the offset of the object file for the architecture specified in <code>cputype</code> within the binary. This is required to ensure that, if this binary is changed, the contents it retains are correctly aligned for virtual memory paging and other uses.</p></dd></dl>
+<h5 class="tight">Discussion</h5>
+<p>An array of <code>fat_arch</code> data structures appears directly after the <code><a href="reference.html#//apple_ref/c/tag/fat_header">fat_header</a></code> data structure of a binary that contains object files for multiple architectures.</p>
+<p>Regardless of the content this data structure describes, all its fields are stored in big-endian byte order.</p>
+
+        <br /><br /> 
+        
+        <div class="mini_nav_text" align="left">
+        <span class="navButtons">
+        <!-- Previous button --><span style="margin-left: 8px"><a href="../9-Revision-5.1/history.html">Next Page &gt;</a></span>
+        </span>
+        <span id="showHideTOCLowerSpan">
+        <a href="#" onclick="showHideTOC();"><img src="../../../../Resources/Images/show_toc_icon.gif" width="15" height="14" border="0" style="margin-bottom: -2px;" alt="" /></a> <a href="#" onclick="showHideTOC();">Hide TOC</a>
+        </span>
+        </div>
+
+        <br/><hr /><div align="center"><p class="content_text" lang="en" dir="ltr"> <!--#if expr="0=1" -->&#x00a9; 2003, 2009 Apple Inc. All Rights Reserved. &#40;<!--#endif -->Last updated: 2009-02-04<!--#if expr="0=1" -->&#041;<!--#endif --></p></div>
+
+        
+        <div class="hideOnPrint hideInXcode">
+        <!-- start of footer -->
+        	<table width="100%" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/documentation/DeveloperTools/Conceptual/MachORuntime/Reference/reference.html%3Fid%3DTP40000895-5.1&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/documentation/DeveloperTools/Conceptual/MachORuntime/Reference/reference.html%3Fid%3DTP40000895-5.1&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/documentation/DeveloperTools/Conceptual/MachORuntime/Reference/reference.html%3Fid%3DTP40000895-5.1&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+
+        <!--#include virtual="/includes/framesetfooter" -->
+        <!-- end of footer -->
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,920 @@
+<html><head><title></title></head>
+
+<body bgcolor="#ffffff">
+
+ 
+
+ 
+
+<h1>
+
+<FONT COLOR="#000066">
+
+<a name="191">
+
+ <a name="//apple_ref/occ/cl/NSConnection">NSConnection</a>
+
+</a>
+
+</FONT>
+
+</h1>
+
+<p><B>Inherits From:</B><BR>  
+
+NSObject
+
+
+
+<p><B>Conforms To:</B><BR>
+
+NSObject (NSObject)
+
+
+
+<p><B>Declared In:	</B><BR>
+
+Foundation/NSConnection.h
+
+
+
+<p><a name="228"></a>
+
+<a name="description"></a>
+
+<H2>Class Description
+
+</H2>
+
+NSConnection objects manage communication between objects in different threads or tasks, on a single host or over the network. They form the backbone of the distributed objects mechanism, and normally operate in the background. You use NSConnection API explicitly when making an object available to other applications, when accessing such a vended object, and when altering default communication parameters; the rest of the time you simply interact with the distributed objects themselves.<p>
+
+<a name="230">
+
+<h5> <p><img src="../NSConnection0.gif"><p></h5>
+
+</a>
+
+<p>NSConnection objects work in pairs, one in each communicating application or thread. A server application has an NSConnection for every client application connected to it, as shown above (the NSConnection labeled <code>s</code> is used to form new connections, as described under <a href="#237">"Vending an Object"</a> and <a href="#246">"Vended Object"</a>). The circles represent NSConnection objects, and the labels indicate the application itself and the application it's connected to. For example, in <code>s/a</code> the <code>s</code> stands for the server and the <code>a</code> stands for client A. If a link is formed between clients A and B in this example, two new NSConnection objects get created: <code>a/b</code> and <code>b/a</code>.<p>
+
+<B><dt>Note:	</B>
+
+For NeXT's implementation the small letters represent NSPort objects. The letter on the left indicates 
+
+the <em>receive port</em>, which messages arrive on; the letter on the right indicates the <em>send port</em>, which 
+
+outgoing messages leave through. Similar mechanisms exist for other OpenStep-compliant systems, 
+
+but any API exporting them isn't part of the OpenStep specification. Subclasses of NSConnection 
+
+that use them (which they typically must do) are therefore not portable among OpenStep 
+
+implementations.
+
+Under normal circumstances, all distributed objects passed between applications are tied through one pair of NSConnection objects. NSConnection objects can't be shared by separate threads, though, so for multithreaded applications a separate NSConnection must be created for each thread. This is shown in here:<p>
+
+<a name="234">
+
+<h5> <p><img src="../NSConnection1.gif"><p></h5>
+
+</a>
+
+<p>Finally, an application can use distributed objects between its own threads to make sending messages thread-safe (see the following figure). This is useful for coordinating work with the Application Kit, for example.<p>
+
+<a name="236">
+
+<h5> <p><img src="../NSConnection2.gif"><p></h5>
+
+</a>
+
+<p><h3>
+
+<a name="237">
+
+ Vending an Object
+
+</a>
+
+</h3>
+
+To make an object available to other applications, set it up as the root object of an NSConnection and register the NSConnection by name on the network. This code fragment vends <code>serverObject</code>:<p>
+
+<blockquote><pre>id serverObject;    /* Assume this exists. */<br>NSConnection *theConnection;<br>    <br>theConnection = [NSConnection defaultConnection];<br>[theConnection setRootObject:serverObject];<br>if ([theConnection registerName:@"server"] == NO) {<br>    /* Handle error. */<br>}
+
+</pre></blockquote><p>This fragment takes advantage of the fact that every thread has a default NSConnection object, which can be set up as a server. An NSConnection can vend only one object, so the default NSConnection might not be available. In this case, you can create additional NSConnections to vend objects with the usual <code>alloc</code> and <code>init</code> methods.<p>
+
+An NSConnection set up this way is called a <em>named NSConnection</em>. A named NSConnection rarely has a channel to any other NSConnection (in the illustrations above the named NSConnection is the circle labeled <code>s</code>). When a client contacts the server, a new pair of NSConnection objects is created specifically to handle communication between the two. The following sections describe this in more detail.<p>
+
+An NSConnection adds itself to the current NSRunLoop when it's initialized. In an application based on the Application Kit, the NSRunLoop is already running, so there's nothing more to do to vend an object. In an application that doesn't use the NSApplication object, you have to start the NSRunLoop explicitly to capture incoming connection requests and messages. This is usually as simple as getting the current thread's NSRunLoop and sending it a <code>run</code> message:<p>
+
+<blockquote><pre>[[NSRunLoop currentRunLoop] run];
+
+</pre></blockquote><p>See <a href="#265">"Configuring an NSConnection"</a> and the NSRunLoop class description for more information on setting NSConnections up to handle requests.<p>
+
+<blockquote><pre>NSConnection *theConnection;<br>id theProxy;<br>    <br>theConnection = [NSConnection connectionWithRegisteredName:@"server"<br>        host:@"*"];<br>theProxy = [[theConnection rootProxy] retain];<br>[theProxy setProtocolForProxy:@protocol(ServerProtocol)];
+
+</pre></blockquote><p><h3>
+
+<a name="246">
+
+ Getting a Vended Object
+
+</a>
+
+</h3>
+
+An application gets a vended object by creating a <strong>proxy</strong>, or a stand-in, for that object in its own address space. The proxy forwards messages sent to it through its NSConnection back to the vended object. An application can get a proxy for a vended object in two ways. First, the <code>rootProxyForConnectionWithRegisteredName:host:</code> class method returns the proxy directly:<p>
+
+<blockquote><pre>id theProxy;<br>    <br>theProxy = [[NSConnection<br>        rootProxyForConnectionWithRegisteredName:@"server" host:@"*"]<br>        retain];<br>[theProxy setProtocolForProxy:@protocol(ServerProtocol)];
+
+</pre></blockquote><p>This message returns a proxy to the root object of the NSConnection named "server". The host name of "*" indicates that any host on the local subnet with such an NSConnection can be used; you can specify a specific host name to restrict the server to an identified host. If the host name is <code>nil</code> or is empty then only the local host is searched for a registered NSConnection.<p>
+
+The invocation of <code>setProtocolForProxy:</code> informs the distributed objects system of the set of messages that <code>theProxy</code> responds to. Normally, the first time a particular selector is forwarded by a proxy the NSConnection object must confirm the argument and return types with the real object. This can add significant overhead to distributed messages. Setting a protocol records this information so that no confirmation is needed for the messages in the protocol, and only the message forwarding costs are incurred.<p>
+
+Another way to get a proxy is to get an NSConnection to the server and then ask for the proxy of its root object:<p>
+
+<blockquote><pre>NSConnection *theConnection;<br>id theProxy;<br>    <br>theConnection = [NSConnection connectionWithRegisteredName:@"server"<br>        host:@"*"];<br>theProxy = [[theConnection rootProxy] retain];<br>[theProxy setProtocolForProxy:@protocol(ServerProtocol)];
+
+</pre></blockquote><p>This is useful if you need to interact with the NSConnection as well as the proxy (note, though, that <code>connection</code> isn't retained in this example).<p>
+
+A named NSConnection spawns a child NSConnection to handle communication between two applications (<code>s</code> spawning <code>s/b</code> and <code>s/a</code> in the first figure). Though the child NSConnection doesn't have a name, it shares the root object and other configuration attributes of its parent (but not the delegate). You shouldn't register a child NSConnection with a name or change its root object, but you can change its other attributes, as described in the next section.<p>
+
+<h3>
+
+<a name="255">
+
+ Forming Connections Between Threads
+
+</a>
+
+</h3>
+
+You can use distributed objects between threads in a single application for thread-safe use of shared objects, such as those in the Application Kit. The Application Kit objects run in the main thread, while special calculations or other computations run in other threads. You can set up distributed objects between threads by registering them under names, but doing so exports the object over the entire network, making them available to other applications. This may not be desirable.<p>
+
+Instead of registering your distributed objects, you can manually set up NSConnections that are linked to each other with NSPorts using the <code>connectionWithReceivePort:sendPort:</code> message. In the main (Application Kit) thread, you create an NSConnection with two NSPorts, then switch them to create another NSConnection in a separate thread. Suppose you have an application that uses a Calculator object to perform intensive calculations. It might make sense to have this object run in a separate thread and communicate through an NSConnection. In the following example, the initial work of setting up a Calculator object is done in the NSApplication delegate's <code>applicationDidFinishLaunching:</code> method:<p>
+
+<blockquote><pre>- (void)applicationDidFinishLaunching:(NSNotification *)note<br>{<br>    NSPort *port1;<br>    NSPort *port2;<br>    NSArray *portArray;<br>    <br>    port1 = [NSPort port];<br>    port2 = [NSPort port];<br>    <br>    kitConnection = [[NSConnection alloc] initWithReceivePort:port1 sendPort:port2];<br>    [kitConnection setRootObject:self];<br>    <br>    /* Ports switched here. */<br>    portArray = [NSArray arrayWithObjects:port2, port1, nil];<br>    <br>    [NSThread detachNewThreadSelector:@selector(connectWithPorts:)<br>            toTarget:[Calculator class] withObject:portArray];<br>    <br>    return;<br>}
+
+</pre></blockquote><p>The delegate creates <code>kitConnection</code>, which is an instance variable, and sets itself up as the root object so that the Calculator object can find it. To set up the server thread, the delegate packages the NSPorts in an NSArray (note that they're in reverse order) and creates a Calculator object in a separate thread by invoking<code> detachNewThreadSelector:toTarget:withObject:</code>. This message starts the new thread by sending <code>connectWithPorts:</code> to the Calculator class, which creates the Calculator object that the application uses as an internal server and connects that object to the application delegate:<p>
+
+<blockquote><pre>+ (void)connectWithPorts:(NSArray *)portArray<br>{<br>    NSAutoreleasePool *pool;<br>    NSConnection *serverConnection;<br>    Calculator *serverObject;<br>    <br>    pool = [[NSAutoreleasePool alloc] init];<br>    <br>    serverConnection = [NSConnection<br>            connectionWithReceivePort:[portArray objectAtIndex:0]<br>            sendPort:[portArray objectAtIndex:1]];<br>    <br>    serverObject = [[self alloc] init];<br>    [(id)[serverConnection rootProxy] setServer:serverObject];<br>    [serverObject release];<br>    <br>    [[NSRunLoop currentRunLoop] run];<br>    [pool release];<br>    [NSThread exit];<br>    <br>    return;<br>}
+
+</pre></blockquote><p><code>connectWithPorts:</code> is responsible for creating the server object and connecting it to the client thread. This method first creates an NSAutoreleasePool to prevent objects from being leaked if the NSThread ever exits. It then creates <code>serverConnection</code> using the two NSPorts from <code>kitConnection</code>, and proceeds to set up the server object. Once this is done, it passes the server object back to the client with a <code>setServer:</code> message. Finally, it starts the NSRunLoop for its thread. If the NSRunLoop ever stops, the NSAutoreleasePool is cleaned up and the NSThread is made to exit.<p>
+
+The application delegate's <code>setServer:</code> message simply sets the protocol and stores the server object:<p>
+
+<blockquote><pre>- (void)setServer:(id)anObject<br>{<br>    [anObject setProtocolForProxy:@protocol(CalculatorMethods)];<br>    calculator = (id &lt;CalculatorMethods&gt;)[anObject retain];<br>    return;<br>}
+
+</pre></blockquote><p>Because <em>anObject</em> arrived through the NSConnections set up between threads, it's really a proxy to the <code>serverObject</code> created in <code>connectWithPorts:</code> above.<p>
+
+<h3>
+
+<a name="265">
+
+ Configuring an NSConnection
+
+</a>
+
+</h3>
+
+You can control some factors of distributed objects communication by configuring NSConnection objects. You can set timeouts to limit the amount of time an NSConnection will wait on a remote message, set the mode it awaits requests and responses on, and control how an NSConnection manages multiple remote messages. In addition to these parameter settings, you can change an NSConnection's registered name or root object for dynamic alteration of your distributed application.<p>
+
+An NSConnection uses two kinds of timeouts, one for outgoing messages and one for replies. An outgoing network message may take some time to send. Once it goes out, there's usually a delay before any return value arrives. If either of these operations exceeds its timeout, the NSConnection raises an NSPortTimeoutException. You can set the values for these timeouts with the <code>setRequestTimeout:</code> and <code>setReplyTimeout:</code> messages, respectively. By default these timeouts are set to the maximum possible value.<p>
+
+NSConnections that vend objects await new connection requests in NSDefaultRunLoopMode (as defined by the NSRunLoop class). When an NSConnection sends a remote message out, it awaits the return value in NSConnectionReplyMode. You can't change this mode, but you can use it to set up NSTimers or other input mechanisms that need to be processed while awaiting replies to remote messages. Use <code>addRequestMode:</code> to add input mechanisms for this mode.<p>
+
+Normally an NSConnection forwards remote messages to their intended recipients as it receives them. If your application returns to the run loop or uses distributed objects either directly or indirectly, it can receive a remote message while it's already busy processing another. Suppose a server is processing a remote message and sends a message to another application through distributed objects. If another application sends a message to the server, its NSConnection immediately forwards it to the intended recipient, even though the server is also awaiting a reply on the outgoing message. This behavior can cause problems if a remote message causes a lengthy change in the server application's state that renders it inconsistent for a time: Other remote messages may interfere with this state, either getting incorrect results or corrupting the state of the server application. You can turn this behavior off with the <code>setIndependentConversationQueueing:</code> method, so that only one remote message is allowed to be in effect at any time within the NSConnection's thread. When independent conversation queueing is turned on, the NSConnection forwards incoming remote messages only when no other remote messages are being handled in its thread. This only affects messages between objects, not requests for new connections; new connections can be formed at any time.<p>
+
+<HR WIDTH="25%" ALIGN="LEFT">
+
+<B>Warning:	</B>
+
+Because independent conversation queueing causes remote messages to block where they 
+
+normally don't, it can cause deadlock to occur between applications. Use this method only when 
+
+you know the nature of the interaction between two applications. Specifically, note that multiple 
+
+callbacks between the client and server aren't possible with independent conversation queueing.
+
+
+
+<HR WIDTH="25%" ALIGN="LEFT">
+
+<p>One other way to configure a named NSConnection is to change its name or root object. This effectively changes the object that applications get using the techniques described in <a href="#246">"Getting a Vended Object,"</a> but doesn't change the proxies that other applications have already received. You might use this technique to field-upgrade a distributed application with an improved server object class. For example, to install a new server process have the old one change its name, perhaps from "Analysis Server" to "Old Analysis Server". <em></em>This hides it from clients attempting to establish new connections, but allows its root object to serve existing connections (when those connections close, the old server process exits). In the meantime, launch the new server which claims the name "Analysis Server" so that new requests for analyses contact the updated object.<p>
+
+<h3>
+
+<a name="272">
+
+ The Delegate
+
+</a>
+
+</h3>
+
+An NSConnection can be assigned a delegate, which has two possible responsibilities: approving the formation of new connections, and authenticating messages that pass between NSConnections.<p>
+
+When a named NSConnection is contacted by a client and forms a child NSConnection to communicate with that client, it sends <code>connection:shouldMakeNewConnection:</code> to its delegate first to approve the new connection. If the delegate returns NO the connection is refused. This method is useful for limiting the load on a server. It's also useful for setting the delegate of a child NSConnection (since delegates aren't shared automatically between parent and child).<p>
+
+Portable Distributed Objects adds message authentication to NSConnection's OpenStep API. Delegates in different applications can cooperate to validate the messages passing between them by implementing <code>authenticationDataForComponents:</code> and <code>authenticateComponents:withData:</code>. The first method requests an authentication stamp for an outgoing message, which is used by the second method to check the validity of the message when it's received.<p>
+
+<code>authenticationDataForComponents:</code> provides the packaged components for an outgoing network message in the form of NSData and NSPort objects. The delegate should use only the NSData objects to create the authentication stamp, by hashing the data, calculating a checksum, or some other method. The stamp should be small enough not to adversely affect network performance. The delegate in the receiving application receives an <code>authenticateComponents:withData:</code> message to confirm the message, and should recalculate the stamp for the components and compare it with the stamp provided. If it returns YES the message is forwarded; if it returns NO, an NSFailedAuthenticationException is raised and a message is logged to the console.<p>
+
+<h3>
+
+<a name="277">
+
+ Handling NSConnection Errors
+
+</a>
+
+</h3>
+
+NSConnections make use of network resources that can become unavailable at any time. When a server machine loses power, for example, the objects on that machine that have been vended to other applications simply cease to exist. In such a case, the NSConnections handling those objects invalidate themselves and post an NSConnectionDidDieNotification to any observers. This notification allows objects to clean up their state as much as possible in the face of an error.<p>
+
+To register for the notification, add an observer to the default NSNotificationCenter:<p>
+
+<blockquote><pre>[[NSNotificationCenter defaultCenter] addObserver:proxyUser<br>        selector:@selector(connectionDidDie:)<br>        name:NSConnectionDidDieNotification<br>        object:serverConnection];
+
+</pre></blockquote><p>The fragment above registers the <code>proxyUser</code> object to receive a <code>connectionDidDie:</code> message when the <code>serverConnection</code> object in the application posts an NSConnectionDidDieNotification. This allows it to release any proxies it holds and to handle the error as gracefully as possible. See the NSNotification and NSNotificationCenter class specifications for more information on notifications.<p>
+
+A less serious error is a timeout on a remote message. This can happen for an outgoing message, meaning the message was never sent to its recipient, or for a reply to a message successfully sent, meaning either that the message failed to reach its recipient or that the reply couldn't be delivered back to the original sender. An application can put an exception handler in place for critical messages, and if a timeout exception is raised it can send the message again, check that the server is still running or take whatever other action it needs to recover.<p>
+
+<a name="283">
+
+<HR WIDTH="50%" ALIGN="LEFT">
+
+<h2>Method Types
+
+</h2>
+
+</a><dl>
+
+<dt>Getting the default instance<dd><dl><dd><dl><dd><dl><dd><dl>
+
+<dt><a href="#//apple_ref/occ/clm/NSConnection/defaultConnection">+ defaultConnection</a></dl></dd>
+
+</dl></dd></dl></dd></dl></dd><dt>Creating instances<dd><dl><dd><dl><dd><dl><dd><dl>
+
+<dt><a href="#//apple_ref/occ/clm/NSConnection/connectionWithReceivePort:sendPort:">+ connectionWithReceivePort:sendPort:</a><dt><a href="#//apple_ref/occ/instm/NSConnection/initWithReceivePort:sendPort:">- initWithReceivePort:sendPort:</a></dl></dd>
+
+</dl></dd></dl></dd></dl></dd><dt>Running the connection in a new thread<dd><dl><dd><dl><dd><dl><dd><dl>
+
+<dt><a href="#//apple_ref/occ/instm/NSConnection/runInNewThread">- runInNewThread</a></dl></dd>
+
+</dl></dd></dl></dd></dl></dd><dt>Vending an object<dd><dl><dd><dl><dd><dl><dd><dl>
+
+<dt><a href="#//apple_ref/occ/instm/NSConnection/registerName:">- registerName:</a><dt><a href="#//apple_ref/occ/instm/NSConnection/setRootObject:">- setRootObject:</a><dt><a href="#//apple_ref/occ/instm/NSConnection/rootObject">- rootObject</a></dl></dd>
+
+</dl></dd></dl></dd></dl></dd><dt>Getting a remote object<dd><dl><dd><dl><dd><dl><dd><dl>
+
+<dt><a href="#//apple_ref/occ/clm/NSConnection/connectionWithRegisteredName:host:">+ connectionWithRegisteredName:host:</a><dt><a href="#//apple_ref/occ/instm/NSConnection/rootProxy">- rootProxy</a><dt><a href="#//apple_ref/occ/clm/NSConnection/rootProxyForConnectionWithRegisteredName:host:">+ rootProxyForConnectionWithRegisteredName:host:</a></dl></dd>
+
+</dl></dd></dl></dd></dl></dd><dt>Getting all NSConnections<dd><dl><dd><dl><dd><dl><dd><dl>
+
+<dt><a href="#//apple_ref/occ/clm/NSConnection/allConnections">+ allConnections</a></dl></dd>
+
+</dl></dd></dl></dd></dl></dd><dt>Configuring instances<dd><dl><dd><dl><dd><dl><dd><dl>
+
+<dt><a href="#//apple_ref/occ/instm/NSConnection/setRequestTimeout:">- setRequestTimeout:</a><dt><a href="#//apple_ref/occ/instm/NSConnection/requestTimeout">- requestTimeout</a><dt><a href="#//apple_ref/occ/instm/NSConnection/setReplyTimeout:">- setReplyTimeout:</a><dt><a href="#//apple_ref/occ/instm/NSConnection/replyTimeout">- replyTimeout</a><dt><a href="#//apple_ref/occ/instm/NSConnection/setIndependentConversationQueueing:">- setIndependentConversationQueueing:</a><dt><a href="#//apple_ref/occ/instm/NSConnection/independentConversationQueueing">- independentConversationQueueing</a><dt><a href="#//apple_ref/occ/instm/NSConnection/addRequestMode:">- addRequestMode:</a><dt><a href="#//apple_ref/occ/instm/NSConnection/removeRequestMode:">- removeRequestMode:</a><dt><a href="#//apple_ref/occ/instm/NSConnection/requestModes">- requestModes</a><dt><a href="#//apple_ref/occ/instm/NSConnection/invalidate">- invalidate</a></dl></dd>
+
+</dl></dd></dl></dd></dl></dd><dt>Getting ports<dd><dl><dd><dl><dd><dl><dd><dl>
+
+<dt><a href="#//apple_ref/occ/instm/NSConnection/receivePort">- receivePort</a><dt><a href="#//apple_ref/occ/instm/NSConnection/sendPort">- sendPort</a></dl></dd>
+
+</dl></dd></dl></dd></dl></dd><dt>Getting statistics<dd><dl><dd><dl><dd><dl><dd><dl>
+
+<dt><a href="#//apple_ref/occ/instm/NSConnection/statistics">- statistics</a></dl></dd>
+
+</dl></dd></dl></dd></dl></dd><dt>Setting the delegate<dd><dl><dd><dl><dd><dl><dd><dl>
+
+<dt><a href="#//apple_ref/occ/instm/NSConnection/setDelegate:">- setDelegate:</a><dt><a href="#//apple_ref/occ/instm/NSConnection/delegate">- delegate</a></dl></dd>
+
+</dl></dd></dl></dd></dl></dd></dl>
+
+<HR WIDTH="50%" ALIGN="LEFT">
+
+<a name="320"></a>
+
+<a name="clm"></a>
+
+<h2>Class Methods</h2>  
+
+
+
+
+
+<a name="321"></a>
+
+<h3>
+
+ <a name="//apple_ref/occ/clm/NSConnection/allConnections">allConnections</a>
+
+</h3>
+
++ (NSArray *)<code>allConnections</code>
+
+<P>Returns all valid NSConnections in the process.<p>
+
+<B>See also: </B>  
+
+<code><a href="#//apple_ref/occ/instm/NSConnection/isValid">- isValid</a>
+
+</code><p><hr WIDTH="25%" ALIGN="LEFT">
+
+<a name="325"></a>
+
+<h3><a name="//apple_ref/occ/clm/NSConnection/connectionWithReceivePort:sendPort:">connectionWithReceivePort:sendPort:</a></h3>
+
++ (NSConnection *)<code>connectionWithReceivePort:</code>(NSPort *)<em>receivePort</em> <code>sendPort:</code>(NSPort *)<em>sendPort</em>
+
+<P>Returns an NSConnection that communicates using <em>receivePort</em> and <em>sendPort</em>. See <code>initWithReceivePort:sendPort:</code> for more information.<p>
+
+<B>See also: </B>  
+
+<code><a href="#//apple_ref/occ/clm/NSConnection/defaultConnection">+ defaultConnection</a>
+
+</code><p><hr WIDTH="25%" ALIGN="LEFT">
+
+<a name="329"></a>
+
+<h3> <a name="//apple_ref/occ/clm/NSConnection/connectionWithRegisteredName:host:">connectionWithRegisteredName:host:</a></h3>
+
++ (NSConnection *)<code>connectionWithRegisteredName:</code>(NSString *)<em>name</em> <code>host:</code>(NSString *)<em>hostName</em>
+
+<P>Returns the NSConnection whose send port links it to the NSConnection registered under <em>name</em> on the host named <em>hostName</em>. Returns <code>nil</code> if no NSConnection can be found for <em>name</em> and <em>hostName</em>. The returned NSConnection is a child of the default NSConnection for the current thread (that is, it shares the default NSConnection's receive port).<p>
+
+If <em>hostName</em> is <code>nil</code> or empty then only the local host is searched for the named NSConnection. If <em>hostName</em> is "*" then all hosts on the local subnet are queried for an NSConnection registered under <em>name;</em> where there are duplicates the connection is made with an arbitrary host, which is then used for every subsequent request from the local host.<p>
+
+To get the object vended by the NSConnection, use the <code>rootProxy</code> instance method. The <code>rootProxyForConnectionWithRegisteredName:host:</code> class method immediately returns this object.<p>
+
+<B>See also: </B>  
+
+<code><a href="#//apple_ref/occ/clm/NSConnection/defaultConnection">+ defaultConnection</a>
+
+</code><p><hr WIDTH="25%" ALIGN="LEFT">
+
+<a name="335"></a>
+
+<h3> <a name="//apple_ref/occ/clm/NSConnection/currentConversation">currentConversation</a></h3>
+
++ (id)<code>currentConversation</code>
+
+<P>&lt;&lt; Description forthcoming. &gt;&gt;<p>
+
+<hr WIDTH="25%" ALIGN="LEFT">
+
+<a name="338"></a>
+
+<h3> <a name="//apple_ref/occ/clm/NSConnection/defaultConnection">defaultConnection</a></h3>
+
++ (NSConnection *)<code>defaultConnection</code>
+
+<P>Returns the default NSConnection for the current thread, creating it if necessary. The default NSConnection uses a single NSPort for both receiving and sending, and is useful only for vending an object; use the <code>setRootObject:</code> and <code>registerName:</code> methods to do this.<p>
+
+<B>See also: </B>  
+
+<code><a href="../NSObject/NSObject.html#//apple_ref/occ/instm/NSObject/init" target="_top">- init</a>
+
+</code><p><hr WIDTH="25%" ALIGN="LEFT">
+
+<a name="342"></a>
+
+<h3> <a name="//apple_ref/occ/clm/NSConnection/rootProxyForConnectionWithRegisteredName:host:">rootProxyForConnectionWithRegisteredName:host:</a></h3>
+
++ (NSDistantObject *)<code>rootProxyForConnectionWithRegisteredName:</code>(NSString *)<em>name</em><em> </em><code>host:</code>(NSString *)<em>hostName</em>
+
+<P>Returns a proxy for the root object of the NSConnection registered under <em>name</em> on the host named <em>hostName</em>, or <code>nil</code> if that NSConnection has no root object set. Also returns <code>nil</code> if no NSConnection can be found for <em>name</em> and <em>hostName</em>. The NSConnection of the returned proxy is a child of the default NSConnection for the current thread (that is, it shares the default NSConnection's receive port).<p>
+
+If <em>hostName</em> is <code>nil</code> or empty then only the local host is searched for the named NSConnection. If <em>hostName</em> is "*" then all hosts on the local subnet are queried for an NSConnection registered under <em>name;</em> where there are duplicates the connection is made with an arbitrary host, which is then used for every subsequent request from the local host.<p>
+
+This method invokes <code>connectionWithRegisteredName:host:</code> and sends the resulting NSConnection object a <code>rootProxy</code> message.<p>
+
+<B>See also: </B>  
+
+<code><a href="#//apple_ref/occ/instm/NSConnection/setRootObject:">- setRootObject:</a>
+
+</code><p><HR WIDTH="50%" ALIGN="LEFT">
+
+<a name="instm"></a>
+
+<h2>Instance Methods</h2>  
+
+
+
+
+
+<a name="349"></a>
+
+<h3>
+
+ <a name="//apple_ref/occ/instm/NSConnection/addRequestMode:">addRequestMode:</a>
+
+</h3>
+
+- (void)<code>addRequestMode:</code>(NSString *)<em>mode</em>
+
+<P>Adds <em>mode</em> to the set of run loop input modes that the NSConnection uses for connection requests. The default input mode is NSDefaultRunLoopMode. See the NSRunLoop class specification for more information on input modes.<p>
+
+<B>See also: </B>  
+
+<code><a href="../NSRunLoop/NSRunLoop.html#//apple_ref/occ/instm/NSRunLoop/addPort:forMode:" target="_top">- addPort:forMode:</code> (NSRunLoop)</a>
+
+<p><hr WIDTH="25%" ALIGN="LEFT">
+
+<a name="353"></a>
+
+<h3> <a name="//apple_ref/occ/instm/NSConnection/addRunLoop:">addRunLoop:</a></h3>
+
+- (void)<code>addRunLoop:</code>(NSRunLoop *)<em>runloop</em>
+
+<P>&lt;&lt; Description forthcoming. &gt;&gt;<p>
+
+<hr WIDTH="25%" ALIGN="LEFT">
+
+<a name="356"></a>
+
+<h3> <a name="//apple_ref/occ/instm/NSConnection/delegate">delegate</a></h3>
+
+- (id)<code>delegate</code>
+
+<P>Returns the NSConnection's delegate.<p>
+
+<B>See also: </B>  
+
+<code><a href="#//apple_ref/occ/instm/NSConnection/setDelegate:">- setDelegate:</a>
+
+</code><p><hr WIDTH="25%" ALIGN="LEFT">
+
+<a name="360"></a>
+
+<h3> <a name="//apple_ref/occ/instm/NSConnection/enableMultipleThreads">enableMultipleThreads</a></h3>
+
+- (void)<code>enableMultipleThreads</code>
+
+<P>&lt;&lt; Description forthcoming. &gt;&gt;<p>
+
+<hr WIDTH="25%" ALIGN="LEFT">
+
+<a name="363"></a>
+
+<h3> <a name="//apple_ref/occ/instm/NSConnection/independentConversationQueueing">independentConversationQueueing</a></h3>
+
+- (BOOL)<code>independentConversationQueueing</code>
+
+<P>Returns YES if the NSConnection handles remote messages atomically, NO otherwise. See <a href="#265">"Configuring an NSConnection"</a> in the class description for more information on independent conversation queueing.<p>
+
+<B>See also: </B>  
+
+<code><a href="#//apple_ref/occ/instm/NSConnection/setIndependentConversationQueueing:">- setIndependentConversationQueueing:</a>
+
+</code><p><hr WIDTH="25%" ALIGN="LEFT">
+
+<a name="367"></a>
+
+<h3><a name="//apple_ref/occ/instm/NSConnection/initWithReceivePort:sendPort:">initWithReceivePort:sendPort:</a></h3>
+
+- (id)<code>initWithReceivePort:</code>(NSPort *)<em>receivePort</em> <code>sendPort:</code>(NSPort *)<em>sendPort</em>
+
+<P>Initializes a newly created NSConnection with <em>receivePort</em> and <em>sendPort</em>. The new NSConnection adds <em>receivePort</em> to the current NSRunLoop with NSDefaultRunLoopMode as the mode. If the application doesn't use an NSApplication object to handle events, it needs to run the NSRunLoop with one of its various <code>run...</code> messages. Returns <code>self</code>.<p>
+
+This method posts an NSConnectionDidInitializeNotification once the connection is initialized.<p>
+
+<em>receivePort</em> and <em>sendPort</em> affect initialization as follows:<p>
+
+<ul><li>If an NSConnection with the same ports already exists, releases the receiver, retains the existing NSConnection, and returns it.<p>
+
+<li>If an NSConnection exists that uses the same ports, but switched in role, then the new NSConnection communicates with it. Messages sent to a proxy held by either NSConnection are forwarded through the other NSConnection. This rule applies both within and across address spaces.<p>
+
+This behavior is useful for setting up distributed objects connections between threads within an application. See <a href="#255">"Forming Connections Between Threads"</a> in the class description for more information.<p>
+
+<li>If <em>receivePort</em> is <code>nil</code>, deallocates the receiver and returns <code>nil</code>.<p>
+
+<li>If <em>sendPort</em> is <code>nil</code> or if both ports are the same, the NSConnection uses <em>receivePort</em> for both sending and receiving, and is useful only for vending an object. Use the <code>registerName:</code> and <code>setRootObject:</code> instance methods to vend an object.<p>
+
+<li>If an NSConnection exists that uses <em>receivePort</em> as both of its ports, it's treated as the parent of the new NSConnection, and its root object and all of its configuration settings are applied to the new NSConnection. You should neither register a name for nor set the root object of the new NSConnection. See <a href="#265">"Configuring an NSConnection"</a> in the class description for more information.<p>
+
+<li>If <em>receivePort</em> and <em>sendPort</em> are different and neither is shared with another NSConnection, the receiver can be used to vend an object as well as to communicate with other NSConnections. However, it has no other NSConnection to communicate with until one is set up.<p>
+
+<li><em>receivePort</em> can't be shared by NSConnections in different threads.<p>
+
+</ul>This method is the designated initializer for the NSConnection class. Because it isn't part of the OpenStep specification, subclasses of NSConnection aren't portable among different OpenStep implementations.<p>
+
+<B>See also: </B>  
+
+<code><a href="#//apple_ref/occ/clm/NSConnection/defaultConnection">+ defaultConnection</a>
+
+</code><p><hr WIDTH="25%" ALIGN="LEFT">
+
+<a name="382"></a>
+
+<h3> <a name="//apple_ref/occ/instm/NSConnection/invalidate">invalidate</a></h3>
+
+- (void)<code>invalidate</code>
+
+<P>Invalidates (but doesn't release) the receiver. After withdrawing the ports that it has registered with the current run loop, <code>invalidate</code> posts an NSConnectionDidDieNotification and then invalidates all remote objects and exported local proxies.<p>
+
+<B>See also: </B>  
+
+<code><a href="#//apple_ref/occ/instm/NSConnection/isValid">- isValid</a></code>, <code><a href="../NSRunLoop/NSRunLoop.html#//apple_ref/occ/instm/NSRunLoop/removePort:forMode:" target="_top">- removePort:forMode:</code> (NSRunLoop)</a>, <a href="#//apple_ref/occ/instm/NSConnection/requestModes"><code>- requestModes</a>
+
+</code><p><hr WIDTH="25%" ALIGN="LEFT">
+
+<a name="386"></a>
+
+<h3> <a name="//apple_ref/occ/instm/NSConnection/isValid">isValid</a></h3>
+
+- (BOOL)<code>isValid</code>
+
+<P>Returns NO if the NSConnection is known to be invalid, YES otherwise. An NSConnection becomes invalid when either of its ports becomes invalid, but only notes that it has become invalid when it tries to send or receive a message. When this happens it posts an NSConnectionDidDieNotification to the default notification center.<p>
+
+<B>See also: </B>  
+
+<code><a href="#//apple_ref/occ/instm/NSConnection/invalidate">- invalidate</a></code>, <code><a href="../NSPort/NSPort.html#//apple_ref/occ/instm/NSPort/isValid" target="_top">- isValid</code> (NSPort)</a>
+
+<p><hr WIDTH="25%" ALIGN="LEFT">
+
+<a name="390"></a>
+
+<h3> <a name="//apple_ref/occ/instm/NSConnection/localObjects">localObjects</a></h3>
+
+- (NSArray *)<code>localObjects</code>
+
+<P>&lt;&lt; Description forthcoming. &gt;&gt;<p>
+
+<hr WIDTH="25%" ALIGN="LEFT">
+
+<a name="393"></a>
+
+<h3> <a name="//apple_ref/occ/instm/NSConnection/multipleThreadsEnabled">multipleThreadsEnabled</a></h3>
+
+- (BOOL)<code>multipleThreadsEnabled</code>
+
+<P>&lt;&lt; Description forthcoming. &gt;&gt;<p>
+
+<hr WIDTH="25%" ALIGN="LEFT">
+
+<a name="396"></a>
+
+<h3><a name="//apple_ref/occ/instm/NSConnection/receivePort">receivePort</a></h3>
+
+- (NSPort *)<code>receivePort</code>
+
+<P>Returns the NSPort that the NSConnection receives incoming network messages on. You can inspect this object for debugging purposes or use it to create another NSConnection, but shouldn't use it to send or receive messages explicitly. Don't set the delegate of the receive port; it already has a delegate established by the NSConnection.<p>
+
+<B>See also: </B>  
+
+<code><a href="#//apple_ref/occ/instm/NSConnection/sendPort">- sendPort</a></code>, <a href="#//apple_ref/occ/instm/NSConnection/initWithReceivePort:sendPort:"><code>- initWithReceivePort:sendPort:</a>
+
+</code><p><hr WIDTH="25%" ALIGN="LEFT">
+
+<a name="400"></a>
+
+<h3> <a name="//apple_ref/occ/instm/NSConnection/registerName:">registerName:</a></h3>
+
+- (BOOL)<code>registerName:</code>(NSString *)<em>name</em>
+
+<P>Registers the NSConnection under <em>name</em> on the local host, returning YES if successful, NO if not (for example, if another NSConnection on the same host is already registered under <em>name</em>). Other NSConnections can then contact it using the <code>connectionWithRegisteredName:host:</code> and <code>rootProxyForConnectionWithRegisteredName:host:</code> class methods.<p>
+
+If the NSConnection was already registered under a name and this method returns NO, the old name remains in effect. If this method is successful, it also unregisters the old name.<p>
+
+To unregister an NSConnection, simply invoke <code>registerName:</code> and supply <code>nil</code> as the connection name.<p>
+
+<B>See also: </B>  
+
+<code><a href="#//apple_ref/occ/instm/NSConnection/setRootObject:">- setRootObject:</a>
+
+</code><p><hr WIDTH="25%" ALIGN="LEFT">
+
+<a name="406"></a>
+
+<h3> <a name="//apple_ref/occ/instm/NSConnection/remoteObjects">remoteObjects</a></h3>
+
+- (NSArray *)<code>remoteObjects</code>
+
+<P>&lt;&lt; Description forthcoming. &gt;&gt;<p>
+
+<hr WIDTH="25%" ALIGN="LEFT">
+
+<a name="409"></a>
+
+<h3> <a name="//apple_ref/occ/instm/NSConnection/removeRequestMode:">removeRequestMode:</a></h3>
+
+- (void)<code>removeRequestMode:</code>(NSString *)<em>mode</em>
+
+<P>Removes <em>mode</em> from the set of run loop input modes that the NSConnection uses for connection requests. <p>
+
+<B>See also: </B>  
+
+<code><a href="../NSRunLoop/NSRunLoop.html#//apple_ref/occ/instm/NSRunLoop/removePort:forMode:" target="_top">- removePort:forMode:</code> (NSRunLoop)</a>
+
+<p><hr WIDTH="25%" ALIGN="LEFT">
+
+<a name="413"></a>
+
+<h3> <a name="//apple_ref/occ/instm/NSConnection/removeRunLoop:">removeRunLoop:</a></h3>
+
+- (void)<code>removeRunLoop:</code>(NSRunLoop *)<em>runloop</em>
+
+<P>&lt;&lt; Description forthcoming. &gt;&gt;<p>
+
+<hr WIDTH="25%" ALIGN="LEFT">
+
+<a name="416"></a>
+
+<h3> <a name="//apple_ref/occ/instm/NSConnection/replyTimeout">replyTimeout</a></h3>
+
+- (NSTimeInterval)<code>replyTimeout</code>
+
+<P>Returns the timeout interval for replies to outgoing remote messages. If a non-<code>oneway</code> remote message is sent and no reply is received by the timeout, an NSPortTimeoutException is raised.<p>
+
+<B>See also: </B>  
+
+<code><a href="#//apple_ref/occ/instm/NSConnection/requestTimeout">- requestTimeout</a></code>, <a href="#//apple_ref/occ/instm/NSConnection/setReplyTimeout:"><code>- setReplyTimeout:</a>
+
+</code><p><hr WIDTH="25%" ALIGN="LEFT">
+
+<a name="420"></a>
+
+<h3> <a name="//apple_ref/occ/instm/NSConnection/requestModes">requestModes</a></h3>
+
+- (NSArray *)<code>requestModes</code>
+
+<P>Returns the set of request modes (as an array of NSStrings) that the NSConnection's receive port is registered for with its NSRunLoop.<p>
+
+<B>See also: </B>  
+
+<code><a href="#//apple_ref/occ/instm/NSConnection/addRequestMode:">- addRequestMode:</a></code>, <code><a href="../NSRunLoop/NSRunLoop.html#//apple_ref/occ/instm/NSRunLoop/addPort:forMode:" target="_top">- addPort:forMode:</code> (NSRunLoop)</a>, <a href="#//apple_ref/occ/instm/NSConnection/removeRequestMode:"><code>- removeRequestMode:</a>
+
+</code><p><hr WIDTH="25%" ALIGN="LEFT">
+
+<a name="424"></a>
+
+<h3> <a name="//apple_ref/occ/instm/NSConnection/requestTimeout">requestTimeout</a></h3>
+
+- (NSTimeInterval)<code>requestTimeout</code>
+
+<P>Returns the timeout interval for outgoing remote messages. If a remote message can't be sent before the timeout, an NSPortTimeoutException is raised.<p>
+
+<B>See also: </B>  
+
+<code><a href="#//apple_ref/occ/instm/NSConnection/replyTimeout">- replyTimeout</a></code>, <a href="#//apple_ref/occ/instm/NSConnection/setRequestTimeout:"><code>- setRequestTimeout:</a>
+
+</code><p><hr WIDTH="25%" ALIGN="LEFT">
+
+<a name="428"></a>
+
+<h3> <a name="//apple_ref/occ/instm/NSConnection/rootObject">rootObject</a></h3>
+
+- (id)<code>rootObject</code>
+
+<P>Returns the object that the NSConnection (or its parent) makes available to other applications or threads, or <code>nil</code> if there is no root object. To get a proxy to this object in another application or thread, invoke the <code>rootProxyForConnectionWithRegisteredName:host:</code> class method with the appropriate arguments.<p>
+
+<B>See also: </B>  
+
+<code><a href="#//apple_ref/occ/instm/NSConnection/rootProxy">- rootProxy</a></code>, <a href="#//apple_ref/occ/instm/NSConnection/setRootObject:"><code>- setRootObject:</a>
+
+</code><p><hr WIDTH="25%" ALIGN="LEFT">
+
+<a name="432"></a>
+
+<h3> <a name="//apple_ref/occ/instm/NSConnection/rootProxy">rootProxy</a></h3>
+
+- (NSDistantObject *)<code>rootProxy</code>
+
+<P>Returns the proxy for the root object of NSConnection's peer in another application or thread. The proxy returned can change between invocations if the peer NSConnection's root object is changed.<p>
+
+<B><dt>Note:	</B>
+
+If the NSConnection uses separate send and receive ports and has no peer, when you invoke 
+
+rootProxy it will block for the duration of the reply timeout interval, waiting for a reply.
+
+<B>See also: </B>  
+
+<code><a href="#//apple_ref/occ/instm/NSConnection/rootObject">- rootObject</a>
+
+</code><p><hr WIDTH="25%" ALIGN="LEFT">
+
+<a name="437"></a>
+
+<h3><a name="//apple_ref/occ/instm/NSConnection/runInNewThread">runInNewThread</a></h3>
+
+- (void)<code>runInNewThread</code>
+
+<P>Creates and starts a new NSThread and then runs the receiving connection in the new thread. If the newly-created thread is the first to be detached from the current thread, this method posts the notification NSBecomingMultiThreaded with nil to the default notification center. <p>
+
+<hr WIDTH="25%" ALIGN="LEFT">
+
+<a name="440"></a>
+
+<h3><a name="//apple_ref/occ/instm/NSConnection/sendPort">sendPort</a></h3>
+
+- (NSPort *)<code>sendPort</code>
+
+<P>Returns the NSPort that the NSConnection sends outgoing network messages through. You can inspect this object for debugging purposes or use it to create another NSConnection, but shouldn't use it to send or receive messages explicitly. Don't set the delegate of the send port; it already has a delegate established by the NSConnection.<p>
+
+<B>See also: </B>  
+
+<code><a href="#//apple_ref/occ/instm/NSConnection/receivePort">- receivePort</a></code>, <a href="#//apple_ref/occ/instm/NSConnection/initWithReceivePort:sendPort:"><code>- initWithReceivePort:sendPort:</a>
+
+</code><p><hr WIDTH="25%" ALIGN="LEFT">
+
+<a name="444"></a>
+
+<h3> <a name="//apple_ref/occ/instm/NSConnection/setDelegate:">setDelegate:</a></h3>
+
+- (void)<code>setDelegate:</code>(id)<em>anObject</em>
+
+<P>Sets the NSConnection's delegate to <em>anObject</em>. Doesn't retain <em>anObject</em>.<p>
+
+<hr WIDTH="25%" ALIGN="LEFT">
+
+<a name="447"></a>
+
+<h3> <a name="//apple_ref/occ/instm/NSConnection/setIndependentConversationQueueing:">setIndependentConversationQueueing:</a></h3>
+
+- (void)<code>setIndependentConversationQueueing:</code>(BOOL)<em>flag</em>
+
+<P>Sets whether the NSConnection handles remote messages atomically. The default is NO: An NSConnection normally forwards remote message to the intended recipients as they come in. See <a href="#265">"Configuring an NSConnection"</a> in the class description for more information.<p>
+
+<B>See also: </B>  
+
+<code><a href="#//apple_ref/occ/instm/NSConnection/independentConversationQueueing">- independentConversationQueueing</a>
+
+</code><p><hr WIDTH="25%" ALIGN="LEFT">
+
+<a name="451"></a>
+
+<h3> <a name="//apple_ref/occ/instm/NSConnection/setReplyTimeout:">setReplyTimeout:</a></h3>
+
+- (void)<code>setReplyTimeout:</code>(NSTimeInterval)<em>seconds</em>
+
+<P>Sets the timeout interval for replies to outgoing remote messages to <em>seconds</em>. If a non-<code>oneway</code> remote message is sent and no reply is forthcoming by the timeout, an NSPortTimeoutException is raised. The default timeout is the maximum possible value.<p>
+
+<B>See also: </B>  
+
+<code><a href="#//apple_ref/occ/instm/NSConnection/setRequestTimeout:">- setRequestTimeout:</a></code>, <a href="#//apple_ref/occ/instm/NSConnection/replyTimeout"><code>- replyTimeout</a>
+
+</code><p><hr WIDTH="25%" ALIGN="LEFT">
+
+<a name="455"></a>
+
+<h3> <a name="//apple_ref/occ/instm/NSConnection/setRequestMode:">setRequestMode:</a></h3>
+
+- (void)<code>setRequestMode:</code>(NSString *)<em>mode</em>
+
+<P>Sets the run loop mode that the NSConnection uses for connection requests to <em>mode</em> and reregisters the NSConnection's receive port with the current NSRunLoop. The default request mode is NSDefaultRunLoopMode. See the NSRunLoop class specification for more information on run modes.<p>
+
+<B>See also: </B>  
+
+<code><a href="#//apple_ref/occ/instm/NSConnection/requestModes">- requestModes</a>
+
+</code><p><hr WIDTH="25%" ALIGN="LEFT">
+
+<a name="459"></a>
+
+<h3> <a name="//apple_ref/occ/instm/NSConnection/setRequestTimeout:">setRequestTimeout:</a></h3>
+
+- (void)<code>setRequestTimeout:</code>(NSTimeInterval)<em>seconds</em>
+
+<P>Sets the timeout interval for outgoing remote messages to <em>seconds</em>. If a remote message can't be sent before the timeout, an NSPortTimeoutException is raised. The default timeout is the maximum possible value.<p>
+
+<B>See also: </B>  
+
+<code><a href="#//apple_ref/occ/instm/NSConnection/setReplyTimeout:">- setReplyTimeout:</a></code>, <a href="#//apple_ref/occ/instm/NSConnection/requestTimeout"><code>- requestTimeout</a>
+
+</code><p><hr WIDTH="25%" ALIGN="LEFT">
+
+<a name="463"></a>
+
+<h3> <a name="//apple_ref/occ/instm/NSConnection/setRootObject:">setRootObject:</a></h3>
+
+- (void)<code>setRootObject:</code>(id)<em>anObject</em>
+
+<P>Sets the object that the NSConnection makes available to other applications or threads to <em>anObject</em>. This only affects new connection requests and <code>rootProxy</code> messages to established NSConnections; application that have proxies to the old root object can still send messages through it.<p>
+
+<B>See also: </B>  
+
+<code><a href="#//apple_ref/occ/instm/NSConnection/rootObject">- rootObject</a>
+
+</code><p><hr WIDTH="25%" ALIGN="LEFT">
+
+<a name="467"></a>
+
+<h3> <a name="//apple_ref/occ/instm/NSConnection/statistics">statistics</a></h3>
+
+- (NSDictionary *)<code>statistics</code>
+
+<P>Returns an NSDictionary containing various statistics for the NSConnection, such as the number of vended objects, the number of requests and replies, and so on. The statistics dictionary should be used only for debugging purposes; see the release notes for more information on its contents.<p>
+
+<a name="470">
+
+<HR WIDTH="50%" ALIGN="LEFT">
+
+<h2>Methods Implemented By the Delegate</h2>
+
+</a><a name="471"></a>
+
+<h3><a name="//apple_ref/occ/instm/NSConnection/authenticateComponents:withData:">authenticateComponents:withData:</a></h3>
+
+- (BOOL)<code>authenticateComponents:</code>(NSArray *)<em>components</em> <code>withData:</code>(NSData *)<em>authenticationData</em>
+
+<P>Returns YES if the <em>authenticationData</em> provided is valid for <em>components</em>, NO otherwise. <em>components</em> contains NSData and NSPort objects belonging to an NSPortMessage object. See the NSPortMessage class specification for more information. <em>authenticationData</em> should have been created by the delegate of the peer NSConnection with <code>authenticationDataForComponents:</code>.<p>
+
+Use this message for validation of incoming messages. An NSConnection raises an NSFailedAuthenticationException on receipt of a remote message that the delegate doesn't authenticate.<p>
+
+<hr WIDTH="25%" ALIGN="LEFT">
+
+<a name="475"></a>
+
+<h3><a name="//apple_ref/occ/instm/NSConnection/authenticationDataForComponents:">authenticationDataForComponents:</a></h3>
+
+- (NSData *)<code>authenticationDataForComponents:</code>(NSArray *)<em>components</em>
+
+<P>Returns an NSData object to be used as a authentication stamp for an outgoing message. <em>components</em> contains the elements of a network message, in the form of NSPort and NSData objects. The delegate should use only the NSData elements to create the authentication stamp. See the NSPortMessage class specification for more information on the components.<p>
+
+If <code>authenticationDataForComponents:</code> returns <code>nil</code>, an NSGenericException will be raised. If the delegate determines that the message shouldn't be authenticated, it should return an empty NSData object (you can generate an empty NSData object with <code>[NSData data]</code>). The delegate on the other side of the connection must then be prepared to accept an empty NSData as the second parameter to <code>authenticateComponents:withData:</code> and to handle the situation appropriately.<p>
+
+<em>components</em> will be validated on receipt by the delegate of the peer NSConnection with <code>authenticateComponents:withData:</code>.<p>
+
+<hr WIDTH="25%" ALIGN="LEFT">
+
+<a name="480"></a>
+
+<h3> <a name="//apple_ref/occ/instm/NSConnection/connection:shouldMakeNewConnection:">connection:shouldMakeNewConnection:</a></h3>
+
+- (BOOL)<code>connection:</code>(NSConnection *)<em>parentConnection</em> <code>shouldMakeNewConnection:</code>(NSConnection *)<em>newConnnection</em>
+
+<P>Returns YES if <em>parentConnection</em> should allow <em>newConnnection</em> to be created and set up, NO if <em>parentConnection</em> should refuse and immediately release <em>newConnection</em>. Use this method to limit the amount of NSConnections created in your application or to change the parameters of child NSConnections.<p>
+
+<hr WIDTH="25%" ALIGN="LEFT">
+
+<a name="483"></a>
+
+<h3> <a name="//apple_ref/occ/instm/NSConnection/makeNewConnection:sender:">makeNewConnection:sender:</a></h3>
+
+- (BOOL)<code>makeNewConnection:</code>(NSConnection *)<em>newConnection<br></em><code>sender:</code>(NSConnection *)<em>parentConnection</em> 
+
+<P>Returns YES if <em>parentConnection</em> should allow <em>newConnnection</em> to be created and set up, NO if <em>parentConnection</em> should refuse and immediately release <em>newConnection</em>. Use this method to limit the amount of NSConnections created in your application or to change the parameters of child NSConnections.<p>
+
+This delegate method is obsolete, and shouldn't be used. Use <code>connection:shouldMakeNewConnection: </code>instead.<p>
+
+<a name="487">
+
+<HR WIDTH="50%" ALIGN="LEFT">
+
+<h2>Notifications
+
+</h2>
+
+</a><a name="488"></a>
+
+<h3> NSConnectionDidDieNotification</h3>
+
+Posted when the NSConnection is deallocated or when it's notified that its NSPort has become invalid. This notification contains a notification object but no userInfo dictionary. The notification object is the NSConnection object.<p>
+
+The NSConnection object posting this notification is no longer useful, so all receivers should unregister themselves for any notifications involving the NSConnection.<p>
+
+<B>See also: </B>  
+
+<code><a href="../NSPort/NSPort.html#//apple_ref/c/data/NSPortDidBecomeInvalidNotification" target="_top">NSPortDidBecomeInvalidNotification</code> (NSPort)</a>
+
+<p><hr WIDTH="25%" ALIGN="LEFT">
+
+<a name="492"></a>
+
+<h3> 
+
+NSConnectionDidInitializeNotification</h3>
+
+Posted when the NSConnection is initialized using <code>initWithReceivePort:sendPort:</code> (the designated initializer for NSConnection). This notification contains a notification object but no userInfo dictionary. The notification object is the NSConnection object.<p>
+
+<B>See also: </B>  
+
+<code><a href="#//apple_ref/occ/instm/NSConnection/initWithReceivePort:sendPort:">initWithReceivePort:sendPort:</a>
+
+</code><p>
+
+ 
+
+ 
+
+
+
+
+
+<i>Copyright &#169; 1997, Apple Computer, Inc.   All rights
+
+reserved.</i>
+
+
+
+<!-- Last updated: 06/17/97 16:47:08 -->
+
+
+
+</body>
+
+</html>
+

@@ -1,0 +1,346 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML EXPERIMENTAL 970324//EN">
+<HTML>
+<HEAD>
+<META NAME="GENERATOR" CONTENT="Adobe FrameMaker 5.5/HTML Export Filter">
+<LINK REL="STYLESHEET" HREF="SettingDatabaseContext.css">
+<TITLE> </TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+<!--start of banner -->
+<!--#include virtual="/includes/framesetheader" -->
+<!-- end of banner -->
+<!--start of path -->
+<font face="Geneva,Helvetica,Arial" size="1">
+<b>PATH<spacer type="horizontal" size="5">&nbsp;</b>
+ <a href="../../../../../webobjects.html" target="_top">WebObjects 4.0 Documentation</a> <b>&gt;</b>
+ <a href="TopicsTOC.html" target="_top">WebObjects Programming Topics</a>
+</font>
+<br><br>
+<!--end of path -->
+
+
+<H1 CLASS="TopictTitleTOC">
+Setting the Delegates of Database Contexts and Adaptor Contexts
+</H1>
+<DIV>
+<H2 CLASS="Synopsis">
+<A NAME="pgfId=635138">
+ </A>
+Synopsis<DIV>
+<IMG SRC="SettingDatabaseContext-1.gif">
+</DIV>
+</H2>
+<P CLASS="Body">
+<A NAME="pgfId=635139">
+ </A>
+Describes how to set the delegates for EODatabaseContexts, EOAdaptorContexts, and their channels. </P>
+</DIV>
+<DIV>
+<H2 CLASS="Heading1">
+<A NAME="pgfId=635140">
+ </A>
+ Discussion<DIV>
+<IMG SRC="SettingDatabaseContext-1.gif">
+</DIV>
+</H2>
+<P CLASS="Body">
+<A NAME="pgfId=635141">
+ </A>
+The delegates for EODatabaseContexts, EOAdaptorContexts, and their channels receive messages that, if they properly implement the corresponding methods, enable them to generate custom primary keys, fine-tune the behavior of batch faulting, satisfy a fetch request from a local cache, and accomplish a variety of other tasks (see the reference documentation for EODatabaseContext.DelegateDelegation). Because EODatabaseContexts, EODatabaseChannels, and related objects are created dynamically, it's a little tricky to set their delegates. The mechanism that you use to set delegates for these objects is notification.</P>
+<P CLASS="Body">
+<A NAME="pgfId=635142">
+ </A>
+When an EOCooperatingObjectStore is added to the EOObjectStoreCoordinator, the coordinator posts an EOCooperatingObjectStoreWasAdded notification. Since EODatabaseContexts are subclasses of EOCooperatingObjectStore, this notification is posted whenever a database context is created and added to the coordinator. To catch this notification, just set up an observing object that listens for the EOCooperatingObjectStoreWasAdded notification. </P>
+<P CLASS="Body">
+<A NAME="pgfId=635143">
+ </A>
+Whenever the designated method of the observing object is invoked via notification, the coordinator is passed in as the notification object. Given the coordinator, you can traverse all the cooperating object stores and set delegates for them. </P>
+<P CLASS="Body">
+<A NAME="pgfId=635144">
+ </A>
+When you set the delegate of an EODatabaseContext object, that delegate object is propogated to all of the EODatabaseContext's EODatabaseChannels.  An EOAdaptorChannel is always created along with the creation of an EODatabaseChannel and an EOAdaptorContext is always created along with creation of an EODatabaseContext; the EODatabaseContext and EODatabaseChannel always keep a reference to these adaptor objects. Through these relationships, a delegate can access EOAdaptorContexts and EOAdaptorChannels from its EODatabaseContext or EODatabaseChannel. </P>
+<P CLASS="Body">
+<A NAME="pgfId=635279">
+ </A>
+The following code shows how to register for EOCooperatingObjectStoreWasAdded notifications in the Session constructor, and then how to set the delegate for each EODatabaseContext. (EOCooperatingObjectStores).  </P>
+<DIV>
+<H5 CLASS="Code-Listing">
+<A NAME="pgfId=635285">
+ </A>
+Figure 1.  Java Code
+</H5>
+<DIV>
+<pre>public Session() {</pre></DIV>
+<A NAME="pgfId=635287">
+ </A>
+<DIV>
+<pre>    super();</pre></DIV>
+<A NAME="pgfId=635289">
+ </A>
+<DIV>
+<pre>    try {</pre></DIV>
+<A NAME="pgfId=635291">
+ </A>
+<DIV>
+<pre>        // Create a selector that can be used to define         // a callback to our addedObjectStore method</pre></DIV>
+<A NAME="pgfId=635293">
+ </A>
+<DIV>
+<pre>        Class params[]={Class.forName("com.apple.yellow.foundation.NSNotification")};</pre></DIV>
+<A NAME="pgfId=635295">
+ </A>
+<DIV>
+<pre>        Selector selector=new NSSelector("addedObjectStore", params);</pre></DIV>
+<A NAME="pgfId=635297">
+ </A>
+<DIV>
+<pre></pre></DIV>
+<A NAME="pgfId=635299">
+ </A>
+<DIV>
+<pre>        // Register as a CooperatingObjectStoreWasAdded         // observer with our callback</pre></DIV>
+<A NAME="pgfId=635301">
+ </A>
+<DIV>
+<pre>        NSNotificationCenter.defaultCenter().addObserver(this,selector, EOObjectStoreCoordinator.CooperatingObjectStoreWasAdded, null);</pre></DIV>
+<A NAME="pgfId=635303">
+ </A>
+<DIV>
+<pre>    }</pre></DIV>
+<A NAME="pgfId=635305">
+ </A>
+<DIV>
+<pre>    catch(Exception e) {</pre></DIV>
+<A NAME="pgfId=635307">
+ </A>
+<DIV>
+<pre>        logString(e.toString());</pre></DIV>
+<A NAME="pgfId=635309">
+ </A>
+<DIV>
+<pre>    }</pre></DIV>
+<A NAME="pgfId=635311">
+ </A>
+<DIV>
+<pre>}</pre></DIV>
+<A NAME="pgfId=635313">
+ </A>
+<DIV>
+<pre>public void addedObjectStore(NSNotification notification)</pre></DIV>
+<A NAME="pgfId=635315">
+ </A>
+<DIV>
+<pre>{</pre></DIV>
+<A NAME="pgfId=635317">
+ </A>
+<DIV>
+<pre>    EOObjectStoreCoordinator coordinator = (EOObjectStoreCoordinator) notification.object();</pre></DIV>
+<A NAME="pgfId=635319">
+ </A>
+<DIV>
+<pre>    NSArray stores=coordinator.cooperatingObjectStores();</pre></DIV>
+<A NAME="pgfId=635321">
+ </A>
+<DIV>
+<pre>    NSEnumerator anEnum=(NSEnumerator) stores.objectEnumerator();  </pre></DIV>
+<A NAME="pgfId=635323">
+ </A>
+<DIV>
+<pre>   	// make sure all of our stores have our this object as its delegate.</pre></DIV>
+<A NAME="pgfId=635325">
+ </A>
+<DIV>
+<pre>    while (anEnum.hasMoreElements()) {</pre></DIV>
+<A NAME="pgfId=635327">
+ </A>
+<DIV>
+<pre></pre></DIV>
+<A NAME="pgfId=635329">
+ </A>
+<DIV>
+<pre>        EODatabaseContext store=(EODatabaseContext) anEnum.nextElement();</pre></DIV>
+<A NAME="pgfId=635331">
+ </A>
+<DIV>
+<pre>        store.setDelegate(this);</pre></DIV>
+<A NAME="pgfId=635333">
+ </A>
+<DIV>
+<pre>        logString("Setting delegate of "+store);</pre></DIV>
+<A NAME="pgfId=635335">
+ </A>
+<DIV>
+<pre>    }</pre></DIV>
+<A NAME="pgfId=635337">
+ </A>
+<DIV>
+<pre>}</pre></DIV>
+<A NAME="pgfId=635339">
+ </A>
+</DIV>
+<DIV>
+<H5 CLASS="Code-Listing">
+<A NAME="pgfId=635345">
+ </A>
+Figure 2.  Objective-C Code
+</H5>
+<DIV>
+<pre>- init {</pre></DIV>
+<A NAME="pgfId=635347">
+ </A>
+<DIV>
+<pre>    self = [super init];</pre></DIV>
+<A NAME="pgfId=635349">
+ </A>
+<DIV>
+<pre>    [[NSNotificationCenter defaultCenter] addObserver: self selector:@selector(addedObjectStore:) name:EOCooperatingObjectStoreWasAdded object:nil];</pre></DIV>
+<A NAME="pgfId=635351">
+ </A>
+<DIV>
+<pre>    return self;</pre></DIV>
+<A NAME="pgfId=635353">
+ </A>
+<DIV>
+<pre>}</pre></DIV>
+<A NAME="pgfId=635355">
+ </A>
+<DIV>
+<pre>- (void) addedObjectStore: (NSNotification *)notification</pre></DIV>
+<A NAME="pgfId=635357">
+ </A>
+<DIV>
+<pre>{</pre></DIV>
+<A NAME="pgfId=635359">
+ </A>
+<DIV>
+<pre>    EOObjectStoreCoordinator *coordinator=[notification object];</pre></DIV>
+<A NAME="pgfId=635361">
+ </A>
+<DIV>
+<pre>    NSArray *stores=[coordinator cooperatingObjectStores];</pre></DIV>
+<A NAME="pgfId=635363">
+ </A>
+<DIV>
+<pre>   // make sure all of our stores have our this object as its delegate.</pre></DIV>
+<A NAME="pgfId=635365">
+ </A>
+<DIV>
+<pre>    [stores makeObjectsPerformSelector: @selector(setDelegate:) withObject: self];</pre></DIV>
+<A NAME="pgfId=635367">
+ </A>
+<DIV>
+<pre>}</pre></DIV>
+<A NAME="pgfId=635369">
+ </A>
+<P CLASS="Body">
+<A NAME="pgfId=635519">
+ </A>
+  </P>
+</DIV>
+</DIV>
+<DIV>
+<H2 CLASS="Heading1">
+<A NAME="pgfId=635370">
+ </A>
+See Also<DIV>
+<IMG SRC="SettingDatabaseContext-1.gif">
+</DIV>
+</H2>
+<UL>
+<P CLASS="Bulleted">
+<A NAME="pgfId=635237">
+ </A>
+&#183;	EODatabaseContext</P>
+<P CLASS="Bulleted">
+<A NAME="pgfId=635238">
+ </A>
+&#183;	EOAdaptorContext</P>
+<P CLASS="Bulleted">
+<A NAME="pgfId=635239">
+ </A>
+&#183;	EOObjectStoreCoordinator</P>
+<P CLASS="Bulleted">
+<A NAME="pgfId=635240">
+ </A>
+&#183;	EOCooperatingObjectStore</P>
+<P CLASS="Bulleted">
+<A NAME="pgfId=635241">
+ </A>
+&#183;	NSNotificationCenter</P>
+<P CLASS="Bulleted">
+<A NAME="pgfId=635242">
+ </A>
+&#183;	NSNotification</P>
+</UL>
+</DIV>
+<DIV>
+<H2 CLASS="Heading1">
+<A NAME="pgfId=635244">
+ </A>
+Questions<DIV>
+<IMG SRC="SettingDatabaseContext-1.gif">
+</DIV>
+</H2>
+<UL>
+<P CLASS="Bulleted">
+<A NAME="pgfId=635245">
+ </A>
+&#183;		How do I dynamically set the delegate for an EODatabaseContext, an EOAdaptorContext, or their related channelst?</P>
+</UL>
+</DIV>
+<DIV>
+<H2 CLASS="Heading1">
+<A NAME="pgfId=635246">
+ </A>
+Keywords<DIV>
+<IMG SRC="SettingDatabaseContext-1.gif">
+</DIV>
+</H2>
+<UL>
+<P CLASS="Bulleted">
+<A NAME="pgfId=635247">
+ </A>
+&#183;	Delegate</P>
+<P CLASS="Bulleted">
+<A NAME="pgfId=635511">
+ </A>
+&#183;	EODatabaseContext</P>
+<P CLASS="Bulleted">
+<A NAME="pgfId=635248">
+ </A>
+&#183;	EODatabaseChannel</P>
+<P CLASS="Bulleted">
+<A NAME="pgfId=635249">
+ </A>
+&#183;	EOAdaptorContext</P>
+<P CLASS="Bulleted">
+<A NAME="pgfId=635250">
+ </A>
+&#183;	EOAdaptorChannel</P>
+</UL>
+</DIV>
+<DIV>
+<H2 CLASS="Heading1">
+<A NAME="pgfId=635252">
+ </A>
+Revision History<DIV>
+<IMG SRC="SettingDatabaseContext-1.gif">
+</DIV>
+</H2>
+<P CLASS="Body">
+<A NAME="pgfId=635253">
+ </A>
+23 July, 1998. David Scheck. First Draft.</P>
+<P CLASS="Body">
+<A NAME="pgfId=635491">
+ </A>
+17 November, 1998. Terry Donoghue. Second Draft.</P>
+</DIV>
+
+
+<!--start of footer -->
+<!--#include virtual="/includes/framesetfooter" -->
+<!-- end of footer -->
+
+</body>
+</HTML>

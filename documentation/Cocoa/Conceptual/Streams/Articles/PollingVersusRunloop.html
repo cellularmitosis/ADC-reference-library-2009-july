@@ -1,0 +1,99 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+<head>
+	<title>Stream Programming Guide for Cocoa: Polling Versus Run-Loop Scheduling</title>
+	<meta id="Generator" name="Generator" content="Gutenberg"/>
+	<meta id="GeneratorVersion" name="GeneratorVersion" content="v132"/>
+	<meta http-equiv="content-type" content="text/html;charset=utf-8"/>
+	<meta id="Copyright" name="Copyright" content="Copyright 2009 Apple Inc. All Rights Reserved."/>
+	<meta id="IndexTitle" name="IndexTitle" content="Polling Versus Run-Loop Scheduling"/>
+	<meta id="xcode-display" name="xcode-display" content="render"/>
+	<meta id="toc-file" name="toc-file" content="../toc.html"/>
+	<meta id="RESOURCES" content="../../../../Resources" />
+	
+	<link rel="stylesheet" type="text/css" href="../../../../Resources/CSS/frameset_styles.css"/>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/lib/prototype.js"></script>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/lib/scriptaculous.js"></script>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/page.js"></script>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/pedia.js"></script>
+	<!--[if lte IE 6]>
+		<style type="text/css">
+			/*<![CDATA[*/ 
+			html {overflow-x:auto; overflow-y:hidden;  }
+			/*]]>*/
+		</style>
+	<![endif]-->
+</head>
+<body bgcolor="#ffffff" onload="initialize_page();"><a name="//apple_ref/doc/uid/20002275" title="Polling Versus Run-Loop Scheduling"></a>
+    <noscript>
+    <div id="tocMenu">
+        <iframe id="toc_content" name="toc_content" SRC="../toc.html" width="210" height="100%" align="left" frameborder="0">This document set is best viewed in a browser that supports iFrames.</iframe>
+    </div>
+    </noscript>
+    <div id="bodyText">
+        <a name="top"></a>
+        <div class="hideOnPrint hideInXcode">
+        <!-- start of header -->
+        <!--#include virtual="/includes/framesetheader" -->
+        <!-- end of header -->
+        </div>
+        
+        <!-- start of path -->
+<div class="breadcrumb hideOnPrint hideInXcode"><a href="http://developer.apple.com/" target="_top">ADC Home</a> &gt; <a href="../../../../../referencelibrary/index.html#//apple_ref/doc/uid/TP30000943" target="_top">Reference Library</a> &gt; <a href="../../../../index.html#//apple_ref/doc/uid/TP30000440" target="_top">Guides</a> &gt; <a href="../../../index.html#//apple_ref/doc/uid/TP30000440-TP30000416" target="_top">Cocoa</a> &gt; <a href="../../../DataManagement-date.html#//apple_ref/doc/uid/TP30000440-TP30000416-TP30000445" target="_top">Data Management</a> &gt; <a href="../index.html" target="_top">Stream Programming Guide for Cocoa</a> &gt; </div><br class="hideInXcode"/><!-- end of path -->
+        
+        <div class="mini_nav_text" align="left">
+        <span class="navButtons">
+        <a href="WritingOutputStreams.html">&lt; Previous Page</a><span style="margin-left: 8px"><a href="HandlingStreamError.html">Next Page &gt;</a></span>
+        </span>
+        <span id="showHideTOCUpperSpan">
+        <a href="#" onclick="showHideTOC();"><img src="../../../../Resources/Images/show_toc_icon.gif" width="15" height="14" border="0" style="margin-bottom: -2px;" alt="" hideText="Hide TOC" showText="Show TOC" /></a> <a href="#" onclick="showHideTOC();">Hide TOC</a>
+        </span>
+        </div>
+        
+        
+        <a name="//apple_ref/doc/uid/20002275-CJBEDDBG" title="Polling Versus Run-Loop Scheduling"></a><hr /><H1>Polling Versus Run-Loop Scheduling</H1><p>A potential problem with stream processing is blocking. A thread that is writing to or reading from a stream might have to wait indefinitely until there is (respectively) space on the stream to put bytes or bytes on the stream that can be read. In effect, the thread is at the mercy of the stream, and that can spell trouble for an application. Blocking can especially be a problem with socket streams because they are dependent on responses from a remote host.</p><p>With Cocoa streams you have two ways to handle stream events:</p><ul class="ul"><li class="li"><p><strong>Run-loop scheduling</strong>. You schedule a stream object on a run loop so that the delegate receives messages reporting stream-related events only when blocking is unlikely to take place. For read and write operations, the pertinent <code>NSStreamEvent</code> constants are <code><!--a  -->NSStreamHasBytesAvailable<!--/a--></code> and <code><!--a  -->NSStreamHasSpaceAvailable<!--/a--></code>.</p></li><li class="li"><p><strong>Polling</strong>. In a closed loop broken only at the end of the stream or upon error, you keep asking the stream object if it has (for read streams) bytes available to read or (for write streams) space available for writing. The pertinent methods are <code>hasBytesAvailable</code> (NSInputStream) and <code>hasSpaceAvailable</code> (NSOutputStream.</p></li></ul><p>Run-loop scheduling is almost always preferable over polling, and that is why the code examples in <span class="content_text"><a href="ReadingInputStreams.html#//apple_ref/doc/uid/20002273-BCIJHAGD">“Reading From Input Streams”</a></span> and <span class="content_text"><a href="WritingOutputStreams.html#//apple_ref/doc/uid/20002274-BAJCABBC">“Writing To Output Streams”</a></span> exclusively show the use of run loops. With polling, your program is locked in a tight loop, waiting for stream events that might or might not be imminent. With run-loop scheduling, your program can go off and do other things, knowing that it will be notified when there is a stream event to handle. Moreover, run loops save you from having to manage state and are more efficient than polling. Polling is also CPU-intensive; there are other things you can be doing with your processing time. </p><p>That said, there can be situations where polling is a viable option. For example, if you are porting legacy code, you might choose to use polling because it is better suited the threading model in the legacy code. <span class="content_text">Listing 1</span> illustrates a method that writes data to an output stream using polling.</p><a name="//apple_ref/doc/uid/20002275-1002142-CJBHJIHD" title="Listing 1Writing to an output stream using polling"></a><p class="codesample"><a name="//apple_ref/doc/uid/20002275-1002142" title="Listing 1Writing to an output stream using polling"></a><strong>Listing 1&nbsp;&nbsp;</strong>Writing to an output stream using polling</p><div class="codesample"><table><tr><td scope="row"><pre>- (void)createNewFile {<span></span></pre></td></tr><tr><td scope="row"><pre>    oStream = [[NSOutputStream alloc] initToMemory];<span></span></pre></td></tr><tr><td scope="row"><pre>    [oStream open];<span></span></pre></td></tr><tr><td scope="row"><pre>    uint8_t *readBytes = (uint8_t *)[data mutableBytes];<span></span></pre></td></tr><tr><td scope="row"><pre>    uint8_t buf[1024];<span></span></pre></td></tr><tr><td scope="row"><pre>    int len = 1024;<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>    while (1) {<span></span></pre></td></tr><tr><td scope="row"><pre>        if (len == 0) break;<span></span></pre></td></tr><tr><td scope="row"><pre>        if ( [oStream hasSpaceAvailable] ) {<span></span></pre></td></tr><tr><td scope="row"><pre>        (void)strncpy(buf, readBytes, len);<span></span></pre></td></tr><tr><td scope="row"><pre>        readBytes += len;<span></span></pre></td></tr><tr><td scope="row"><pre>        if ([oStream write:(const uint8_t *)buf maxLength:len] == -1) {<span></span></pre></td></tr><tr><td scope="row"><pre>            [self handleError:[oStream streamError]];<span></span></pre></td></tr><tr><td scope="row"><pre>            break;<span></span></pre></td></tr><tr><td scope="row"><pre>        }<span></span></pre></td></tr><tr><td scope="row"><pre>        [bytesWritten setIntValue:[bytesWritten intValue]+len];<span></span></pre></td></tr><tr><td scope="row"><pre>        len = (([data length] - [bytesWritten intValue] >= 1024) ? 1024 :<span></span></pre></td></tr><tr><td scope="row"><pre>            [data length] - [bytesWritten intValue]);<span></span></pre></td></tr><tr><td scope="row"><pre>        }<span></span></pre></td></tr><tr><td scope="row"><pre>    }<span></span></pre></td></tr><tr><td scope="row"><pre>    NSData *newData = [oStream propertyForKey:<span></span></pre></td></tr><tr><td scope="row"><pre>        NSStreamDataWrittenToMemoryStreamKey];<span></span></pre></td></tr><tr><td scope="row"><pre>    if (!newData) {<span></span></pre></td></tr><tr><td scope="row"><pre>        NSLog(@"No data written to memory!");<span></span></pre></td></tr><tr><td scope="row"><pre>    } else {<span></span></pre></td></tr><tr><td scope="row"><pre>        [self processData:newData];<span></span></pre></td></tr><tr><td scope="row"><pre>    }<span></span></pre></td></tr><tr><td scope="row"><pre>    [oStream close];<span></span></pre></td></tr><tr><td scope="row"><pre>    [oStream release];<span></span></pre></td></tr><tr><td scope="row"><pre>    oStream = nil;<span></span></pre></td></tr><tr><td scope="row"><pre>}<span></span></pre></td></tr></table></div><p>It should be pointed out that neither the polling nor run-loop scheduling approaches are airtight defenses against blocking. If the NSInputStream <code>hasBytesAvailable</code> method or the NSOutputStream <code>hasSpaceAvailable</code> method returns <code>NO</code>, it means in both cases that the stream definitely has no available bytes or space. However, if either of these methods returns <code>YES</code>, it can mean that there is available bytes or space <em>or</em> that the only way to find out is to attempt a read or a write operation (which could lead to a momentary block). The <code>NSStreamEventHasBytesAvailable</code> and <code>NSStreamEventHasSpaceAvailable</code> stream events have identical semantics. </p>
+
+        <br/><br/> 
+
+        <div class="mini_nav_text" align="left">
+        <span class="navButtons">
+        <a href="WritingOutputStreams.html">&lt; Previous Page</a><span style="margin-left: 8px"><a href="HandlingStreamError.html">Next Page &gt;</a></span>
+        </span>
+        <span id="showHideTOCLowerSpan">
+        <a href="#" onclick="showHideTOC();"><img src="../../../../Resources/Images/show_toc_icon.gif" width="15" height="14" border="0" style="margin-bottom: -2px;" alt="" /></a> <a href="#" onclick="showHideTOC();">Hide TOC</a>
+        </span>
+        </div>
+
+        <br/><hr /><div align="center"><p class="content_text" lang="en" dir="ltr"> <!--#if expr="0=1" -->&#x00a9; 2004, 2009 Apple Inc. All Rights Reserved. &#40;<!--#endif -->Last updated: 2009-05-06<!--#if expr="0=1" -->&#041;<!--#endif --></p></div>
+
+        
+        <div class="hideOnPrint hideInXcode">
+        <!-- start of footer -->
+        	<table width="100%" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/documentation/Cocoa/Conceptual/Streams/Articles/PollingVersusRunloop.html%3Fid%3D10000188i-1.6&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/documentation/Cocoa/Conceptual/Streams/Articles/PollingVersusRunloop.html%3Fid%3D10000188i-1.6&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/documentation/Cocoa/Conceptual/Streams/Articles/PollingVersusRunloop.html%3Fid%3D10000188i-1.6&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+
+        <!--#include virtual="/includes/framesetfooter" -->
+        <!-- end of footer -->
+        </div>
+    </div>
+</body>
+</html>

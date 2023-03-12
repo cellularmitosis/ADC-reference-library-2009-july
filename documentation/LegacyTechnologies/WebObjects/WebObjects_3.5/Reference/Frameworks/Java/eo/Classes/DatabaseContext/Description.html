@@ -1,0 +1,542 @@
+<html><head><title></title></head>
+<body bgcolor="#ffffff">
+ 
+ 
+<h1>
+<FONT COLOR="#000066">
+<a name="816">
+ <a name="//apple_ref/java/cl/DatabaseContext">DatabaseContext</a>
+</a>
+</FONT>
+</h1>
+<p><B>Extends:</B><BR>  
+next.eo.CooperatingObjectStore
+
+<p><a name="826"></a>
+<a name="description"></a>
+<H2>Class Description
+</H2>
+DatabaseContext is an ObjectStore for relational databases, creating and saving objects based on Entity definitions in a Model object. <p>
+A DatabaseContext represents a single connection to a database server, and it determines the updating and locking strategy used by its DatabaseChannel objects. A DatabaseContext has a corresponding Database object. If the server supports multiple concurrent transactions, the Database object may have several DatabaseContexts. If the server and adaptor support it, a DatabaseContext may in turn have several DatabaseChannels, which handle access to the data on the server. <p>
+The relationship between DatabaseContext and other classes in the control and access layers is illustrated in the following diagram.<p>
+<p><img src="../DatabaseContext.anc.gif"><p><p>
+As a subclass of CooperatingObjectStore, DatabaseContext acts as one of possibly several CooperatingObjectStores for an ObjectStoreCoordinator, which mediates between EditingContexts and CooperatingObjectStores. <p>
+A DatabaseContext creates an AdaptorContext when initialized, and uses this object to communicate with the database server.<p>
+<h3>
+<a name="2802">
+ Creating and Using a DatabaseContext
+</a>
+</h3>
+Though you can create a DatabaseContext explicitly by using the static method <a href="#2777"><code>registeredDatabaseContextForModel</code></a>, you should rarely need to do so. If you're using the "higher-level" objects EditingContexts and DatabaseDataSources, then the DatabaseContexts those objects need are created automatically, on demand. When you create a DatabaseDataSource (typically for use with a DisplayGroup), it registers a DatabaseContext that's capable of fetching objects for the data source's entities. If objects fetched into an EditingContext (described more in the following section) have references to objects from Model objects that are based on another database, the DatabaseContext creates and registers a DatabaseContext for each of the additional databases.<p>
+DatabaseContexts are created on demand when an ObjectStoreCoordinator posts a CooperatingObjectStoreNeeded notification. The DatabaseContext class registers for the notification, and it provides the ObjectStoreCoordinator with a new DatabaseContext instance that can handle the request. For more discussion of this topic, see the chapter "Application Configurations" in the <em>Enterprise Objects Framework Developer's Guide</em>.<p>
+For the most part, you don't need to programmatically interact with a DatabaseContext. However, some of the reasons you might want to are as follows:<p>
+<ul><li>To implement your own locking strategy, either application-wide, or on a per-fetch basis. This is described in the section "<a href="#2877">Updating And Locking Strategies</a>."<p>
+<li>To do performance tuning. This is described in the section "<a href="#2831">Faulting</a>."<p>
+<li>To intervene when objects are created and fetched to provide custom behavior. This is described in the section "<a href="#2849">Delegate Methods</a>," and in the individual delegate method descriptions in the <a href="../../Interfaces/DatabaseContextDelegates/Frameset.html#" target="_top">DatabaseContextDelegates</a> interface specification.<p>
+</ul><h3>
+<a name="2818">
+ Fetching and Saving Objects
+</a>
+</h3>
+Conceptually, a DatabaseContext fetches and saves objects on behalf of an EditingContext. However, the two objects don't interact with each other directly-an ObjectStoreCoordinator acts as a mediator between them. The relationship between EditingContext, ObjectStoreCoordinator, and DatabaseContext is illustrated in the following figure. This configuration includes one ObjectStoreCoordinator, and can include one or more EditingContexts, and one or more DatabaseContexts.<p>
+<p><img src="../DatabaseContext.anc1.gif"><p><p>
+When an EditingContext fetches objects, the request is passed through the ObjectStoreCoordinator, which forwards it to the appropriate DatabaseContext based on the fetch specification or global ID. When the DatabaseContext receives a request to fetch or write information to the database, it tries to use one of its DatabaseChannels. If all of its channels are busy, it broadcasts a DatabaseChannelNeededNotification in the hopes that an observer can provide a new channel or that an existing channel can be freed up. This observer could be a manager that decides how many database cursors can be opened by a particular client.<p>
+DatabaseContext knows how to interact with other CooperatingObjectStores to save changes made to an object graph in more than one database server. For a more detailed discussion of this subject, see the class specifications for ObjectStoreCoordinator and CooperatingObjectStore.<p>
+<h3>
+<a name="2826">
+ Setting a Fetch Limit
+</a>
+</h3>
+DatabaseContext defines a hint for use with a FetchSpecification in the <a href="#5614"><code>objectsWithFetchSpecification</code></a> method. Named by the key FetchLimitHintKey, the hint's value is a java.lang.Number containing an integer value indicating the maximum number of objects to fetch. Depending on the value of the PromptAfterFetchLimitHintKey (<code>true</code> or <code>false</code>), the DatabaseContext will either stop fetching objects when this limit is reached or it will ask the EditingContext's message handler to ask the user whether it should continue fetching.<p>
+<h3>
+<a name="2828">
+ Using a Custom Query
+</a>
+</h3>
+DatabaseContext defines a hint for use with a FetchSpecification in the <a href="#5614"><code>objectsWithFetchSpecification</code></a> method. Named by the key CustomQueryExpressionHintKey, the hint's value is a SQL string for performing the fetch. The expression must query the same attributes in the same order that Enterprise Objects Framework would if it were generating the SELECT expression dynamically. If this key is supplied, other characteristics of the FetchSpecification such as <code>isDeep</code>, <code>qualifier</code>, and <code>sortOrderings</code> are ignored-in that sense this key is more of a directive than a hint.<p>
+<h3>
+<a name="2831">
+ Faulting
+</a>
+</h3>
+When a DatabaseContext fetches an object, it examines the relationships defined in the model and creates objects representing the destinations of the fetched object's relationships. For example, if you fetch an employee object, you can ask for its manager and immediately receive an object; you don't have to get the manager's employee ID from the object you just fetched and fetch the manager yourself.<p>
+DatabaseContext doesn't immediately fetch data for the destination objects of relationships, however, since fetching is fairly expensive. To avoid this waste of time and resources, the destination objects aren't initially filled with fetched data. Instead, they exist without any of their values until those values are actually needed. When the "empty" destination object (called a <em>fault</em>) is accessed (sent a message), the object triggers its DatabaseContext to fetch its data.<p>
+Faults come in two varieties: single object faults for to-one relationships, and array faults for to-many relationships. When an array fault is accessed, it fetches all of the destination objects and replaces itself with an array of those objects.<p>
+You can fine-tune faulting behavior for additional performance gains by using two different mechanisms: batch faulting, and prefetching relationships.<p>
+<h4>
+<a name="2836">
+ Batch Faulting
+</a>
+</h4>
+When you access a Fault, its data is fetched from the database. However, triggering one fault has no effect on other faults-it just fetches the object or array of objects for the one fault. You can take advantage of this expensive round trip to the database server by batching faults together. DatabaseContext provides the <a href="#2407"><code>batchFetchRelationship</code></a> method for doing this. For example, given an array of Employee objects, this method can fetch all of their departments with one round trip to the server, rather than asking the server for each of the employee's departments individually. You can use the delegate methods <a href="../../Interfaces/DatabaseContextDelegates/Frameset.html#" target="_top"><code>databaseContextShouldFetchArrayFault</code></a> and <a href="../../Interfaces/DatabaseContextDelegates/Frameset.html#" target="_top"><code>databaseContextShouldFetchObjectFault</code></a> to fine-tune batch faulting behavior.<p>
+You can also set batch faulting in a Model object. In that approach, you specify the <em>number</em> of faults that should be triggered along with the first fault; you don't actually control which faults are triggered the way you do with <code>batchFetchRelationship</code>. For more information on setting batch faulting in a Model, see the chapter "Using EOModeler" in the <em>Enterprise Objects Framework Developer's Guide</em>.<p>
+<h4>
+<a name="2845">
+ Prefetching Relationships
+</a>
+</h4>
+DatabaseContext defines a hint for use with a FetchSpecification in the <a href="#5614"><code>objectsWithFetchSpecification</code></a> method. Named by the key PrefetchingRelationshipHintKey, the hint's value is a next.util.ImmutableVector of relationship paths whose destinations should be fetched along with the objects specified. For example, when fetching Movies, you can provide a prefetching hint for "directors", "roles.talent", and "plotSummary" to force these objects to be fetched as well, as opposed to having faults created for them. Although prefetching increases the initial fetch cost, it can improve overall performance by reducing the number of round trips made to the database server.<p>
+Using this key also has an effect on how a FetchSpecification refreshes. "Refreshing" refers to existing objects being overwritten with fetched values-this allows your application to see changes to the database that have been made by someone else. Normally, when you set a FetchSpecification to refresh using <code>setRefreshesRefetchedObjects</code>, it only refreshes the objects you're fetching. For example, if you fetch employees, you don't also fetch the employees' departments. However, if you have the PrefetchingRelationshipHintKey set, the refetch is propagated for all of the relationships specified for the hint.<p>
+<h3>
+<a name="2849">
+ Delegate Methods
+</a>
+</h3>
+A DatabaseContext shares its delegate with its DatabaseChannels. These delegate methods are actually sent from DatabaseChannel, but they're defined in DatabaseContext for ease of access:<p>
+<ul><li><a href="../../Interfaces/DatabaseContextDelegates/Frameset.html#" target="_top">databaseContextDidSelectObjects</a><br>
+<li><a href="../../Interfaces/DatabaseContextDelegates/Frameset.html#" target="_top">databaseContextShouldSelectObjects</a><br>
+<li><a href="../../Interfaces/DatabaseContextDelegates/Frameset.html#" target="_top">databaseContextShouldUpdateCurrentSnapshot</a><br>
+<li><a href="../../Interfaces/DatabaseContextDelegates/Frameset.html#" target="_top">databaseContextShouldUsePessimisticLockWithFetchSpecification</a><br>
+</ul>You can use the DatabaseContext delegate methods to intervene when objects are created and when they're fetched from the database. This gives you more fine-grained control over such issues as how an object's primary key is generated (<a href="../../Interfaces/DatabaseContextDelegates/Frameset.html#" target="_top"><code>databaseContextNewPrimaryKeyForObject</code></a>), how and if objects are locked (<a href="../../Interfaces/DatabaseContextDelegates/Frameset.html#" target="_top"><code>databaseContextShouldLockObjectWithGlobalID</code></a>), what fetch specification is used to fetch objects (<a href="../../Interfaces/DatabaseContextDelegates/Frameset.html#" target="_top"><code>databaseContextShouldSelectObjects</code></a>), how batch faulting is performed (<a href="../../Interfaces/DatabaseContextDelegates/Frameset.html#" target="_top"><code>databaseContextShouldFetchArrayFault</code></a> and <a href="../../Interfaces/DatabaseContextDelegates/Frameset.html#" target="_top"><code>databaseContextShouldFetchObjectFault</code></a>), and so on. For more information, see the individual delegate method descriptions in <a href="../../Interfaces/DatabaseContextDelegates/Frameset.html#" target="_top">DatabaseContextDelegates</a>.<p>
+<h3>
+<a name="2874">
+ Snapshots
+</a>
+</h3>
+A Database records snapshots for its DatabaseContexts. These snapshots form the application's view of the current state of the database server. This global view is overridden locally by DatabaseContexts, which form their own snapshots as they make changes during a transaction. When a DatabaseContext commits its top-level transaction, it reconciles all changed snapshots with the global view of the database object, so that other DatabaseContexts (except those with open transactions) immediately use the new snapshots as well.<p>
+<h3>
+<a name="2877">
+ Updating And Locking Strategies
+</a>
+</h3>
+DatabaseContext supports two updating strategies: <code>UpdateWithOptimisticLocking</code>, and <code>UpdateWithPessimisticLocking</code>.<p>
+<code>UpdateWithOptimisticLocking</code> is the default update strategy. Under optimistic locking, objects aren't locked immediately on being fetched from the server. Instead, whenever you attempt to save updates to an object in the database, the object's snapshot is used to ensure that the values in the corresponding database row haven't changed since the object was fetched. As long as the snapshot matches the values in the database, the update is allowed to proceed. <p>
+The <code>UpdateWithPessimisticLocking</code> strategy causes objects to be locked in the database when they're selected. This ensures that no one else can modify the objects until the transaction ends. However, this doesn't necessarily mean that either the select or the update operation will succeed.<p>
+DatabaseContext also supports "on-demand" locking, in which specific optimistic locks can be promoted to database locks during the course of program execution. You can either use <a href="#5582"><code>lockObjectWithGlobalID</code></a> to lock a database row for a particular object, or <a href="#5614"><code>objectsWithFetchSpecification</code></a> to fetch objects with a fetch specification that includes locking. <p>
+For more discussion of locking strategies, see the chapter "Behind the Scenes" in the <em>Enterprise Objects Framework Developer's Guide</em>.<p>
+<a name="830">
+<HR WIDTH=50% ALIGN=LEFT>
+<h2>Method Types
+</h2>
+</a><dl>
+<dt>Constructors<dl><dl><dl><dl>
+<dt><a href="#2327">DatabaseContext</a></dl>
+</dl></dl></dl><dt>Fetching objects<dl><dl><dl><dl>
+<dt><a href="#5609">objectsForSourceGlobalID</a><dt><a href="#5614">objectsWithFetchSpecification</a><dt><a href="#5403">arrayFaultWithSourceGlobalID</a><dt><a href="#5480">faultForGlobalID</a><dt><a href="#2407">batchFetchRelationship</a></dl>
+</dl></dl></dl><dt>Accessing the adaptor context<dl><dl><dl><dl>
+<dt><a href="#5473">adaptorContext</a></dl>
+</dl></dl></dl><dt>Accessing the database object<dl><dl><dl><dl>
+<dt><a href="#2457">database</a></dl>
+</dl></dl></dl><dt>Accessing the coordinator<dl><dl><dl><dl>
+<dt><a href="#2430">coordinator</a></dl>
+</dl></dl></dl><dt>Managing channels<dl><dl><dl><dl>
+<dt><a href="#2383">availableChannel</a><dt><a href="#2648">registerChannel</a><dt><a href="#2653">registeredChannels</a><dt><a href="#4884">unregisterChannel</a></dl>
+</dl></dl></dl><dt>Accessing the delegate<dl><dl><dl><dl>
+<dt><a href="#2698">setDelegate</a><dt><a href="#2462">delegate</a></dl>
+</dl></dl></dl><dt>Committing or discarding changes<dl><dl><dl><dl>
+<dt><a href="#5538">invalidateAllObjects</a><dt><a href="#5543">invalidateObjectsWithGlobalIDs</a><dt><a href="#2693">rollbackChanges</a><dt><a href="#5643">saveChangesInEditingContext</a><dt><a href="#2418">commitChanges</a><dt><a href="#2583">performChanges</a><dt><a href="#2588">prepareForSaveWithCoordinator</a><dt><a href="#2628">recordUpdateForObject</a><dt><a href="#2593">recordChangesInEditingContext</a><dt><a href="#5631">refaultObject</a></dl>
+</dl></dl></dl><dt>Determining if the DatabaseContext is responsible for a particular operation<dl><dl><dl><dl>
+<dt><a href="#2563">ownsObject</a><dt><a href="#2558">ownsGlobalID</a><dt><a href="#2510">handlesFetchSpecification</a><dt><a href="#2777">registeredDatabaseContextForModel</a></dl>
+</dl></dl></dl><dt>Managing Snapshots<dl><dl><dl><dl>
+<dt><a href="#2494">forgetSnapshotForGlobalID</a><dt><a href="#2499">forgetSnapshotsForGlobalIDs</a><dt><a href="#2543">localSnapshotForGlobalID</a><dt><a href="#2613">recordSnapshotForGlobalID</a><dt><a href="#2618">recordSnapshots</a><dt><a href="#2722">snapshotForGlobalID</a></dl>
+</dl></dl></dl><dt>Initializing objects<dl><dl><dl><dl>
+<dt><a href="#5533">initializeObject</a></dl>
+</dl></dl></dl><dt>Locking objects<dl><dl><dl><dl>
+<dt><a href="#2712">setUpdateStrategy</a><dt><a href="#2732">updateStrategy</a><dt><a href="#2673">registerLockedObjectWithGlobalID</a><dt><a href="#2531">isObjectLockedWithGlobalID</a><dt><a href="#2478">forgetAllLocks</a><dt><a href="#2483">forgetLocksForObjectsWithGlobalIDs</a><dt><a href="#5582">lockObjectWithGlobalID</a></dl>
+</dl></dl></dl><dt>Returning information about objects<dl><dl><dl><dl>
+<dt><a href="#2747">valuesForKeys</a></dl>
+</dl></dl></dl><dt>Checking connection status<dl><dl><dl><dl>
+<dt><a href="#2520">hasBusyChannels</a></dl>
+</dl></dl></dl></dl>
+<HR WIDTH=50% ALIGN=LEFT>
+<a name="2316"></a>
+<a name="cons"></a>
+<h2>Constructors</h2>  
+
+
+<a name="2327"></a>
+<h3>
+ DatabaseContext
+</h3>
+public <code>next.eo.DatabaseContext</code>(next.eo.Database <em>aDatabase</em>)
+
+<P>Creates and returns a new DatabaseContext. Typically, you don't need to programmatically create DatabaseContext objects. Rather, they are created automatically by the control layer. See <a href="#2802">"Creating and Using a DatabaseContext"</a> for more information.<p>
+<em>aDatabase</em> is assigned to the new DatabaseContext as the Database object with which the new context works. The new DatabaseContext creates an AdaptorContext with which to communicate with the database server. Throws an exception if the underlying adaptor context can't create a corresponding adaptor channel.<p>
+<B>See also: </B>  
+<a href="#2457"><code>database</code></a>
+<p><HR WIDTH=50% ALIGN=LEFT>
+<a name="2770"></a>
+<a name="clm"></a>
+<h2>Static Methods</h2>  
+
+
+<a name="2777"></a>
+<h3>
+ <a name="//apple_ref/java/clm/DatabaseContext/registeredDatabaseContextForModel">registeredDatabaseContextForModel</a>
+</h3>
+public static next.eo.DatabaseContext <code>registeredDatabaseContextForModel</code>(next.eo.Model <em>aModel</em>, 
+next.eo.EditingContext <em>anEditingContext</em>)
+
+<P>Finds the ObjectStoreCoordinator for <em>anEditingContext</em> and checks to see if it already contains a DatabaseContext cooperating object store for <em>aModel</em>. If it does, it returns that DatabaseContext. Otherwise it instantiates a new DatabaseContext, adds it to the ObjectStoreCoordinator, and returns the DatabaseContext.<p>
+<HR WIDTH=50% ALIGN=LEFT>
+<a name="instm"></a>
+<h2>Instance Methods</h2>  
+
+
+<a name="5473"></a>
+<h3>
+ <a name="//apple_ref/java/instm/DatabaseContext/adaptorContext">adaptorContext</a>
+</h3>
+public next.eo.AdaptorContext <code>adaptorContext</code>()
+
+<P>Returns the AdaptorContext used by the DatabaseContext for communication with the database server.<p>
+<hr WIDTH=25% ALIGN=LEFT>
+<a name="5403"></a>
+<h3> <a name="//apple_ref/java/instm/DatabaseContext/arrayFaultWithSourceGlobalID">arrayFaultWithSourceGlobalID</a></h3>
+public next.util.ImmutableVector <code>arrayFaultWithSourceGlobalID</code>(next.eo.GlobalID <em>globalID</em>, 
+java.lang.String <em>name</em>, next.eo.EditingContext <em>anEditingContext</em>);
+
+<P>Overrides the inherited implementation to create a to-many fault for <em>anEditingContext</em>. <em>name</em> must correspond to a Relationship in the Entity for the specified <em>globalID</em>.<p>
+<B>See also: </B>  
+<a href="#5480"><code>faultForGlobalID</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="2383"></a>
+<h3> <a name="//apple_ref/java/instm/DatabaseContext/availableChannel">availableChannel</a></h3>
+public next.eo.DatabaseChannel <code>availableChannel</code>()
+
+<P>Returns a DatabaseChannel that's registered with the receiver and that isn't busy. If the method can't find a channel that meets these criteria, it posts a DatabaseChannelNeededNotification in the hopes that someone will provide a new channel. After posting the notification, the receiver checks its list of channels again. If there are still no available channels, the receiver creates a DatabaseChannel itself. However, if the list is not empty and there are no available channels, the method returns <code>null</code>.<p>
+<B>See also: </B>  
+<a href="#2648"><code>registerChannel</code></a>, <a href="#2653"><code>registeredChannels</code></a>, <a href="#4884"><code>unregisterChannel</code></a> 
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="2407"></a>
+<h3> <a name="//apple_ref/java/instm/DatabaseContext/batchFetchRelationship">batchFetchRelationship</a></h3>
+public void <code>batchFetchRelationship</code>(next.eo.Relationship <em>relationship</em>, 
+next.util.ImmutableVector <em>objects</em>, next.eo.EditingContext <em>anEditingContext</em>)
+
+<P>Clears all the faults for the <em>relationship</em> of <em>anEditingContext</em>'s <em>objects</em> and performs a single, efficient, fetch (at most two fetches, if the relationship is many-to-many). This method provides a way to fetch the same relationship for multiple objects. For example, given an array of Employee objects, this method can fetch all of their departments with one round trip to the server, rather than asking the server for each of the employee's departments individually.<p>
+<hr WIDTH=25% ALIGN=LEFT>
+<a name="2418"></a>
+<h3> <a name="//apple_ref/java/instm/DatabaseContext/commitChanges">commitChanges</a></h3>
+public void <code>commitChanges</code>()
+
+<P>Overrides the inherited implementation to instruct the adaptor to commit the transaction. If the commit is successful, any primary and foreign key changes are written back to the saved objects, database locks are released, and an ObjectsChangedInStoreNotification (defined in ObjectStore) is posted describing the committed changes. Raises an exception if the adaptor is unable to commit the transaction; the error message indicates the nature of the problem. You should never need to invoke this method directly.<p>
+<B>See also: </B>  
+<a href="#2583"><code>performChanges</code></a>, <a href="#2693"><code>rollbackChanges</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="2430"></a>
+<h3> <a name="//apple_ref/java/instm/DatabaseContext/coordinator">coordinator</a></h3>
+public next.eo.ObjectStoreCoordinator <code>coordinator</code>()
+
+<P>Returns the receiver's ObjectStoreCoordinator or <code>null</code> if there is none.<em> </em>This method is only valid during a save operation.<p>
+<hr WIDTH=25% ALIGN=LEFT>
+<a name="2457"></a>
+<h3> <a name="//apple_ref/java/instm/DatabaseContext/database">database</a></h3>
+public next.eo.Database <code>database</code>()
+
+<P>Returns the receiver's Database. <p>
+<B>See also: </B>  
+<a href="#2316">"Constructors"</a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="2462"></a>
+<h3> <a name="//apple_ref/java/instm/DatabaseContext/delegate">delegate</a></h3>
+public java.lang.Object <code>delegate</code>()
+
+<P>Returns the receiver's delegate. <p>
+<B>See also: </B>  
+<em> </em><a href="#2698"><code>setDelegate</code></a><code> 
+</code><p><hr WIDTH=25% ALIGN=LEFT>
+<a name="5480"></a>
+<h3> <a name="//apple_ref/java/instm/DatabaseContext/faultForGlobalID">faultForGlobalID</a></h3>
+public java.lang.Object <code>faultForGlobalID</code>(next.eo.GlobalID <em>globalID</em>, 
+next.eo.EditingContext <em>anEditingContext</em>);
+
+<P>Overrides the inherited implementation<em> </em>to create a to-one fault for the object identified by<em> globalID</em> and register it in <em>anEditingContext.</em><p>
+<B>See also: </B>  
+<a href="#5403"><code>arrayFaultWithSourceGlobalID</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="2478"></a>
+<h3> <a name="//apple_ref/java/instm/DatabaseContext/forgetAllLocks">forgetAllLocks</a></h3>
+public void <code>forgetAllLocks</code>()
+
+<P>Clears all of the receiver's locks. Doesn't cause the locks to be forgotten in the server, only in the receiver. This method is useful when something has happened to cause the server to forget the locks and the receiver needs to be synced up. This method is invoked whenever a transaction is committed or rolled back.<p>
+<B>See also: </B>  
+<a href="#2673"><code>registerLockedObjectWithGlobalID</code></a>, <a href="#2531"><code>isObjectLockedWithGlobalID</code></a>, 
+<a href="#2531"><code>isObjectLockedWithGlobalID</code></a>, <a href="#2483"><code>forgetLocksForObjectsWithGlobalIDs</code></a>, 
+<a href="#5582"><code>lockObjectWithGlobalID</code></a>, <code>lockObject</code> (EditingContext)
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="2483"></a>
+<h3> <a name="//apple_ref/java/instm/DatabaseContext/forgetLocksForObjectsWithGlobalIDs">forgetLocksForObjectsWithGlobalIDs</a></h3>
+public void <code>forgetLocksForObjectsWithGlobalIDs</code>(next.util.ImmutableVector <em>anImmutableVector</em>)
+
+<P>Clears the locks made for the enterprise objects identified by each of the GlobalIDs <em>globalIDs</em>. Doesn't cause the locks to be forgotten in the server, only in the receiver.<p>
+<B>See also: </B>  
+<a href="#2673"><code>registerLockedObjectWithGlobalID</code></a>, <a href="#2531"><code>isObjectLockedWithGlobalID</code></a>, 
+<a href="#2531"><code>isObjectLockedWithGlobalID</code></a>, <a href="#2478"><code>forgetAllLocks</code></a>, <a href="#5582"><code>lockObjectWithGlobalID</code></a>, <code>lockObject</code> 
+(EditingContext)
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="2494"></a>
+<h3> <a name="//apple_ref/java/instm/DatabaseContext/forgetSnapshotForGlobalID">forgetSnapshotForGlobalID</a></h3>
+public void <code>forgetSnapshotForGlobalID</code>(next.eo.GlobalID <em>globalID</em>)
+
+<P>Deletes the snapshot made for the enterprise object identified by <em>globalID</em>.<p>
+<B>See also: </B>  
+<a href="#2613"><code>recordSnapshotForGlobalID</code></a>, <a href="#2543"><code>localSnapshotForGlobalID</code></a>, <a href="#2618"><code>recordSnapshots</code></a>, 
+<a href="#2722"><code>snapshotForGlobalID</code></a>, <a href="#2499"><code>forgetSnapshotsForGlobalIDs</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="2499"></a>
+<h3> <a name="//apple_ref/java/instm/DatabaseContext/forgetSnapshotsForGlobalIDs">forgetSnapshotsForGlobalIDs</a></h3>
+public void <code>forgetSnapshotsForGlobalIDs</code>(next.util.ImmutableVector <em>globalID</em><em>s</em>)
+
+<P>Deletes the snapshots made for the enterprise objects identified by <em>globalID</em><em>s</em>, an array of GlobalID objects.<p>
+<B>See also: </B>  
+<a href="#2613"><code>recordSnapshotForGlobalID</code></a>, <a href="#2543"><code>localSnapshotForGlobalID</code></a>, <a href="#2618"><code>recordSnapshots</code></a>, 
+<a href="#2722"><code>snapshotForGlobalID</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="2510"></a>
+<h3> <a name="//apple_ref/java/instm/DatabaseContext/handlesFetchSpecification">handlesFetchSpecification</a></h3>
+public boolean <code>handlesFetchSpecification</code>(next.eo.FetchSpecification <em>fetchSpecification</em>)
+
+<P>Overrides the inherited implementation to return <code>true</code> if the receiver is responsible for fetching the objects described by the entity name in <em>fetchSpecification</em>. <p>
+<B>See also: </B>  
+<em> </em><a href="#2563"><code>ownsObject</code></a>, <a href="#2558"><code>ownsGlobalID</code></a><em> 
+</em><p><hr WIDTH=25% ALIGN=LEFT>
+<a name="2520"></a>
+<h3> <a name="//apple_ref/java/instm/DatabaseContext/hasBusyChannels">hasBusyChannels</a></h3>
+public boolean <code>hasBusyChannels</code>()
+
+<P>Returns <code>true</code> if the receiver's AdaptorContext has channels that have outstanding operations (that is, have a fetch in progress), <code>false</code> otherwise.<p>
+<hr WIDTH=25% ALIGN=LEFT>
+<a name="5533"></a>
+<h3> <a name="//apple_ref/java/instm/DatabaseContext/initializeObject">initializeObject</a></h3>
+public void <code>initializeObject</code>(java.lang.Object <em>object</em>, next.eo.GlobalID <em>globalID</em>, 
+next.eo.EditingContext <em>anEditingContext</em>);
+
+<P>Overrides the inherited implementation to initialize <em>object</em> for <em>anEditingContext</em> by filling it with properties based on row data fetched from the adaptor. The snapshot for <em>globalID</em> is looked up and those attributes in the snapshot that are marked as class properties in the Entity are assigned to <em>object</em>. For relationship class properties, faults are constructed and assigned to the object.<p>
+<hr WIDTH=25% ALIGN=LEFT>
+<a name="5538"></a>
+<h3> <a name="//apple_ref/java/instm/DatabaseContext/invalidateAllObjects">invalidateAllObjects</a></h3>
+public void <code>invalidateAllObjects</code>();
+
+<P>Overrides the inherited implementation to discard all snapshots in the receiver's Database, forget all locks, and post an AllObjectsChangedInObjectStoreNotification, as well as an ObjectsChangedInStoreNotification with the invalidated global IDs in the <code>userInfo</code> dictionary. Both of these notifications are defined in ObjectStore. This method works by invoking <a href="#5543"><code>invalidateObjectsWithGlobalIDs</code></a> for all of the snapshots in the receiver's Database.<p>
+<hr WIDTH=25% ALIGN=LEFT>
+<a name="5543"></a>
+<h3> <a name="//apple_ref/java/instm/DatabaseContext/invalidateObjectsWithGlobalIDs">invalidateObjectsWithGlobalIDs</a></h3>
+public void <code>invalidateObjectsWithGlobalIDs</code>(next.util.ImmutableVector <em>globalIDs</em>);
+
+<P>Overrides the inherited implementation to discard the snapshots for the objects identified by the GlobalIDs in <em>globalIDs</em> and broadcasts an ObjectsChangedInStoreNotification (defined in ObjectStore), which causes the EditingContext containing objects fetched from the receiver to refault those objects. The result is that these objects will be refetched from the database the next time they're accessed.<p>
+<hr WIDTH=25% ALIGN=LEFT>
+<a name="2531"></a>
+<h3> <a name="//apple_ref/java/instm/DatabaseContext/isObjectLockedWithGlobalID">isObjectLockedWithGlobalID</a></h3>
+public boolean <code>isObjectLockedWithGlobalID</code>(next.eo.GlobalID <em>globalID</em>)
+
+<P>Returns <code>true</code> if the enterprise object identified by <em>globalID</em> is locked, <code>false</code> otherwise.<p>
+<B>See also: </B>  
+<a href="#2673"><code>registerLockedObjectWithGlobalID</code></a>, <a href="#2478"><code>forgetAllLocks</code></a>, <a href="#2531"><code>isObjectLockedWithGlobalID</code></a>, 
+<a href="#2483"><code>forgetLocksForObjectsWithGlobalIDs</code></a>, <a href="#5582"><code>lockObjectWithGlobalID</code></a>, <code>lockObject</code> 
+(EditingContext)
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="2543"></a>
+<h3> <a name="//apple_ref/java/instm/DatabaseContext/localSnapshotForGlobalID">localSnapshotForGlobalID</a></h3>
+public next.util.ImmutableHashtable <code>localSnapshotForGlobalID</code>(next.eo.GlobalID <em>globalID</em>)
+
+<P>Returns the snapshot for the object identified by <em>globalID</em>, if there is one; else returns <code>null</code>. Only searches locally (in the transaction scope), not in the Database. <p>
+<B>See also: </B>  
+<a href="#2613"><code>recordSnapshotForGlobalID</code></a>, <a href="#2494"><code>forgetSnapshotForGlobalID</code></a>, <a href="#2618"><code>recordSnapshots</code></a>, 
+<a href="#2722"><code>snapshotForGlobalID</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="5582"></a>
+<h3> <a name="//apple_ref/java/instm/DatabaseContext/lockObjectWithGlobalID">lockObjectWithGlobalID</a></h3>
+public void <code>lockObjectWithGlobalID</code>(next.eo.GlobalID <em>globalID</em>, 
+next.eo.EditingContext <em>anEditingContext</em>);
+
+<P>Overrides the ObjectStore method<code> <a href="#5582"></code><code>lockObjectWithGlobalID</code><code></a> </code>to attempt to lock the database row corresponding to <em>globalID</em> in the underlying database server, on behalf of <em>anEditingContext</em>. If a transaction is not already open at the time of the lock request, the transaction is begun and is held open until either <a href="#2418"><code>commitChanges</code></a> or <a href="#5538"><code>invalidateAllObjects</code></a> is invoked. At that point all locks are released. Raises an exception if unable to obtain the lock.<p>
+<B>See also: </B>  
+<a href="#2673"><code>registerLockedObjectWithGlobalID</code></a>, <a href="#2531"><code>isObjectLockedWithGlobalID</code></a>, <a href="#2478"><code>forgetAllLocks</code></a>, 
+<a href="#2483"><code>forgetLocksForObjectsWithGlobalIDs</code></a>,<code> lockObject</code> (EditingContext)
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="5609"></a>
+<h3> <a name="//apple_ref/java/instm/DatabaseContext/objectsForSourceGlobalID">objectsForSourceGlobalID</a></h3>
+public next.util.ImmutableVector <code>objectsForSourceGlobalID</code>(next.eo.GlobalID <em>globalID</em>, 
+java.lang.String <em>name</em>, next.eo.EditingContext <em>anEditingContext</em>);
+
+<P>Overrides the inherited implementation to service a to-many fault. The snapshot for the source object identified by <em>globalID</em> is located and the Relationship named <em>name</em> is used to construct a qualifier from that snapshot. This qualifier is then used to fetch the requested objects into <em>anEditingContext</em> using the method <a href="#5614"><code>objectsWithFetchSpecification</code></a>.<p>
+<hr WIDTH=25% ALIGN=LEFT>
+<a name="5614"></a>
+<h3> <a name="//apple_ref/java/instm/DatabaseContext/objectsWithFetchSpecification">objectsWithFetchSpecification</a></h3>
+public next.util.ImmutableVector 
+<code>objectsWithFetchSpecification</code>(next.eo.FetchSpecification <em>fetchSpecification</em>, 
+next.eo.EditingContext <em>anEditingContext</em>);
+
+<P>Overrides the inherited implementation to fetch objects from an external store into <em>anEditingContext</em>. The receiver obtains an available DatabaseChannel and issues a fetch with <em>fetchSpecification</em>. If one of these objects is already present in memory, by default this method doesn't overwrite its values with the new values from the database (you can change this behavior; see the <code>setRefreshesRefetchedObjects</code> method in the FetchSpecification class specification).<p>
+You can fine-tune the fetching behavior by adding hints to <em>fetchSpecification</em>'s hints dictionary:<p>
+<ul><li>Use FetchLimitHintKey and PromptAfterFetchLimitHintKey to specify a fetch limit.<br>
+<li>Use CustomQueryExpressionHintKey to provide a raw SQL string for performing the fetch.<br>
+<li>Use PrefetchingRelationshipHintKey to fetch the destinations of relationships along with the objects specified.<br>
+</ul>These hints are described in more detail above in the class description.<p>
+You can use this method to implement "on-demand" locking by using a <em>fetchSpecification</em> that includes locking. For more discussion of this subject, see "<a href="#2877">"Updating And Locking Strategies"</a>" in the class description.<p>
+Raises an exception if an error occurs; the error message indicates the nature of the problem.<p>
+<B>See also: </B>  
+<code>objectsWithFetchSpecification</code> (EditingContext)
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="2558"></a>
+<h3> <a name="//apple_ref/java/instm/DatabaseContext/ownsGlobalID">ownsGlobalID</a></h3>
+public boolean <code>ownsGlobalID</code>(next.eo.GlobalID <em>globalID</em>)
+
+<P>Overrides the inherited implementation to return <code>true</code> if the receiver is responsible for fetching and saving the object identified by <em>globalID</em>, <code>false</code> otherwise. The receiver is determined to be responsible if <em>globalID</em> is a subclass of KeyGlobalID and <em>globalID</em> has an entity from one of the receiver's Database's Model objects.<p>
+<B>See also: </B>  
+ <a href="#2510"><code>handlesFetchSpecification</code></a>, <a href="#2563"><code>ownsObject</code></a> 
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="2563"></a>
+<h3> <a name="//apple_ref/java/instm/DatabaseContext/ownsObject">ownsObject</a></h3>
+public boolean <code>ownsObject</code>(java.lang.Object <em>object</em>)
+
+<P>Overrides the inherited implementation to return <code>true</code> if the receiver is responsible for fetching and saving <em>object</em>, <code>false</code> otherwise. The receiver is determined to be responsible if the entity corresponding to <em>object</em> is in one of the receiver's Database's Model objects.<p>
+<B>See also: </B>  
+ <a href="#2558"><code>ownsGlobalID</code></a>, <a href="#2510"><code>handlesFetchSpecification</code></a> 
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="2583"></a>
+<h3> <a name="//apple_ref/java/instm/DatabaseContext/performChanges">performChanges</a></h3>
+public void <code>performChanges</code>()
+
+<P>Overrides the inherited implementation to construct AdaptorOperations from the DatabaseOperations produced during <a href="#2593"><code>recordChangesInEditingContext</code></a> and <a href="#2628"><code>recordUpdateForObject</code></a>. Invokes the delegate method <a href="../../Interfaces/DatabaseContextDelegates/Frameset.html#" target="_top"><code>databaseContextWillOrderAdaptorOperationsFromDatabaseOperations</code></a> to give the delegate an opportunity to construct alternative AdaptorOperations from the DatabaseOperations. Then invokes the delegate method <a href="../../Interfaces/DatabaseContextDelegates/Frameset.html#" target="_top"><code>databaseContextWillPerformAdaptorOperations</code></a> to let the delegate substitute its own array of AdaptorOperations. Gives the AdaptorOperations to an available AdaptorChannel for execution. If the save succeeds, updates the snapshots in the receiver to reflect the new state of the server. You should never need to invoke this method directly.<p>
+This method throws an exception if the adaptor is unable to perform the operations.<p>
+<B>See also: </B>  
+<em> </em><a href="#2418"><code>commitChanges</code></a>, <a href="#2693"><code>rollbackChanges</code></a><em> 
+</em><p><hr WIDTH=25% ALIGN=LEFT>
+<a name="2588"></a>
+<h3> <a name="//apple_ref/java/instm/DatabaseContext/prepareForSaveWithCoordinator">prepareForSaveWithCoordinator</a></h3>
+public void 
+<code>prepareForSaveWithCoordinator</code>(next.eo.ObjectStoreCoordinator <em>anObjectStoreCoordinator</em>, 
+next.eo.EditingContext <em>anEditingContext</em>)
+
+<P>Overrides the inherited implementation to do whatever is necessary to prepare to save changes. If needed, generates primary keys for any new objects in <em>anEditingContext</em> that are owned by the receiver. This method is invoked before the object graph is analyzed and foreign key assignments are performed. You should never need to invoke this method directly.<p>
+<hr WIDTH=25% ALIGN=LEFT>
+<a name="2593"></a>
+<h3> <a name="//apple_ref/java/instm/DatabaseContext/recordChangesInEditingContext">recordChangesInEditingContext</a></h3>
+public void <code>recordChangesInEditingContext</code>()
+
+<P>Overrides the inherited implementation to construct a list of DatabaseOperations for all changes to objects in the EditingContext that are owned by the receiver. Forwards any relationship changes discovered but not owned by the receiver to the ObjectStoreCoordinator. This method is typically invoked in the course of an ObjectStoreCoordinator saving changes through its <code>saveChangesInEditingContext</code> method. It's invoked after <a href="#2588"><code>prepareForSaveWithCoordinator</code></a> and before <a href="#2583"><code>performChanges</code></a>. You should never need to invoke this method directly.<p>
+<hr WIDTH=25% ALIGN=LEFT>
+<a name="2613"></a>
+<h3> <a name="//apple_ref/java/instm/DatabaseContext/recordSnapshotForGlobalID">recordSnapshotForGlobalID</a></h3>
+public void <code>recordSnapshotForGlobalID</code>(next.util.ImmutableHashtable <em>aSnapshot</em>, 
+next.eo.GlobalID <em>aGlobalID</em>)
+
+<P>Records <em>aSnapshot</em> under <em>globalID</em>. This method only records snapshots locally (in the transaction scope). If you want to record snapshots globally, use the corresponding Database method.<p>
+<B>See also: </B>  
+<a href="#2494"><code>forgetSnapshotForGlobalID</code></a>, <a href="#2543"><code>localSnapshotForGlobalID</code></a>, <a href="#2618"><code>recordSnapshots</code></a>, 
+<a href="#2722"><code>snapshotForGlobalID</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="2618"></a>
+<h3> <a name="//apple_ref/java/instm/DatabaseContext/recordSnapshots">recordSnapshots</a></h3>
+public void <code>recordSnapshots</code>(next.util.ImmutableHashtable <em>snapshots</em>)
+
+<P>Records the objects in <em>snapshots</em>, a dictionary of snapshots. <em>snapshots</em>' keys are GlobalIDs and its values are the corresponding snapshots represented as next.util.ImmutableHashtables. This method only records snapshots locally (in the transaction scope). If you want to record snapshots globally, use the corresponding Database method.<p>
+<B>See also: </B>  
+<a href="#2613"><code>recordSnapshotForGlobalID</code></a>, <a href="#2543"><code>localSnapshotForGlobalID</code></a>, <a href="#2494"><code>forgetSnapshotForGlobalID</code></a>, 
+<a href="#2722"><code>snapshotForGlobalID</code></a><em> 
+</em><p><hr WIDTH=25% ALIGN=LEFT>
+<a name="2628"></a>
+<h3> <a name="//apple_ref/java/instm/DatabaseContext/recordUpdateForObject">recordUpdateForObject</a></h3>
+public void <code>recordUpdateForObject</code>(java.lang.Object <em>object</em>, next.util.ImmutableHashtable <em>changes</em>)
+
+<P>Overrides the inherited method to communicate to the receiver from another CooperatingObjectStore (through the ObjectStoreCoordinator) that <em>changes</em> need to be made to an <em>object</em> in the receiver. For example, an insert of an object in a relationship property might require changing a foreign key property in an object owned by another CooperatingObjectStore. This method can be invoked any time after <a href="#2588"><code>prepareForSaveWithCoordinator</code></a> and before <a href="#2583"><code>performChanges</code></a>.<p>
+<hr WIDTH=25% ALIGN=LEFT>
+<a name="5631"></a>
+<h3> <a name="//apple_ref/java/instm/DatabaseContext/refaultObject">refaultObject</a></h3>
+public void <code>refaultObject</code>(java.lang.Object <em>object</em>, next.eo.GlobalID <em>globalID</em>, 
+next.eo.EditingContext <em>anEditingContext</em>);
+
+<P>Overrides the inherited method to refault the enterprise object <em>object</em> identified by <em>globalID</em> in <em>anEditingContext</em>. (You don't refault to-many relationship arrays, you just recreate them.) This method should be used with caution since refaulting an object doesn't remove the object snapshot from the undo stack. Newly inserted objects should not be refaulted since they can't be refetched from the external store. If you attempt to do this, an exception will be raised.<p>
+<hr WIDTH=25% ALIGN=LEFT>
+<a name="2648"></a>
+<h3> <a name="//apple_ref/java/instm/DatabaseContext/registerChannel">registerChannel</a></h3>
+public void <code>registerChannel</code>(next.eo.DatabaseChannel <em>channel</em>)
+
+<P>Registers <em>channel</em>, which means that it's added to the <code>availableChannel</code> pool used to service fetch and fault requests. You use this method if you need to perform more than one fetch simultaneously.<p>
+<B>See also: </B>  
+<a href="#2383"><code>availableChannel</code></a>, <a href="#2653"><code>registeredChannels</code></a>, <a href="#4884"><code>unregisterChannel</code></a><em> 
+</em><p><hr WIDTH=25% ALIGN=LEFT>
+<a name="2653"></a>
+<h3> <a name="//apple_ref/java/instm/DatabaseContext/registeredChannels">registeredChannels</a></h3>
+public next.util.ImmutableVector <code>registeredChannels</code>()
+
+<P>Returns all of the DatabaseChannels that have been registered for use with the receiver. <p>
+<B>See also: </B>  
+<em> </em><a href="#2648"><code>registerChannel</code></a>, <a href="#2383"><code>availableChannel</code></a>, <a href="#4884"><code>unregisterChannel</code></a><em> 
+</em><p><hr WIDTH=25% ALIGN=LEFT>
+<a name="2673"></a>
+<h3> <a name="//apple_ref/java/instm/DatabaseContext/registerLockedObjectWithGlobalID">registerLockedObjectWithGlobalID</a></h3>
+public void <code>registerLockedObjectWithGlobalID</code>(next.eo.GlobalID <em>globalID</em>)
+
+<P>Registers as a locked object the enterprise object identified by <em>globalID</em>.<p>
+<B>See also: </B>  
+<a href="#2478"><code>forgetAllLocks</code></a>, <a href="#2531"><code>isObjectLockedWithGlobalID</code></a>, <a href="#2483"><code>forgetLocksForObjectsWithGlobalIDs</code></a>, 
+<a href="#5582"><code>lockObjectWithGlobalID</code></a>, <code>lockObject</code> (EditingContext)
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="2693"></a>
+<h3> <a name="//apple_ref/java/instm/DatabaseContext/rollbackChanges">rollbackChanges</a></h3>
+public void <code>rollbackChanges</code>()
+
+<P>Overrides the inherited implementation to instruct the adaptor to roll back the transaction. Rolls back any changed snapshots, and releases all locks.<p>
+<B>See also: </B>  
+<a href="#2583"><code>performChanges</code></a>, <a href="#2418"><code>commitChanges</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="5643"></a>
+<h3> <a name="//apple_ref/java/instm/DatabaseContext/saveChangesInEditingContext">saveChangesInEditingContext</a></h3>
+public void <code>saveChangesInEditingContext</code>(next.eo.EditingContext <em>anEditingContext</em>);
+
+<P>Overrides the inherited implementation to save the changes made in <em>anEditingContext</em>. This message is sent by an EditingContext to its ObjectStore to commit changes. Normally an EditingContext doesn't send this message to a DatabaseContext, but to an ObjectStoreCoordinator. Raises an exception if an error occurs; the error message indicates the nature of the problem.<p>
+<hr WIDTH=25% ALIGN=LEFT>
+<a name="2698"></a>
+<h3> <a name="//apple_ref/java/instm/DatabaseContext/setDelegate">setDelegate</a></h3>
+public void <code>setDelegate</code>(java.lang.Object <em>delegate</em>)
+
+<P>Sets the receiver's delegate to <em>delegate</em>, and propagates the delegate to all of the receiver's DatabaseChannels. DatabaseChannels share the delegate of their DatabaseContext.<p>
+<B>See also: </B>  
+<em> </em><a href="#2462"><code>delegate</code></a><em> 
+</em><p><hr WIDTH=25% ALIGN=LEFT>
+<a name="2712"></a>
+<h3> <a name="//apple_ref/java/instm/DatabaseContext/setUpdateStrategy">setUpdateStrategy</a></h3>
+public void <code>setUpdateStrategy</code>(int <em>strategy</em>)
+
+<P>Sets the update strategy used by the DatabaseContext to <em>strategy</em>. See "<a href="#2877">"Updating And Locking Strategies"</a>" in the class description for information on update strategies. Raises an exception if the receiver has any transactions in progress or if you try to set <em>strategy</em> to UpdateWithPessimisticLocking and the receiver's Database already has snapshots. <p>
+<B>See also: </B>  
+<em> </em><a href="#2732"><code>updateStrategy</code></a><em> 
+</em><p><hr WIDTH=25% ALIGN=LEFT>
+<a name="2722"></a>
+<h3> <a name="//apple_ref/java/instm/DatabaseContext/snapshotForGlobalID">snapshotForGlobalID</a></h3>
+public next.util.ImmutableHashtable <code>snapshotForGlobalID</code>(next.eo.GlobalID <em>globalID</em>)
+
+<P>Returns the snapshot for the object identified by <em>globalID</em>, if there is one; else returns <code>null</code>. Searches first locally (in the transaction scope) and then in the Database.<p>
+<B>See also: </B>  
+<a href="#2613"><code>recordSnapshotForGlobalID</code></a>, <a href="#2543"><code>localSnapshotForGlobalID</code></a>, <a href="#2494"><code>forgetSnapshotForGlobalID</code></a>, 
+<a href="#2618"><code>recordSnapshots</code></a><em> </em>  
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="4884"></a>
+<h3> <a name="//apple_ref/java/instm/DatabaseContext/unregisterChannel">unregisterChannel</a></h3>
+public void <code>unregisterChannel</code>(next.eo.DatabaseChannel <em>channel</em>)
+
+<P>Unregisters the DatabaseChannel <em>channel</em>, which means that it removes it from the <code>availableChannel</code> pool used for database communication (for example, to service fetch and fault requests). <p>
+<B>See also: </B>  
+<em> </em><a href="#2648"><code>registerChannel</code></a>, <a href="#2653"><code>registeredChannels</code></a>, <a href="#2383"><code>availableChannel</code></a><em> 
+</em><p><hr WIDTH=25% ALIGN=LEFT>
+<a name="2732"></a>
+<h3> <a name="//apple_ref/java/instm/DatabaseContext/updateStrategy">updateStrategy</a></h3>
+public int <code>updateStrategy</code>()
+
+<P>Returns the update strategy used by the receiver. The default strategy is UpdateWithOptimisticLocking. See the class description for information on update strategies. <p>
+<B>See also: </B>  
+<em> </em><a href="#2712"><code>setUpdateStrategy</code></a><em> 
+</em><p><hr WIDTH=25% ALIGN=LEFT>
+<a name="2747"></a>
+<h3> <a name="//apple_ref/java/instm/DatabaseContext/valuesForKeys">valuesForKeys</a></h3>
+public next.util.ImmutableHashtable <code>valuesForKeys</code>(next.util.ImmutableVector <em>keys</em>, 
+java.lang.Object <em>object</em>)
+
+<P>Overrides the inherited implementation to return values for the specified <em>keys</em> from the snapshot of <em>object</em>. The returned values are used primarily by another DatabaseContext to extract foreign key properties for objects owned by the receiver. <em> </em> <p>
+<hr WIDTH=25% ALIGN=LEFT>
+<a name="2321"></a>
+<h3> <a name="//apple_ref/java/instm/DatabaseContext/"></a></h3>
+
+ 
+ 
+
+
+<i>Copyright &#169; 1998, Apple Computer, Inc.   All rights
+reserved.</i>
+
+<!-- Last updated: 01/18/98 16:11:04 -->
+
+</body>
+</html>

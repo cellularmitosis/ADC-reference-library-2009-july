@@ -1,0 +1,49 @@
+  <h3>Enqueuing a Delayed Observer</h3><P>
+  The enqueueObserver method records an EODelayedObserver for later change
+  notification. However, enqueuing is usually performed automatically by an
+  EODelayedObserver in its objectWillChange method. Hence, it's typically
+  enough that an object being observed invoke willChange as needed. For
+  example, in Java Client and Application Kit applications, an
+  EODisplayGroup (EOInterface) does this (among many other things) on
+  receiving an ObjectsChangedInEditingContextNotification from its
+  EOEditingContext.<P>
+  Although individual EODelayedObserverQueues can be created, single
+  instance provided by the static method defaultObserverQueue can be used.
+  Using separate queues bypasses the prioritization mechanism, which may
+  cause problems between the objects using the separate queues. By using
+  separate queues, EODelayedObserver subclasses should record a
+  designated EODelayedObserverQueue which is always used, and
+  observerQueue is implemented to return that object
+  To remove an enqueued observer, dequeueObserver method can be used.
+  EODelayedObserver also defines the discardPendingNotification method,
+  which removes the receiver from its designated queue.<P>
+  <h3>Change Notification</h3><P>
+  The actual process of change notification is initiated by the
+  enqueueObserver messages that line observers up to receive notifications.
+  Regardless of how many times enqueueObserver is invoked for a particular
+  observer, that observer is only put in the queue once. The first observer
+  enqueued during the run loop also sets up the EODelayedObserverQueue to
+  receive a message at the end of the run loop. EODelayedObserver sets up
+  this delayed invocation in NSRunLoop.DefaultRunLoopMode, but this mode can
+  be changed or additional modes can be added in which delayed invocation
+  occurs.<P>
+  notifyObserversUpToPriority cycles through the queue of EODelayedObservers
+  in priority order, from ObserverPriorityFirst to the priority given,
+  sending each observer a subjectChanged message. Each time, it returns to
+  the earliest priority (rather than continuing through the queue) in case
+  the message resulted in another EODelayedObserver with a earlier priority
+  being enqueued. This guarantees an optimal delivery of
+  change notifications.<P>
+  <h3>Observer Proxies</h3><P>
+  It may not always be possible for a custom observer class to inherit from
+  EODelayedObserver. To aid such objects in participating in delayed change
+  notifications, the Framework defines a subclass of EODelayedObserver,
+  EOObserverProxy, which implements its subjectChanged method to invoke an
+  action method of custom object. An EOObserverProxy can be created,
+  providing the "real" observer, the action method to invoke, and the
+  priority at which the EOObserverProxy should be enqueued. Then, instead of
+  registering the custom object as an observer of objects, the proxy can be
+  registered(using EOObserverCenter's addObserver). When the proxy receives an
+  objectWillChange message, it enqueues itself for delayed change notification,
+  receives the subjectChanged message from the EODelayedObserverQueue, and then
+  sends the action message to the "real" observer.

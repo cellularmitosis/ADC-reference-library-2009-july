@@ -1,0 +1,129 @@
+<html><head><title>Creating a WebObjects <br>Database Application</title></head>
+<body bgcolor=#ffffff>
+ 
+<a href="Movies.book.html"><IMG SRC="ArrowUp.gif" border=0>Table of Contents</a> <a href="5_Actors.html"><IMG SRC="ArrowLeft.gif" border=0>Previous Section</a>
+ 
+<a name="540">
+<h1> Add a detail display group to the details page</h1>
+</a><a name="541">
+In the previous section, you navigated relationships to access attributes in other entities. Using the <strong>movieRoles</strong> relationship in the Movies entity, you were able to display attributes of a movie's roles. Similarly, you displayed the names of the actors who played a role by navigating two relationships: <strong>movieRoles</strong> to get from a movie to one of its roles and <strong>talent</strong> to get from the role to the actor who played it. Traversing the object graph this way works very well in read-only scenarios where you only want to display information in a related object. However, it doesn't work completely in scenarios where you want to be able to make changes to the related objects.<p>
+</a><a name="505">
+In the next section, you'll give the application the ability to insert, update, and delete movie roles for the selected movie. This read-write scenario requires a slight modification to the way you access movie role information. To be able to insert new movie roles for a movie, you need a WODisplayGroup for managing MovieRole objects.<p>
+</a><a name="578">
+<h2> Disconnect the bindings </h2>
+</a><ol>
+<a name="579">
+<P><li>Inspect the repetition.
+</a><a name="516">
+<P><li>Disconnect the <strong>list</strong> binding.
+</a><a name="580">
+<P><li>Disconnect the <strong>item</strong> binding.
+</a><a name="510">
+<p><center><img src="6_MasDet.fig_2.gif"></center><p>
+</a><a name="582">
+<P><li>Similarly, disconnect the <strong>value</strong> bindings for each of the three string elements.
+</a></ol>
+<a name="583">
+<h2> Delete the movieRole variable</h2>
+</a><ol>
+<a name="584">
+<P><li>Select the <strong>movieRole</strong> variable in the object browser.
+</a><a name="585">
+<P><li>Click the delete button.
+</a><a name="513">
+<p><center><img src="7_InUpDe.fig_1.gif"></center><p>
+</a><a name="586">
+<p>Recall that the <strong>movieRole</strong> variable was created automatically when you bound <strong>movies </strong><img src="arrow.gif"><strong> movieRoles</strong> to the repetition's <strong>list</strong> attribute. Since you disconnected the <strong>list</strong> and <strong>item</strong> bindings, you don't need the <strong>movieRole</strong> variable anymore.<p>
+</a></ol>
+<a name="545">
+<h2> Create a second WODisplayGroup </h2>
+</a><ol>
+<a name="542">
+<P><li>Drag the MovieRole entity from your model file into the MovieDetails component window.
+</a><a name="543">
+<p>WebObjects Builder creates a variable named <strong>movieroles</strong> in the MovieDetails component. <strong>movieroles</strong> is a WODisplayGroup that manages MovieRole objects.<p>
+</a></ol>
+<a name="544">
+<h2> Set up a master-detail relationship</h2>
+</a><a name="281">
+As is, the <strong>movieroles</strong> display group manages <em>all</em> the movie roles in the database, but it should manage only the MovieRole objects that are related to the selected movie. To restrict the objects that <strong>movieroles</strong> manages, you need to set up a <em>master-detail</em> relationship between the <strong>movieroles</strong> and <strong>movies</strong> display groups. <p>
+</a><ol>
+<a name="508">
+<P><li>Add the following <strong>init</strong> method to MovieDetails' script:
+</a><pre><a name="556">	- init {
+</a><a name="557">		[super init];
+</a><a name="559">		[movieroles setDataSource:[[movies dataSource]
+</a><a name="547">			dataSourceQualifiedByKey:@"movieRoles"]];
+</a><a name="562">		return self;
+</a><a name="563">	}
+</a></pre></ol>
+<a name="546">
+The first line of this <strong>init</strong> method invokes any initialization performed by the object's superclass. Whenever you implement an <strong>init</strong> method, include a call to the super class's <strong>init</strong> method. If you omit the call to <strong>super</strong>, your objects won't be fully initialized.<p>
+</a><a name="548">
+The second line of this method assigns a new data source to the <strong>movieroles</strong> display group. A data source-an instance of an EODataSource subclass-is an object that defines a basic interface for providing enterprise objects. It exists primarily as a simple means for a WODisplayGroup or other higher-level class to access a store of objects. For example, when you tell a display group to fetch, it does so by telling its data source to fetch.<p>
+</a><a name="708">
+To restrict the objects that <strong>movieroles</strong> displays, you need to replace <strong>movieroles</strong>' data source with a <em>detail data source</em>. A detail data source is a data source that qualifies (restricts) its set of enterprise objects to an object that's selected in a <em>master data source</em>. A detail data source is set up to provide objects for the destination entity of a particular relationship.<p>
+</a><a name="551">
+The following expression:<p>
+</a><pre><a name="555">[[movies dataSource] dataSourceQualifiedByKey:@"movieRoles"]
+</a></pre><a name="553">
+gets the data source from the <strong>movies</strong> display group and asks it to provide a detail data source. The data source returned by <strong>dataSourceQualifiedByKey:</strong> is set up to provide MovieRole objects that are related to one of <strong>movies</strong>' enterprise objects through the <strong>movieRoles</strong> relationship.<p>
+</a><a name="552">
+<h2> Qualify the detail data source</h2>
+</a><a name="681">
+In a master-detail setup, changes to the detail apply to the objects in the master; for example, adding an object to the detail also adds it to the relationship of the <em>master object</em>. Once you have a detail data source, you can set the master object by sending the detail a <strong>qualifyWithRelationshipKey:ofObject:</strong> message. The detail then uses the master object in evaluating the relationship and applies inserts and deletes to that master object. In the MovieDetails page, this plays out as follows: If you insert a new MovieRole object in the <strong>movieroles</strong> display group, it is also added to the <strong>movieRoles</strong> array of the selected Movie object.<p>
+</a><ol>
+<a name="558">
+<P><li>Modify the <strong>setMovie:</strong> method to look like this:
+</a><pre><a name="732">	- setMovie:aMovie {
+</a><a name="733">		if (aMovie)
+</a><a name="734">			[movies setObjectArray:[NSArray<br>
+				arrayWithObject:aMovie]];
+</a><a name="735">		else
+</a><a name="736">			[movies setObjectArray:nil];
+</a><a name="737">		[movies selectObject:aMovie];
+</a><a name="549">
+</a><a name="560">		// Add the following lines.
+</a><a name="568">		[[movieroles dataSource]
+</a><a name="740">				qualifyWithRelationshipKey:@"movieRoles"
+</a><a name="741">				ofObject:aMovie];
+</a><a name="742">		[movieroles fetch];
+</a><a name="743">	}
+</a></pre></ol>
+<a name="575">
+<h2> Create the repetition bindings</h2>
+</a><ol>
+<a name="561">
+<P><li>Bind the <strong>movieroles</strong> <img src="arrow.gif"> <strong>displayedObjects</strong> method to the repetition's <strong>list</strong> attribute.
+</a><a name="554">
+<p>WebObjects Builder adds the <strong>movieRole</strong> variable back and automatically binds it to the repetition's <strong>item</strong> attribute.<p>
+</a><a name="6086">
+<p><strong>movieRole</strong>'s <strong>displayedObjects</strong> method returns an array of roles in the selected movie. In general, WODisplayGroup's <strong>displayedObjects</strong> method returns the list of objects that you want to display. <p>
+</a><a name="6108">
+<p>Typically, a display group's object array contains more objects than the display group makes available for display. Most display groups fetch all of the objects in the database, and you usually do not want to display all of the objects in the database. To display fewer objects, you associate a qualifier with the display group. After the display group has performed the fetch, it applies the qualifier to the fetched objects. <strong>displayedObjects</strong> returns an array that either contains the entire array of objects after the qualifier has been applied, or if the batch size is greater than 0, it returns the objects in the current batch. <p>
+</a><a name="6690">
+<p>For example, suppose there are one thousand records in the database. A typical display group would fetch all one thousand records. Then suppose the display group had a qualifier that narrows the list down to one hundred objects that should eventually be displayed. If the batch size is 0 (indicating that the display is not being batched), <strong>displayedObjects</strong> returns all one hundred objects that should be displayed. If the batch size is ten, <strong>displayedObjects</strong> returns the ten objects out of those one hundred that currently should be displayed. When the page is loaded, <strong>displayedObjects</strong> returns the first ten objects. When the Next Page button is clicked, <strong>displayedObjects</strong> returns the next ten objects, and so on.<p>
+</a><a name="565">
+<P><li>Bind <strong>movieRole </strong><img src="arrow.gif"><strong> talent </strong><img src="arrow.gif"><strong> firstName</strong> to the first string element.
+</a><a name="567">
+<P><li>Bind <strong>movieRole </strong><img src="arrow.gif"><strong> talent </strong><img src="arrow.gif"><strong> lastName</strong> to the second string element.
+</a><a name="571">
+<P><li>Bind <strong>movieRole </strong><img src="arrow.gif"><strong> roleName</strong> to the last string element.
+</a></ol>
+
+<P>
+ 
+<a href="Movies.book.html"><IMG SRC="ArrowUp.gif" border=0>Table of Contents</a> <a href="7_InUpDe.html"><IMG SRC="ArrowRight.gif" border=0>Next Section</a>
+<P>
+
+
+
+<!-- This file was created with Quadralay WebWorks Publisher 3.0.9 -->
+<!-- -->
+<!-- For more information on how this document, and how the rest of -->
+<!-- this server was created, email yourEmail@xyzcorp.com -->
+<!-- -->
+<!-- Last updated: 02/07/97 17:30:44 -->
+
+</body>
+</html>

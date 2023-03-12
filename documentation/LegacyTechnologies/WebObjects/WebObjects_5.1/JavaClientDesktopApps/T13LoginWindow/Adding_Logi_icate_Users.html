@@ -1,0 +1,162 @@
+<HTML>
+	<HEAD>
+		<meta http-equiv="content-type" content="text/html;charset=iso-8859-1">
+		<meta name="generator" content="XML_Publisher">
+		<meta name="Copyright" content="Copyright 2001 Apple Computer, Inc. All Rights Reserved.">
+        <title>Adding
+Logic to Authenticate Users</title>
+		</HEAD>
+	<BODY bgcolor="#ffffff">
+<!-- start of header -->
+<!--#include virtual="/includes/framesetheader" -->
+<!-- end of header --> <!-- insert Show/Hide frames -->
+<script type="text/javascript" language="JavaScript"><!--
+function loadFrames(){
+if (top == self || (parent.frames[1].name != content))
+    top.location.href = 'index.html?' + location.href;
+}
+
+if (self != top) {
+  // loaded in frames
+  document.write('<a href="'+self.location+'" target="_top"><img src="../images/hideframes.gif" border="0" alt="Hide Frames"></a>');
+  }
+else {
+  // not loaded frames
+	document.write('<a href="JavaScript:loadFrames()"><img src="../images/showframes.gif" border="0" alt="Show Frames"></a>');
+}
+//--></script>
+<!-- end Show/Hide frames -->
+<a href="Building_th_r_Interface.html" target="content"><img src="../images/previous.gif" border="0"></a>&nbsp;<a href="Restricting_Access.html" target="content"><img src="../images/next.gif" border="0"></a>&nbsp;<!-- apple_doc:infillMarkerTop -->  
+<!-- apple_doc: pageHeadingStart --><a name = "TPXREF40"></a><a name="-647015"></a><h2><font face="Lucida Grande,Helvetica,Arial">Adding
+Logic to Authenticate Users</font></h2><!-- apple_doc: pageHeadingEnd -->
+
+<p>Now that you have a user interface for the login window, you
+need to add logic to authenticate users. The first step is to extract
+the values of the two text fields in the nib file. To do this, you
+need access to the text fields in the nib file's controller class,
+as described in  <a href="../NonDirectJavaClient/iProgrammati_PXREF27.html" target="_top">"Programmatic Access to Interface Components"</a>.
+Add an instance variable of type EOTextField for both of the text
+fields in the nib file. The instance variable's names must correspond
+to the name of the outlets with which the text fields are connected.</p>
+<pre>public EOTextField username, password;</pre>
+<p>Now, add methods for the actions you added to the nib file.
+You added two actions, <code>clear</code> and <code>login</code>,
+so add two methods with those names to the nib file's controller
+class.</p>
+<pre>public void login() {}
+public void clear() {}</pre>
+<p>The <code>clear</code> method simply clears the
+values of the text fields. Add this code to it:</p>
+<pre>username.setText(&quot;&quot;);
+password.setText(&quot;&quot;);</pre>
+<p>The <code>login</code> method
+authenticates users by sending the user-entered values from the
+User Name and Password text fields to remote methods on the server-side
+application, which query a data store to perform the authentication.
+If a user successfully authenticates, the client-side method that
+invoked the server-side method receives an object (an EOGlobalID)
+representing the user who authenticated.</p>
+<p>Add the method in  <a href="#BACICFFA">Listing 20-1</a> to the nib file's controller class to perform
+the remote method invocation. If the user successfully authenticates,
+the method returns <code>true</code>.</p>
+<a name = "BACICFFA"></a><a name="-647730"></a><p><b><font face="Geneva,Helvetica,Arial" size="2">Listing 20-1 Client-side
+login method</font></b></p>
+<pre>public boolean clientSideRequestLogin() {
+    EOGlobalID person =
+        (EOGlobalID)(_distributedObjectStore().invokeStatelessRemoteMethodWithKeyPath(
+        &quot;session&quot;, &quot;clientSideRequestLogin&quot;, new Class[] {String.class, String.class},
+        new  Object[] {username.getText(), password.getText()}));
+    if (person != null) {
+        EOEditingContext ec = new EOEditingContext();
+        _user = (Person)(ec.faultForGlobalID(person, ec));
+        return true;
+    }
+    else
+        return false;
+}</pre>
+<p>Remember to also add the method that returns the client's
+parent object store, as described in  <a href="../DistributionLayer/iDistributed_PXREF43.html" target="_top">"Distributed Object Store"</a> since
+the remote method invocation is invoked on the client's parent
+object store.</p>
+<p>Now, invoke the client-side method <code>clientSideRequestLogin</code> in
+the <code>login</code> method, adding a
+conditional based on the response, as shown in  <a href="#BACICHHE">Listing 20-2</a>.</p>
+<a name = "BACICHHE"></a><a name="-647888"></a><p><b><font face="Geneva,Helvetica,Arial" size="2">Listing 20-2 login
+method</font></b></p>
+<pre>public void login() {
+     if (this.clientSideRequestLogin()) {
+        //allow user into application
+     }
+     else {
+        EODialogs.runErrorDialog(&quot;Login failed&quot;, &quot;Login failed. Please try
+          again.&quot;);
+        }
+    }</pre>
+<p>This is all you need to do on the client side. Now, you need
+to add the method on the server-side that actually performs the
+authentication. The remote method invocation specifies the keypath
+"session" and the method <code>clientSideRequestLogin</code>,
+so add a method in <code>Session.java</code> with
+that name, as shown in  <a href="#BACIIICC">Listing 20-3</a>.</p>
+<a name = "BACIIICC"></a><a name="-647924"></a><p><b><font face="Geneva,Helvetica,Arial" size="2">Listing 20-3 Authentication
+in <code>Session.java</code></font></b></p>
+<pre>public EOGlobalID clientSideRequestLogin(String username, String password) {
+        EOGenericRecord user;
+        EOEditingContext editingContext = new EOEditingContext();
+        
+        NSMutableDictionary userCredentials = new NSMutableDictionary();
+        userCredentials.setObjectForKey(username, &quot;username&quot;);
+        userCredentials.setObjectForKey(password, &quot;userPassword&quot;);
+        
+      NSArray foundObjects = EOUtilities.objectsMatchingValues(editingContext, &quot;Person&quot;,
+        userCredentials);
+        if (foundObjects.count() == 1) {
+            
+            user = (EOGenericRecord)foundObjects.objectAtIndex(0);
+
+            return(editingContext.globalIDForObject(user));
+        }
+        else {
+            return null;
+        }
+    }</pre>
+<p>This method constructs a dictionary based on the values passed
+in from the client side (the user-entered name and password). Then,
+using the class <code>com.webobjects.eoaccess.EOUtilities</code>,
+the method performs a fetch against the data store in the Person
+entity. If a record matching the user's credentials is found,
+the method returns the EOGlobalID for that user.</p>
+<p>The client-side method <code>clientSideRequestLogin</code> receives
+the result of this method, and if it is not <code>null</code>,
+allows the user into the application. If it receives <code>null</code>,
+however, it displays a dialog with an error message, as shown in  <a href="#TPXREF43">Figure 20-7</a>.</p>
+<br><a name = "TPXREF43"></a><a name="-648471"></a><p><b><font face="Geneva,Helvetica,Arial" size="2">Figure
+20-7 Login failed</font></b></p> <img src = "../Art/loginfailed.gif" alt = "[image: ../Art/loginfailed.gif]">
+
+<p>Of course, authentication fails if you don't add users to
+the entity in the data store on which you perform the fetch specification,
+so remember to add users.</p>
+
+<br>
+    <!-- insert Show/Hide frames -->
+<script type="text/javascript" language="JavaScript"><!--
+function loadFrames(){
+if (top == self || (parent.frames[1].name != content))
+    top.location.href = 'index.html?' + location.href;
+}
+
+if (self != top) {
+  // loaded in frames
+  document.write('<a href="'+self.location+'" target="_top"><img src="../images/hideframes.gif" border="0" alt="Hide Frames"></a>');
+  }
+else {
+  // not loaded frames
+	document.write('<a href="JavaScript:loadFrames()"><img src="../images/showframes.gif" border="0" alt="Show Frames"></a>');
+}
+//--></script>
+<!-- end Show/Hide frames -->
+<a href="Building_th_r_Interface.html" target="content"><img src="../images/previous.gif" border="0"></a>&nbsp;<a href="Restricting_Access.html" target="content"><img src="../images/next.gif" border="0"></a>&nbsp;<!-- apple_doc:infillMarkerBottom --> <br><br><p><hr><font face="Geneva,Helvetica,Arial" size="2">&#169; 2002 Apple Computer, Inc. (Last Updated May 1, 2002)</font></p><!-- start of footer -->
+<!--#include virtual="/includes/framesetfooter" -->
+<!-- end of footer -->
+</body>
+</html>

@@ -1,0 +1,339 @@
+<html><head>
+<script language="JavaScript" src="../../../../../../../../../../frametest.js"></script>
+<title>The ODBCEOAdaptor Framework</title></head>
+<body bgcolor=#ffffff>
+
+<!-- start of header -->
+<!--#include virtual="/includes/framesetheader" -->
+<!-- end of header -->
+
+<!--start of path -->
+<font face="Geneva,Helvetica,Arial" size="1">
+<b>PATH<spacer type="horizontal" size="5">&nbsp;</b>
+ <a href="../../../../../../../../../../webobjects.html" target="_top">WebObjects 4.0 Documentation</a> <b>&gt;</b>
+ <a href="../frameset.html" target="_top">ODBCEOAdaptor Reference</a>
+</font>
+<br><br>
+<!--end of path -->
+
+<!-- start of navigation -->
+<a href="ODBCAdaptor.html"><img src="../../../../../../../../../../images/next.gif" border="0"></a>
+<!-- end of navigation -->
+
+
+<hr><br>
+ 
+<h1><a name="//apple_ref/java/cl/The ODBCEOAdaptor Framework">The ODBCEOAdaptor Framework</a>
+ <BR>
+</h1>
+<p><B>Framework:</B><BR>  
+com.apple.yellow.odbceoadaptor
+
+<p><B>Header File Directories:</B><BR>  
+System/Developer/Java/Headers
+
+<p><a name="1261">
+<h1>Introduction </h1>
+</a>The ODBCEOAdaptor framework is a set of classes that allow your programs to connect to an ODBC server. These classes provide ODBC-specific method implementations for the EOAccess framework's EOAdaptor, EOAdaptorChannel, EOAdaptorContext, and EOSQLExpression abstract classes.<p>
+ODBC (Open Data Base Connectivity) defines a standard interface that Windows applications can use to access any data source. Unlike the other Enterprise Objects Frameworks adaptors that support a single type of database, the ODBC adaptor supports any data source that has an ODBC driver. Consequently, in addition to having standard adaptor features, the ODBC adaptor also manages information relating to the driver and to the data types defined by the data source the driver supports.<p>
+The following table lists the classes in the ODBCEOAdaptor Framework and provides a brief description of each class.<p>
+<Table Border="3">
+<caption></caption>
+<tr><th><b>Class
+</b></th><th><b>Description
+</b></th></tr>
+<tr><td scope="row">ODBCAdaptor
+</td><td>Represents a single connection to a ODBC database server, and is responsible for 
+keeping login and model information, performing ODBC-specific formatting of SQL 
+expressions, and reporting errors. 
+</td></tr>
+<tr><td scope="row">ODBCChannel
+</td><td>Represents an independent communication channel to the database server its 
+ODBCAdaptor is connected to.
+</td></tr>
+<tr><td scope="row">ODBCContext
+</td><td>Represents a single transaction scope on the database server to which its adaptor object 
+is connected.
+</td></tr>
+<tr><td scope="row">ODBCSQLExpression
+</td><td>Defines how to build SQL statements for ODBCChannels.
+</td></tr>
+
+</Table>
+
+<Table>
+<tr><td scope="row">
+</Table>
+<p>
+<a name="1891">
+<hr width=50% align=left>
+<h2> The Connection Dictionary</h2>
+</a>The connection dictionary contains items needed to connect to an ODBC server, such as the data source (it's common to omit the user name and password from the connection dictionary, and prompt users to enter those values in a login panel). The keys of this dictionary identify the information the server expects, and the values of those keys are the values that the adaptor uses when trying to connect to the server. For ODBC the required keys are as follows:<p>
+dataSource<p>userName<p>password<p>The connection dictionary can also optionally have the keys connectionString, typeInfo, and driverInfo. <p>
+The connectionString contains the user name, password, and data source. If the connectionString key is present in the connection dictionary, the other login keys are ignored and this string is used to connect to the database.<p>
+The typeInfo key refers to the typeInfo dictionary, which is used to cache type information in the connection dictionary. This is done because different ODBC drivers work with different data types. Caching type information in the connection dictionary avoids costly connections to the driver and the database. The typeInfo dictionary contains the following information for every type in your database:<p>
+<blockquote><pre>defaultODBCType = (&lt;CHAR/TIMESTAMP/BIT/...&gt;, ...)<br>precision = &lt;precision&gt;<br>minScale = &lt;minScale&gt;<br>maxScale = &lt;maxScale&gt;<br>isUnsigned = &lt;YES/NO&gt;<br>isNullable = &lt;YES/NO&gt;<br>isSearchable = &lt;YES/NO&gt;<br>createParams = &lt;0/1/2&gt;
+</pre></blockquote><p>
+Likewise, the driverInfo key refers to the driverInfo dictionary, which stores information about the driver, such as its name and version. This information is also cached in the connection dictionary.<p>
+<a name="1901">
+<hr width=50% align=left>
+<h2> Locking</h2>
+</a>All adaptors use the database server's native locking facilities to lock rows on the server. If you're using the Microsoft SQL Server, the ODBC adaptor locks a row by using the HOLDLOCK keyword in SELECT statements. In all other cases it uses the SELECT... FOR UPDATE... statement. Locking occurs when:<p>
+<ul><li>You send the adaptor channel a <a href="ODBCChannel.html#108"><code>selectAttributesWithFetchSpecification</code></a> message with <code>true</code> specified as the value for the <code>lock</code> keyword.
+<li>You explicitly lock an object's row with the EODatabaseContext's <code>lockObjectWithGlobalID</code> message.
+<li>You set pessimistic locking at the database level and fetch objects.
+</ul><a name="1909">
+<hr width=50% align=left>
+<h2> Data Type Mapping</h2>
+</a>Every adaptor provides a mapping between each server data type and the Objective-C type to which a database value will be coerced when it's fetched from the database. ODBC adds an intermediate layer: the generic ODBC type (identifier) to which each database data type maps.<p>
+For example, the following table shows the mapping from some of the Microsoft Access database data types to ODBC to Objective-C and Java:<p>
+<Table Border="3">
+<caption></caption>
+<tr><th><b>Microsoft Access 
+Database Type	
+</b></th><th><b>Generic ODBC Type 	
+</b></th><th><b>Objective-C Type
+</b></th><th><b>Java Data Type
+</b></th></tr>
+<tr><td scope="row">TEXT        
+</td><td>SQL_VARCHAR   
+</td><td>NSString
+</td><td>String
+</td></tr>
+<tr><td scope="row">CURRENCY      
+</td><td>SQL_NUMERIC      
+</td><td>NSDecimalNumber
+</td><td>BigDecimal
+</td></tr>
+<tr><td scope="row">BINARY         
+</td><td>SQL_BINARY      
+</td><td>NSData
+</td><td>NSData
+</td></tr>
+<tr><td scope="row">DATETIME      
+</td><td>SQL_TIMESTAMP  
+</td><td>NSCalendarDate
+</td><td>NSGregorianDate
+</td></tr>
+
+</Table>
+
+<Table>
+<tr><td scope="row">
+</Table>
+<p>
+The following table lists the mapping between generic ODBC types and Objective-C types.<p>
+<Table Border="3">
+<caption></caption>
+<tr><th><b>ODBC Data Type
+</b></th><th><b>Objective-C Data Type
+</b></th><th><b>Java Data Type
+</b></th></tr>
+<tr><td scope="row">SQL_VARCHAR
+</td><td>NSString
+</td><td>String
+</td></tr>
+<tr><td scope="row">SQL_CHAR
+</td><td>NSString
+</td><td>String
+</td></tr>
+<tr><td scope="row">SQL_LONGVARCHAR
+</td><td>NSString
+</td><td>String
+</td></tr>
+<tr><td scope="row">SQL_DECIMAL
+</td><td>NSDecimalNumber
+</td><td>BigDecimal
+</td></tr>
+<tr><td scope="row">SQL_NUMERIC
+</td><td>NSDecimalNumber
+</td><td>BigDecimal
+</td></tr>
+<tr><td scope="row">SQL_BIGINT
+</td><td>NSNumber
+</td><td>Number
+</td></tr>
+<tr><td scope="row">SQL_SMALLINT
+</td><td>NSNumber
+</td><td>Number
+</td></tr>
+<tr><td scope="row">SQL_INTEGER
+</td><td>NSNumber
+</td><td>Number
+</td></tr>
+<tr><td scope="row">SQL_REAL
+</td><td>NSNumber
+</td><td>Number
+</td></tr>
+<tr><td scope="row">SQL_FLOAT
+</td><td>NSNumber
+</td><td>Number
+</td></tr>
+<tr><td scope="row">SQL_DOUBLE
+</td><td>NSNumber
+</td><td>Number
+</td></tr>
+<tr><td scope="row">SQL_BIT
+</td><td>NSNumber
+</td><td>Number
+</td></tr>
+<tr><td scope="row">SQL_TINYINT
+</td><td>NSNumber
+</td><td>Number
+</td></tr>
+<tr><td scope="row">SQL_VARBINARY
+</td><td>NSData
+</td><td>NSData
+</td></tr>
+<tr><td scope="row">SQL_BINARY
+</td><td>NSData
+</td><td>NSData
+</td></tr>
+<tr><td scope="row">SQL_LONGVARBINARY
+</td><td>NSData
+</td><td>NSData
+</td></tr>
+<tr><td scope="row">SQL_TIMESTAMP
+</td><td>NSCalendarDate
+</td><td>NSGregorianDate
+</td></tr>
+<tr><td scope="row">SQL_DATE
+</td><td>NSCalendarDate
+</td><td>NSGregorianDate
+</td></tr>
+<tr><td scope="row">SQL_TIME
+</td><td>NSCalendarDate
+</td><td>NSGregorianDate
+</td></tr>
+
+</Table>
+
+<Table>
+<tr><td scope="row">
+</Table>
+<p>
+<a name="2208">
+<hr width=50% align=left>
+<h2> </h2>
+</a><a name="2995">
+<hr width=50% align=left>
+<h2> </h2>
+</a><a name="2996">
+<hr width=50% align=left>
+<h2> Prototype Attributes</h2>
+</a>The ODBCEOAdaptor Framework provides the following set of prototype attributes:<p>
+<Table Border="3">
+<caption></caption>
+<tr><th><b>Name
+</b></th><th><b>External Type
+</b></th><th><b>Value Class Name
+</b></th><th><b>Other Attributes
+</b></th></tr>
+<tr><td scope="row">binaryID
+</td><td>BINARY
+</td><td>NSData
+</td><td>width = 12
+</td></tr>
+<tr><td scope="row">city
+</td><td>CHAR
+</td><td>NSString
+</td><td>columnName = CITY
+width = 50
+</td></tr>
+<tr><td scope="row">date
+</td><td>DATETIME
+</td><td>NSCalendarDate
+</td><td>columnName = ""
+</td></tr>
+<tr><td scope="row">longText
+</td><td>LONGTEXT
+</td><td>NSString
+</td><td>&nbsp;</td></tr>
+<tr><td scope="row">money
+</td><td>CURRENCY
+</td><td>NSDecimalNumber
+</td><td>columnName = ""
+</td></tr>
+<tr><td scope="row">phoneNumber
+</td><td>CHAR
+</td><td>NSString
+</td><td>columnName = PHONE
+width = 20
+</td></tr>
+<tr><td scope="row">rawImage
+</td><td>LONGBINARY
+</td><td>NSData
+</td><td> columnName = RAW_IMAGE
+</td></tr>
+<tr><td scope="row">state
+</td><td>CHAR
+</td><td>NSString
+</td><td>columnName = STATE;
+width = 2
+</td></tr>
+<tr><td scope="row">streetAddress
+</td><td>CHAR
+</td><td>NSString
+</td><td>columnName = STREET_ADDRESS
+width = 100
+</td></tr>
+<tr><td scope="row">tiffImage
+</td><td>LONGBINARY
+</td><td>NSImage
+</td><td>adaptorValueConversionMethodName = TIFFRepresentation
+columnName = PHOTO
+valueFactoryMethodName = "imageWithData:"; 
+</td></tr>
+<tr><td scope="row">uniqueID
+</td><td>LONG
+</td><td>NSNumber
+</td><td>columnName = ""
+valueType = i
+</td></tr>
+<tr><td scope="row">zipCode
+</td><td>CHAR
+</td><td>NSString
+</td><td>columnName = ZIP
+width = 10
+</td></tr>
+
+</Table>
+
+<Table>
+<tr><td>
+</Table>
+<p>
+<a name="2132">
+<hr width=50% align=left>
+<h2> Generating Primary Keys</h2>
+</a>Each adaptor provides a database-specific implementation of the method <code>primaryKeyForNewRowWithEntity:</code> for generating primary keys.  The ODBCChannel's implementation uses a table named EO_PK_TABLE to keep track of the next available primary key value for a given table. The table contains a row for each table for which the adaptor provides primary key values.<p>
+ODBCChannel's implementation of <code>primaryKeyForNewRowWithEntity:</code> attempts to select a value from the EO_PK_TABLE for the new row's table. If the attempt fails because the table doesn't exist, the adaptor creates the table using the following SQL statement:<p>
+<blockquote><pre>CREATE TABLE EO_PK_TABLE (
+</pre></blockquote><p>
+<blockquote><pre>NAME TEXT_TYPE(40),
+</pre></blockquote><p>
+<blockquote><pre>PK NUMBER_TYPE
+</pre></blockquote><p>
+<blockquote><pre>)
+</pre></blockquote><p>
+where <em>TEXT_TYPE</em> is the external (database) type for characters and <em>NUMBER_TYPE</em> is the external type for the table's primary key attribute. The ODBC adaptor sets the PK value for each row to the corresponding table's maximum primary key value plus one. After determining a primary key value for the new row, the ODBC adaptor updates the counter in the corresponding row in EO_PK_TABLE.<p>
+For more information on this topic, see <em>Enterprise Objects Framework Developer's Guide</em>.<p>
+<a name="2157">
+<hr width=50% align=left>
+<h2> Bind Variables</h2>
+</a><ul><li>The ODBCAdaptor uses bind variables. A bind variable is a placeholder used in an SQL statement that is replaced with an actual value after the database server determines an execution plan.
+</ul><p>
+
+<hr><br>
+<a href="../frameset.html" target="_top">[TOC]</a> [Prev] <a href="ODBCAdaptor.html">[Next]</a>
+<hr><br>
+
+
+
+<i>Copyright &#169; 1998, Apple Computer, Inc.   All rights
+reserved.</i>
+
+<!-- Last updated: 09/15/98 11:38:29 -->
+
+</body>
+</html>

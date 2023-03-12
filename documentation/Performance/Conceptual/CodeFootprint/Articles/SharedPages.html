@@ -1,0 +1,184 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+<head>
+	<title>Code Size Performance Guidelines: Reducing Shared Memory Pages</title>
+	<meta id="Generator" name="Generator" content="Gutenberg"/>
+	<meta id="GeneratorVersion" name="GeneratorVersion" content="v132"/>
+	<meta http-equiv="content-type" content="text/html;charset=utf-8"/>
+	<meta id="Copyright" name="Copyright" content="Copyright 2009 Apple Inc. All Rights Reserved."/>
+	<meta id="IndexTitle" name="IndexTitle" content="Reducing Shared Memory Pages"/>
+	<meta id="xcode-display" name="xcode-display" content="render"/>
+	<meta id="toc-file" name="toc-file" content="../toc.html"/>
+	<meta id="RESOURCES" content="../../../../Resources" />
+	
+	<link rel="stylesheet" type="text/css" href="../../../../Resources/CSS/frameset_styles.css"/>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/lib/prototype.js"></script>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/lib/scriptaculous.js"></script>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/page.js"></script>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/pedia.js"></script>
+	<!--[if lte IE 6]>
+		<style type="text/css">
+			/*<![CDATA[*/ 
+			html {overflow-x:auto; overflow-y:hidden;  }
+			/*]]>*/
+		</style>
+	<![endif]-->
+</head>
+<body bgcolor="#ffffff" onload="initialize_page();"><a name="//apple_ref/doc/uid/20001863" title="Reducing Shared Memory Pages"></a>
+    <noscript>
+    <div id="tocMenu">
+        <iframe id="toc_content" name="toc_content" SRC="../toc.html" width="210" height="100%" align="left" frameborder="0">This document set is best viewed in a browser that supports iFrames.</iframe>
+    </div>
+    </noscript>
+    <div id="bodyText">
+        <a name="top"></a>
+        <div class="hideOnPrint hideInXcode">
+        <!-- start of header -->
+        <!--#include virtual="/includes/framesetheader" -->
+        <!-- end of header -->
+        </div>
+        
+        <!-- start of path -->
+<div class="breadcrumb hideOnPrint hideInXcode"><a href="http://developer.apple.com/" target="_top">ADC Home</a> &gt; <a href="../../../../../referencelibrary/index.html#//apple_ref/doc/uid/TP30000943" target="_top">Reference Library</a> &gt; <a href="../../../../index.html#//apple_ref/doc/uid/TP30000440" target="_top">Guides</a> &gt; <a href="../../../index.html#//apple_ref/doc/uid/TP30000440-TP30000430" target="_top">Performance</a> &gt; <a href="../../../Tools-date.html#//apple_ref/doc/uid/TP30000440-TP30000430-TP30000463" target="_top">Tools</a> &gt; <a href="../index.html" target="_top">Code Size Performance Guidelines</a> &gt; </div><br class="hideInXcode"/><!-- end of path -->
+        
+        <div class="mini_nav_text" align="left">
+        <span class="navButtons">
+        <a href="ImprovingLocality.html">&lt; Previous Page</a><span style="margin-left: 8px"><a href="ReducingExports.html">Next Page &gt;</a></span>
+        </span>
+        <span id="showHideTOCUpperSpan">
+        <a href="#" onclick="showHideTOC();"><img src="../../../../Resources/Images/show_toc_icon.gif" width="15" height="14" border="0" style="margin-bottom: -2px;" alt="" hideText="Hide TOC" showText="Show TOC" /></a> <a href="#" onclick="showHideTOC();">Hide TOC</a>
+        </span>
+        </div>
+        
+        
+        <a name="//apple_ref/doc/uid/20001863-CJBJFIDD" title="Reducing Shared Memory Pages"></a><hr /><H1>Reducing Shared Memory Pages</H1>
+
+<p> As noted in <span class="content_text"><a href="MachOOverview.html#//apple_ref/doc/uid/20001860-BAJGJEJC">“Overview of the Mach-O Executable Format,”</a></span> the data in the <code>__DATA</code> segment of a Mach-O binary is writable and thus shareable (via copy-on-write). Writable data slows down paging performance in low-memory situations by increasing the number of pages that may need to be written to disk. For frameworks, writable data is shared initially but has the potential to be replicated to the memory space of each process. </p>
+<p>Reducing the amount of dynamic or non-constant data in an executable can have a significant impact on performance, especially for frameworks The following sections show you how to reduce the size of your executable’s <code>__DATA</code> segment, and thus reduced the number of shared memory pages.</p>
+
+<!-- This template is being used for both PDF and HTML. -->
+
+    
+    <!-- TopicBook.pm uses this template for its miniTOCs, but needs a different title. -->
+    <h4>Contents:</h4>
+    
+    
+    <p class="blockquote">
+    
+        
+			
+			
+				<a href="SharedPages.html#//apple_ref/doc/uid/20001863-101955-BBCBBBIH">Declaring Data as const</a>
+				
+			<br/>
+			
+        
+			
+			
+				<a href="SharedPages.html#//apple_ref/doc/uid/20001863-102402-BBCCAEJC">Initializing Static Data</a>
+				
+			<br/>
+			
+        
+			
+			
+				<a href="SharedPages.html#//apple_ref/doc/uid/20001863-102528-TPXREF110">Avoiding Tentative-Definition Symbols</a>
+				
+			<br/>
+			
+        
+			
+			
+				<a href="SharedPages.html#//apple_ref/doc/uid/20001863-102597-TPXREF111">Analyzing Mach-O Executables</a>
+				
+			<br/>
+			
+        
+
+    </p><br/>
+
+<a name="//apple_ref/doc/uid/20001863-101955" title="Declaring Data as const"></a><a name="//apple_ref/doc/uid/20001863-101955-BBCBBBIH" title="Declaring Data as const"></a><h2>Declaring Data as const</h2><a name="//apple_ref/doc/uid/20001863-DontLinkElementID_89"></a>
+<p>The easiest way to make the <code>__DATA</code> segment smaller is to mark more globally scoped data as constant. <a name="//apple_ref/doc/uid/20001863-DontLinkElementID_90"></a>Most of the time, it’s easy to mark data as constant. For example, if you’re never going to modify the elements in an array, you should include the <code>const</code> keyword in the array declaration, as shown here:</p>
+<div class="codesample"><table><tr><td scope="row"><pre>const int fibonacci_table[8] = {1, 1, 2, 3, 5, 8, 13, 21};<span></span></pre></td></tr></table></div>
+<p>Remember to mark pointers as constant (when appropriate). In the following example, the strings <code>"a"</code> and <code>"b"</code> are constant, but the array pointer <code>foo</code> is not:</p>
+<div class="codesample"><table><tr><td scope="row"><pre>static const char *foo[] = {"a", "b"};<span></span></pre></td></tr><tr><td scope="row"><pre>foo[1] = "c";       // OK: foo[1] is not constant.<span></span></pre></td></tr></table></div>
+<p>To mark the entire declaration as constant, you need to add the <code>const</code> keyword to the pointer to make the pointer constant. In the following example, both the array and its contents are constant:</p>
+<div class="codesample"><table><tr><td scope="row"><pre>static const char *const foo[] = {"a", "b"};<span></span></pre></td></tr><tr><td scope="row"><pre>foo[1] = "c";       // NOT OK: foo[1] is constant.<span></span></pre></td></tr></table></div>
+<p>Sometimes you may want to rewrite your code to separate out the constant data. The following example contains an array of structures in which only one field is declared <code>const</code>. Because the entire array isn’t declared <code>const</code>, it is stored in the <code>__DATA</code> segment. </p>
+<div class="codesample"><table><tr><td scope="row"><pre>struct {<span></span></pre></td></tr><tr><td scope="row"><pre>    const char *imageName;<span></span></pre></td></tr><tr><td scope="row"><pre>    NSImage *image;<span></span></pre></td></tr><tr><td scope="row"><pre>} images[100] = {<span></span></pre></td></tr><tr><td scope="row"><pre>    {"FooImage", nil},<span></span></pre></td></tr><tr><td scope="row"><pre>    {"FooImage2", nil}<span></span></pre></td></tr><tr><td scope="row"><pre>    // and so on<span></span></pre></td></tr><tr><td scope="row"><pre>};<span></span></pre></td></tr></table></div>
+<p>To store as much of this data as possible in the <code>__TEXT</code> segment, create two parallel arrays, one marked constant and one not:</p>
+<div class="codesample"><table><tr><td scope="row"><pre>const char *const imageNames[100] = { "FooImage", /* . . . */ };<span></span></pre></td></tr><tr><td scope="row"><pre>NSImage *imageInstances[100] = { nil, /* . . . */ };<span></span></pre></td></tr></table></div>
+<p>If an uninitialized data item contains pointers, the compiler can’t store the item in the <code>__TEXT</code> segment. Strings end up in the <code>__TEXT</code> segment’s <code>__cstring</code> section but the rest of the data item, including the pointers to the strings, ends up in the <code>__DATA</code> segment’s <code>const</code> section. In the following example, <code>daytimeTable</code> would end up split between the <code>__TEXT</code> and <code>__DATA</code> segments, even though it’s constant:</p>
+<div class="codesample"><table><tr><td scope="row"><pre>struct daytime {<span></span></pre></td></tr><tr><td scope="row"><pre>    const int value;<span></span></pre></td></tr><tr><td scope="row"><pre>    const char *const name;<span></span></pre></td></tr><tr><td scope="row"><pre>};<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>const struct daytime daytimeTable[] = {<span></span></pre></td></tr><tr><td scope="row"><pre>    {1, "dawn"},<span></span></pre></td></tr><tr><td scope="row"><pre>    {2, "day"},<span></span></pre></td></tr><tr><td scope="row"><pre>    {3, "dusk"},<span></span></pre></td></tr><tr><td scope="row"><pre>    {4, "night"}<span></span></pre></td></tr><tr><td scope="row"><pre>};<span></span></pre></td></tr></table></div>
+<p>To place the whole array in the <code>__TEXT</code> segment, you must rewrite this structure so it uses a fixed-size char array instead of a string pointer, as shown in the following example:</p>
+<div class="codesample"><table><tr><td scope="row"><pre>struct daytime {<span></span></pre></td></tr><tr><td scope="row"><pre>    const int value;<span></span></pre></td></tr><tr><td scope="row"><pre>    const char name[6];<span></span></pre></td></tr><tr><td scope="row"><pre>};<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>const struct daytime daytimeTable[] = {<span></span></pre></td></tr><tr><td scope="row"><pre>    {1, {'d', 'a', 'w', 'n', '\0'}},<span></span></pre></td></tr><tr><td scope="row"><pre>    {2, {'d', 'a', 'y', '\0'}},<span></span></pre></td></tr><tr><td scope="row"><pre>    {3, {'d', 'u', 's', 'k', '\0'}},<span></span></pre></td></tr><tr><td scope="row"><pre>    {4, {'n', 'i', 'g', 'h', 't', '\0'}}<span></span></pre></td></tr><tr><td scope="row"><pre>};<span></span></pre></td></tr></table></div>
+<p>Unfortunately, there’s no good solution if the strings are of widely varying sizes, because this solution would leave a lot of unused space.</p>
+<p>The array is split onto two segments because the compiler always stores constant strings in the <code>__TEXT</code> segment’s <code>__cstring</code> section. If the compiler stored the rest of the array in the <code>__DATA</code> segment’s <code>__data</code> section, it’s possible that the strings and the pointers to the strings would end up on different pages. If that happened, the system would have to update the pointers to the strings with the new addresses, and it can’t do that if the pointers are in the <code>__TEXT</code> segment because the <code>__TEXT</code> segment is marked read-only. So the pointers to the strings, and the rest of the array along with it, must be stored in the <code>const</code> section of the <code>__DATA</code> segment. The <code>__const</code> section is reserved for data declared <code>const</code> that couldn’t be placed in the <code>__TEXT</code> segment.</p>
+<a name="//apple_ref/doc/uid/20001863-102402" title="Initializing Static Data"></a><a name="//apple_ref/doc/uid/20001863-102402-BBCCAEJC" title="Initializing Static Data"></a><h2>Initializing Static Data</h2><a name="//apple_ref/doc/uid/20001863-DontLinkElementID_91"></a>
+<p>As is pointed out in <span class="content_text"><a href="MachOOverview.html#//apple_ref/doc/uid/20001860-BAJGJEJC">“Overview of the Mach-O Executable Format,”</a></span> the compiler stores uninitialized static data in the <code>__bss</code> section of the <code>__DATA</code> segment and stores initialized data in the <code>__data</code> section. If you have only a small amount of static data in the <code>__bss</code> section, you might want to consider moving it to the <code>__data</code> section instead. Storing data in two different sections increases the number of memory pages used by the executable, which in turn increases the potential for paging. </p>
+<p>The goal of merging the <code>__bss</code> and <code>__data</code> sections is to reduce the number of memory pages used by your application. If moving data into the <code>__data</code> section increases the number of memory pages in that section, there is no benefit to this technique. In fact, adding to the pages in the <code>__data</code> section increases the amount of time spent reading and initializing that data at launch time. </p>
+<p>Suppose you declare the following static variables:</p>
+<div class="codesample"><table><tr><td scope="row"><pre>static int x;<span></span></pre></td></tr><tr><td scope="row"><pre>static short conv_table[128];<span></span></pre></td></tr></table></div>
+<p>To move these variables into the <code>__data</code> section of your executable’s <code>__DATA</code> segment, you would change the definition to the following:<a name="//apple_ref/doc/uid/20001863-DontLinkElementID_92"></a></p>
+<div class="codesample"><table><tr><td scope="row"><pre>static int x = 0;<span></span></pre></td></tr><tr><td scope="row"><pre>static short conv_table[128] = {0};<span></span></pre></td></tr></table></div>
+<a name="//apple_ref/doc/uid/20001863-102528" title="Avoiding Tentative-Definition Symbols"></a><a name="//apple_ref/doc/uid/20001863-102528-TPXREF110" title="Avoiding Tentative-Definition Symbols"></a><h2>Avoiding Tentative-Definition Symbols</h2>
+<p>The compiler puts any <a name="//apple_ref/doc/uid/20001863-DontLinkElementID_93"></a><a name="//apple_ref/doc/uid/20001863-DontLinkElementID_94"></a>duplicate<a name="//apple_ref/doc/uid/20001863-DontLinkElementID_95"></a> symbols it encounters in the <code>__common</code> <a name="//apple_ref/doc/uid/20001863-DontLinkElementID_96"></a>section of the <code>__DATA</code> segment (see <span class="content_text"><a href="MachOOverview.html#//apple_ref/doc/uid/20001860-BAJGJEJC">“Overview of the Mach-O Executable Format”</a></span>). The problem here is the same as with uninitialized static variables. If an executable’s non-constant global data is distributed among several sections, it is more likely that this data will be on different memory pages; consequently, the pages may have to be swapped in and out separately. The goal for the <code>__common</code><a name="//apple_ref/doc/uid/20001863-DontLinkElementID_97"></a> section is the same as that for the <code>__bss</code> <a name="//apple_ref/doc/uid/20001863-DontLinkElementID_98"></a>section: to eliminate it from your executable if you have a small amount of data in it.</p>
+<p>A common source of a <a name="//apple_ref/doc/uid/20001863-DontLinkElementID_99"></a>tentative-definition symbol is the definition of that symbol in a header file. Typically, headers declare a symbol but do not include the definition of that symbol; the definition is instead provided in an implementation file. But definitions appearing in header files can result in that code or data appearing in every <a name="//apple_ref/doc/uid/20001863-DontLinkElementID_100"></a>implementation file that includes the header file. The solution to this problem is to ensure that header files contain only declarations, not definitions.</p>
+<p>For functions, you would obviously declare a prototype for that function in your header file and put the definition of that function in your implementation file. For global variables and data structures, you should do something similar. Rather than defining the variable in your header file, define it in your implementation file and initialize it appropriately. Then, declare that variable in your header file, preceding the declaration with the <code>extern</code> keyword. This technique localizes the variable definition to one file while still allowing access to that variable from other files. </p>
+<p>You can also get tentative-definition symbols when you accidentally import the same header file twice. To make sure you do not do this, include preprocessor directives to prohibit the inclusion of files that have already been included. Thus, in your header file, you would have the following code:</p>
+<div class="codesample"><table><tr><td scope="row"><pre>#ifndef MYHEADER_H<span></span></pre></td></tr><tr><td scope="row"><pre>#define MYHEADER_H<span></span></pre></td></tr><tr><td scope="row"><pre>// Your header file declarations. . .<span></span></pre></td></tr><tr><td scope="row"><pre>#endif<span></span></pre></td></tr></table></div>
+<p>Then when you want to include that header file, include it in the following way:</p>
+<div class="codesample"><table><tr><td scope="row"><pre>#ifndef MYHEADER_H<span></span></pre></td></tr><tr><td scope="row"><pre>#include "MyHeader.h"<span></span></pre></td></tr><tr><td scope="row"><pre>#endif<span></span></pre></td></tr></table></div>
+<a name="//apple_ref/doc/uid/20001863-102597" title="Analyzing Mach-O Executables"></a><a name="//apple_ref/doc/uid/20001863-102597-TPXREF111" title="Analyzing Mach-O Executables"></a><h2>Analyzing Mach-O Executables</h2>
+<p>You have several tools at your disposal for finding out how much memory your non-constant data is occupying. These tools report on various aspects of data usage.</p>
+<p>While your application or framework is running, use the <code>size</code> and <code>pagestuff</code> tools to see how big your various data sections are and which symbols they contain. Some things to look for include the following:<a name="//apple_ref/doc/uid/20001863-DontLinkElementID_101"></a><a name="//apple_ref/doc/uid/20001863-DontLinkElementID_102"></a><a name="//apple_ref/doc/uid/20001863-DontLinkElementID_103"></a></p>
+<ul class="ul"><li class="li"><p>To find executables with lots of non-constant data, check for files with large <code>__data</code> sections in the <code>__DATA</code> segment. </p></li>
+<li class="li"><p>Check for variables and symbols in the <code>__bss</code> and <code>__common</code> sections that can be removed or moved to the <code>__data</code> section.</p></li>
+<li class="li"><p>To locate data that, although declared constant, the compiler can’t treat as constant, check for executables or object files with a <code>__const</code> section in the <code>__DATA</code> segment.</p></li></ul>
+<p>Some of the bigger consumers of memory in the <code>__DATA</code> segment are fixed-size <a name="//apple_ref/doc/uid/20001863-DontLinkElementID_104"></a>global arrays initialized but not declared <code>const</code>. You can sometimes find these tables by searching your source code for “<code>[] = {</code>“.</p>
+<p>You can also let the compiler help you find where arrays can be made constant. Put <code>const</code> in front of all the initialized arrays you suspect might be read-only and recompile. If an array is not truly read-only, it will not compile. Remove the offending <code>const</code> and retry.</p>
+
+        <br/><br/> 
+
+        <div class="mini_nav_text" align="left">
+        <span class="navButtons">
+        <a href="ImprovingLocality.html">&lt; Previous Page</a><span style="margin-left: 8px"><a href="ReducingExports.html">Next Page &gt;</a></span>
+        </span>
+        <span id="showHideTOCLowerSpan">
+        <a href="#" onclick="showHideTOC();"><img src="../../../../Resources/Images/show_toc_icon.gif" width="15" height="14" border="0" style="margin-bottom: -2px;" alt="" /></a> <a href="#" onclick="showHideTOC();">Hide TOC</a>
+        </span>
+        </div>
+
+        <br/><hr /><div align="center"><p class="content_text" lang="en" dir="ltr"> <!--#if expr="0=1" -->&#x00a9; 2003, 2006 Apple Computer, Inc. All Rights Reserved. &#40;<!--#endif -->Last updated: 2006-06-28<!--#if expr="0=1" -->&#041;<!--#endif --></p></div>
+
+        
+        <div class="hideOnPrint hideInXcode">
+        <!-- start of footer -->
+        	<table width="100%" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/documentation/Performance/Conceptual/CodeFootprint/Articles/SharedPages.html%3Fid%3D10000149i-3.1&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/documentation/Performance/Conceptual/CodeFootprint/Articles/SharedPages.html%3Fid%3D10000149i-3.1&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/documentation/Performance/Conceptual/CodeFootprint/Articles/SharedPages.html%3Fid%3D10000149i-3.1&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+
+        <!--#include virtual="/includes/framesetfooter" -->
+        <!-- end of footer -->
+        </div>
+    </div>
+</body>
+</html>

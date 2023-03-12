@@ -1,0 +1,1278 @@
+<html><head><title></title></head>
+
+<body bgcolor="#ffffff">
+
+ 
+
+ 
+
+<h2><a name="//apple_ref/occ/cl/EOSQLExpression">EOSQLExpression</a>
+
+ <BR>
+
+</h2>
+
+<p><B>Inherits From:</B><BR>  
+
+NSObject
+
+
+
+<p><B>Conforms To:</B>
+
+NSObject (NSObject)
+
+
+
+<p><B>Declared in:</B>
+
+EOAccess/EOSQLExpression.h
+
+
+
+<p><a name="986">
+
+<a name="description"></a>
+
+<h3>Class Description </h3>
+
+</a>EOSQLExpression is an abstract superclass that defines how to build SQL statements for adaptor channels. Concrete subclasses of EOSQLExpression override many of its methods in terms of the query language syntax for a specific RDBMS. EOSQLExpression objects are used internally by the Framework, and unless you're creating a concrete adaptor, you won't ordinarily need to interact with EOSQLExpression objects yourself. You most commonly create and use an EOSQLExpression object when you want to send an SQL statement directly to the server. In this case, you simply create an expression with the EOSQLExpression class method <a href="#1099"><B>expressionForString: </B></a>, and send the expression object to an adaptor channel using EOAdaptorChannel's <B>evaluateExpression: </B> method.<p>
+
+<a name="988">
+
+<h3> Building Expressions</h3>
+
+</a>The following four methods create EOSQLExpression objects for the four basic database operations-select, insert, update, and delete:<p>
+
+<ul><li><a href="#1117">+ selectStatementForAttributes:lock:fetchSpecification:entity:</a><br><li><a href="#1113">+ insertStatementForRow:entity:</a><br><li><a href="#1133">+ updateStatementForRow:qualifier:entity:</a><br><li><a href="#1095">+ deleteStatementWithQualifier:entity:</a><br></ul><p>Unless you're implementing an EOSQLExpression subclass, these and the class method <a href="#1099"><B>expressionForString: </B></a> are the only EOSQLExpression methods you should ever need. If, on the other hand, you are creating a subclass, you need to understand the mechanics of how EOSQLExpression builds SQL statements. Each of the creation methods above allocates an EOSQLExpression, initializes the expression with the specified entity, and sends the new expression object one of the following <B>prepare... </B> methods:<p>
+
+<ul><li><a href="#1277">- prepareSelectExpressionWithAttributes:lock:fetchSpecification:</a><br><li><a href="#1270">- prepareInsertExpressionWithRow:</a><br><li><a href="#1288">- prepareUpdateExpressionWithRow:qualifier:</a><br><li><a href="#1263">- prepareDeleteExpressionForQualifier:</a><br></ul><p>The <B>prepare... </B> methods, in turn, invoke a corresponding <B>assemble... </B> method, first generating values for the <B>assemble... </B> method's arguments. The <B>assemble... </B> methods:<p>
+
+<ul><li><a href="#970">- assembleSelectStatementWithAttributes:lock:qualifier:fetchOrder: selectString:columnList:tableList:whereClause:joinClause: orderByClause:lockClause:</a><br><li><a href="#1181">- assembleInsertStatementWithRow:tableList:columnList:valueList:</a><br><li><a href="#1203">- assembleUpdateStatementWithRow:qualifier:tableList:updateList:whereClause:</a><br><li><a href="#1175">- assembleDeleteStatementWithQualifier:tableList:whereClause:</a><br></ul><p>combine their arguments into SQL statements that the database server can understand.<p>
+
+These three sets of methods establish a framework in which SQL statements are generated. The bulk of the remaining methods generate pieces of an SQL statement.<p>
+
+An individual SQL statement is constructed by combining the SQL strings for any model or value objects specified in the "build" method in the appropriate form. An SQL string for a modeling or value object is a string representation of the object that the database understands; for example, the SQL string for an EOEntity is ultimately its table name. An EOSQLExpression gets the SQL strings for attributes and values with the methods <a href="#1312"><B>sqlStringForAttributeNamed: </B></a> and <a href="#1353"><B>sqlStringForValue:attributeNamed: </B></a>. If necessary, it also formats the SQL strings according to an EOAttribute's "read" or "write" format with the class method <a href="#1103"><B>formatSQLString:format: </B></a>.<p>
+
+Each of the "build" methods above invokes a number of instance methods. These methods are documented individually below.<p>
+
+<a name="1008">
+
+<h3> Using Table Aliases</h3>
+
+</a>By default, EOSQLExpression uses table aliases in SELECT statements. For example, the following SELECT statement uses table aliases:<p>
+
+<blockquote><pre>SELECT t0.FIRST_NAME, t0.LAST_NAME, t1.NAME
+
+</pre></blockquote><p>
+
+<blockquote><pre>FROM EMPLOYEE t0, DEPARTMENT t1
+
+</pre></blockquote><p>
+
+<blockquote><pre>WHERE t0.DEPARTMENT_ID = t1.DEPARTMENT_ID
+
+</pre></blockquote><p>
+
+The EMPLOYEE table is aliased t0, and the DEPARTMENT table is aliased t1. Table aliases are necessary in some SELECT statements-when a table contains a self-referential relationship, for example. Assume the EMPLOYEE table contains a manager column. Managers are also employees, so to retrieve all the employees whose manager is Bob Smith, the SELECT statement looks like this:<p>
+
+<blockquote><pre>SELECT t0.FIRST_NAME, t0.LAST_NAME
+
+</pre></blockquote><p>
+
+<blockquote><pre>FROM EMPLOYEE t0, EMPLOYEE t1
+
+</pre></blockquote><p>
+
+<blockquote><pre>WHERE t1.FIRST_NAME = "BOB" AND t1.LAST_NAME = "SMITH" AND
+
+</pre></blockquote><p>
+
+<blockquote><pre>t0.MANAGER_ID = t1.EMPLOYEE_ID 
+
+</pre></blockquote><p>
+
+When the Framework maps operations on enterprise objects to operations on database rows, it reduces insert, update, and delete operations to one or more single-table operations. As a result, EOSQLExpression assumes that INSERT, UPDATE, and DELETE statements are always single-table operations, and does not use table aliases in the statements of these types.<p>
+
+In addition, if EOSQLExpression detects that all the attributes in a SELECT statement's attribute list are flattened attributes and they're all flattened from the same table, the expression doesn't use table aliases. For example, suppose that an EOSQLExpression object is created to select a customer's credit card. In the application, a customer object has a credit card object as one of its properties, and all operations on credit cards are described in terms of a customer. As a result, the expression object is initialized with the entity for the Customer object. Rather than create a statement like the following:<p>
+
+<blockquote><pre>SELECT t1.TYPE, t1.NUMBER, t1.EXPIRATION, t1.CREDIT_LIMIT, t1.CUSTOMER_ID
+
+</pre></blockquote><p>
+
+<blockquote><pre>FROM CUSTOMER t0, CREDIT_CARD t1
+
+</pre></blockquote><p>
+
+<blockquote><pre>WHERE t1.CUSTOMER_ID = t0.CUSTOMER_ID AND t1.CUSTOMER_ID = 459
+
+</pre></blockquote><p>
+
+EOSQLExpression detects that all the attributes correspond to columns in the CREDIT_CARD table and creates the following statement:<p>
+
+<blockquote><pre>SELECT TYPE, NUMBER, EXPIRATION, CREDIT_LIMIT, CUSTOMER_ID
+
+</pre></blockquote><p>
+
+<blockquote><pre>FROM CREDIT_CARD
+
+</pre></blockquote><p>
+
+<blockquote><pre>WHERE CUSTOMER_ID = 459
+
+</pre></blockquote><p>
+
+<a name="1027">
+
+<h3> Bind Variables</h3>
+
+</a>Some RDBMS client libraries use bind variables. A bind variable is a placeholder used in an SQL statement that is replaced with an actual value after the database server determines an execution plan. If you are writing an adaptor for a database server that uses bind variables, you must override the following EOSQLExpression variables:<p>
+
+<ul><li><a href="#1214">- bindVariableDictionaryForAttribute:value:</a><br><li><a href="#1255">- mustUseBindVariableForAttribute:</a><br><li><a href="#1304">- shouldUseBindVariableForAttribute:</a><br></ul><p>If your adaptor doesn't need to use bind variables, the default implementations of the bind variable methods are sufficient.<p>
+
+<p>
+
+<dl><dt>Creating an EOSQLExpression object
+
+<dl><dt><a href="#//apple_ref/occ/clm/EOSQLExpression/selectStatementForAttributes:lock:fetchSpecification:entity:">+ selectStatementForAttributes:lock:fetchSpecification:entity:</a>
+
+<dt><a href="#//apple_ref/occ/clm/EOSQLExpression/insertStatementForRow:entity:">+ insertStatementForRow:entity:</a>
+
+<dt><a href="#//apple_ref/occ/clm/EOSQLExpression/updateStatementForRow:qualifier:entity:">+ updateStatementForRow:qualifier:entity:</a>
+
+<dt><a href="#//apple_ref/occ/clm/EOSQLExpression/deleteStatementWithQualifier:entity:">+ deleteStatementWithQualifier:entity:</a>
+
+<dt><a href="#//apple_ref/occ/clm/EOSQLExpression/expressionForString:">+ expressionForString:</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOSQLExpression/initWithEntity:">- initWithEntity:</a>
+
+</dl><dt>Building SQL Expressions
+
+<dl><dt><a href="#//apple_ref/occ/instm/EOSQLExpression/prepareSelectExpressionWithAttributes:lock:fetchSpecification:">- prepareSelectExpressionWithAttributes:lock:fetchSpecification:</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOSQLExpression/prepareInsertExpressionWithRow:">- prepareInsertExpressionWithRow:</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOSQLExpression/prepareUpdateExpressionWithRow:qualifier:">- prepareUpdateExpressionWithRow:qualifier:</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOSQLExpression/prepareDeleteExpressionForQualifier:">- prepareDeleteExpressionForQualifier:</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOSQLExpression/setStatement:">- setStatement:</a>
+
+</dl><dt>Getting the SQL statement
+
+<dl><dt><a href="#//apple_ref/occ/instm/EOSQLExpression/statement">- statement</a>
+
+</dl><dt>Generating SQL for attributes and values
+
+<dl><dt><a href="#//apple_ref/occ/clm/EOSQLExpression/formatSQLString:format:">+ formatSQLString:format:</a>
+
+<dt><a href="#//apple_ref/occ/clm/EOSQLExpression/formatValue:forAttribute:">+ formatValue:forAttribute:</a>
+
+<dt><a href="#//apple_ref/occ/clm/EOSQLExpression/formatStringValue:">+ formatStringValue:</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOSQLExpression/sqlStringForValue:attributeNamed:">- sqlStringForValue:attributeNamed:</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOSQLExpression/sqlStringForAttributeNamed:">- sqlStringForAttributeNamed:</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOSQLExpression/sqlStringForAttribute:">- sqlStringForAttribute:</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOSQLExpression/sqlStringForAttributePath:">- sqlStringForAttributePath:</a>
+
+</dl><dt>Generating SQL for names of database objects
+
+<dl><dt><a href="#//apple_ref/occ/instm/EOSQLExpression/sqlStringForSchemaObjectName:">- sqlStringForSchemaObjectName:</a>
+
+<dt><a href="#//apple_ref/occ/clm/EOSQLExpression/setUseQuotedExternalNames:">+ setUseQuotedExternalNames:</a>
+
+<dt><a href="#//apple_ref/occ/clm/EOSQLExpression/useQuotedExternalNames">+ useQuotedExternalNames</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOSQLExpression/externalNameQuoteCharacter">- externalNameQuoteCharacter</a>
+
+</dl><dt>Generating an attribute list
+
+<dl><dt><a href="#//apple_ref/occ/instm/EOSQLExpression/addSelectListAttribute:">- addSelectListAttribute:</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOSQLExpression/addInsertListAttribute:value:">- addInsertListAttribute:value:</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOSQLExpression/addUpdateListAttribute:value:">- addUpdateListAttribute:value:</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOSQLExpression/appendItem:toListString:">- appendItem:toListString:</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOSQLExpression/listString">- listString</a>
+
+</dl><dt>Generating a value list
+
+<dl><dt><a href="#//apple_ref/occ/instm/EOSQLExpression/addInsertListAttribute:value:">- addInsertListAttribute:value:</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOSQLExpression/addUpdateListAttribute:value:">- addUpdateListAttribute:value:</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOSQLExpression/valueList">- valueList</a>
+
+</dl><dt>Generating a table list
+
+<dl><dt><a href="#//apple_ref/occ/instm/EOSQLExpression/tableListWithRootEntity:">- tableListWithRootEntity:</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOSQLExpression/aliasesByRelationshipPath">- aliasesByRelationshipPath</a>
+
+</dl><dt>Generating the join clause
+
+<dl><dt><a href="#//apple_ref/occ/instm/EOSQLExpression/joinExpression">- joinExpression</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOSQLExpression/addJoinClauseWithLeftName:rightName:joinSemantic:">- addJoinClauseWithLeftName:rightName:joinSemantic:</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOSQLExpression/assembleJoinClauseWithLeftName:rightName:joinSemantic:">- assembleJoinClauseWithLeftName:rightName:joinSemantic:</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOSQLExpression/joinClauseString">- joinClauseString</a>
+
+</dl><dt>Generating a search pattern
+
+<dl><dt><a href="#//apple_ref/occ/clm/EOSQLExpression/sqlPatternFromShellPattern:">+ sqlPatternFromShellPattern:</a>
+
+<dt><a href="#//apple_ref/occ/clm/EOSQLExpression/sqlPatternFromShellPattern:withEscapeCharacter:">+ sqlPatternFromShellPattern:withEscapeCharacter:</a>
+
+</dl><dt>Generating a relational operator
+
+<dl><dt><a href="#//apple_ref/occ/instm/EOSQLExpression/sqlStringForSelector:value:">- sqlStringForSelector:value:</a>
+
+</dl><dt>Getting the where clause
+
+<dl><dt><a href="#//apple_ref/occ/instm/EOSQLExpression/whereClauseString">- whereClauseString</a>
+
+</dl><dt>Generating an order by clause
+
+<dl><dt><a href="#//apple_ref/occ/instm/EOSQLExpression/addOrderByAttributeOrdering:">- addOrderByAttributeOrdering:</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOSQLExpression/orderByString">- orderByString</a>
+
+</dl><dt>Getting the lock clause
+
+<dl><dt><a href="#//apple_ref/occ/instm/EOSQLExpression/lockClause">- lockClause</a>
+
+</dl><dt>Assembling a statement
+
+<dl><dt><a href="#//apple_ref/occ/instm/EOSQLExpression/assembleSelectStatementWithAttributes:lock:qualifier:fetchOrder:selectString:columnList:tableList:whereClause:joinClause:orderByClause:lockClause:"><a href="#970">- assembleSelectStatementWithAttributes:lock:qualifier:fetchOrder: 
+
+selectString:columnList:tableList:whereClause:joinClause: 
+
+orderByClause:lockClause:</a></a>
+
+<dt><a href="#//apple_ref/occ/instm/EOSQLExpression/assembleInsertStatementWithRow:tableList:columnList:valueList:">- assembleInsertStatementWithRow:tableList:columnList:valueList:</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOSQLExpression/assembleUpdateStatementWithRow:qualifier:tableList:updateList:whereClause:"><a href="#1203">- assembleUpdateStatementWithRow:qualifier:tableList:updateList:
+
+whereClause:</a></a>
+
+<dt><a href="#//apple_ref/occ/instm/EOSQLExpression/assembleDeleteStatementWithQualifier:tableList:whereClause:">- assembleDeleteStatementWithQualifier:tableList:whereClause:</a>
+
+</dl><dt>Generating SQL for qualifiers
+
+<dl><dt><a href="#//apple_ref/occ/instm/EOSQLExpression/sqlStringForConjoinedQualifiers:">- sqlStringForConjoinedQualifiers:</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOSQLExpression/sqlStringForDisjoinedQualifiers:">- sqlStringForDisjoinedQualifiers:</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOSQLExpression/sqlStringForKeyComparisonQualifier:">- sqlStringForKeyComparisonQualifier:</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOSQLExpression/sqlStringForKeyValueQualifier:">- sqlStringForKeyValueQualifier:</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOSQLExpression/sqlStringForNegatedQualifier:">- sqlStringForNegatedQualifier:</a>
+
+</dl><dt>Managing bind variables
+
+<dl><dt><a href="#//apple_ref/occ/clm/EOSQLExpression/setUseBindVariables:">+ setUseBindVariables:</a>
+
+<dt><a href="#//apple_ref/occ/clm/EOSQLExpression/useBindVariables">+ useBindVariables</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOSQLExpression/addBindVariableDictionary:">- addBindVariableDictionary:</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOSQLExpression/bindVariableDictionaries">- bindVariableDictionaries</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOSQLExpression/bindVariableDictionaryForAttribute:value:">- bindVariableDictionaryForAttribute:value:</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOSQLExpression/mustUseBindVariableForAttribute:">- mustUseBindVariableForAttribute:</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOSQLExpression/shouldUseBindVariableForAttribute:">- shouldUseBindVariableForAttribute:</a>
+
+</dl><dt>Using table aliases
+
+<dl><dt><a href="#//apple_ref/occ/instm/EOSQLExpression/setUseAliases:">- setUseAliases:</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOSQLExpression/useAliases">- useAliases</a>
+
+</dl><dt>Getting the entity
+
+<dl><dt><a href="#//apple_ref/occ/instm/EOSQLExpression/entity">- entity</a>
+
+</dl></dl><a name="1094">
+
+<a name="clm"></a>
+
+<h3>Class Methods  </h3>
+
+</a><a name="1095">
+
+<h4> <a name="//apple_ref/occ/clm/EOSQLExpression/deleteStatementWithQualifier:entity:">deleteStatementWithQualifier:entity:</a></h4>
+
+</a>+ (EOSQLExpression *)<code>deleteStatementWithQualifier:</code>(EOQualifier *)<em>qualifier </em><code>entity:</code>(id)<em>entity</em> <p>
+
+Creates and returns an SQL DELETE expression to delete the rows described by <em>qualifier</em>. Creates an instance of EOSQLExpression, initializes it with <em>entity</em>, and sends it a <a href="#1263"><B>prepareDeleteExpressionForQualifier: </B></a> message. Raises an NSInvalidArgumentException if <em>qualifier</em> is <B>nil </B>.<p>
+
+The expression created with this method does not use table aliases because Enterprise Objects Framework assumes that all INSERT, UPDATE, and DELETE statements are single-table operations.<code> </code>As a result, all keys in <em>qualifier</em> should be simple key names; no key paths are allowed. To generate DELETE statements that do use table aliases, you must override <B>prepareDeleteExpressionForQualifier: </B> to send a <a href="#1300"><B>setUseAliases: </B></a>YES message prior to invoking <B>super </B>'s version.<p>
+
+<a name="1099">
+
+<h4> <a name="//apple_ref/occ/clm/EOSQLExpression/expressionForString:">expressionForString:</a></h4>
+
+</a>+ (EOSQLExpression *)<code>expressionForString:</code>(NSString *)<em>string</em> <p>
+
+Creates and returns an SQL expression for <em>string</em>. <em>string</em> should be a valid expression in the target query language. This method does not perform substitutions or formatting of any kind.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOSQLExpression/setStatement:">- setStatement:</a>
+
+ </B><p><a name="1103">
+
+<h4> <a name="//apple_ref/occ/clm/EOSQLExpression/formatSQLString:format:">formatSQLString:format:</a></h4>
+
+</a>+ (NSString *)<code>formatSQLString:</code>(NSString *)<em>sqlString </em><code>format:</code>(NSString *)<em>format</em> <p>
+
+Applies an EOAttribute's "read" or "write" format to a value for the attribute. <em>sqlString</em> is a value for an EOAttribute, and <em>format</em> is one of the attribute's formats. If <em>format</em> is <B>nil </B>, this method returns <em>sqlString</em> unchanged.<p>
+
+<B>See also: </B>  
+
+<B><a href="../EOAttribute.html#//apple_ref/occ/instm/EOAttribute/readFormat" target="_top">- readFormat</B> (EOAttribute)</a>, <B><a href="../EOAttribute/EOAttribute.html#//apple_ref/occ/instm/EOAttribute/writeFormat" target="_top">- writeForma </B><code>t</code> (EOAttribute)</a>
+
+<p><a name="1107">
+
+<h4> <a name="//apple_ref/occ/clm/EOSQLExpression/formatStringValue:">formatStringValue:</a></h4>
+
+</a>+ (NSString *)<code>formatStringValue:</code>(NSString *)<em>string</em> <p>
+
+Formats <em>string</em> for use as a string constant in a SQL statement. EOSQLExpression's implementation encloses the string in single quotes, escaping any single quotes already present in <em>string</em>. Raises an NSInternalInconsistencyException if <em>string</em> is <B>nil </B>.<p>
+
+<a name="1110">
+
+<h4> <a name="//apple_ref/occ/clm/EOSQLExpression/formatValue:forAttribute:">formatValue:forAttribute:</a></h4>
+
+</a>+ (NSString *)<code>formatValue:</code>(id)<em>value </em><code>forAttribute:</code>(EOAttribute *)<em>attribute</em> <p>
+
+Overridden by subclasses to return a string representation of <em>value</em> suitable for use in an SQL statement. EOSQLExpression's implementation returns <em>value</em> unchanged. A subclass should override this method to format <em>value</em> depending on <em>attribute</em>'s external type. For example, a subclass might format a date using a special database-specific syntax or standard form or truncate numbers to <em>attribute</em>'s precision and scale.<p>
+
+<a name="1113">
+
+<h4> <a name="//apple_ref/occ/clm/EOSQLExpression/insertStatementForRow:entity:">insertStatementForRow:entity:</a></h4>
+
+</a>+ (EOSQLExpression *)<code>insertStatementForRow:</code>(NSDictionary *)<em>row </em><code>entity:</code>(EOEntity *)<em>entity</em> <p>
+
+Creates and returns an SQL INSERT expression to insert <em>row</em>. Creates an instance of EOSQLExpression, initializes it with <em>entity</em>, and sends it <a href="#1270"><B>prepareInsertExpressionWithRow: </B></a>. Raises an NSInvalidArgumentException if <em>entity</em> is <B>nil </B>.<p>
+
+The expression created with this method does not use table aliases because Enterprise Objects Framework assumes that all INSERT, UPDATE, and DELETE statements are single-table operations.<code> </code>To generate INSERT statements that do use table aliases, you must override <B>prepareInsertExpressionWithRow: </B> to send a <a href="#1300"><B>setUseAliases: </B></a>YES message prior to invoking <B>super </B>'s version.<p>
+
+<a name="1117">
+
+<h4> <a name="//apple_ref/occ/clm/EOSQLExpression/selectStatementForAttributes:lock:fetchSpecification:entity:">selectStatementForAttributes:lock:fetchSpecification:entity:</a></h4>
+
+</a>+ (EOSQLExpression *)<code>selectStatementForAttributes:</code>(NSArray *)<em>attributes<br></em><code>lock:</code>(BOOL)<em>flag<br></em><code>fetchSpecification:</code>(EOFetchSpecification *)<em>fetchSpecification<br></em><code>entity:</code>(EOEntity *)<em>entity</em> <p>
+
+Creates and returns an SQL SELECT expression. Creates an instance of EOSQLExpression, initializes it with <em>entity</em>, and sends it <a href="#1277"><B>prepareSelectExpressionWithAttributes:lock:fetchSpecification: </B></a>. The expression created with this method uses table aliases. Raises an NSInvalidArgumentException if <em>attributes</em> is <B>nil </B> or empty, <em>fetchSpecification</em> is <B>nil </B>, or <em>entity</em> is <B>nil </B>.<p>
+
+The expression created with this method uses table aliases.<code> </code>To generate SELECT statements that don't use them, you must override <B>prepareSelectExpressionWithAttributes:lock:fetchSpecification: </B> to send a <a href="#1300"><B>setUseAliases: </B></a>NO message prior to invoking <B>super </B>'s version.<p>
+
+<a name="1121">
+
+<h4> <a name="//apple_ref/occ/clm/EOSQLExpression/setUseBindVariables:">setUseBindVariables:</a></h4>
+
+</a>+ (void)<code>setUseBindVariables:</code>(BOOL)<em>flag</em> <p>
+
+Sets whether all instances of EOSQLExpression subclasses use bind variables. By default, instances don't use bind variables; if the value for the global user default named "EOAdaptorUseBindVariables" is YES, though, instances do use them. For more information on bind variables, see the discussion in the class description.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/clm/EOSQLExpression/useBindVariables">+ useBindVariables</a>
+
+ </B><p><a name="1420">
+
+<h4> <a name="//apple_ref/occ/clm/EOSQLExpression/setUseQuotedExternalNames:">setUseQuotedExternalNames:</a></h4>
+
+</a>+ (void)<B>setUseQuotedExternalNames: </B>(BOOL)<em>flag</em> <p>
+
+Sets whether all instances of EOSQLExpression subclasses quote external names when they are referenced in SQL statements. By setting <em>flag</em> to YES, you can access database tables with names such as "%return", "1st year", and "TABLE" that you couldn't otherwise access. By default, instances don't quote external names; if the value for the global user default named "EOAdaptorQuotesExternalNames" is YES, though, instances do use quotes.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/clm/EOSQLExpression/useQuotedExternalNames">+ useQuotedExternalNames</a> </B>, <a href="#//apple_ref/occ/instm/EOSQLExpression/sqlStringForSchemaObjectName:"><B>- sqlStringForSchemaObjectName:</a> </B>, 
+
+<B><a href="#//apple_ref/occ/instm/EOSQLExpression/externalNameQuoteCharacter">- externalNameQuoteCharacter</a>
+
+ </B><p><a name="1437">
+
+<h4> <a name="//apple_ref/occ/clm/EOSQLExpression/sqlPatternFromShellPattern:">sqlPatternFromShellPattern:</a></h4>
+
+</a>+ (NSString *)<code>sqlPatternFromShellPattern:</code>(NSString *)<em>pattern</em> <p>
+
+Translates a "like" qualifier to an SQL "like" expression. Invoked from <a href="#1333"><B>sqlStringForKeyValueQualifier: </B></a> when the qualifier argument is an EOKeyValueQualifier object whose selector is <B>isLike: </B>. EOSQLExpression's implementation performs the following substitutions<p>
+
+<b>Character in pattern	Substitution string
+
+</b>*	%
+
+?	_
+
+%	[%] <em>(unless the percent character appears in square brackets)
+
+</em>_	[_] <em>(unless the underscore character appears in square brackets)
+
+</em><B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/clm/EOSQLExpression/sqlPatternFromShellPattern:withEscapeCharacter:">+ sqlPatternFromShellPattern:withEscapeCharacter:</a>
+
+ </B><p><a name="1125">
+
+<h4> <a name="//apple_ref/occ/clm/EOSQLExpression/sqlPatternFromShellPattern:withEscapeCharacter:">sqlPatternFromShellPattern:withEscapeCharacter:</a></h4>
+
+</a>+ (NSString *)<code>sqlPatternFromShellPattern:</code>(NSString *)<em>pattern<br></em><B>withEscapeCharacter: </B>(unichar)<em>escapeCharacter</em><p>
+
+<em>Like </em><B>sqlPatternFromShellPattern: </B><em> except the argument escapeCharacter allows you to specify a character for escaping the wild card characters "%" and "_".</em><p>
+
+<a name="1133">
+
+<h4> <a name="//apple_ref/occ/clm/EOSQLExpression/updateStatementForRow:qualifier:entity:">updateStatementForRow:qualifier:entity:</a></h4>
+
+</a>+ (EOSQLExpression *)<code>updateStatementForRow:</code>(NSDictionary *)<em>row<br></em><code>qualifier:</code>(EOQualifier *)<em>qualifier<br></em><code>entity:</code>(EOEntity *)<em>entity</em> <p>
+
+Creates and returns an SQL UPDATE expression to update the row identified by <em>qualifier</em> with the values in <em>row</em>. <em>row</em> should only contain entries for values that have actually changed. Creates an instance of EOSQLExpression, initializes it with <em>entity</em>, and sends it <a href="#1288"><B>prepareUpdateExpressionWithRow:qualifier: </B></a>. Raises an NSInvalidArgumentException if <em>row</em> is <B>nil </B> or empty, <em>qualifier</em> is <B>nil </B>, or <em>entity</em> is <B>nil </B>.<p>
+
+The expression created with this method does not use table aliases because Enterprise Objects Framework assumes that all INSERT, UPDATE, and DELETE statements are single-table operations.<code> </code>As a result, all keys in <em>qualifier</em> should be simple key names; no key paths are allowed. To generate UPDATE statements that do use table aliases, you must override <B>prepareUpdateExpressionWithRow:qualifier: </B> to send a <a href="#1300"><B>setUseAliases: </B></a>YES message prior to invoking <B>super </B>'s version.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOSQLExpression/setUseAliases:">- setUseAliases:</a>
+
+ </B><p><a name="1138">
+
+<h4> <a name="//apple_ref/occ/clm/EOSQLExpression/useBindVariables">useBindVariables</a></h4>
+
+</a>+ (BOOL)<code>useBindVariables</code> <p>
+
+Returns YES if instances use bind variables, NO otherwise. For more information on bind variables, see the discussion in the class description.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/clm/EOSQLExpression/setUseBindVariables:">+ setUseBindVariables:</a>
+
+ </B><p><a name="1424">
+
+<h4> <a name="//apple_ref/occ/clm/EOSQLExpression/useQuotedExternalNames">useQuotedExternalNames</a></h4>
+
+</a>+ (BOOL)<B>useQuotedExternalNames </B> <p>
+
+Returns YES if instances use quoted external names, NO otherwise.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/clm/EOSQLExpression/setUseQuotedExternalNames:">+ setUseQuotedExternalNames:</a> </B>, <a href="#//apple_ref/occ/instm/EOSQLExpression/sqlStringForSchemaObjectName:"><B>- sqlStringForSchemaObjectName:</a> </B>, 
+
+<B><a href="#//apple_ref/occ/instm/EOSQLExpression/externalNameQuoteCharacter">- externalNameQuoteCharacter</a>
+
+ </B><p><a name="1142">
+
+<a name="instm"></a>
+
+<h3>Instance Methods </h3>
+
+</a><a name="1143">
+
+<h4> <a name="//apple_ref/occ/instm/EOSQLExpression/addBindVariableDictionary:">addBindVariableDictionary:</a></h4>
+
+</a>- (void)<code>addBindVariableDictionary:</code>(NSMutableDictionary *)<em>binding</em> <p>
+
+Adds <em>binding</em> to the receiver's array of bind variable dictionaries. <em>binding</em> is generally created using the method <a href="#1214"><B>bindVariableDictionaryForAttribute:value: </B></a> and is added to the receiver's bind variable dictionaries in <a href="#1353"><B>sqlStringForValue:attributeNamed: </B></a> when the receiver uses a bind variable for the specified attribute. See the method description for <B>bindVariableDictionaryForAttribute:value: </B> for a description of the contents of a bind variable dictionary, and for more information on bind variables, see the discussion in the class description.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOSQLExpression/bindVariableDictionaries">- bindVariableDictionaries</a>
+
+ </B><p><a name="1147">
+
+<h4> <a name="//apple_ref/occ/instm/EOSQLExpression/addInsertListAttribute:value:">addInsertListAttribute:value:</a></h4>
+
+</a>- (void)<code>addInsertListAttribute:</code>(EOAttribute *)<em>attribute </em><code>value:</code>(NSString *)<em>value</em> <p>
+
+Adds the SQL string for <em>attribute</em> to a comma-separated list of attributes and <em>value</em> to a comma-separated list of values. Both lists are constructed for use in an INSERT statement. Use the methods <a href="#1245"><B>listString </B></a> and <a href="#1379"><B>valueList </B></a> to access the attributes and value lists.<p>
+
+Invokes <a href="#1172"><B>appendItem:toListString: </B></a> to add an SQL string for <em>attribute</em> to the receiver's <B>listString </B>, and again to add a formatted SQL string for <em>value</em> to the receiver's <B>valueList </B>.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOSQLExpression/sqlStringForAttribute:">- sqlStringForAttribute:</a> </B>, <a href="#//apple_ref/occ/instm/EOSQLExpression/sqlStringForValue:attributeNamed:"><B>- sqlStringForValue:attributeNamed:</a> </B>, 
+
+<B><a href="#//apple_ref/occ/clm/EOSQLExpression/formatValue:forAttribute:">+ formatValue:forAttribute:</a>
+
+ </B><p><a name="1152">
+
+<h4> <a name="//apple_ref/occ/instm/EOSQLExpression/addJoinClauseWithLeftName:rightName:joinSemantic:">addJoinClauseWithLeftName:rightName:joinSemantic:</a></h4>
+
+</a>- (void)<code>addJoinClauseWithLeftName:</code>(NSString *)<em>leftName </em><code>rightName:</code>(NSString *)<em>rightName </em><code>joinSemantic:</code>(EOJoinSemantic)<em>semantic</em> <p>
+
+Creates a new join clause by invoking <a href="#1190"><B>assembleJoinClauseWithLeftName:rightName:joinSemantic: </B></a> and adds it to the receiver's join clause string. Separates join conditions already in the join clause string with the word "and". Invoked from <a href="#1239"><B>joinExpression </B></a>.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOSQLExpression/joinClauseString">- joinClauseString</a>
+
+ </B><p><a name="1156">
+
+<h4> <a name="//apple_ref/occ/instm/EOSQLExpression/addOrderByAttributeOrdering:">addOrderByAttributeOrdering:</a></h4>
+
+</a>- (void)<code>addOrderByAttributeOrdering:</code>(EOSortOrdering *)<em>sortOrdering</em> <p>
+
+Adds an attribute-direction pair ("LAST_NAME asc", for example) to the receiver's ORDER BY string. If <em>sortOrdering</em>'s selector is <B>compareCaseInsensitiveAscending: </B> or <B>compareCaseInsensitiveDescending: </B>, the string generated has the format "upper(attribute) direction". Use the method <a href="#1259"><B>orderByString </B></a> to access the ORDER BY string. <B>addOrderByAttributeOrdering: </B> invokes <a href="#1172"><B>appendItem:toListString: </B></a> to add the attribute-direction pair.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOSQLExpression/sqlStringForAttributeNamed:">- sqlStringForAttributeNamed:</a>
+
+ </B><p><a name="1160">
+
+<h4> <a name="//apple_ref/occ/instm/EOSQLExpression/addSelectListAttribute:">addSelectListAttribute:</a></h4>
+
+</a>- (void)<code>addSelectListAttribute:</code>(EOAttribute *)<em>attribute</em> <p>
+
+Adds an SQL string for <em>attribute</em> to a comma-separated list of attribute names for use in a SELECT statement. The SQL string for <em>attribute</em> is formatted with <em>attribute</em>'s "read" format. Use <a href="#1245"><B>listString </B></a> to access the list. <B>addSelectListAttribute: </B> invokes <a href="#1172"><B>appendItem:toListString: </B></a> to add the attribute name.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOSQLExpression/sqlStringForAttribute:">- sqlStringForAttribute:</a> </B>, <a href="#//apple_ref/occ/clm/EOSQLExpression/formatSQLString:format:"><B>+ formatSQLString:format:</a> </B>, <B><a href="../EOAttribute/EOAttribute.html#//apple_ref/occ/instm/EOAttribute/readFormat" target="_top">- readForma </B><code>t</code> (EOAttribute)</a>
+
+<p><a name="1164">
+
+<h4> <a name="//apple_ref/occ/instm/EOSQLExpression/addUpdateListAttribute:value:">addUpdateListAttribute:value:</a></h4>
+
+</a>- (void)<code>addUpdateListAttribute:</code>(EOAttribute *)<em>attribute </em><code>value:</code>(NSString *)<em>value</em> <p>
+
+Adds a attribute-value assignment ("LAST_NAME = `Thomas'", for example) to a comma-separated list for use in an UPDATE statement. Formats <em>value</em> with <em>attribute</em>'s "write" format. Use <a href="#1245"><B>listString </B></a> to access the list. <B>addUpdateListAttribute:value: </B> invokes <a href="#1172"><B>appendItem:toListString: </B></a> to add the attribute-value assignment.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/clm/EOSQLExpression/formatSQLString:format:">+ formatSQLString:format:</a>
+
+ </B><p><a name="1168">
+
+<h4> <a name="//apple_ref/occ/instm/EOSQLExpression/aliasesByRelationshipPath">aliasesByRelationshipPath</a></h4>
+
+</a>- (NSMutableDictionary *)<code>aliasesByRelationshipPath</code> <p>
+
+Returns a dictionary of table aliases. The keys of the dictionary are relationship paths-"department" and "department.location", for example. The values are the table aliases for the corresponding table-"t1" and "t2", for example. The <B>aliasesByRelationshipPath </B> dictionary always has at least one entry: an entry for the EOSQLExpression's entity. The key of this entry is the empty string (@"") and the value is "t0". The dictionary returned from this method is built up over time with successive calls to <a href="#1315"><B>sqlStringForAttributePath: </B></a>.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOSQLExpression/tableListWithRootEntity:">- tableListWithRootEntity:</a>
+
+ </B><p><a name="1172">
+
+<h4> <a name="//apple_ref/occ/instm/EOSQLExpression/appendItem:toListString:">appendItem:toListString:</a></h4>
+
+</a>- (void)<code>appendItem:</code>(NSString *)<em>itemString </em><code>toListString:</code>(NSMutableString *)<em>listString</em> <p>
+
+Adds <em>itemString</em> to a comma-separated list. If <em>listString</em> already has entries, this method appends a comma followed by <em>itemString</em>. Invoked from <a href="#1160"><B>addSelectListAttribute: </B></a>, <a href="#1147"><B>addInsertListAttribute:value: </B></a>, <a href="#1164"><B>addUpdateListAttribute:value: </B></a>, and <a href="#1156"><B>addOrderByAttributeOrdering: </B></a><p>
+
+<a name="1175">
+
+<h4> <a name="//apple_ref/occ/instm/EOSQLExpression/assembleDeleteStatementWithQualifier:tableList:whereClause:">assembleDeleteStatementWithQualifier:tableList:whereClause:</a></h4>
+
+</a>- (NSString *)<code>assembleDeleteStatementWithQualifier:</code>(EOQualifier *)<em>qualifier<br></em><code>tableList:</code>(NSString *)<em>tableList<br></em><code>whereClause:</code>(NSString *)<em>whereClause</em> <p>
+
+Invoked from <a href="#1263"><B>prepareDeleteExpressionForQualifier: </B></a> to return an SQL DELETE statement of the form:<p>
+
+<blockquote><pre>DELETE FROM tableList
+
+</pre></blockquote><p>
+
+<blockquote><pre>SQL_WHERE whereClause
+
+</pre></blockquote><p>
+
+<em>qualifier</em> is the argument to <B>prepareDeleteExpressionForQualifier: </B> from which <em>whereClause</em> was derived. It is provided for subclasses that need to generate the WHERE clause in a particular way.<p>
+
+<a name="1181">
+
+<h4> <a name="//apple_ref/occ/instm/EOSQLExpression/assembleInsertStatementWithRow:tableList:columnList:valueList:">assembleInsertStatementWithRow:tableList:columnList:valueList:</a></h4>
+
+</a>- (NSString *)<code>assembleInsertStatementWithRow:</code>(NSDictionary *)<em>row<br></em><code>tableList:</code>(NSString *)<em>tableList<br></em><code>columnList:</code>(NSString *)<em>columnList<br></em><code>valueList:</code>(NSString *)<em>valueList</em> <p>
+
+Invoked from <a href="#1270"><B>prepareInsertExpressionWithRow: </B></a> to return an SQL INSERT statement of the form:<p>
+
+<blockquote><pre>INSERT INTO tableList (columnList)
+
+</pre></blockquote><p>
+
+<blockquote><pre>VALUES valueList
+
+</pre></blockquote><p>
+
+or, if <em>columnList</em> is <B>nil </B>:<p>
+
+<blockquote><pre>INSERT INTO tableList
+
+</pre></blockquote><p>
+
+<blockquote><pre>VALUES valueList
+
+</pre></blockquote><p>
+
+<em>row</em> is the argument to <B>prepareInsertExpressionWithRow: </B> from which <em>columnList</em> and <em>valueList</em> were derived. It is provided for subclasses that need to generate the list of columns and values in a particular way.<p>
+
+<a name="1190">
+
+<h4> <a name="//apple_ref/occ/instm/EOSQLExpression/assembleJoinClauseWithLeftName:rightName:joinSemantic:">assembleJoinClauseWithLeftName:rightName:joinSemantic:</a></h4>
+
+</a>- (NSString *)<code>assembleJoinClauseWithLeftName:</code>(NSString *)<em>leftName<br></em><code>rightName:</code>(NSString *)<em>rightName<br></em><code>joinSemantic:</code>(EOJoinSemantic)<em>semantic</em> <p>
+
+Returns a join clause of the form:<p>
+
+<blockquote><pre>leftName operator rightName
+
+</pre></blockquote><p>
+
+Where operator is "=" for an inner join, "*=" for a left-outer join, and "=*" for a right-outer join. Invoked from <a href="#1152"><B>addJoinClauseWithLeftName:rightName:joinSemantic: </B></a>.<p>
+
+<a name="970">
+
+<h4> <a name="//apple_ref/occ/instm/EOSQLExpression/assembleSelectStatementWithAttributes:lock:qualifier:fetchOrder:selectString:columnList:tableList:whereClause:joinClause:orderByClause:lockClause:">assembleSelectStatementWithAttributes:lock:qualifier:fetchOrder:<br>selectString:columnList:tableList:whereClause:joinClause:<br>orderByClause:lockClause:</a></h4>
+
+</a>- (NSString *)<code>assembleSelectStatementWithAttributes:</code>(NSArray *)<em>attributes<br></em><code>lock:</code>(BOOL)<em>lock<br></em><code>qualifier:</code>(EOQualifier *)<em>qualifier<br></em><code>fetchOrder:</code>(NSArray *)<em>fetchOrder<br></em><code>selectString:</code>(NSString *)<em>selectString<br></em><code>columnList:</code>(NSString *)<em>columnList<br></em><code>tableList:</code>(NSString *)<em>tableList<br></em><code>whereClause:</code>(NSString *)<em>whereClause<br></em><code>joinClause:</code>(NSString *)<em>joinClause<br></em><code>orderByClause:</code>(NSString *)<em>orderByClause<br></em><code>lockClause:</code>(NSString *)<em>lockClause</em><p>
+
+Invoked from <a href="#1277"><B>prepareSelectExpressionWithAttributes:lock:fetchSpecification: </B></a> to Return an SQL SELECT statement of the form:<p>
+
+<blockquote><pre>SELECT columnList
+
+</pre></blockquote><p>
+
+<blockquote><pre>FROM tableList lockClause
+
+</pre></blockquote><p>
+
+<blockquote><pre>WHERE whereClause AND joinClause
+
+</pre></blockquote><p>
+
+<blockquote><pre>ORDER BY orderByClause
+
+</pre></blockquote><p>
+
+If <em>lockClause</em> is <B>nil </B>, it is omitted from the statement. Similarly, if <em>orderByClause</em> is <B>nil </B>, the "ORDER BY <em>orderByClause</em>" is omitted. If either <em>whereClause</em> or <em>joinClause</em> is <B>nil </B>, the "AND" and <B>nil </B>-valued argument are omitted. If both are <B>nil </B>, the entire WHERE clause is omitted.<p>
+
+<em>attributes</em>,<em> lock</em>, <em>qualifier</em>, and <em>fetchOrder</em> are the arguments to <B>prepareSelectExpressionWithAttributes:lock:fetchSpecification: </B> from which the other <B>assembleSelect... </B> arguments were derived. They are provided for subclasses that need to generate the clauses of the SELECT statement in a particular way.<p>
+
+<a name="1203">
+
+<h4> <a name="//apple_ref/occ/instm/EOSQLExpression/assembleUpdateStatementWithRow:qualifier:tableList:updateList:whereClause:">assembleUpdateStatementWithRow:qualifier:tableList:updateList:whereClause:</a></h4>
+
+</a>- (NSString *)<code>assembleUpdateStatementWithRow:</code>(NSDictionary *)<em>row<br></em><code>qualifier:</code>(EOQualifier *)<em>qualifier<br></em><code>tableList:</code>(NSString *)<em>tableList<br></em><code>updateList:</code>(NSString *)<em>updateList<br></em><code>whereClause:</code>(NSString *)<em>whereClause</em> <p>
+
+Invoked from <a href="#1288"><B>prepareUpdateExpressionWithRow:qualifier: </B></a> to return an SQL UPDATE statement of the form:<p>
+
+<blockquote><pre>UPDATE tableList
+
+</pre></blockquote><p>
+
+<blockquote><pre>SET updateList
+
+</pre></blockquote><p>
+
+<blockquote><pre>WHERE whereClause
+
+</pre></blockquote><p>
+
+<em>row</em> and <em>qualifier</em> are the arguments to <B>prepareUpdateExpressionWithRow:qualifier: </B> from which <em>updateList</em> and <em>whereClause</em> were derived. They are provided for subclasses that need to generate the clauses of the UPDATE statement in a particular way.<p>
+
+<a name="1210">
+
+<h4> <a name="//apple_ref/occ/instm/EOSQLExpression/bindVariableDictionaries">bindVariableDictionaries</a></h4>
+
+</a>- (NSArray *)<code>bindVariableDictionaries</code> <p>
+
+Returns the receiver's bind variable dictionaries. For more information on bind variables, see the discussion in the class description.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOSQLExpression/addBindVariableDictionary:">- addBindVariableDictionary:</a>
+
+ </B><p><a name="1214">
+
+<h4> <a name="//apple_ref/occ/instm/EOSQLExpression/bindVariableDictionaryForAttribute:value:">bindVariableDictionaryForAttribute:value:</a></h4>
+
+</a>- (NSMutableDictionary *)<code>bindVariableDictionaryForAttribute:</code>(EOAttribute *)<em>attribute </em><code>value:</code>(id)<em>value</em> <p>
+
+Implemented by subclasses to create and return the bind variable dictionary for <em>attribute</em> and <em>value</em>. The dictionary returned from this method must contain at least the following key-value pairs:<p>
+
+<b>Key	Value
+
+</b>EOBindVariableNameKey	the name of the bind variable for <em>attribute
+
+</em>EOBindVariablePlaceHolderKey	the placeholder string used in the SQL statement
+
+EOBindVariableAttributeKey	<em>attribute
+
+</em>EOBindVariableValueKey	<em>value
+
+</em>An adaptor subclass may define additional entries as required by its RDBMS.<p>
+
+Invoked from <a href="#1353"><B>sqlStringForValue:attributeNamed: </B></a> when the message <a href="#1255"><B>mustUseBindVariableForAttribute: </B></a><em>attribute</em> returns YES or when the receiver's class uses bind variables and the message <a href="#1304"><B>shouldUseBindVariableForAttribute: </B></a><em>attribute</em> returns YES. For more information on bind variables, see the discussion in the class description.<p>
+
+A subclass that uses bind variables should implement this method without invoking EOSQLExpression's implementation. The subclass implementation must return a dictionary with entries for the keys listed above and may add additional keys.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOSQLExpression/bindVariableDictionaryForAttribute:value:">- bindVariableDictionaryForAttribute:value:</a> </B>, <a href="#//apple_ref/occ/clm/EOSQLExpression/useBindVariables"><B>+ useBindVariables</a>
+
+ </B><p><a name="1226">
+
+<h4> <a name="//apple_ref/occ/instm/EOSQLExpression/entity">entity</a></h4>
+
+</a>- (EOEntity *)<code>entity</code> <p>
+
+Returns the receiver's entity.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOSQLExpression/initWithEntity:">- initWithEntity:</a>
+
+ </B><p><a name="1428">
+
+<h4> <a name="//apple_ref/occ/instm/EOSQLExpression/externalNameQuoteCharacter">externalNameQuoteCharacter</a></h4>
+
+</a>- (NSString *)<B>externalNameQuoteCharacter </B> <p>
+
+Returns the string `\"' (an escaped quote character) if the receiver uses quoted external names, or the empty string ("") otherwise.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/clm/EOSQLExpression/useQuotedExternalNames">+ useQuotedExternalNames</a> </B>, <a href="#//apple_ref/occ/instm/EOSQLExpression/sqlStringForSchemaObjectName:"><B>- sqlStringForSchemaObjectName:</a>
+
+ </B><p><a name="1230">
+
+<h4> <a name="//apple_ref/occ/instm/EOSQLExpression/initWithEntity:">initWithEntity:</a></h4>
+
+</a>- <code>initWithEntity:</code>(EOEntity *)<em>entity</em> <p>
+
+Initializes a new instance of EOSQLExpression with <em>entity</em>.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOSQLExpression/entity">- entity</a>
+
+ </B><p><a name="1234">
+
+<h4> <a name="//apple_ref/occ/instm/EOSQLExpression/joinClauseString">joinClauseString</a></h4>
+
+</a>- (NSMutableString *)<code>joinClauseString</code> <p>
+
+Returns the part of the receiver's WHERE clause that specifies join conditions. Together, the <B>joinClauseString </B> and the <B><a href="#1385">whereClauseString</a> </B> make up a statement's WHERE clause. If the receiver's statement doesn't contain join conditions, this method returns an empty string.<p>
+
+A EOSQLExpression's <B>joinClauseString </B> is generally set by invoking <a href="#1239"><B>joinExpression </B></a>.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOSQLExpression/whereClauseString">- whereClauseString</a> </B>, <a href="#//apple_ref/occ/instm/EOSQLExpression/addJoinClauseWithLeftName:rightName:joinSemantic:"><B>- addJoinClauseWithLeftName:rightName:joinSemantic:</a>
+
+ </B><p><a name="1239">
+
+<h4> <a name="//apple_ref/occ/instm/EOSQLExpression/joinExpression">joinExpression</a></h4>
+
+</a>- (void)<code>joinExpression</code> <p>
+
+Builds up the <B><a href="#1234">joinClauseString</a> </B> for use in a SELECT statement. For each relationship path in the <a href="#1168"><B>aliasesByRelationshipPath </B></a> dictionary, this method invokes <a href="#1152"><B>addJoinClauseWithLeftName:rightName:joinSemantic: </B></a> for each of the relationship's EOJoin objects.<p>
+
+If the <B>aliasesByRelationshipPath </B> dictionary only has one entry (the entry for the EOSQLExpression's entity), the <B>joinClauseString </B> is empty.<p>
+
+You must invoke this method <em>after</em> invoking <a href="#1160"><B>addSelectListAttribute: </B></a> for each attribute to be selected and after sending <B>sqlStringForSQLExpression:self </B> to the qualifier for the SELECT statement. (These methods build up the <B>aliasesByRelationshipPath </B> dictionary by invoking <a href="#1315"><B>sqlStringForAttributePath: </B></a>.)<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOSQLExpression/whereClauseString">- whereClauseString</a> </B>, <B><a href="../../Protocols/EOQualifierSQLGeneration/EOQualifierSQLGeneration.html#//apple_ref/occ/instm/EOQualifierSQLGeneration/sqlStringForSQLExpression:" target="_top">- sqlStringForSQLExpression: </B> (EOQualifierSQLGeneration protocol)</a>
+
+<p><a name="1245">
+
+<h4> <a name="//apple_ref/occ/instm/EOSQLExpression/listString">listString</a></h4>
+
+</a>- (NSMutableString *)<code>listString</code> <p>
+
+Returns a comma-separated list of attributes or "attribute = value" assignments. <B>listString </B> is built up with successive invocations of <a href="#1147"><B>addInsertListAttribute:value: </B></a>, <a href="#1160"><B>addSelectListAttribute: </B></a>, or <a href="#1164"><B>addUpdateListAttribute:value: </B></a> for INSERT statements, SELECT statements, and UPDATE statements, respectively. The contents of <B>listString </B> vary according to the type of statement the receiver is building:<p>
+
+<b>Type of Statement	Sample listString Contents
+
+</b>INSERT	FIRST_NAME, LAST_NAME, EMPLOYEE_ID
+
+UPDATE	FIRST_NAME = "Timothy", LAST_NAME = "Richardson"
+
+SELECT	t0.FIRST_NAME, t0.LAST_NAME, t1.DEPARTMENT_NAME
+
+<a name="1252">
+
+<h4> <a name="//apple_ref/occ/instm/EOSQLExpression/lockClause">lockClause</a></h4>
+
+</a>- (NSString *)<code>lockClause</code> <p>
+
+Overridden by subclasses to return the SQL string used in a SELECT statement to lock selected rows. A concrete subclass of EOSQLExpression must override this method to return the string used by its adaptor's RDBMS.<p>
+
+<a name="1255">
+
+<h4> <a name="//apple_ref/occ/instm/EOSQLExpression/mustUseBindVariableForAttribute:">mustUseBindVariableForAttribute:</a></h4>
+
+</a>- (BOOL)<code>mustUseBindVariableForAttribute:</code>(EOAttribute *)<em>attribute</em><p>
+
+Returns YES if the receiver must use bind variables for <em>attribute</em>, NO otherwise. EOSQLExpression's implementation returns NO. An SQL expression subclass that uses bind variables should override this method to return YES if the underlying RDBMS requires that bind variables be used for attributes with <em>attribute</em>'s external type.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOSQLExpression/shouldUseBindVariableForAttribute:">- shouldUseBindVariableForAttribute:</a> </B>, <a href="#//apple_ref/occ/instm/EOSQLExpression/bindVariableDictionaryForAttribute:value:"><B>- bindVariableDictionaryForAttribute:value:</a>
+
+ </B><p><a name="1259">
+
+<h4> <a name="//apple_ref/occ/instm/EOSQLExpression/orderByString">orderByString</a></h4>
+
+</a>- (NSMutableString *)<code>orderByString</code> <p>
+
+Returns the comma-separated list of "attribute direction" pairs ("LAST_NAME asc, FIRST_NAME asc", for example) for use in a SELECT statement.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOSQLExpression/addOrderByAttributeOrdering:">- addOrderByAttributeOrdering:</a>
+
+ </B><p><a name="1263">
+
+<h4> <a name="//apple_ref/occ/instm/EOSQLExpression/prepareDeleteExpressionForQualifier:">prepareDeleteExpressionForQualifier:</a></h4>
+
+</a>- (void)<code>prepareDeleteExpressionForQualifier:</code>(EOQualifier *)<em>qualifier</em> <p>
+
+Generates a DELETE statement by performing the following steps:<p>
+
+<ol>
+
+<a name="1266">
+
+<li>Sends an <B>sqlStringForSQLExpression:self </B> message to <em>qualifier</em> to generate the receiver's <B><a href="#1385">whereClauseString</a> </B>.
+
+</a><a name="1267">
+
+<li>Invokes <a href="#1364"><B>tableListWithRootEntity: </B></a> to get the table name for the FROM clause.
+
+</a><a name="1268">
+
+<li>Invokes <a href="#1175"><B>assembleDeleteStatementWithQualifier:tableList:whereClause: </B></a>.
+
+</a></ol>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/clm/EOSQLExpression/deleteStatementWithQualifier:entity:">+ deleteStatementWithQualifier:entity:</a>
+
+ </B><p><a name="1270">
+
+<h4> <a name="//apple_ref/occ/instm/EOSQLExpression/prepareInsertExpressionWithRow:">prepareInsertExpressionWithRow:</a></h4>
+
+</a>- (void)<code>prepareInsertExpressionWithRow:</code>(NSDictionary *)<em>row</em> <p>
+
+Generates an INSERT statement by performing the following steps:<p>
+
+<ol>
+
+<a name="1273">
+
+<li>Invokes <a href="#1147"><B>addInsertListAttribute:value: </B></a> for each entry in <em>row</em> to prepare the comma-separated list of attributes and the corresponding list of values.<em> </em>
+
+</a><a name="1274">
+
+<li>Invokes <a href="#1364"><B>tableListWithRootEntity: </B></a> to get the table name.
+
+</a><a name="1275">
+
+<li>Invokes <a href="#1181"><B>assembleInsertStatementWithRow:tableList:columnList:valueList: </B></a>.
+
+</a></ol>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/clm/EOSQLExpression/insertStatementForRow:entity:">+ insertStatementForRow:entity:</a>
+
+ </B><p><a name="1277">
+
+<h4> <a name="//apple_ref/occ/instm/EOSQLExpression/prepareSelectExpressionWithAttributes:lock:fetchSpecification:">prepareSelectExpressionWithAttributes:lock:fetchSpecification:</a></h4>
+
+</a>- (void)<code>prepareSelectExpressionWithAttributes:</code>(NSArray *)<em>attributes </em><code>lock:</code>(BOOL)<em>flag </em><code>fetchSpecification:</code>(EOFetchSpecification *)<em>fetchSpecification</em> <p>
+
+Generates a SELECT statement by performing the following steps:<p>
+
+<ol>
+
+<a name="1280">
+
+<li>Invokes <a href="#1160"><B>addSelectListAttribute: </B></a> for each entry in <em>attributes</em> to prepare the comma-separated list of attributes.<em> </em>
+
+</a><a name="1281">
+
+<li>Sends an <B>sqlStringForSQLExpression:self </B> message to <em>qualifier</em> to generate the receiver's <a href="#1385"><B>whereClauseString </B></a>. 
+
+</a><a name="1282">
+
+<li>Invokes <a href="#1156"><B>addOrderByAttributeOrdering: </B></a> for each EOAttributeOrdering object in <em>fetchSpecification</em>.<em> </em>First conjoins the qualifier in <em>fetchSpecification</em> with the restricting qualifier, if any, of the receiver's entity.
+
+</a><a name="1283">
+
+<li>Invokes <a href="#1239"><B>joinExpression </B></a> to generate the receiver's <a href="#1234"><B>joinClauseString </B></a>.
+
+</a><a name="1284">
+
+<li>Invokes <a href="#1364"><B>tableListWithRootEntity: </B></a> to get the comma-separated list of tables for the FROM clause.
+
+</a><a name="1285">
+
+<li>If <em>flag</em> is YES, invokes <a href="#1252"><B>lockClause </B></a> to get the SQL string to lock selected rows.
+
+</a><a name="1286">
+
+<li>Invokes <a href="#970"><B>assembleSelectStatementWithAttributes:lock:qualifier:fetchOrder: selectString:columnList:tableList:whereClause:joinClause: orderByClause:lockClause: </B></a>.
+
+</a></ol>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/clm/EOSQLExpression/selectStatementForAttributes:lock:fetchSpecification:entity:">+ selectStatementForAttributes:lock:fetchSpecification:entity:</a>
+
+ </B><p><a name="1288">
+
+<h4> <a name="//apple_ref/occ/instm/EOSQLExpression/prepareUpdateExpressionWithRow:qualifier:">prepareUpdateExpressionWithRow:qualifier:</a></h4>
+
+</a>- (void)<code>prepareUpdateExpressionWithRow:</code>(NSDictionary *)<em>row </em><code>qualifier:</code>(EOQualifier *)<em>qualifier</em> <p>
+
+Generates an UPDATE statement by performing the following steps:<p>
+
+<ol>
+
+<a name="1291">
+
+<li>Invokes <a href="#1164"><B>addUpdateListAttribute:value: </B></a> for each entry in <em>row</em> to prepare the comma-separated list of "attribute = value" assignments.<em> </em>
+
+</a><a name="1292">
+
+<li>Sends an <B>sqlStringForSQLExpression:self </B> message to <em>qualifier</em> to generate the receiver's <B><a href="#1385">whereClauseString</a> </B>.
+
+</a><a name="1293">
+
+<li>Invokes <a href="#1364"><B>tableListWithRootEntity: </B></a> to get the table name for the FROM clause.
+
+</a><a name="1294">
+
+<li>Invokes <a href="#1203"><B>assembleUpdateStatementWithRow:qualifier:tableList:updateList:whereClause: </B></a>.
+
+</a></ol>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/clm/EOSQLExpression/updateStatementForRow:qualifier:entity:">+ updateStatementForRow:qualifier:entity:</a>
+
+ </B><p><a name="1296">
+
+<h4> <a name="//apple_ref/occ/instm/EOSQLExpression/setStatement:">setStatement:</a></h4>
+
+</a>- (void)<code>setStatement:</code>(NSString *)<em>statement</em> <p>
+
+Sets the receiver's SQL statement to <em>string</em>, which should be a valid expression in the target query language. Use this method-instead of a <B>prepare... </B> method-to directly assign an SQL string to an EOSQLExpression object. This method does not perform substitutions or formatting of any kind. <p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/clm/EOSQLExpression/expressionForString:">+ expressionForString:</a> </B>, <a href="#//apple_ref/occ/instm/EOSQLExpression/statement"><B>- statement</a>
+
+ </B><p><a name="1300">
+
+<h4> <a name="//apple_ref/occ/instm/EOSQLExpression/setUseAliases:">setUseAliases:</a></h4>
+
+</a>- (void)<code>setUseAliases:</code>(BOOL)<em>useAliases</em> <p>
+
+Tells the receiver whether or not to use table aliases.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOSQLExpression/useAliases">- useAliases</a>
+
+ </B><p><a name="1304">
+
+<h4> <a name="//apple_ref/occ/instm/EOSQLExpression/shouldUseBindVariableForAttribute:">shouldUseBindVariableForAttribute:</a></h4>
+
+</a>- (BOOL)<code>shouldUseBindVariableForAttribute:</code>(EOAttribute *)<em>attribute</em> <p>
+
+Returns YES if the receiver can provide a bind variable dictionary for <em>attribute</em>, NO otherwise. Bind variables aren't used for values associated with this attribute when the class method <a href="#1138"><B>useBindVariables </B></a> returns NO. EOSQLExpression's implementation returns NO. An SQL expression subclass should override this method to return YES if the receiver should use bind variables for attributes with <em>attribute</em>'s external type. It should also return YES for any attribute for which the receiver must use bind variables.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOSQLExpression/mustUseBindVariableForAttribute:">- mustUseBindVariableForAttribute:</a>
+
+ </B><p><a name="1308">
+
+<h4> <a name="//apple_ref/occ/instm/EOSQLExpression/sqlStringForAttribute:">sqlStringForAttribute:</a></h4>
+
+</a>- (NSString *)<code>sqlStringForAttribute:</code>(EOAttribute *)<em>attribute</em> <p>
+
+Returns the SQL string for <em>attribute</em>, complete with a table alias if the receiver uses table aliases. Invoked from <a href="#1312"><B>sqlStringForAttributeNamed: </B></a> when the attribute name is not a path.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOSQLExpression/sqlStringForAttributePath:">- sqlStringForAttributePath:</a>
+
+ </B><p><a name="1312">
+
+<h4> <a name="//apple_ref/occ/instm/EOSQLExpression/sqlStringForAttributeNamed:">sqlStringForAttributeNamed:</a></h4>
+
+</a>- (NSString *)<code>sqlStringForAttributeNamed:</code>(NSString *)<em>name</em> <p>
+
+Returns the SQL string for the attribute named <em>name</em>, complete with a table alias if the receiver uses table aliases. Generates the return value using <a href="#1315"><B>sqlStringForAttributePath: </B></a> if <em>name</em> is an attribute path ("department.name", for example); otherwise, uses <a href="#1308"><B>sqlStringForAttribute: </B></a>.<p>
+
+<a name="1315">
+
+<h4> <a name="//apple_ref/occ/instm/EOSQLExpression/sqlStringForAttributePath:">sqlStringForAttributePath:</a></h4>
+
+</a>- (NSString *)<code>sqlStringForAttributePath:</code>(NSArray *)<em>path</em> <p>
+
+Returns the SQL string for <em>path</em>, complete with a table alias if the receiver uses table aliases. Invoked from <a href="#1312"><B>sqlStringForAttributeNamed: </B></a> when the specified attribute name is a path ("department.location.officeNumber", for example). <em>path</em> is an array of any number of EORelationship objects followed by an EOAttribute object. The EORelationship and EOAttribute objects each correspond to a component in path. For example, if the attribute name argument to <B>sqlForAttributeNamed: </B> is "department.location.officeNumber", <em>path</em> is an array containing the following objects in the order listed:<p>
+
+<ul><li>The EORelationship object in the receiver's entity named "department". (Assume the relationship's destination entity is named "Department".)<br><li>The EORelationship object in the Department entity named "location". (Assume the relationship's destination entity is named "Location".)<br><li>The EOAttribute object in the Location entity named "officeNumber".<br></ul><p>Assuming that the receiver uses aliases and the alias for the Location table is t2, the SQL string for this sample attribute path is "t2.officeNumber".<p>
+
+If the receiver uses table aliases, this method has the side effect of adding a "relationship path"-"alias name" entry to the <B>aliasesByRelationship </B> dictionary.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOSQLExpression/sqlStringForAttribute:">- sqlStringForAttribute:</a> </B>, <a href="#//apple_ref/occ/instm/EOSQLExpression/aliasesByRelationshipPath"><B>- aliasesByRelationshipPath</a>
+
+ </B><p><a name="1324">
+
+<h4> <a name="//apple_ref/occ/instm/EOSQLExpression/sqlStringForConjoinedQualifiers:">sqlStringForConjoinedQualifiers:</a></h4>
+
+</a>- (NSString *)<code>sqlStringForConjoinedQualifiers:</code>(NSArray *)<em>qualifiers</em> <p>
+
+Creates and returns an SQL string that is the result of interposing the word "AND" between the SQL strings for the qualifiers in <em>qualifiers</em>. Generates an SQL string for each qualifier by sending <B>sqlStringForSQLExpression: </B> messages to the qualifiers with <B>self </B> as the argument. If the SQL string for a qualifier contains only white space, it isn't included in the return value. The return value is enclosed in parentheses if the SQL strings for two or more qualifiers were ANDed together.<p>
+
+<a name="1327">
+
+<h4> <a name="//apple_ref/occ/instm/EOSQLExpression/sqlStringForDisjoinedQualifiers:">sqlStringForDisjoinedQualifiers:</a></h4>
+
+</a>- (NSString *)<code>sqlStringForDisjoinedQualifiers:</code>(NSArray *)<em>qualifiers</em> <p>
+
+Creates and returns an SQL string that is the result of interposing the word "OR" between the SQL strings for the qualifiers in <em>qualifiers</em>. Generates an SQL string for each qualifier by sending <B>sqlStringForSQLExpression: </B> messages to the qualifiers with <B>self </B> as the argument. If the SQL string for a qualifier contains only white space, it isn't included in the return value. The return value is enclosed in parentheses if the SQL strings for two or more qualifiers were ORed together.<p>
+
+<a name="1330">
+
+<h4> <a name="//apple_ref/occ/instm/EOSQLExpression/sqlStringForKeyComparisonQualifier:">sqlStringForKeyComparisonQualifier:</a></h4>
+
+</a>- (NSString *)<code>sqlStringForKeyComparisonQualifier:</code>(EOKeyComparisonQualifier *)<em>qualifier</em> <p>
+
+Creates and returns an SQL string that is the result of interposing an operator between the SQL strings for the right and left keys in <em>qualifier</em>. Determines the SQL operator by invoking <a href="#1340"><B>sqlStringForSelector:value: </B></a> with <em>qualifier</em>'s selector and <B>nil </B> for the value. Generates SQL strings for <em>qualifier</em>'s keys by invoking <a href="#1312"><B>sqlStringForAttributeNamed: </B></a> to get SQL strings. This method also formats the strings for the right and left keys using <a href="#1103"><B>formatSQLString:format: </B></a> with the corresponding attributes' "read" formats.<p>
+
+<a name="1333">
+
+<h4> <a name="//apple_ref/occ/instm/EOSQLExpression/sqlStringForKeyValueQualifier:">sqlStringForKeyValueQualifier:</a></h4>
+
+</a>- (NSString *)<code>sqlStringForKeyValueQualifier:</code>(EOKeyValueQualifier *)<em>qualifier</em> <p>
+
+Creates and returns an SQL string that is the result of interposing an operator between the SQL strings for <em>qualifier</em>'s key and value. Determines the SQL operator by invoking <a href="#1340"><B>sqlStringForSelector:value: </B></a> with <em>qualifier</em>'s selector and value. Generates an SQL string for <em>qualifier</em>'s key by invoking <a href="#1312"><B>sqlStringForAttributeNamed: </B></a> to get an SQL string and <a href="#1103"><B>formatSQLString:format: </B></a> with the corresponding attribute's "read" format. Similarly, generates an SQL string for qualifier's value by invoking <a href="#1353"><B>sqlStringForValue:attributeNamed: </B></a> to get an SQL string and <a href="#1110"><B>formatValue:forAttribute: </B></a> to format it. (First invokes <a href="#1437"><B>sqlPatternFromShellPattern: </B></a> for the value if <em>qualifier</em>'s selector is <B>isLike: </B>.)<p>
+
+<a name="1336">
+
+<h4> <a name="//apple_ref/occ/instm/EOSQLExpression/sqlStringForNegatedQualifier:">sqlStringForNegatedQualifier:</a></h4>
+
+</a>- (NSString *)<code>sqlStringForNegatedQualifier:</code>(EOQualifier *)<em>qualifier</em> <p>
+
+Creates and returns an SQL string that is the result of surrounding the SQL string for <em>qualifier</em> in parentheses and appending it to the word "not". For example, if the string for <em>qualifier</em> is "FIRST_NAME = `John'", <B>sqlStringForNegatedQualifier: </B> returns the string "not (FIRST_NAME = `John')".<p>
+
+Generates an SQL string for <em>qualifier</em> by sending an <B>sqlStringForSQLExpression: </B> message to <em>qualifier</em> with <B>self </B> as the argument. If the SQL string for <em>qualifier</em> contains only white space, this method returns <B>nil </B>.<p>
+
+<a name="1430">
+
+<h4> <a name="//apple_ref/occ/instm/EOSQLExpression/sqlStringForSchemaObjectName:">sqlStringForSchemaObjectName:</a></h4>
+
+</a>- (NSString *)<B>sqlStringForSchemaObjectName: </B>(NSString *)<em>name</em> <p>
+
+Returns <em>name</em> enclosed in the external name quote character if the receiver uses quoted external names, otherwise simply returns <em>name</em> unaltered.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/clm/EOSQLExpression/useQuotedExternalNames">+ useQuotedExternalNames</a> </B>, <a href="#//apple_ref/occ/instm/EOSQLExpression/externalNameQuoteCharacter"><B>- externalNameQuoteCharacter</a>
+
+ </B><p><a name="1340">
+
+<h4> <a name="//apple_ref/occ/instm/EOSQLExpression/sqlStringForSelector:value:">sqlStringForSelector:value:</a></h4>
+
+</a>- (NSString *)<code>sqlStringForSelector:</code>(SEL)<em>selector </em><code>value:</code>(id)<em>value</em> <p>
+
+Returns an SQL operator for <em>selector </em>and<em> value</em>. The following table summarizes EOSQLExpression's default mapping:<p>
+
+<b>Selector	SQL Operator
+
+</b>isEqualTo:	"is" if value is an EONull, "=" otherwise 
+
+isNotEqualTo:	"is not" if <em>value</em> is an EONull, "!=" otherwise
+
+isLessThan:	"&lt;"
+
+isGreaterThan:	"&gt;"
+
+isLessThanOrEqualTo:	"&lt;="
+
+isGreaterThanOrEqualTo:	"&gt;="
+
+isLike:	"like"
+
+Raises an NSInternalInconsistencyException if selector is an unknown operator.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOSQLExpression/sqlStringForKeyComparisonQualifier:">- sqlStringForKeyComparisonQualifier:</a> </B>, <a href="#//apple_ref/occ/instm/EOSQLExpression/sqlStringForKeyValueQualifier:"><B>- sqlStringForKeyValueQualifier:</a>
+
+ </B><p><a name="1353">
+
+<h4> <a name="//apple_ref/occ/instm/EOSQLExpression/sqlStringForValue:attributeNamed:">sqlStringForValue:attributeNamed:</a></h4>
+
+</a>- (NSString *)<code>sqlStringForValue:</code>(id)<em>value </em><code>attributeNamed:</code>(NSString *)<em>name</em> <p>
+
+Returns a string for <em>value</em> appropriate for use in an SQL statement. If the receiver uses a bind variable for the attribute named <em>name</em>, then <B>sqlStringForValue:attributeNamed: </B> gets the bind variable dictionary for the attribute, adds it to the receiver's array of bind variables dictionaries, and returns the value for the binding's "EOBindVariablePlaceHolderKey". Otherwise, this method invokes <a href="#1110"><B>formatValue:forAttribute: </B></a> and returns the formatted string for <em>value</em>.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOSQLExpression/mustUseBindVariableForAttribute:">- mustUseBindVariableForAttribute:</a> </B>, <a href="#//apple_ref/occ/instm/EOSQLExpression/shouldUseBindVariableForAttribute:"><B>- shouldUseBindVariableForAttribute:</a> </B>, 
+
+<B><a href="#//apple_ref/occ/clm/EOSQLExpression/useBindVariables">+ useBindVariables</a> </B>, <a href="#//apple_ref/occ/instm/EOSQLExpression/bindVariableDictionaries"><B>- bindVariableDictionaries</a> </B>, <a href="#//apple_ref/occ/instm/EOSQLExpression/addBindVariableDictionary:"><B>- addBindVariableDictionary:</a>
+
+ </B><p><a name="1357">
+
+<h4> <a name="//apple_ref/occ/instm/EOSQLExpression/statement">statement</a></h4>
+
+</a>- (NSString *)<code>statement</code> <p>
+
+Returns the complete SQL statement for the receiver. An SQL statement can be assigned to an EOSQLExpression object directly using the class method <a href="#1099"><B>expressionForString: </B></a> or using the instance method <a href="#1296"><B>setStatement: </B></a>. Generally, however, an EOSQLExpression's statement is built up using one of the following methods:<p>
+
+<ul><li><a href="#1277">- prepareSelectExpressionWithAttributes:lock:fetchSpecification:</a><br><li><a href="#1270">- prepareInsertExpressionWithRow:</a><br><li><a href="#1288">- prepareUpdateExpressionWithRow:qualifier:</a><br><li><a href="#1263">- prepareDeleteExpressionForQualifier:</a><br></ul><p><a name="1364">
+
+<h4> <a name="//apple_ref/occ/instm/EOSQLExpression/tableListWithRootEntity:">tableListWithRootEntity:</a></h4>
+
+</a>- (NSString *)<code>tableListWithRootEntity:</code>(EOEntity *)<em>entity</em> <p>
+
+Returns the comma-separated list of tables for use in a SELECT, UPDATE, or DELETE statement's FROM clause. If the receiver doesn't use table aliases, the table list consists only of the table name for <em>entity</em>-"EMPLOYEE", for example. If the receiver does use table aliases (only in SELECT statements by default), the table list is a comma separated list of table names and their aliases, for example:<p>
+
+<blockquote><pre>EMPLOYEE t0, DEPARTMENT t1
+
+</pre></blockquote><p>
+
+<B>tableListWithRootEntity: </B> creates a string containing the table name for <em>entity</em> and a corresponding table alias ("EMPLOYEE t0", for example). For each entry in <a href="#1168"><B>aliasesByRelationshipPath </B></a>, this method appends a new table name and table alias.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOSQLExpression/useAliases">- useAliases</a> </B>, <a href="#//apple_ref/occ/instm/EOSQLExpression/aliasesByRelationshipPath"><B>- aliasesByRelationshipPath</a>
+
+ </B><p><a name="1370">
+
+<h4> <a name="//apple_ref/occ/instm/EOSQLExpression/useAliases">useAliases</a></h4>
+
+</a>- (BOOL)<code>useAliases</code> <p>
+
+Returns YES if the receiver generates statements with table aliases, NO otherwise. For example, the following SELECT statement uses table aliases:<p>
+
+<blockquote><pre>SELECT t0.FIRST_NAME, t0.LAST_NAME, t1.NAME
+
+</pre></blockquote><p>
+
+<blockquote><pre>FROM EMPLOYEE t0, DEPARTMENT t1
+
+</pre></blockquote><p>
+
+<blockquote><pre>WHERE t0.DEPARTMENT_ID = t1.DEPARTMENT_ID
+
+</pre></blockquote><p>
+
+The EMPLOYEE table has the alias t0, and the DEPARTMENT table has the alias t1. <p>
+
+By default, EOSQLExpression uses table aliases only in SELECT statements. Enterprise Objects Framework assumes that INSERT, UPDATE, and DELETE statements are single-table operations. For more information, see the discussion in the class description.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOSQLExpression/setUseAliases:">- setUseAliases:</a> </B>, <a href="#//apple_ref/occ/instm/EOSQLExpression/aliasesByRelationshipPath"><B>- aliasesByRelationshipPath</a>
+
+ </B><p><a name="1379">
+
+<h4> <a name="//apple_ref/occ/instm/EOSQLExpression/valueList">valueList</a></h4>
+
+</a>- (NSMutableString *)<code>valueList</code> <p>
+
+Returns the comma-separated list of values used in an INSERT statement. For example, the value list for the following INSERT statement:<p>
+
+<blockquote><pre>INSERT EMPLOYEE (FIRST_NAME, LAST_NAME, EMPLOYEE_ID, DEPARTMENT_ID, SALARY)
+
+</pre></blockquote><p>
+
+<blockquote><pre>VALUES ('Shaun', 'Hayes', 1319, 23, 4600)
+
+</pre></blockquote><p>
+
+is "`Shaun', `Hayes', 1319, 23, 4600". An EOSQLExpression's <B>valueList </B> is generated a value at a time with <a href="#1147"><B>addInsertListAttribute:value: </B></a> messages.<p>
+
+<a name="1385">
+
+<h4> <a name="//apple_ref/occ/instm/EOSQLExpression/whereClauseString">whereClauseString</a></h4>
+
+</a>- (NSString *)<code>whereClauseString</code> <p>
+
+Returns the part of the receiver's WHERE clause that qualifies rows. The whereClauseString does not specify join conditions; the <a href="#1234"><B>joinClauseString </B></a> does that. Together, the <B>whereClauseString </B> and the <B>joinClauseString </B> make up a statement's where clause. For example, a qualifier for an Employee entity specifies that a statement only affects employees who belong to the Finance department and whose monthly salary is greater than $4500. Assume the corresponding where clause looks like this:<p>
+
+<blockquote><pre>WHERE EMPLOYEE.SALARY &gt; 4500 AND DEPARTMENT.NAME = `Finance'
+
+</pre></blockquote><p>
+
+<blockquote><pre>AND EMPLOYEE.DEPARTMENT_ID = DEPARTMENT.DEPARTMENT_ID
+
+</pre></blockquote><p>
+
+EOSQLExpression generates both a <B>whereClauseString </B> and a <B>joinClauseString </B> for this qualifier. The <B>whereClauseString </B> qualifies the rows and looks like this:<p>
+
+<blockquote><pre>EMPLOYEE.SALARY &gt; 4500 AND DEPARTMENT.NAME = `Finance'
+
+</pre></blockquote><p>
+
+The <B>joinClauseString </B> specifies the join conditions between the EMPLOYEE table and the DEPARTMENT table and looks like this:<p>
+
+<blockquote><pre>EMPLOYEE.DEPARTMENT_ID = DEPARTMENT.DEPARTMENT_ID
+
+</pre></blockquote><p>
+
+A EOSQLExpression's <B>whereClauseString </B> is generally set by sending a <B>sqlStringForSQLExpression: </B> message to an EOQualifier object.<p>
+
+<B>See also: </B>  
+
+<B><a href="../../Protocols/EOQualifierSQLGeneration/EOQualifierSQLGeneration.html#//apple_ref/occ/instm/EOQualifierSQLGeneration/sqlStringForSQLExpression:" target="_top">- sqlStringForSQLExpression: </B> (EOQualifierSQLGeneration protocol)</a>
+
+<p><a name="1195">
+
+<h4> <a name="//apple_ref/occ/instm/EOSQLExpression/"></a></h4>
+
+</a>
+
+ 
+
+ 
+
+
+
+
+
+<i>Copyright &#169; 1997, Apple Computer, Inc.   All rights
+
+reserved.</i>
+
+
+
+<!-- Last updated: 10/16/97 11:25:54 -->
+
+
+
+</body>
+
+</html>
+

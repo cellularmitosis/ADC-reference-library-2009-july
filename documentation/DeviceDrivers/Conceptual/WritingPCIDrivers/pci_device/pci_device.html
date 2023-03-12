@@ -1,0 +1,135 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+<head>
+	<title>Writing PCI Drivers: Writing a Driver for a PCI Device</title>
+	<meta id="Generator" name="Generator" content="Gutenberg"/>
+	<meta id="GeneratorVersion" name="GeneratorVersion" content="v132"/>
+	<meta http-equiv="content-type" content="text/html;charset=utf-8"/>
+	<meta id="Copyright" name="Copyright" content="Copyright 2009 Apple Inc. All Rights Reserved."/>
+	<meta id="IndexTitle" name="IndexTitle" content="Writing a Driver for a PCI Device"/>
+	<meta id="xcode-display" name="xcode-display" content="render"/>
+	<meta id="toc-file" name="toc-file" content="../toc.html"/>
+	<meta id="RESOURCES" content="../../../../Resources" />
+	
+	<link rel="stylesheet" type="text/css" href="../../../../Resources/CSS/frameset_styles.css"/>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/lib/prototype.js"></script>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/lib/scriptaculous.js"></script>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/page.js"></script>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/pedia.js"></script>
+	<!--[if lte IE 6]>
+		<style type="text/css">
+			/*<![CDATA[*/ 
+			html {overflow-x:auto; overflow-y:hidden;  }
+			/*]]>*/
+		</style>
+	<![endif]-->
+</head>    
+<body bgcolor="#ffffff" onload="initialize_page();"><a name="//apple_ref/doc/uid/TP30000347" title="Writing a Driver for a PCI Device"></a>
+    <noscript>
+    <div id="tocMenu">
+        <iframe id="toc_content" name="toc_content" SRC="../toc.html" width="210" height="100%" align="left" frameborder="0">This document set is best viewed in a browser that supports iFrames.</iframe>
+    </div>
+    </noscript>
+    <div id="bodyText">
+        <a name="top"></a>
+        <div class="hideOnPrint hideInXcode">
+        <!-- start of header -->
+        <!--#include virtual="/includes/framesetheader" -->
+        <!-- end of header -->
+        </div>
+        
+        <!-- start of path -->
+<div class="breadcrumb hideOnPrint hideInXcode"><a href="http://developer.apple.com/" target="_top">ADC Home</a> &gt; <a href="../../../../../referencelibrary/index.html#//apple_ref/doc/uid/TP30000943" target="_top">Reference Library</a> &gt; <a href="../../../../index.html#//apple_ref/doc/uid/TP30000440" target="_top">Guides</a> &gt; <a href="../../../../HardwareDrivers/index.html#//apple_ref/doc/uid/TP30000440-TP40003576" target="_top">Hardware &amp; Drivers</a> &gt; <a href="../../../../HardwareDrivers/PCIandPCCard-date.html#//apple_ref/doc/uid/TP30000440-TP40003576-TP30000550" target="_top">PCI and PC Card</a> &gt; <a href="../about/about.html#//apple_ref/doc/uid/TP30000344-TP9">Writing PCI Drivers</a> &gt; </div><br class="hideInXcode"/><!-- end of path -->
+        
+        <div class="mini_nav_text" align="left">
+        <span class="navButtons">
+        <a href="../pci_controller/pci_controller.html">&lt; Previous Page</a><span style="margin-left: 8px"><a href="../agp_device/agp_device.html">Next Page &gt;</a></span>
+        </span>
+        <span id="showHideTOCUpperSpan">
+        <a href="#" onclick="showHideTOC();"><img src="../../../../Resources/Images/show_toc_icon.gif" width="15" height="14" border="0" style="margin-bottom: -2px;" alt="" hideText="Hide TOC" showText="Show TOC" /></a> <a href="#" onclick="showHideTOC();">Hide TOC</a>
+        </span>
+        </div>
+
+        <hr />
+        
+        
+        <a name="//apple_ref/doc/uid/TP30000347-TP9" title="Writing a Driver for a PCI Device"></a><h1>Writing a Driver for a PCI Device</h1><p>A PCI device driver manages a device attached to a PCI bus. The driver matches and attaches to a nub object of the <code>IOPCIDevice</code> or <code>IOAGPDevice</code> class, configures the device through the PCI configuration space, and sets up the memory-mapped registers or the I/O space to make it possible to control the device. Little else is necessary other than the code to control the device itself.</p>
+<!-- This template is being used for both PDF and HTML. -->
+
+    
+    <h4>In this section:</h4>
+    
+    
+    <p class="blockquote">
+    
+        
+			
+			
+				<a href="pci_device.html#//apple_ref/doc/uid/TP30000347-TPXREF102">Matching</a>
+				
+			<br/>
+			
+        
+			
+			
+				<a href="pci_device.html#//apple_ref/doc/uid/TP30000347-TPXREF105">PCI Device Inspection and Configuration</a>
+				
+			<br/>
+			
+        
+			
+			
+				<a href="pci_device.html#//apple_ref/doc/uid/TP30000347-TPXREF108">Device Access</a>
+				
+			<br/>
+			
+        
+
+    </p><br/>
+
+<a name="//apple_ref/doc/uid/TP30000347-TPXREF102" title="Matching"></a><h2>Matching</h2><p>A driver that is capable of controlling a device on a PCI bus announces this fact by including a personality in its property list. This personality includes the key <code><!--a  -->IOProviderClass<!--/a--></code> with the value <code><!--a  -->IOPCIDevice<!--/a--></code>.</p><p>Because <code>IOAGPDevice</code> is a subclass of <code>IOPCIDevice</code>, it is not necessary to match on <code>IOAGPDevice</code> for your driver to attach to AGP devices. Thus, you should generally only match on <code>IOPCIDevice</code>.</p><p><code>IOPCIDevice</code> and <code>IOAGPDevice</code> both define two sets of keys that a driver can use for matching, one based on standard PCI registers and another based on Open Firmware. A PCI device driver can use either type of key. It can even use a combination of the two as long as they are in separate personalities.</p><a name="//apple_ref/doc/uid/TP30000347-TPXREF103" title="PCI Matching"></a><h3>PCI Matching</h3><p>PCI device drivers can base their property matching on the PCI configuration space registers for vendor and device ID (offsets 0x00 and 0x02), subsystem vendor and device ID (offsets 0x2C and 0x2E), and class code (offset 0x09). Other registers, such as revision ID and header type, are not available in property matching and must be examined by the <code><!--a-->probe<!--/a--></code> method. The PCI matching dictionary keys are:</p><div class="tableholder"><table class="graybox" border = "0" cellspacing="0" cellpadding="5"><tr><th scope="col" align="left" style="font-weight: bold" bgcolor="#CCCCCC"><p>Key</p></th><th scope="col" align="left" style="font-weight: bold" bgcolor="#CCCCCC"><p>Matching behavior</p></th></tr><tr><td  scope="row"><p><code><!--a  -->IOPCIMatch<!--/a--></code></p></td><td ><p>Matches against the primary vendor/device ID registers or the subsystem vendor/device ID registers. The primary IDs are checked first; if either of these doesn’t match then the subsystem IDs are checked.</p></td></tr><tr><td  scope="row"><p><code><!--a  -->IOPCIPrimaryMatch<!--/a--></code></p></td><td ><p>Matches only against the primary vendor/device ID registers.</p></td></tr><tr><td  scope="row"><p><code><!--a  -->IOPCISecondaryMatch<!--/a--></code></p></td><td ><p>Matches only against the subsystem vendor/device ID registers.</p></td></tr><tr><td  scope="row"><p><code><!--a  -->IOPCIClassMatch<!--/a--></code></p></td><td ><p>Matches against the class code register.</p></td></tr></table></div><p>The value for a key can be a single register value or a list of register values separated by spaces. Register values are given as little-endian hexadecimal strings, with the device ID first and the vendor ID second. See <span class="content_text"><a href="../endianness/endianness.html#//apple_ref/doc/uid/TP30000349-CHDIHIGD">“Endianness and Addressing”</a></span> for more information on endianness.</p><p>In addition to the value itself, each key value can include a mask indicating that only part of the value should be compared.</p><p>Here are some examples of matching dictionary entries. The first example matches a PCI device with a primary vendor ID of 0x8086 and primary device ID of 0x1229, or with subsystem IDs of those values.</p><div class="codesample"><table><tr><td scope="row"><pre>&lt;key>IOPCIMatch&lt;/key><span></span></pre></td></tr><tr><td scope="row"><pre>    &lt;string>0x12298086&lt;/string><span></span></pre></td></tr></table></div><p>The second example matches a PCI device with a primary vendor ID of 0x8086 and a primary device ID of 0x1229 or 0x1227, or with subsystem IDs of those values.</p><div class="codesample"><table><tr><td scope="row"><pre>&lt;key>IOPCIMatch&lt;/key><span></span></pre></td></tr><tr><td scope="row"><pre>    &lt;string>0x12298086 0x12278086&lt;/string><span></span></pre></td></tr></table></div><p>The third example matches a PCI device with a primary vendor ID of 0x8086 and a primary device ID of 0x1229. Subsystem IDs aren’t checked.</p><div class="codesample"><table><tr><td scope="row"><pre>&lt;key>IOPCIMatch&lt;/key><span></span></pre></td></tr><tr><td scope="row"><pre>    &lt;string>0x12298086&lt;/string><span></span></pre></td></tr></table></div><p>The fourth example uses a mask to match a PCI device with a primary vendor ID of 0x8086 and any primary device ID whose first two digits are 0x12. Subsystem IDs aren’t checked.</p><div class="codesample"><table><tr><td scope="row"><pre>&lt;key>IOPCIPrimaryMatch&lt;/key><span></span></pre></td></tr><tr><td scope="row"><pre>    &lt;string>0x12008086&amp;amp;0xFF00FFFF&lt;/string><span></span></pre></td></tr></table></div><p>The mask is attached to the register value using an ampersand character, which must be encoded as <code>&amp;amp;</code> in XML if you are editing it directly. If you are using Xcode or Property List Editor, the <code>&amp;amp;</code> escape is represented simply as an ampersand (&amp;).</p><div class="notebox"><a name="//apple_ref/doc/uid/TP30000347-DontLinkElementID_3" title="Note"></a><p><strong>Note:</strong>&nbsp;In the register value, bits that are set to be ignored by the mask must currently be set to 0.</p></div><p>This entry matches a PCI device with a primary vendor ID of 0x8086 and a class code beginning with 0x0200, the class code for Ethernet controllers.</p><div class="codesample"><table><tr><td scope="row"><pre>&lt;key>IOPCIMatch&lt;/key><span></span></pre></td></tr><tr><td scope="row"><pre>    &lt;string>0x00008086&amp;0x0000FFFF&lt;/string><span></span></pre></td></tr><tr><td scope="row"><pre>&lt;key>IOPCIClassMatch&lt;/key><span></span></pre></td></tr><tr><td scope="row"><pre>    &lt;string>0x02000000&amp;0xFFFFFF00&lt;/string><span></span></pre></td></tr></table></div><div class="notebox"><a name="//apple_ref/doc/uid/TP30000347-DontLinkElementID_4" title="Note"></a><p><strong>Note:</strong>&nbsp;The <code><!--a  -->IOPCIClassMatch<!--/a--></code> value currently requires a full 4-byte value for matching, of which the last byte is ignored.</p></div><a name="//apple_ref/doc/uid/TP30000347-TPXREF104" title="Open Firmware Matching"></a><h3>Open Firmware Matching</h3><p>A PCI device driver can use Open Firmware matching in a personality by specifying a value for the <code><!--a  -->IONameMatch<!--/a--></code> key. The value is either a single string or an array of strings, which are compared against the values for the Open Firmware device properties <code>name</code>, <code>compatible</code>, <code>device_type</code>, or <code>model</code>.</p><p>If any of the values for the <code>IONameMatch</code> key match any of the Open Firmware properties, the match is considered a success and an instance of the driver is created for the personality. The name that resulted in a match is stored as a property in the driver’s I/O Registry entry in the <code><!--a  -->IONameMatched<!--/a--></code> key (<code><!--a  -->kIONameMatchedKey<!--/a--></code>).</p><p>For more information on name matching, you should consult the documentation for the <code>IOService</code> class.</p><a name="//apple_ref/doc/uid/TP30000347-TPXREF105" title="PCI Device Inspection and Configuration"></a><h2>PCI Device Inspection and Configuration</h2><p>Before a driver begins interacting with a PCI device, whether in the <code><!--a-->probe<!--/a--></code> method or the <code><!--a-->start<!--/a--></code> method, it typically examines the values in the PCI configuration space registers and sets some of them as required. The IOPCIDevice class defines several methods and register masks to make doing so easy.</p><p>The most general methods are <code><!--a-->configRead32<!--/a--></code>, <code><!--a-->configWrite32<!--/a--></code>, and <code><!--a-->setConfigBits<!--/a--></code>. The first method reads a full 32-bit value from a 4-byte aligned address in the PCI configuration space. The driver can then extract the specific register value. A driver might use this method during probing to examine the value of the revision ID register, for example. <code>IOPCIDevice</code> defines a number of constants for the various register offsets.</p><p>The method <code><!--a-->configWrite32<!--/a--></code> writes a full 32-bit value into a 4-byte aligned address in the PCI configuration space. The more flexible method <code><!--a-->setConfigBits<!--/a--></code> can write individual bits into the configuration space without disturbing others. It takes a 32-bit value to write along with a 32-bit mask indicating which bits to set or clear. This is commonly used to write to the command register. This code fragment, for example, enables the memory write and invalidate (MWI) transaction on the bus:</p><div class="codesample"><table><tr><td scope="row"><pre>UInt32 configMask = 0;<span></span></pre></td></tr><tr><td scope="row"><pre>UInt32 configBits = 0;<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>configMask = configBits = kIOPCICommandMemWrInvalidate;<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>// provider is the PCI nub object<span></span></pre></td></tr><tr><td scope="row"><pre>provider->setConfigBits(kIOPCIConfigCommand,<span></span></pre></td></tr><tr><td scope="row"><pre>    configMask, configBits);<span></span></pre></td></tr></table></div><p>For commonly used configuration settings, IOPCIDevice defines convenience methods that take a <code>bool</code> argument for enabling and disabling the settings. These methods are <code><!--a-->setMemoryEnable<!--/a--></code> for memory-mapped control of the PCI device and <code><!--a-->setIOEnable<!--/a--></code> for I/O-mapped control.</p><p>Some devices require bus mastering to work properly. For most cards, Open Firmware should set this up automatically based on information in the card’s declaration ROM before Mac OS X even starts to boot. However, this automatic setup does not always occur, depending on the specifics of the particular card and on decisions made by the card vendor when populating the card with ROMs. If a card is not configured correctly in this regard, you can use <code><!--a-->setBusMasterEnable<!--/a--></code> to manually turn bus mastering on or off for the device.</p><p>Other methods for inspecting the PCI device include <code><!--a-->findPCICapability<!--/a--></code>, <code><!--a-->getBusNumber<!--/a--></code>, <code><!--a-->getDeviceNumber<!--/a--></code>, and <code><!--a-->getFunctionNumber<!--/a--></code>. For details on these and all other methods, see the reference documentation in <code>/System/Developer/Documentation</code>.</p><a name="//apple_ref/doc/uid/TP30000347-TPXREF108" title="Device Access"></a><h2>Device Access</h2><p>The <code><!--a-->start<!--/a--></code> method is where a driver sets up its hardware for operation. For PCI devices this involves configuring the hardware as described above, setting up the communication channel between the CPU and the device, and then performing whatever device-specific initialization is required. You can gain access to PCI device by mapping the device’s registers (its memory space) into the kernel’s address space, or by reading and writing in the device’s I/O space using the nub object.</p><p>Mapping the device registers is the most convenient way to set up device control. Once this is done, the driver has very little further interaction with the <code>IOPCIDevice</code> nub. Instead, it interacts with the hardware as if it were ordinary memory, albeit uncached memory, using either device accessor methods for byte swapping or by directly dereferencing pointers into the card’s memory space.</p><p>I/O space access provides a single programming interface for using I/O space. On processors with a separate I/O memory bus, the I/O space methods actually use this bus. On processors without a separate I/O memory bus, the methods simply use memory-mapped space and handle the required synchronization automatically.</p><a name="//apple_ref/doc/uid/TP30000347-TPXREF109" title="Memory-Mapped Device Access"></a><h3>Memory-Mapped Device Access</h3><p>Setting up memory-mapped device control is a two-step process. The driver must first get an <code>IOMemoryMap</code> object for one of the device’s base address registers, using the <code><!--a-->mapDeviceMemoryWithRegister<!--/a--></code> method. Constants are available for the base address register offsets. The driver then calls the memory map’s <code><!--a-->getVirtualAddress<!--/a--></code> method to retrieve a pointer to the memory-mapped register block in the kernel’s virtual address space. Here’s an example of the standard idiom for setting up memory-mapped registers, which is typically done in the driver’s<code><!--a-->start<!--/a--></code> method:</p><div class="codesample"><table><tr><td scope="row"><pre>IOMemoryMap *map;<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>map = provider->mapDeviceMemoryWithRegister(kIOPCIConfigBaseAddress0);<span></span></pre></td></tr><tr><td scope="row"><pre>if (!map) {<span></span></pre></td></tr><tr><td scope="row"><pre>    // Handle error<span></span></pre></td></tr><tr><td scope="row"><pre>}<span></span></pre></td></tr><tr><td scope="row"><pre>deviceRegisterPointer = (deviceStruct *)map->getVirtualAddress();<span></span></pre></td></tr></table></div><p>Both <code>map</code> and <code>deviceRegisterPointer</code> are instance variables of the driver. Because the driver created the map object by invoking <code>mapDeviceMemoryWithRegister</code>, it must cache the pointer and later release the map object in its <code><!--a-->stop<!--/a--></code> method. <code>deviceRegisterPointer</code> is a pointer to a structure defined by the driver that corresponds to the layout of the device-specific registers.</p><p>You should note two things when using memory-mapped control of a PCI device. First, the PCI bus standard uses little-endian byte addressing. The endianness of the bus generally has minimal impact on device driver writers. However, the endianness also encourages a related model of register layout that directly affects most driver writers. For more information, see <span class="content_text"><a href="../endianness/endianness.html#//apple_ref/doc/uid/TP30000349-CHDIHIGD">“Endianness and Addressing.”</a></span></p><p>Second, while accesses into PCI space are explicitly uncached, in-order execution of these accesses is not guaranteed. When order of execution is important, I/O barriers may be used.</p><p>I/O barriers are often used for the following reasons:</p><ul class="spaceabove"><li class="li"><p>To ensure that the operands of a command sent to a device are written into the device’s registers before stating the command.</p></li><li class="li"><p>To ensure that a command has started executing before polling for its completion status.</p></li><li class="li"><p>To ensure that an interrupt line is cleared before waiting for that interrupt again.</p></li></ul><p>A general-purpose I/O barrier in Mac OS X is provided by the <code>libkern</code> function <code><!--a-->OSSynchronizeIO<!--/a--></code>. On the PowerPC architecture, for example, this issues an <code>eieio</code> instruction to enforce in-order execution of the write operation. Because of the performance impact, you should only use an I/O barrier when in-order execution is required for correct operation.</p><p>Synchronization is required only when writing directly to hardware registers; when setting up buffers and structures used by hardware, it is not necessary. See an example PCI driver from Apple’s open source collection for examples of how to use <code><!--a-->OSSynchronizeIO<!--/a--></code>.</p><p>In unusual circumstances, you might find it desirable to enable caching on portions of I/O space. If you do this, then writes to that portion of PCI space are no longer guaranteed to be written back to the device’s memory space. Additional synchronization is necessary in these cases. Enabling caching and performing I/O to cached I/O spaces is beyond the scope of this book. If you need such support you should contact Apple Developer Technical Support for additional information.</p><a name="//apple_ref/doc/uid/TP30000347-TPXREF110" title="I/O Space Device Access"></a><h3>I/O Space Device Access</h3><p>Setting up I/O space access is required only for devices with relocatable I/O spaces. In this case, the driver must obtain an IOMemoryMap object, just as for memory-mapped access. Apart from this, however, I/O space access is performed using a set of six methods for reading and writing 32-bit, 16-bit, and 8-bit values. The <code><!--a-->ioWrite16<!--/a--></code> method, for example, takes a byte offset into the memory space, the value to write, and the memory map for the I/O space. For devices with nonrelocatable I/O spaces, the memory map argument is omitted. The I/O space methods perform all necessary byte swapping and synchronization. For more information on these methods, see the IOPCIDevice reference documentation in <code>/System/Developer/Documentation/Kernel/IOKit/IOPCIDevice</code>.</p>
+
+        <br /><br /> 
+        
+        <div class="mini_nav_text" align="left">
+        <span class="navButtons">
+        <a href="../pci_controller/pci_controller.html">&lt; Previous Page</a><span style="margin-left: 8px"><a href="../agp_device/agp_device.html">Next Page &gt;</a></span>
+        </span>
+        <span id="showHideTOCLowerSpan">
+        <a href="#" onclick="showHideTOC();"><img src="../../../../Resources/Images/show_toc_icon.gif" width="15" height="14" border="0" style="margin-bottom: -2px;" alt="" /></a> <a href="#" onclick="showHideTOC();">Hide TOC</a>
+        </span>
+        </div>
+
+        <br/><hr /><div align="center"><p class="content_text" lang="en" dir="ltr"> <!--#if expr="0=1" -->&#x00a9; 1999, 2006 Apple Computer, Inc. All Rights Reserved. &#40;<!--#endif -->Last updated: 2006-04-04<!--#if expr="0=1" -->&#041;<!--#endif --></p></div>
+
+        
+        <div class="hideOnPrint hideInXcode">
+        <!-- start of footer -->
+        	<table width="100%" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/documentation/DeviceDrivers/Conceptual/WritingPCIDrivers/pci_device/pci_device.html%3Fid%3DTP40000975-4.1&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/documentation/DeviceDrivers/Conceptual/WritingPCIDrivers/pci_device/pci_device.html%3Fid%3DTP40000975-4.1&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/documentation/DeviceDrivers/Conceptual/WritingPCIDrivers/pci_device/pci_device.html%3Fid%3DTP40000975-4.1&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+
+        <!--#include virtual="/includes/framesetfooter" -->
+        <!-- end of footer -->
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,141 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+<head>
+	<title>File-System Performance Guidelines: Mapping Files Into Memory</title>
+	<meta id="Generator" name="Generator" content="Gutenberg"/>
+	<meta id="GeneratorVersion" name="GeneratorVersion" content="v132"/>
+	<meta http-equiv="content-type" content="text/html;charset=utf-8"/>
+	<meta id="Copyright" name="Copyright" content="Copyright 2009 Apple Inc. All Rights Reserved."/>
+	<meta id="IndexTitle" name="IndexTitle" content="Mapping Files Into Memory"/>
+	<meta id="xcode-display" name="xcode-display" content="render"/>
+	<meta id="toc-file" name="toc-file" content="../toc.html"/>
+	<meta id="RESOURCES" content="../../../../Resources" />
+	
+	<link rel="stylesheet" type="text/css" href="../../../../Resources/CSS/frameset_styles.css"/>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/lib/prototype.js"></script>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/lib/scriptaculous.js"></script>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/page.js"></script>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/pedia.js"></script>
+	<!--[if lte IE 6]>
+		<style type="text/css">
+			/*<![CDATA[*/ 
+			html {overflow-x:auto; overflow-y:hidden;  }
+			/*]]>*/
+		</style>
+	<![endif]-->
+</head>
+<body bgcolor="#ffffff" onload="initialize_page();"><a name="//apple_ref/doc/uid/20001990" title="Mapping Files Into Memory"></a>
+    <noscript>
+    <div id="tocMenu">
+        <iframe id="toc_content" name="toc_content" SRC="../toc.html" width="210" height="100%" align="left" frameborder="0">This document set is best viewed in a browser that supports iFrames.</iframe>
+    </div>
+    </noscript>
+    <div id="bodyText">
+        <a name="top"></a>
+        <div class="hideOnPrint hideInXcode">
+        <!-- start of header -->
+        <!--#include virtual="/includes/framesetheader" -->
+        <!-- end of header -->
+        </div>
+        
+        <!-- start of path -->
+<div class="breadcrumb hideOnPrint hideInXcode"><a href="http://developer.apple.com/" target="_top">ADC Home</a> &gt; <a href="../../../../../referencelibrary/index.html#//apple_ref/doc/uid/TP30000943" target="_top">Reference Library</a> &gt; <a href="../../../../index.html#//apple_ref/doc/uid/TP30000440" target="_top">Guides</a> &gt; <a href="../../../index.html#//apple_ref/doc/uid/TP30000440-TP30000430" target="_top">Performance</a> &gt; <a href="../../../Tools-date.html#//apple_ref/doc/uid/TP30000440-TP30000430-TP30000463" target="_top">Tools</a> &gt; <a href="../index.html" target="_top">File-System Performance Guidelines</a> &gt; </div><br class="hideInXcode"/><!-- end of path -->
+        
+        <div class="mini_nav_text" align="left">
+        <span class="navButtons">
+        <a href="FileSystemCalls.html">&lt; Previous Page</a><span style="margin-left: 8px"><a href="IteratingFiles.html">Next Page &gt;</a></span>
+        </span>
+        <span id="showHideTOCUpperSpan">
+        <a href="#" onclick="showHideTOC();"><img src="../../../../Resources/Images/show_toc_icon.gif" width="15" height="14" border="0" style="margin-bottom: -2px;" alt="" hideText="Hide TOC" showText="Show TOC" /></a> <a href="#" onclick="showHideTOC();">Hide TOC</a>
+        </span>
+        </div>
+        
+        
+        <a name="//apple_ref/doc/uid/20001990-DontLinkElementID_17" title="Mapping Files Into Memory"></a><hr /><H1><a name="//apple_ref/doc/uid/20001990-CJBJFIDD" title="Mapping Files Into Memory"></a>Mapping Files Into Memory</H1><p>File mapping is the process of mapping the disk sectors of a file into the virtual memory space of a process. Once mapped, your application accesses the file as if it were entirely resident in memory. As you read data from the mapped file pointer, the kernel pages in the appropriate data and returns it to your application. </p><p>Although mapping files can offer tremendous performance advantages, it is not appropriate in all cases. The following sections explain when file mapping can help you and how you go about doing it in your code.</p>
+<!-- This template is being used for both PDF and HTML. -->
+
+    
+    <!-- TopicBook.pm uses this template for its miniTOCs, but needs a different title. -->
+    <h4>Contents:</h4>
+    
+    
+    <p class="blockquote">
+    
+        
+			
+			
+				<!--a  -->Choosing When to Map Files<!--/a-->
+				
+			<br/>
+			
+        
+			
+			
+				<a href="MappingFiles.html#//apple_ref/doc/uid/20001990-105405">File Mapping Caveats</a>
+				
+			<br/>
+			
+        
+			
+			
+				<!--a  -->Mapping Resource Files<!--/a-->
+				
+			<br/>
+			
+        
+			
+			
+				<a href="MappingFiles.html#//apple_ref/doc/uid/20001990-104516">File Mapping Example</a>
+				
+			<br/>
+			
+        
+
+    </p><br/>
+
+<a name="//apple_ref/doc/uid/20001990-102465" title="Choosing When to Map Files"></a><h2>Choosing When to Map Files</h2><a name="//apple_ref/doc/uid/20001990-DontLinkElementID_106"></a><a name="//apple_ref/doc/uid/20001990-DontLinkElementID_107"></a><p>When deciding whether or not to map files, keep in mind that the overall goal is to reduce transfers between disk and memory. File mapping can help you in some cases, but not all. The more of a file you map into memory, the less useful file mapping becomes. </p><p>Another thing to remember about mapped files is that they share the process space with system libraries, your application code, and allocated memory. Most applications have around 2 gigabytes of addressable memory, depending on the number of libraries they load. In order to map a file, there must be an available address range big enough to fit the file. Finding this much space can be difficult if your application’s virtual memory space is fragmented or you attempt to map a very large file. </p><p>Before you map any files into memory, make sure you understand your typical file usage patterns. Tools such as Shark and <code>fs_usage</code> can help you identify where your application accesses files and how long those operations take. For any operations that are taking longer than expected, you can then look at your code to determine if file mapping might be of use. </p><p>File mapping is effective in the following situations:</p><ul class="ul"><li class="li"><p>You have a large file whose contents you want to access randomly one or more times.</p></li><li class="li"><p>You have a small file whose contents you want to read into memory all at once and access frequently. This technique is best for files that are no more than a few virtual memory pages in size. </p></li><li class="li"><a name="//apple_ref/doc/uid/20001990-DontLinkElementID_108"></a><p>You want to cache specific portions of a file in memory. File mapping eliminates the need to cache the data at all, which leaves more room in the system disk caches for other data. </p></li></ul><p>You should not use file mapping in the following situations:</p><ul class="ul"><li class="li"><p>You want to read a file sequentially from start to finish only once.</p></li><li class="li"><p>The file is several hundred megabytes or more in size. (Mapping large files fills virtual memory space quickly. In addition, your program may not have the available space if it has been running for a while or its memory space is fragmented.)</p></li></ul><p>For large sequential read operations, you are better off disabling disk caching and reading the file into a small memory buffer. See <span class="content_text"><a href="FilePerformance.html#//apple_ref/doc/uid/20001987-99732">“Cache Files Selectively”</a></span> for more information.</p><a name="//apple_ref/doc/uid/20001990-105405" title="File Mapping Caveats"></a><h2>File Mapping Caveats</h2><p>Even in situations where you think file mapping is ideal, there are still some caveats that may apply. In particular, you may not want to map files in the following situations: </p><ul class="ul"><li class="li"><p>The file is larger than the available contiguous virtual memory address space. Files whose size is several hundred megabytes or more fall into this category.</p></li><li class="li"><p>The file is located on a removable drive.</p></li><li class="li"><p>The file is located on a network drive.</p></li></ul><p>When randomly accessing a very large file, it’s often a better idea to map only a small portion of the file at a time. The problem with mapping large files is that the file can occupy a significant portion of your application’s virtual address space. The address space for a single process is currently limited to 4 gigabytes, with some portions of that space reserved for various system frameworks and libraries. If you try to map a very large file, you might find there isn’t enough room to map the entire file anyway. This problem can also occur if you map too many files into your process space.</p><p>For files on removable or network drives, you should avoid mapping files altogether. If you map files on a removable or network drive and that drive is unmounted, or disappears for another reason, accessing the mapped memory can cause a bus error and crash your program. If you insist on mapping these types of files, be sure to install a signal handler in your application to trap and handle the bus error condition. Even with the signal handler installed, your application’s current thread may block until it receives a timeout from trying to access a network file. This timeout period can make your application appear hung and unresponsive and is easily avoided by not mapping the files in the first place.</p><p>Mapping a file on the root device is always safe. (If the root device is somehow removed or unavailable, the system cannot continue running.) Note that the user’s home directory is not required to be on the root device.</p><a name="//apple_ref/doc/uid/20001990-98816" title="Mapping Resource Files"></a><h2>Mapping Resource Files</h2><a name="//apple_ref/doc/uid/20001990-DontLinkElementID_109"></a><p>Mapping your data fork-based resource files into memory is often a good idea. Resource files typically contain frequently-used data that your application needs to operate. Because of its usefulness, Mac OS X includes a mechanism to map resources automatically. To enable this mechanism, add the following lines to your <code>Info.plist</code> file<a name="//apple_ref/doc/uid/20001990-DontLinkElementID_110"></a>:</p><div class="codesample"><table><tr><td scope="row"><pre>&lt;key>CSResourcesFileMapped&lt;/key><span></span></pre></td></tr><tr><td scope="row"><pre>&lt;true/><span></span></pre></td></tr></table></div><p>The CFBundle resource file functions (<code>CFBundleOpenBundleResourceMap</code><a name="//apple_ref/doc/uid/20001990-DontLinkElementID_111"></a> and <code>CFBundleOpenBundleResourceFiles</code><a name="//apple_ref/doc/uid/20001990-DontLinkElementID_112"></a>) check for the <code>CSResourcesFileMapped</code> key before opening a resource file. If this key is present and set to true, the functions map the resource file into memory. The resource data is mapped read-only, so you cannot write to the file or any of its resources directly. For example, the following will cause an memory access exception if the <code>PICT</code> resource comes from a mapped resource file:</p><div class="codesample"><table><tr><td scope="row"><pre>PicHandle picture = (PicHandle)GetResource(‘PICT’, 128);<span></span></pre></td></tr><tr><td scope="row"><pre>(**picture).rect = myRect; // crash here attempting to write<span></span></pre></td></tr><tr><td scope="row"><pre>                            // to read-only memory<span></span></pre></td></tr></table></div><a name="//apple_ref/doc/uid/20001990-104516" title="File Mapping Example"></a><h2>File Mapping Example</h2><p><span class="content_text"><a href="MappingFiles.html#//apple_ref/doc/uid/20001990-104547">Listing 1</a></span> demonstrates the BSD routines <code>mmap</code><a name="//apple_ref/doc/uid/20001990-DontLinkElementID_113"></a> and <code>munmap</code><a name="//apple_ref/doc/uid/20001990-DontLinkElementID_114"></a> to map and unmap files. The mapped file occupies a system-determined portion of the application’s virtual address space until <code>munmap</code> is used to unmap the file. </p><a name="//apple_ref/doc/uid/20001990-DontLinkElementID_18" title="Listing 1Mapping a file into virtual memory"></a><p class="codesample"><a name="//apple_ref/doc/uid/20001990-104547" title="Listing 1Mapping a file into virtual memory"></a><strong>Listing 1&nbsp;&nbsp;</strong>Mapping a file into virtual memory</p><div class="codesample"><table><tr><td scope="row"><pre>void ProcessFile( char * inPathName )<span></span></pre></td></tr><tr><td scope="row"><pre>{<span></span></pre></td></tr><tr><td scope="row"><pre>    size_t dataLength;<span></span></pre></td></tr><tr><td scope="row"><pre>    void * dataPtr;<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>    if( MapFile( inPathName, &amp;dataPtr, &amp;dataLength ) == 0 )<span></span></pre></td></tr><tr><td scope="row"><pre>    {<span></span></pre></td></tr><tr><td scope="row"><pre>        //<span></span></pre></td></tr><tr><td scope="row"><pre>        // process the data and unmap the file<span></span></pre></td></tr><tr><td scope="row"><pre>        //<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>        // . . .<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>        munmap( dataPtr, dataLength );<span></span></pre></td></tr><tr><td scope="row"><pre>    }<span></span></pre></td></tr><tr><td scope="row"><pre>}<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>// MapFile<span></span></pre></td></tr><tr><td scope="row"><pre>// Return the contents of the specified file as a read-only pointer.<span></span></pre></td></tr><tr><td scope="row"><pre>//<span></span></pre></td></tr><tr><td scope="row"><pre>// Enter:inPathName is a UNIX-style "/"-delimited pathname<span></span></pre></td></tr><tr><td scope="row"><pre>//<span></span></pre></td></tr><tr><td scope="row"><pre>// Exit:    outDataPtra     pointer to the mapped memory region<span></span></pre></td></tr><tr><td scope="row"><pre>//          outDataLength   size of the mapped memory region<span></span></pre></td></tr><tr><td scope="row"><pre>//          return value    an errno value on error (see sys/errno.h)<span></span></pre></td></tr><tr><td scope="row"><pre>//                          or zero for success<span></span></pre></td></tr><tr><td scope="row"><pre>//<span></span></pre></td></tr><tr><td scope="row"><pre>int MapFile( char * inPathName, void ** outDataPtr, size_t * outDataLength )<span></span></pre></td></tr><tr><td scope="row"><pre>{<span></span></pre></td></tr><tr><td scope="row"><pre>    int outError;<span></span></pre></td></tr><tr><td scope="row"><pre>    int fileDescriptor;<span></span></pre></td></tr><tr><td scope="row"><pre>    struct stat statInfo;<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>    // Return safe values on error.<span></span></pre></td></tr><tr><td scope="row"><pre>    outError = 0;<span></span></pre></td></tr><tr><td scope="row"><pre>    *outDataPtr = NULL;<span></span></pre></td></tr><tr><td scope="row"><pre>    *outDataLength = 0;<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>    // Open the file.<span></span></pre></td></tr><tr><td scope="row"><pre>    fileDescriptor = open( inPathName, O_RDONLY, 0 );<span></span></pre></td></tr><tr><td scope="row"><pre>    if( fileDescriptor &lt; 0 )<span></span></pre></td></tr><tr><td scope="row"><pre>    {<span></span></pre></td></tr><tr><td scope="row"><pre>       outError = errno;<span></span></pre></td></tr><tr><td scope="row"><pre>    }<span></span></pre></td></tr><tr><td scope="row"><pre>    else<span></span></pre></td></tr><tr><td scope="row"><pre>    {<span></span></pre></td></tr><tr><td scope="row"><pre>        // We now know the file exists. Retrieve the file size.<span></span></pre></td></tr><tr><td scope="row"><pre>        if( fstat( fileDescriptor, &amp;statInfo ) != 0 )<span></span></pre></td></tr><tr><td scope="row"><pre>        {<span></span></pre></td></tr><tr><td scope="row"><pre>            outError = errno;<span></span></pre></td></tr><tr><td scope="row"><pre>        }<span></span></pre></td></tr><tr><td scope="row"><pre>        else<span></span></pre></td></tr><tr><td scope="row"><pre>        {<span></span></pre></td></tr><tr><td scope="row"><pre>            // Map the file into a read-only memory region.<span></span></pre></td></tr><tr><td scope="row"><pre>            *outDataPtr = mmap(NULL,<span></span></pre></td></tr><tr><td scope="row"><pre>                                statInfo.st_size,<span></span></pre></td></tr><tr><td scope="row"><pre>                                PROT_READ,<span></span></pre></td></tr><tr><td scope="row"><pre>                                0,<span></span></pre></td></tr><tr><td scope="row"><pre>                                fileDescriptor,<span></span></pre></td></tr><tr><td scope="row"><pre>                                0);<span></span></pre></td></tr><tr><td scope="row"><pre>            if( *outDataPtr == MAP_FAILED )<span></span></pre></td></tr><tr><td scope="row"><pre>            {<span></span></pre></td></tr><tr><td scope="row"><pre>                outError = errno;<span></span></pre></td></tr><tr><td scope="row"><pre>            }<span></span></pre></td></tr><tr><td scope="row"><pre>            else<span></span></pre></td></tr><tr><td scope="row"><pre>            {<span></span></pre></td></tr><tr><td scope="row"><pre>                // On success, return the size of the mapped file.<span></span></pre></td></tr><tr><td scope="row"><pre>                *outDataLength = statInfo.st_size;<span></span></pre></td></tr><tr><td scope="row"><pre>            }<span></span></pre></td></tr><tr><td scope="row"><pre>        }<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>        // Now close the file. The kernel doesn’t use our file descriptor.<span></span></pre></td></tr><tr><td scope="row"><pre>        close( fileDescriptor );<span></span></pre></td></tr><tr><td scope="row"><pre>    }<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>    return outError;<span></span></pre></td></tr><tr><td scope="row"><pre>}<span></span></pre></td></tr></table></div>	
+
+        <br/><br/> 
+
+        <div class="mini_nav_text" align="left">
+        <span class="navButtons">
+        <a href="FileSystemCalls.html">&lt; Previous Page</a><span style="margin-left: 8px"><a href="IteratingFiles.html">Next Page &gt;</a></span>
+        </span>
+        <span id="showHideTOCLowerSpan">
+        <a href="#" onclick="showHideTOC();"><img src="../../../../Resources/Images/show_toc_icon.gif" width="15" height="14" border="0" style="margin-bottom: -2px;" alt="" /></a> <a href="#" onclick="showHideTOC();">Hide TOC</a>
+        </span>
+        </div>
+
+        <br/><hr /><div align="center"><p class="content_text" lang="en" dir="ltr"> <!--#if expr="0=1" -->&#x00a9; 2003, 2005 Apple Computer, Inc. All Rights Reserved. &#40;<!--#endif -->Last updated: 2005-07-07<!--#if expr="0=1" -->&#041;<!--#endif --></p></div>
+
+        
+        <div class="hideOnPrint hideInXcode">
+        <!-- start of footer -->
+        	<table width="100%" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/documentation/Performance/Conceptual/FileSystem/Articles/MappingFiles.html%3Fid%3D10000161i-3.1&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/documentation/Performance/Conceptual/FileSystem/Articles/MappingFiles.html%3Fid%3D10000161i-3.1&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/documentation/Performance/Conceptual/FileSystem/Articles/MappingFiles.html%3Fid%3D10000161i-3.1&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+
+        <!--#include virtual="/includes/framesetfooter" -->
+        <!-- end of footer -->
+        </div>
+    </div>
+</body>
+</html>

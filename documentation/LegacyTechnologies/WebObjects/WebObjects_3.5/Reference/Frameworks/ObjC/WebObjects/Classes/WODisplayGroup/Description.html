@@ -1,0 +1,1437 @@
+<html>
+<body bgcolor="#FFFFFF">
+<CENTER><H1>Class WODisplayGroup</H1></CENTER>
+<a name="//apple_ref/occ/cl/WODisplayGroup">
+<!-- inherits from:NSObject -->
+<DL>
+<DT><B>Inherits From:</B></DT><DD>NSObject</DD>
+<DT><B>Adopts:</B></DT>
+<!-- adopted:NSCoding -->
+<DD>NSCoding</DD><BR>
+</DL>
+<HR>
+
+<CENTER><A name="classAtAGlance"><h2>CLASS AT A GLANCE</h2></a></CENTER>
+
+<h4>Purpose</h4>
+
+<P>
+
+A WODisplayGroup collects an array of objects from an EODataSource and displays and edits properties of those objects.
+
+<H4>Principal Attributes</h4>
+
+<UL>
+
+<LI>Array of objects supplied by an EODataSource
+
+<LI>EOQualifier and EOSortOrderings to filter the objects for display
+
+<LI>Array of selection indexes
+
+<LI>Delegate
+
+</UL>
+
+<H4>Creation</H4>
+
+Through Project Builder Wizard or WebObjects Builder and EOModeler
+
+<br>
+
+init
+
+<H4>Commonly Used Methods</H4>
+
+<TABLE><TR>
+
+<TD>allObjects</td>
+
+<td>Returns all objects in the WODisplayGroup.</td>
+
+</TR><TR>
+
+<TD>displayedObjects</td><TD>Returns the subset of all objects made available for display.</td>
+
+</TR><TR>
+
+<td>selectedObjects</td><td>Returns the selected objects.</td>
+
+</TR><TR>
+
+<td>setQualifier:</td><td>Sets a filter that limits the objects displayed.</td>
+
+</TR><TR>
+
+<td>setSortOrdering:</td><td>Sets the ordering used to sort the objects.</td>
+
+</TR><TR>
+
+<td>updateDisplayedObjects</td><td>Filters, sorts, and redisplays the objects</td>
+
+</TR><TR>
+
+<td>insert</td><td>Creates a new object and inserts it into the EODataSource.</td>
+
+</tr></table>
+
+<HR>
+
+<a name="description"></a><CENTER><H2>CLASS DESCRIPTION</H2></CENTER>
+<P>
+<P>
+<P>
+
+A WODisplayGroup is the basic user interface manager for a WebObjects application that accesses a database. It collects objects from an EODataSource, filters and sorts them, and maintains a selection in the filtered subset. You bind WebObjects dynamic elements to WODisplayGroup attributes and methods to display information from the database on your web page. 
+
+<P>
+
+A WODisplayGroup manipulates its EODataSource by sending it <b>fetchObjects</b>, <b>insertObject:</b>, and other messages, and registers itself as an editor and message handler of the EODataSource's EOEditingContext. The EOEditingContext then monitors the WODisplayGroup for changes to objects.
+
+<P>
+
+Most of a WODisplayGroup's interactions are with its EODataSource and its EOEditingContext. See the 
+
+<!-- <A HREF="../../eo/EODataSource/EODataSource.html" target=_top>
+
+-->
+
+EODataSource,
+
+<!-- </a>
+
+-->
+
+ and 
+
+<!-- <A HREF="../../eo/EditingContext/EditingContext.html" target=_top>
+
+-->
+
+EOEditingContext
+
+<!-- </a>
+
+--> 
+
+class specifications in the <i>Enterprise Objects Frameworks Reference</i> for more information on these interactions.
+
+<P>
+
+<H3>Creating a WODisplayGroup</H3>
+
+<P>
+
+You create most WODisplayGroups in one of these ways:
+
+<UL>
+
+<P><LI>By using Project Builder's Wizard facility to create the WODisplayGroup and the dynamic elements that are bound to it. 
+
+<P><LI>By dragging an entity icon from the EOModeler application to create a WODisplayGroup associated with the model's data source.
+
+</UL>
+
+<P>Most WODisplayGroups operate independently of other WODisplayGroups; however, you can set up a master-detail association between two WODisplayGroups. You typically do this by dragging a to-many relationship from the EOModeler application to a component opened in the WebObjects Builder application. When you do this, the display group you create has an EODetailDataSource as its data source, a detail key equal to the to-many relationship's key, and a master object equal to the entity from which you dragged the relationship. 
+<P>
+
+To create a WODisplayGroup programmatically, simply initialize it and set its EODataSource:
+
+<P><PRE>EODataSource *myDataSource;    /* Assume this exists. */
+
+WODisplayGroup *myDisplayGroup;
+
+
+
+myDisplayGroup = [[[WODisplayGroup] alloc] init] autorelease];
+
+[myDisplayGroup setDataSource:myDataSource];
+
+</PRE>
+
+<H3>Getting Objects</H3>
+
+<P>
+
+Since a WODisplayGroup isn't much use without objects to manage, the first thing you do with a WODisplayGroup is send it a <b>fetch</b> message. You can use the basic <b>fetch</b> method, or you can configure the WODisplayGroup in WebObjects Builder to fetch automatically when its component is loaded. The <b>fetch</b> method asks the WODisplayGroup's EODataSource to fetch from its persistent store with a <b>fetchObjects</b> message.
+
+
+
+<H4>Filtering and Sorting</H4>
+
+<P>
+
+A WODisplayGroup's fetched objects are available through its <b>allObjects</b> method. These objects are treated only as candidates for display, however. The array of objects actually displayed is filtered and sorted by the WODisplayGroup's delegate or by a qualifier and a sort ordering array. You set the qualifier and sort orderings using the <b>setQualifier:</b> and <b>setSortOrdering:</B> methods. The <b>displayedObjects</b> method returns this filtered and sorted array; index arguments to other WODisplayGroup methods are defined in terms of this array.
+
+<P>
+
+If the WODisplayGroup has a delegate that responds to <B>displayGroup:displayArrayForObjects:</B>, it invokes this method rather than using its own qualifier and sort ordering array. The delegate is then responsible for filtering the objects and returning a sorted array. If the delegate only needs to perform one of these steps, it can get the qualifier or sort orderings from the WODisplayGroup and apply either itself using the NSArray methods <b>filteredArrayUsingQualifier:</b> and <b>sortedArrayUsingKeyOrderingArray:</b>.
+
+<P>
+
+If you change the qualifier or sort ordering, or alter the delegate in a way that changes how it filters and sorts the WODisplayGroup's objects, you can send <B>updateDisplayedObjects</b> to the WODisplayGroup to get it to refilter and resort its objects. Note that this doesn't cause the WODisplayGroup to refetch.
+
+
+
+<H4>Batching the Output</H4>
+
+<P>
+
+Even after the output has been qualified and sorted, there might be too many objects to display on a single HTML page. For this reason and to improve your application's performance, WODisplayGroup supports batching the display. When batching is used, the HTML page shows only a certain number of objects at a time. If you create the WODisplayGroup using Project Builder's Wizard, the default batch size is 10. Thus if there are one hundred objects to display, <b>displayedObjects</b> returns only the first ten of those objects when the page is drawn. If <b>displayNextBatch</b> is invoked, <b>displayedObjects</b> is updated to contain the next ten objects, and the page is redrawn.
+
+<P>
+
+You use <b>displayNextBatch</b> and <b>displayPreviousBatch</b> to move back and forth through the displayed objects. The <b>setNumberOfObjectsPerBatch:</b> method changes the batch size. You can also change batch size using WebObjects Builder.  
+
+
+
+<H3>Changing and Examining the Selection</H3>
+
+<P>
+
+A WODisplayGroup keeps a selection in terms of indexes into the array of displayed objects. Components that display values for multiple objects are responsible for updating the selection in their WODisplayGroups according to user actions on their dynamic elements. This is typically done with the <b>setSelectionIndexes:</b> method. Other methods available for indirect manipulation of the selection are the action methods <b>selectNext</b> and <b>selectPrevious</b>.
+
+<P>
+
+To get the selection, you can use the <b>selectionIndexes</b> method, which returns an array of indexes (as NSNumber objects), or <b>selectedObjects</b>, which returns an array containing the selected objects themselves. Another method, <b>selectedObject</b>, returns the first selected object if there is one.
+
+<P>
+
+<B>Note:  </B>The selection is a programmatical selection only. The selected objects don't actually appear highlighted on the web page. 
+
+
+
+<H3>The Delegate</H3>
+
+<P>
+
+The WODisplayGroup delegate offers a number of methods, and WODisplayGroup invokes them as appropriate. Besides the aforementioned <b>displayGroup:displayArrayForObjects:</b>, there are methods that inform the delegate that the WODisplayGroup has fetched, created an object (or failed to create one), inserted or deleted an object, changed the selection, or set a value for a property. There are also methods that request permission from the delegate to perform most of these same actions. The delegate can return YES to permit the action or NO to deny it. See each method's description in the <A HREF="#delegate" >Methods Implemented by the Delegate</a> section for more information.
+
+
+
+<H3>Performing Queries</H3>
+
+<P>
+
+If you are building a component that allows users to perform database queries, you use a WODisplayGroup to construct a qualifier that reflects the query. 
+
+<P>
+To construct a qualifier, you bind dynamic elements in your component to keys in the <B>queryMatch</B>, <B>queryMax</B>, or <B>queryMin</B> dictionaries. The possible keys to these dictionaries are the properties of the entity managed by the WODisplayGroup. 
+<P>
+For simple queries, the <B>queryMatch</B> dictionary is often sufficient. The associated <B>queryOperator</B> dictionary tells how to match the values in <B>queryMatch</B>. When a qualifier is constructed from <B>queryMatch</B>, it works this way:
+<UL>
+<P><LI>
+For each key in <B>queryMatch</B>, it looks to see if the <B>queryOperator</B> dictionary has a value for that same key. If it does, the value in <B>queryOperator</B> is used to perform the matching. Values in query operator can be things like <, >, =, <B>like</B>, and so on. The <B>allQualifierOperators</B> method returns the possible values you can use in <B>queryOperator</B>.
+<P><LI>
+If the key does not have an associated value in <B>queryOperator</B>, the type of its value determines how matching will be performed:
+<UL>
+<P><LI>
+If the value is an NSString, pattern matching is used. <B>defaultStringMatchOperator</B> returns the pattern matching operator used to match the string (<B>like</B> or <B>caseInsensitiveLike</B>), and <B>defaultStringMatchFormat</B> returns the pattern matching format used (by default "%@*", which matches the string as a prefix). 
+<P><LI>
+If the value is anything besides an NSString, the value is matched exactly (=). 
+</UL>
+</UL>
+<P>
+<B>Tip:</B> To ensure that value types are interpreted appropriately, use formatters on the WOTextField. That is, if the value is a number, use WOTextField's <B>numberformat</B> attribute to specify how the number should appear. If the value is a date, use the <B>dateformat</B> attribute.
+<P>
+<B>Tip:</B> You might find it convenient to use the array returned by <B>allQualifierOperators</B> as input to a WOPopUpButton element so that your users can choose how they want the matching to be performed. 
+<P>
+To perform from-to queries, you can use <B>queryMax</B> and <B>queryMin</B>. For example, suppose you had a Movies database and wanted to build a query to return all movies released between two dates: January 1, 1994 and December 31, 1994. <B>queryMax</B> would contain one key, <B>dateReleased</B>, with the value December 31, 1994, and <B>queryMin</B> would contain the same key with the value January 1, 1994. 
+<P>
+After you've provided the values for the query, you build the qualifier and perform the fetches using one of two methods: <B>qualifyDataSource</B> or <B>qualifyDisplayGroup</B>.  <B>qualifyDataSource</B> fetches the items directly from the database. <B>qualifyDisplayGroup</B> filters the objects in memory after they are fetched. Both use <B>qualifierFromQueryValues</B> to construct the qualifier used to perform the fetch.
+<P>
+
+<hr>
+<!-- instance methods -->
+<a name="instance methods"><CENTER><H2>INSTANCE METHODS</H2></CENTER></a>
+<!-- key://apple_ref/occ/instm/WODisplayGroup/allObjects meth:allObjects descr:<TT>- (NSArray *)<B>allObjects</B> </TT> -->
+<H3><a name="//apple_ref/occ/instm/WODisplayGroup/allObjects">allObjects</a></H3>
+   <TT>- (NSArray *)<B>allObjects</B> </TT>
+<P>
+Returns all of the objects collected by the receiver.
+
+<P>
+
+<B>See Also: </b>- <b>displayedObjects</b>, - <b>fetch
+</B>
+
+<hr>
+<!-- key://apple_ref/occ/instm/WODisplayGroup/allQualifierOperators meth: allQualifierOperators descr:<TT>- (NSArray *)<B> allQualifierOperators </B> </TT> -->
+<H3><a name="//apple_ref/occ/instm/WODisplayGroup/allQualifierOperators"> allQualifierOperators </a></H3>
+   <TT>- (NSArray *)<B> allQualifierOperators </B> </TT>
+<P>
+Returns an NSArray containing all of the relational operators supported by EOQualifier: =, !=, &lt;, &lt;=, &gt;, &gt;=, "like" and "caseInsensitiveLike".
+
+<P>
+
+<B>See Also: </b>- <b>queryOperator</b>, - <b>relationalQualifierOperators
+</B>
+
+<hr>
+<!-- key://apple_ref/occ/instm/WODisplayGroup/batchCount meth:batchCount descr:<TT>- (unsigned)<B>batchCount</B> </TT> -->
+<H3><a name="//apple_ref/occ/instm/WODisplayGroup/batchCount">batchCount</a></H3>
+   <TT>- (unsigned)<B>batchCount</B> </TT>
+<P>
+The number of batches to display. For example, if the displayed objects array contains two hundred records and the batch size is ten, <b>batchCount</b> returns twenty (twenty batches of ten records each). 
+
+<P>
+
+<B>See Also: </b>- <b>currentBatchIndex</b>, - <b>displayNextBatch</b>, - <b>displayPreviousBatch</b>, - <B>hasMultipleBatches</B>, - <b>numberOfObjectsPerBatch</B>
+
+<hr>
+<!-- key://apple_ref/occ/instm/WODisplayGroup/buildsQualifierFromInput meth:buildsQualifierFromInput descr:<TT>- (BOOL)<B>buildsQualifierFromInput</B> </TT> -->
+<H3><a name="//apple_ref/occ/instm/WODisplayGroup/buildsQualifierFromInput">buildsQualifierFromInput</a></H3>
+   <TT>- (BOOL)<B>buildsQualifierFromInput</B> </TT>
+<P>
+Returns  YES if the receiver performs database fetches using the <b>executeQuery</b> method.
+
+<P>
+This method is provided for backwards compatibility only. For WebObjects 3.5 and above you should use the <B>queryMatch</B>, <B>queryMax</B>, and <B>queryMin</B> methods to construct queries.
+<hr>
+<!-- key://apple_ref/occ/instm/WODisplayGroup/clearSelection meth:clearSelection descr:<TT>- (BOOL)<B>clearSelection</B> </TT> -->
+<H3><a name="//apple_ref/occ/instm/WODisplayGroup/clearSelection">clearSelection</a></H3>
+   <TT>- (BOOL)<B>clearSelection</B> </TT>
+<P>
+Invokes <b>setSelectionIndexes:</b> to clear the selection, returning YES on success and NO on failure.
+
+<hr>
+<!-- key://apple_ref/occ/instm/WODisplayGroup/currentBatchIndex meth:currentBatchIndex descr:<TT>- (unsigned)<B>currentBatchIndex</B> </TT> -->
+<H3><a name="//apple_ref/occ/instm/WODisplayGroup/currentBatchIndex">currentBatchIndex</a></H3>
+   <TT>- (unsigned)<B>currentBatchIndex</B> </TT>
+<P>
+Returns the index of the batch currently being displayed. The total batch count equals the number of displayed objects divided by the batch size. For example, if the WODisplayGroup has one hundred objects to display and the batch size is twenty, there are five batches. The first batch has a batch index of 1. 
+
+<P>
+
+<B>See Also:</b> - <b>batchCount</b>, - <b>numberOfObjectsPerBatch</b>, - <b>setCurrentBatchIndex:</B>
+
+<hr>
+<!-- key://apple_ref/occ/instm/WODisplayGroup/dataSource meth:dataSource descr:<TT>- (EODataSource *)<B>dataSource</B> </TT> -->
+<H3><a name="//apple_ref/occ/instm/WODisplayGroup/dataSource">dataSource</a></H3>
+   <TT>- (EODataSource *)<B>dataSource</B> </TT>
+<P>
+Returns the receiver's EODataSource.
+
+<P>
+
+<B>See Also:</b> - <B>hasDetailDataSource</B>, - <b>setDataSource:</B>
+
+<hr>
+<!-- key://apple_ref/occ/instm/WODisplayGroup/defaultStringMatchFormat meth:defaultStringMatchFormat descr:<TT>- (NSString *)<B>defaultStringMatchFormat</B> </TT> -->
+<H3><a name="//apple_ref/occ/instm/WODisplayGroup/defaultStringMatchFormat">defaultStringMatchFormat</a></H3>
+   <TT>- (NSString *)<B>defaultStringMatchFormat</B> </TT>
+<P>
+Returns the format string that specifies how pattern matching will be performed on string values in the <B>queryMatch</B> dictionary. If a key in the <B>queryMatch</B> dictionary does not have an associated operator in the <B>queryOperator</B> dictionary, then its value is matched using pattern matching, and the format string returned by this method specifies how it will be matched. 
+<P>
+<B>See Also: </B>- <B>defaultStringMatchOperator</B>, - <B>setDefaultStringMatchFormat:</B>
+<hr>
+<!-- key://apple_ref/occ/instm/WODisplayGroup/defaultStringMatchOperator meth:defaultStringMatchOperator descr:<TT>- (NSString *)<B>defaultStringMatchOperator</B> </TT> -->
+<H3><a name="//apple_ref/occ/instm/WODisplayGroup/defaultStringMatchOperator">defaultStringMatchOperator</a></H3>
+   <TT>- (NSString *)<B>defaultStringMatchOperator</B> </TT>
+<P>
+Returns the operator used to perform pattern matching for string values in the <B>queryMatch</B> dictionary. If a key in the <B>queryMatch</B> dictionary does not have an associated operator in the <B>queryOperator</B> dictionary, then the operator returned by this method is used to perform pattern matching. 
+<P>
+<B>See Also: </B>- <B>defaultStringMatchFormat</B>, - <B>setDefaultStringMatchOperator:</B>
+<hr>
+<!-- key://apple_ref/occ/instm/WODisplayGroup/delegate meth:delegate descr:<TT>- (id)<B>delegate</B> </TT> -->
+<H3><a name="//apple_ref/occ/instm/WODisplayGroup/delegate">delegate</a></H3>
+   <TT>- (id)<B>delegate</B> </TT>
+<P>
+Returns the receiver's delegate.
+
+<P>
+
+<B>See Also:</b> - <b>setDelegate:</b>
+
+<hr>
+<!-- key://apple_ref/occ/instm/WODisplayGroup/delete meth:delete descr:<TT>- (id)<B>delete</B> </TT> -->
+<H3><a name="//apple_ref/occ/instm/WODisplayGroup/delete">delete</a></H3>
+   <TT>- (id)<B>delete</B> </TT>
+<P>
+Uses <b>deleteSelection</b> to attempt to delete the selected objects and then causes the page to reload. Returns <b>nil</b> to force reloading of the web page.
+
+<P>
+
+<B>See Also:</b> - <b>deleteObjectAtIndex:</B>
+
+<hr>
+<!-- key://apple_ref/occ/instm/WODisplayGroup/deleteObjectAtIndex: meth:deleteObjectAtIndex: descr:<TT>- (BOOL)<B>deleteObjectAtIndex:</B>(unsigned)<I>anIndex</I> </TT> -->
+<H3><a name="//apple_ref/occ/instm/WODisplayGroup/deleteObjectAtIndex:">deleteObjectAtIndex:</a></H3>
+   <TT>- (BOOL)<B>deleteObjectAtIndex:</B>(unsigned)<I>index</I> </TT>
+<P>
+Attempts to delete the object at <i>index</i>, returning YES if successful and NO if not. Checks with the delegate using the method <b>displayGroup:shouldDeleteObject:</b>. If the delegate returns NO, this method fails and returns NO. If successful, it sends the delegate a <b>displayGroup:didDeleteObject:</b> message.
+
+<P>
+
+This method performs the delete by sending <b>deleteObject</b> to the EODataSource. If that message raises an exception, this method fails and returns NO.
+
+<P>
+
+<B>See Also:</b> - <b>delete</b>, - <b>deleteSelection</B>
+
+<hr>
+<!-- key://apple_ref/occ/instm/WODisplayGroup/deleteSelection meth:deleteSelection descr:<TT>- (BOOL)<B>deleteSelection</B> </TT> -->
+<H3><a name="//apple_ref/occ/instm/WODisplayGroup/deleteSelection">deleteSelection</a></H3>
+   <TT>- (BOOL)<B>deleteSelection</B> </TT>
+<P>
+Attempts to delete the selected objects, returning YES if successful and NO if not.
+
+<P>
+
+<B>See Also:</b> - <b>delete</b>, - <b>deleteObjectAtIndex:</B>
+
+<hr>
+<!-- key://apple_ref/occ/instm/WODisplayGroup/detailKey meth:detailKey descr:<TT>- (NSString *)<B>detailKey</B> </TT> -->
+<H3><a name="//apple_ref/occ/instm/WODisplayGroup/detailKey">detailKey</a></H3>
+   <TT>- (NSString *)<B>detailKey</B> </TT>
+<P>
+For detail display groups, returns the key to the master object that specifies what this detail display group represents. That is, if you send the object returned by the <B>masterObject</B> method a <B>valueForKey:</B> message with this key, you obtain the objects controlled by this display group.
+<P>
+This method returns <B>nil</B> if the receiver is not a detail display group or if the detail key has not yet been set. You typically create a detail display group by dragging a to-many relationship from EOModeler to an open component in WebObjects Builder. 
+<P>
+<B>See Also: </B>- <B>hasDetailDataSource</B>, - <B>masterObject</B>, - <B>setDetailKey:</B> 
+<hr>
+<!-- key://apple_ref/occ/instm/WODisplayGroup/displayBatchContainingSelectedObject meth:displayBatchContainingSelectedObject descr:<TT>- (id)<B>displayBatchContainingSelectedObject</B> </TT> -->
+<H3><a name="//apple_ref/occ/instm/WODisplayGroup/displayBatchContainingSelectedObject">displayBatchContainingSelectedObject</a></H3>
+   <TT>- (id)<B>displayBatchContainingSelectedObject</B> </TT>
+<P>
+Displays the batch containing the selection and sets the current batch index to that batch's index. Returns <b>nil</b> to force the page to reload.
+
+<P>
+
+<B>See Also:</b> - <b>displayNextBatch</b>, - <b>displayPreviousBatch</b>, - <b>setCurrentBatchIndex:</B>
+
+<hr>
+<!-- key://apple_ref/occ/instm/WODisplayGroup/displayedObjects meth:displayedObjects descr:<TT>- (NSArray *)<B>displayedObjects</B> </TT> -->
+<H3><a name="//apple_ref/occ/instm/WODisplayGroup/displayedObjects">displayedObjects</a></H3>
+   <TT>- (NSArray *)<B>displayedObjects</B> </TT>
+<P>
+Returns the objects that should be displayed or otherwise made available to the user, as filtered by the receiver's delegate, by the receiver's qualifier and sort ordering.
+
+<P>
+
+If batching is in effect, <b>displayedObjects</b> returns the current batch of objects.
+
+<P>
+
+<B>See Also:</b> - <b>allObjects</b>, - <b>updateDisplayedObjects</b>, - <b>qualifier</b>,  - <b>sortOrdering</b>, - <b>displayGroup:displayArrayForObjects:</B> (delegate method)
+
+<hr>
+<!-- key://apple_ref/occ/instm/WODisplayGroup/displayNextBatch meth:displayNextBatch descr:<TT>- (id)<B>displayNextBatch</B> </TT> -->
+<H3><a name="//apple_ref/occ/instm/WODisplayGroup/displayNextBatch">displayNextBatch</a></H3>
+   <TT>- (id)<B>displayNextBatch</B> </TT>
+<P>
+Increments the current batch index, displays that batch of objects, and clears the selection. If the batch currently being displayed is the last batch, this method displays the first batch of objects.  Returns <b>nil</b> to force the page to reload. 
+
+<P>
+
+<B>See Also:</b> - <b>batchCount</b>, - <b>currentBatchIndex</b>, - <b>displayBatchContainingSelectedObject</b>, - <b>displayPreviousBatch</B>
+
+<hr>
+<!-- key://apple_ref/occ/instm/WODisplayGroup/displayPreviousBatch meth:displayPreviousBatch descr:<TT>- (id)<B>displayPreviousBatch</B> </TT> -->
+<H3><a name="//apple_ref/occ/instm/WODisplayGroup/displayPreviousBatch">displayPreviousBatch</a></H3>
+   <TT>- (id)<B>displayPreviousBatch</B> </TT>
+<P>
+Decrements the current batch index, displays that batch of objects, and clears the selection. If the batch currently being displayed is the first batch, this method displays the last batch of objects.   Returns <b>nil</b> to force the page to reload.
+
+
+
+<P>
+
+<B>See Also:</b> - <b>batchCount</b>, - <b>currentBatchIndex</b>, - <b>displayBatchContainingSelectedObject</b>, - <b>displayNextBatch</B>
+
+<hr>
+<!-- key://apple_ref/occ/instm/WODisplayGroup/endEditing meth:endEditing descr:<TT>- (BOOL)<B>endEditing</B> </TT> -->
+<H3><a name="//apple_ref/occ/instm/WODisplayGroup/endEditing">endEditing</a></H3>
+   <TT>- (BOOL)<B>endEditing</B> </TT>
+<P>
+Ends any editing taking place and returns YES.
+
+<hr>
+<!-- key://apple_ref/occ/instm/WODisplayGroup/executeQuery meth:executeQuery descr:<TT>- (id)<B>executeQuery</B> </TT> -->
+<H3><a name="//apple_ref/occ/instm/WODisplayGroup/executeQuery">executeQuery</a></H3>
+   <TT>- (id)<B>executeQuery</B> </TT>
+<P>
+Builds a qualifier using <b>qualifierFromInputValues</b> and then fetches the objects that match that qualifier. The WODisplayGroup's qualifier is set to <b>nil</b> at the end of this method so that subsequent <B>updateDisplayedObjects</b> messages only apply the sort ordering. 
+
+<P>
+This method is provided for backwards compatibility only. For WebObjects 3.5 and above you should use the <B>qualifyDataSource</B> or <B>qualifyDisplayGroup</B> methods to perform queries.
+<hr>
+<!-- key://apple_ref/occ/instm/WODisplayGroup/fetch meth:fetch descr:<TT>- (id)<B>fetch</B> </TT> -->
+<H3><a name="//apple_ref/occ/instm/WODisplayGroup/fetch">fetch</a></H3>
+   <TT>- (id)<B>fetch</B> </TT>
+<P>
+
+Attempts to fetch objects from the EODataSource. 
+<P>
+Before fetching, invokes <b>endEditing</b> and sends <b>displayGroupShouldFetch:</b>  to the delegate. If both of those methods were successful, it then sends a <b>fetchObjects</b> message to the receiver's EODataSource to replace the object array, and if successful sends the delegate a <b>displayGroup:didFetchObjects:</b> message.
+
+<P>
+
+This method returns <b>nil</b> to force the page to reload.
+
+<P>
+
+<B>See Also:  </b>- <b>allObjects</b>, - <b>updateDisplayedObjects</b>
+
+<hr>
+<!-- key://apple_ref/occ/instm/WODisplayGroup/fetchesOnLoad meth:fetchesOnLoad descr:<TT>- (BOOL)<B>fetchesOnLoad</B> </TT> -->
+<H3><a name="//apple_ref/occ/instm/WODisplayGroup/fetchesOnLoad">fetchesOnLoad</a></H3>
+   <TT>- (BOOL)<B>fetchesOnLoad</B> </TT>
+<P>
+Returns YES if the receiver fetches automatically after being loaded, NO if it must be told explicitly to fetch. The default is YES. You can set this behavior in WebObjects Builder using the Display Group Options panel.
+
+<P>
+
+<B>See Also:</b> - <b>fetch</b>, - <b>setFetchesOnLoad:</B>
+
+<hr>
+<!-- key://apple_ref/occ/instm/WODisplayGroup/hasDetailDataSource meth:hasDetailDataSource descr:<TT>- (BOOL)<B>hasDetailDataSource</B> </TT> -->
+<H3><a name="//apple_ref/occ/instm/WODisplayGroup/hasDetailDataSource">hasDetailDataSource</a></H3>
+   <TT>- (BOOL)<B>hasDetailDataSource</B> </TT>
+<P>
+Returns YES if the display group's data source is an EODetailDataSource, and NO otherwise. If you drag a to-many relationship from EOModeler to an open component in WebObjects Builder, you create a display group that has an EODetailDataSource. You can also set this up using the Display Group Options panel in WebObjects Builder. 
+<P>
+<B>See Also: </B>- <B>detailKey</B>, - <B>masterObject</B>
+<hr>
+<!-- key://apple_ref/occ/instm/WODisplayGroup/hasMultipleBatches meth: hasMultipleBatches descr:<TT>- (BOOL)<B> hasMultipleBatches </B> </TT> -->
+<H3><a name="//apple_ref/occ/instm/WODisplayGroup/hasMultipleBatches"> hasMultipleBatches </a></H3>
+   <TT>- (BOOL)<B> hasMultipleBatches </B> </TT>
+<P>
+Returns YES if the batch count is greater than 1. A display group displays its objects in batches if the <B>numberOfObjectsPerBatch</B> method returns a number that is less than the number of objects in the <B>displayedObjects</B> array.
+<P>
+<B>See Also: </B>- <B>batchCount</B>, - <B>setNumberOfObjectsPerBatch:</B>
+<hr>
+<!-- key://apple_ref/occ/instm/WODisplayGroup/init meth:init descr:<TT>- (id)<B>init</B> </TT> -->
+<H3><a name="//apple_ref/occ/instm/WODisplayGroup/init">init</a></H3>
+   <TT>- (id)<B>init</B> </TT>
+<P>
+Initializes the WODisplayGroup. The WODisplayGroup then needs to have an EODataSource set with <b>setDataSource:</b>.
+
+<hr>
+<!-- key://apple_ref/occ/instm/WODisplayGroup/inputObjectForQualifier meth:inputObjectForQualifier descr:<TT>- (NSMutableDictionary *)<B>inputObjectForQualifier</B> </TT> -->
+<H3><a name="//apple_ref/occ/instm/WODisplayGroup/inputObjectForQualifier">inputObjectForQualifier</a></H3>
+   <TT>- (NSMutableDictionary *)<B>inputObjectForQualifier</B> </TT>
+<P>
+Returns an NSMutableDictionary that is used by <b>qualifierFromInputValues</b> to build a qualifier. 
+<P>
+This method is provided for backwards compatibility only. For WebObjects 3.5 and above you should use the <B>queryMatch</B>, <B>queryMax</B>, and <B>queryMin</B> methods to construct queries.
+<hr>
+<!-- key://apple_ref/occ/instm/WODisplayGroup/inQueryMode meth:inQueryMode descr:<TT>- (BOOL)<B>inQueryMode</B> </TT> -->
+<H3><a name="//apple_ref/occ/instm/WODisplayGroup/inQueryMode">inQueryMode</a></H3>
+   <TT>- (BOOL)<B>inQueryMode</B> </TT>
+<P>
+Returns YES to indicate that the receiver is in query mode, NO otherwise. In query mode, controls in the user interface that normally display values become empty, allowing users to type queries directly into them (this is also known as a "Query by Example" interface). In effect, the receiver's "displayedObjects" are replaced with an empty <B>queryMatch</B> dictionary. When <B>qualifyDisplayGroup</B> or <B>qualifyDataSource</B> is subsequently invoked, the query is performed and the display reverts to displaying values-- this time, the objects returned by the query. 
+<P>
+<B>See Also: </B>- <B>setInQueryMode:</B>
+<hr>
+<!-- key://apple_ref/occ/instm/WODisplayGroup/insert meth:insert descr:<TT>- (id)<B>insert</B> </TT> -->
+<H3><a name="//apple_ref/occ/instm/WODisplayGroup/insert">insert</a></H3>
+   <TT>- (id)<B>insert</B> </TT>
+<P>
+Invokes <b>insertObjectAtIndex:</b> with an index just past the first index in the selection, or 0 if there's no selection.
+<P>
+
+This method returns <b>nil</b> to force the page to reload.
+
+<hr>
+<!-- key://apple_ref/occ/instm/WODisplayGroup/insertedObjectDefaultValues meth:insertedObjectDefaultValues descr:<TT>- (NSDictionary *)<B>insertedObjectDefaultValues</B> </TT> -->
+<H3><a name="//apple_ref/occ/instm/WODisplayGroup/insertedObjectDefaultValues">insertedObjectDefaultValues</a></H3>
+   <TT>- (NSDictionary *)<B>insertedObjectDefaultValues</B> </TT>
+<P>
+Returns the default values to be used for newly inserted objects. The keys into the dictionary are the properties of the entity that the display group manages. If the dictionary returned by this method is empty, the <b>insert</b> method adds an object that is initially empty. Because the object is empty, the display group has no value to display on the HTML page for that object, meaning that there is nothing for the user to select and modify. Use the <b>setInsertedObjectDefaultValues:</b> method to set up a default value so that there is something to display on the page.
+
+<hr>
+<!-- key://apple_ref/occ/instm/WODisplayGroup/insertObject:atIndex: meth:insertObject:atIndex: descr:<TT>- (void)<B>insertObject:</B> <I>anObject</I> <B>atIndex:</B>(unsigned)<I>anIndex</I> </TT> -->
+<H3><a name="//apple_ref/occ/instm/WODisplayGroup/insertObject:atIndex:">insertObject:atIndex:</a></H3>
+   <TT>- (void)<B>insertObject:</B><I>anObject</I> <B>atIndex:</B>(unsigned)<I>index</I>  </TT>
+<P>
+Inserts <i>anObject</i> into the receiver's EODataSource and displayed objects at <i>index</i>, if possible. This method checks with the delegate before actually inserting, using <b>displayGroup:shouldInsertObject:atIndex:</b>. If the delegate refuses, <i>anObject</i> isn't inserted. After successfully inserting the object, this method informs the delegate with a <b>displayGroup:didInsertObject:</b> message, and selects the newly inserted object.
+<P>
+Raises an NSRangeException if index is out of bounds.
+<P>
+
+<B>See Also: </B>- <b>insertObjectAtIndex:</b>, - <b>insert</b>
+
+<hr>
+<!-- key://apple_ref/occ/instm/WODisplayGroup/insertObjectAtIndex: meth:insertObjectAtIndex: descr:<TT>- (id)<B>insertObjectAtIndex:</B>(unsigned)<I>anIndex</I> </TT> -->
+<H3><a name="//apple_ref/occ/instm/WODisplayGroup/insertObjectAtIndex:">insertObjectAtIndex:</a></H3>
+   <TT>- (id)<B>insertObjectAtIndex:</B>(unsigned)<I>anIndex</I> </TT>
+<P>
+Asks the receiver's EODataSource to create a new object by sending it a <b>createObject</b> message, then inserts the new object using <b>insertObject:atIndex:</b>. If a new object can't be created, this method sends the delegate a <b>displayGroup:createObjectFailedForDataSource:</b> message.
+
+<P>
+
+If the object is successfully created, this method then sets the default values specified by <b>insertedObjectDefaultValues</b>.
+
+<p>
+<B>See Also: </B>- <b>insert</b>
+
+<hr>
+<!-- key://apple_ref/occ/instm/WODisplayGroup/lastQualifierFromInputValues meth:lastQualifierFromInputValues descr:<TT>- (EOQualifier *)<B>lastQualifierFromInputValues</B> </TT> -->
+<H3><a name="//apple_ref/occ/instm/WODisplayGroup/lastQualifierFromInputValues">lastQualifierFromInputValues</a></H3>
+   <TT>- (EOQualifier *)<B>lastQualifierFromInputValues</B> </TT>
+<P>
+If <b>qualifierFromInputValues</b> has previously been invoked to construct a qualifier, this method returns the qualifier that that method built. If <b>qualifierFromInputValues</b> has not been used, this method return <b>nil</b>.
+
+<P>
+This method is provided for backwards compatibility only. For WebObjects 3.5 and above, the <B>qualifierFromQueryValues</B> performs a similar function.
+<hr>
+<!-- key://apple_ref/occ/instm/WODisplayGroup/localKeys meth:localKeys descr:<TT>- (NSArray *)<B>localKeys</B> </TT> -->
+<H3><a name="//apple_ref/occ/instm/WODisplayGroup/localKeys">localKeys</a></H3>
+   <TT>- (NSArray *)<B>localKeys</B> </TT>
+<P>
+Returns the additional keys that dynamic elements can be bound to. A WODisplayGroup's basic keys are typically those of the attributes and relationships of its objects, as defined by their class descriptions through an entity in the model. Local keys are typically used to form associations with key paths, with arbitrary methods of objects, or with properties of objects not associated with an entity. 
+
+<P>
+
+<B>See Also:</b> - <b>setLocalKeys:</B>
+
+<hr>
+<!-- key://apple_ref/occ/instm/WODisplayGroup/masterObject meth:masterObject descr:<TT>- (id)<B>masterObject</B> </TT> -->
+<H3><a name="//apple_ref/occ/instm/WODisplayGroup/masterObject">masterObject</a></H3>
+   <TT>- (id)<B>masterObject</B> </TT>
+<P>
+Returns the master object for a detail display group (a display group that represents a detail in a master-detail relationship). A detail display group is one that uses an EODetailDataSource.  You create a detail display group by dragging a to-many relationship from EOModeler to an open component in WebObjects Builder. If the display group is not a detail display group or does not have a master object set, this method returns <B>nil</B>. 
+<P>
+<B>See Also: </B>- <B>detailKey</B> - <B>hasDetailDataSource</B>, - <B>setMasterObject:</B>
+<hr>
+<!-- key://apple_ref/occ/instm/WODisplayGroup/numberOfObjectsPerBatch meth:numberOfObjectsPerBatch descr:<TT>- (unsigned)<B>numberOfObjectsPerBatch</B> </TT> -->
+<H3><a name="//apple_ref/occ/instm/WODisplayGroup/numberOfObjectsPerBatch">numberOfObjectsPerBatch</a></H3>
+   <TT>- (unsigned)<B>numberOfObjectsPerBatch</B> </TT>
+<P>
+Returns the batch size. You can set the batch size using <b>setNumberOfObjectsPerBatch:</b> or using WebObjects Builder's Display Group Options panel.
+
+<P>
+
+<B>See Also:</b> - <b>setNumberOfObjectsPerBatch:</B>
+
+<hr>
+<!-- key://apple_ref/occ/instm/WODisplayGroup/qualifier meth:qualifier descr:<TT>- (EOQualifier *)<B>qualifier</B> </TT> -->
+<H3><a name="//apple_ref/occ/instm/WODisplayGroup/qualifier">qualifier</a></H3>
+   <TT>- (EOQualifier *)<B>qualifier</B> </TT>
+<P>
+Returns the receiver's qualifier, which it uses to filter its array of objects for display when the delegate doesn't do so itself.
+
+<P>
+
+<B>See Also:</b>  - <b>displayedObjects</b>, - <b>setQualifier:</b>, - <b>updateDisplayedObjects </B>
+
+<hr>
+<!-- key://apple_ref/occ/instm/WODisplayGroup/qualifierFromInputValues meth:qualifierFromInputValues descr:<TT>- (EOQualifier *)<B>qualifierFromInputValues</B> </TT> -->
+<H3><a name="//apple_ref/occ/instm/WODisplayGroup/qualifierFromInputValues">qualifierFromInputValues</a></H3>
+   <TT>- (EOQualifier *)<B>qualifierFromInputValues</B> </TT>
+<P>
+Builds a qualifier from the dictionaries returned by <b>inputObjectForQualifier</b> and <b>secondObjectForQualifier</b>. This qualifier is used by the <b>executeQuery</b> method to fetch records from the database.
+
+<P>
+This method is provided for backwards compatibility only. For WebObjects 3.5 and above, the method <B>qualifierFromQueryValues</B> performs a similar function.
+<hr>
+<!-- key://apple_ref/occ/instm/WODisplayGroup/qualifierFromQueryValues meth:qualifierFromQueryValues descr:<TT>- (EOQualifier *)<B>qualifierFromQueryValues</B> </TT> -->
+<H3><a name="//apple_ref/occ/instm/WODisplayGroup/qualifierFromQueryValues">qualifierFromQueryValues</a></H3>
+   <TT>- (EOQualifier *)<B>qualifierFromQueryValues</B> </TT>
+<P>
+Builds a qualifier constructed from entries in the three query dictionaries: <B>queryMatch</B>, <B>queryMax</B>, and <B>queryMin</B>. 
+<P>
+<B>See Also: </B>- <B>qualifyDataSource</B>, - <B>qualifyDisplayGroup</B>
+<hr>
+<!-- key://apple_ref/occ/instm/WODisplayGroup/qualifyDataSource meth:qualifyDataSource descr:<TT>- (void)<B>qualifyDataSource</B> </TT> -->
+<H3><a name="//apple_ref/occ/instm/WODisplayGroup/qualifyDataSource">qualifyDataSource</a></H3>
+   <TT>- (void)<B>qualifyDataSource</B> </TT>
+<P>
+Takes the result of <B>qualifierFromQueryValues</B> and applies to the receiver's data source. The receiver then sends itself a <B>fetch</B> message. If the receiver is in query mode, query mode is exited. This method differs from <B>qualifyDisplayGroup</B> as follows: whereas <B>qualifyDisplayGroup</B> performs in-memory filtering of already fetched objects, <B>qualifyDataSource</B> triggers a new qualified fetch against the database. 
+<P>
+<B>See Also: </B>- <B>queryMatch</B>, - <B>queryMax</B>, - <B>queryMin</B>, - <B>queryOperator</B>
+<hr>
+<!-- key://apple_ref/occ/instm/WODisplayGroup/qualifyDisplayGroup meth:qualifyDisplayGroup descr:<TT>- (void)<B>qualifyDisplayGroup</B> </TT> -->
+<H3><a name="//apple_ref/occ/instm/WODisplayGroup/qualifyDisplayGroup">qualifyDisplayGroup</a></H3>
+   <TT>- (void)<B>qualifyDisplayGroup</B> </TT>
+<P>
+Takes the result of the <B>qualifierFromQueryValues</B> and applies to the receiver using <B>setQualifier:</B>. The method <B>updateDisplayedObjects</B> is invoked to refresh the display. If the receiver is in query mode, query mode is exited.
+<P>
+<B>See Also: </B>- <B>qualifyDataSource</B>, - <B>queryMatch</B>, - <B>queryMax</B>, - <B>queryMin</B>, - <B>queryOperator</B>
+<hr>
+<!-- key://apple_ref/occ/instm/WODisplayGroup/queryMatch meth:queryMatch descr:<TT>- (NSMutableDictionary *)<B>queryMatch</B> </TT> -->
+<H3><a name="//apple_ref/occ/instm/WODisplayGroup/queryMatch">queryMatch</a></H3>
+   <TT>- (NSMutableDictionary *)<B>queryMatch</B> </TT>
+<P>
+Returns a dictionary of query values to match. The <B>qualifierFromQueryValues</B> method uses this dictionary along with the <B>queryMax</B> and <B>queryMin</B> dictionaries to construct qualifiers. 
+<P>
+Use the <B>queryOperator</B> dictionary to specify the type of matching  (=, <, >, <B>like</B>, and so on) for each key in the <B>queryMatch</B> dictionary.
+<P>
+If the <B>queryOperator</B> dictionary does not contain a key contained in the <B>queryMatch</B> dictionary, the default is to match the value exactly (=) if the value is a number or a date and to perform pattern matching if the value is an NSString. In the case of string values, the <B>defaultStringMatchFormat</B> and <B>defaultStringMatchOperator</B> specify exactly how the pattern matching will be performed. 
+<P>
+<B>See Also: </B>- <B>allQualifierOperators</B>, - <B>qualifyDataSource</B>, - <B>qualifyDisplayGroup</B>, - <B>relationalQualifierOperators</B>
+<hr>
+<!-- key://apple_ref/occ/instm/WODisplayGroup/queryMax meth:queryMax descr:<TT>- (NSMutableDictionary *)<B>queryMax</B> </TT> -->
+<H3><a name="//apple_ref/occ/instm/WODisplayGroup/queryMax">queryMax</a></H3>
+   <TT>- (NSMutableDictionary *)<B>queryMax</B> </TT>
+<P>
+Returns a dictionary of less than query values. The <B>qualifierFromQueryValues</B> method uses this dictionary along with the <B>queryMatch</B> and <B>queryMin</B> dictionaries to construct qualifiers. 
+<P>
+<B>See Also: </B>- <B>qualifyDataSource</B>, - <B>qualifyDisplayGroup</B>, - <B>queryOperator</B>
+<hr>
+<!-- key://apple_ref/occ/instm/WODisplayGroup/queryMin meth:queryMin descr:<TT>- (NSMutableDictionary *)<B>queryMin</B> </TT> -->
+<H3><a name="//apple_ref/occ/instm/WODisplayGroup/queryMin">queryMin</a></H3>
+   <TT>- (NSMutableDictionary *)<B>queryMin</B> </TT>
+<P>
+Returns a dictionary of greater than query values. The <B>qualifierFromQueryValues</B> method uses this dictionary along with the <B>queryMatch</B> and <B>queryMin</B> dictionaries to construct qualifiers. 
+<P>
+<B>See Also: </B>- <B>qualifyDataSource</B>, - <B>qualifyDisplayGroup</B>, - <B>queryOperator</B>
+<hr>
+<!-- key://apple_ref/occ/instm/WODisplayGroup/queryOperator meth:queryOperator descr:<TT>- (NSMutableDictionary *)<B>queryOperator</B> </TT> -->
+<H3><a name="//apple_ref/occ/instm/WODisplayGroup/queryOperator">queryOperator</a></H3>
+   <TT>- (NSMutableDictionary *)<B>queryOperator</B> </TT>
+<P>
+Returns a dictionary of operators to use on items in the <B>queryMatch</B> dictionary. If a key in the <B>queryMatch</B> dictionary also exists in <B>queryOperator</B>, that operator for that key is used. The <B>allQualifierOperators</B> method returns the operator strings you can use as values in this dictionary. 
+<P>
+<B>See Also: </B>- <B>qualifierFromQueryValues</B>, - <B>queryMax</B> - <B>queryMin</B>, - <B>relationalQualifierOperators</B>
+<hr>
+<!-- key://apple_ref/occ/instm/WODisplayGroup/redisplay meth:redisplay descr:<TT>- (void)<B>redisplay</B> </TT> -->
+<H3><a name="//apple_ref/occ/instm/WODisplayGroup/redisplay">redisplay</a></H3>
+   <TT>- (void)<B>redisplay</B> </TT>
+<P>
+Sends out a contents changed notification.
+
+<hr>
+<!-- key://apple_ref/occ/instm/WODisplayGroup/relationalQualifierOperators meth:relationalQualifierOperators descr:<TT>- (void)<B>relationalQualifierOperators</B> </TT> -->
+<H3><a name="//apple_ref/occ/instm/WODisplayGroup/relationalQualifierOperators">relationalQualifierOperators</a></H3>
+   <TT>- (void)<B>relationalQualifierOperators</B> </TT>
+<P>
+Returns an NSArray containing all of the relational operators supported by EOQualifier: =, !=, &lt;, &lt;=, &gt;, and &gt;=. In other words, returns all of the EOQualifier operators except for the ones that work exclusively on strings: "like" and "caseInsensitiveLike".
+<P>
+
+<B>See Also: </b>- <b>allQualifierOperators</b>, - <b> queryOperator 
+</B>
+
+<hr>
+<!-- key://apple_ref/occ/instm/WODisplayGroup/secondObjectForQualifier meth:secondObjectForQualifier descr:<TT>- (NSMutableDictionary *)<B>secondObjectForQualifier</B> </TT> -->
+<H3><a name="//apple_ref/occ/instm/WODisplayGroup/secondObjectForQualifier">secondObjectForQualifier</a></H3>
+   <TT>- (NSMutableDictionary *)<B>secondObjectForQualifier</B> </TT>
+<P>
+Returns a mutable dictionary that specifies the "to" value in from-to queries. This method is used by the <b>qualifierFromInputValues</b> method to build a qualifier. 
+
+<P>
+This method is provided for backwards compatibility only. For WebObjects 3.5 and above you should use the <B>queryMatch</B>, <B>queryMax</B>, and <B>queryMin</B> methods to construct queries.
+<hr>
+<!-- key://apple_ref/occ/instm/WODisplayGroup/selectedObject meth:selectedObject descr:<TT>- (id)<B>selectedObject</B> </TT> -->
+<H3><a name="//apple_ref/occ/instm/WODisplayGroup/selectedObject">selectedObject</a></H3>
+   <TT>- (id)<B>selectedObject</B> </TT>
+<P>
+Returns the first selected object in the displayed objects array, or <b>nil</b> if there's no such object.
+
+<P>
+
+<B>See Also:</b> - <b>displayedObjects</b>, - <b>selectionIndexes</b>, - <b>selectedObjects</B>
+
+<hr>
+<!-- key://apple_ref/occ/instm/WODisplayGroup/selectedObjects meth:selectedObjects descr:<TT>- (NSArray *)<B>selectedObjects</B> </TT> -->
+<H3><a name="//apple_ref/occ/instm/WODisplayGroup/selectedObjects">selectedObjects</a></H3>
+   <TT>- (NSArray *)<B>selectedObjects</B> </TT>
+<P>
+Returns the objects selected in the receiver's displayed objects array.
+
+<P>
+
+<B>See Also:</b> - <b>displayedObjects</b>, 
+
+- <b>selectionIndexes</b>, 
+
+- <b>selectedObject</B>
+
+<hr>
+<!-- key://apple_ref/occ/instm/WODisplayGroup/selectionIndexes meth:selectionIndexes descr:<TT>- (NSArray *)<B>selectionIndexes</B> </TT> -->
+<H3><a name="//apple_ref/occ/instm/WODisplayGroup/selectionIndexes">selectionIndexes</a></H3>
+   <TT>- (NSArray *)<B>selectionIndexes</B> </TT>
+<P>
+Returns the selection as an array of NSNumbers. The NSNumbers are indexes into the array returned by <b>displayedObjects</b>.
+
+<P>
+
+<B>See Also:</b> - <b>selectedObject</b>, 
+
+- <b>selectedObjects</b>, 
+
+- <b>setSelectionIndexes:</B>
+
+<hr>
+<!-- key://apple_ref/occ/instm/WODisplayGroup/selectNext meth:selectNext descr:<TT>- (id)<B>selectNext</B> </TT> -->
+<H3><a name="//apple_ref/occ/instm/WODisplayGroup/selectNext">selectNext</a></H3>
+   <TT>- (id)<B>selectNext</B> </TT>
+<P>
+Attempts to select the object just after the currently selected one. The selection is altered in this way:
+
+<UL><LI>If there are no objects, does nothing.
+
+<P><LI>If there's no selection, selects the object at index zero.
+
+<P><LI>If the first selected object is the last object in the displayed objects array, selects the first object.
+
+<P><LI>Otherwise selects the object after the first selected object.
+
+</UL>
+
+<P>
+
+This method  returns <b>nil</b> to force the page to reload.
+
+<P>
+
+<B>See Also:</b> - <b>selectPrevious</b>, - <b>setSelectionIndexes:</B>
+
+<hr>
+<!-- key://apple_ref/occ/instm/WODisplayGroup/selectObject: meth:selectObject: descr:<TT>- (BOOL)<B>selectObject:</B>(id)<I>object</I> </TT> -->
+<H3><a name="//apple_ref/occ/instm/WODisplayGroup/selectObject:">selectObject:</a></H3>
+   <TT>- (BOOL)<B>selectObject:</B>(id)<I>object</I> </TT>
+<P>
+Attempts to select the object equal to <i>anObject</i> in the receiver's displayed objects array, returning YES if successful and NO otherwise. <i>anObject</i> is equal to an object in the displayed objects array if its address is the same as the object in the array.
+
+<P>
+
+<B>See Also:</b> - <b>selectNext</b>, - <b>selectPrevious</B> 
+
+<hr>
+<!-- key://apple_ref/occ/instm/WODisplayGroup/selectObjectsIdenticalTo: meth:selectObjectsIdenticalTo: descr:<TT>- (BOOL)<B>selectObjectsIdenticalTo:</B>(NSArray *)<I>objectSelection</I> </TT> -->
+<H3><a name="//apple_ref/occ/instm/WODisplayGroup/selectObjectsIdenticalTo:">selectObjectsIdenticalTo:</a></H3>
+   <TT>- (BOOL)<B>selectObjectsIdenticalTo:</B>(NSArray *)<I>objects</I> </TT>
+<P>
+Attempts to select the objects in the receiver's displayed objects array whose <b>id</b>s are equal to those of <i>objects</i>, returning YES if successful and NO otherwise.
+<P>
+
+<B>See Also: </B>- <b>setSelectionIndexes:</b>, - <b>selectObjectsIdenticalTo:selectFirstOnNoMatch:</b>
+<hr>
+<!-- key://apple_ref/occ/instm/WODisplayGroup/selectObjectsIdenticalTo:selectFirstOnNoMatch: meth:selectObjectsIdenticalTo:selectFirstOnNoMatch: descr:<TT>- (BOOL)<B>selectObjectsIdenticalTo:</B>(NSArray *)<I>objectSelection</I> <B>selectFirstOnNoMatch:</B>(BOOL)<I>selectFirstOnNoMatch</I> </TT> -->
+<H3><a name="//apple_ref/occ/instm/WODisplayGroup/selectObjectsIdenticalTo:selectFirstOnNoMatch:">selectObjectsIdenticalTo:selectFirstOnNoMatch:</a></H3>
+   <TT>- (BOOL)<B>selectObjectsIdenticalTo:</B>(NSArray *)<I>objects</I> <B>selectFirstOnNoMatch:</B>(BOOL)<I>flag</I> </TT>
+<P>
+Selects the objects in the receiver's displayed objects array whose <b>id</b>s are equal to those of <i>objects</i>, returning YES if successful and NO otherwise. If no objects in the displayed objects array match objects and <i>flag</i> is YES, attempts to select the first object in the displayed objects array.
+<P>
+
+<B>See Also: </B>- <b>setSelectionIndexes:</b>, - <b>selectObjectsIdenticalTo:</b>
+<hr>
+<!-- key://apple_ref/occ/instm/WODisplayGroup/selectPrevious meth:selectPrevious descr:<TT>- (id)<B>selectPrevious</B> </TT> -->
+<H3><a name="//apple_ref/occ/instm/WODisplayGroup/selectPrevious">selectPrevious</a></H3>
+   <TT>- (id)<B>selectPrevious</B> </TT>
+<P>
+Attempts to select the object just before the presently selected one. The selection is altered in this way:
+
+<UL><LI>If there are no objects, does nothing.
+
+<P><LI>If there's no selection, selects the object at index zero.
+
+<P><LI>If the first selected object is at index zero, selects the last object.
+
+<P><LI>Otherwise selects the object before the first selected object.
+
+</UL>
+
+<P>
+
+This method returns <b>nil</b> to force the page to reload.
+
+<P>
+
+<B>See Also:</b> - <b>selectNext</b>, - <b>redisplay</B>
+
+<hr>
+<!-- key://apple_ref/occ/instm/WODisplayGroup/selectsFirstObjectAfterFetch meth:selectsFirstObjectAfterFetch descr:<TT>- (BOOL)<B>selectsFirstObjectAfterFetch</B> </TT> -->
+<H3><a name="//apple_ref/occ/instm/WODisplayGroup/selectsFirstObjectAfterFetch">selectsFirstObjectAfterFetch</a></H3>
+   <TT>- (BOOL)<B>selectsFirstObjectAfterFetch</B> </TT>
+<P>
+Returns YES if the receiver automatically selects its first displayed object after a fetch if there was no selection, NO if it leaves an empty selection as-is. 
+
+<P>
+
+WODisplayGroups by default do select the first object after a fetch when there was no previous selection.
+
+<P>
+
+<B>See Also:</b> - <b>displayedObjects</b>, 
+
+- <b>fetch</b>, - <b>setSelectsFirstObjectAfterFetch:</B>
+
+<hr>
+<!-- key://apple_ref/occ/instm/WODisplayGroup/setBuildsQualifierFromInput: meth:setBuildsQualifierFromInput: descr:<TT>- (void)<B>setBuildsQualifierFromInput:</B>(BOOL)<I>flag</I> </TT> -->
+<H3><a name="//apple_ref/occ/instm/WODisplayGroup/setBuildsQualifierFromInput:">setBuildsQualifierFromInput:</a></H3>
+   <TT>- (void)<B>setBuildsQualifierFromInput:</B>(BOOL)<I>flag</I> </TT>
+<P>
+Sets whether the receiver should build a qualifier before fetching. If <I>flag</i> is YES, the receiver should perform database fetches using the <b>executeQuery</b> method, which first builds a qualifier using the method <b>qualifierFromInputValues</b> and then performs the fetch. 
+
+<P>
+This method is provided for backwards compatibility only. For WebObjects 3.5 and above you should use the <B>queryMatch</B>, <B>queryMax</B>, and <B>queryMin</B> methods to construct queries.
+<hr>
+<!-- key://apple_ref/occ/instm/WODisplayGroup/setCurrentBatchIndex: meth:setCurrentBatchIndex: descr:<TT>- (void)<B>setCurrentBatchIndex:</B>(unsigned)<I>batchIndex</I> </TT> -->
+<H3><a name="//apple_ref/occ/instm/WODisplayGroup/setCurrentBatchIndex:">setCurrentBatchIndex:</a></H3>
+   <TT>- (void)<B>setCurrentBatchIndex:</B>(unsigned)<I>anInt</I> </TT>
+<P>
+Displays the <i>anInt</i> batch of objects. The total batch count equals the number of displayed objects divided by the batch size. For example, if the WODisplayGroup has one hundred objects to display and the batch size is twenty, there are five batches. The first batch has a batch index of 1. <b>setCurrentBatchIndex:3</b> would display the third batch of objects (objects 41 to 60 in this example).
+
+<P>
+
+If <i>anInt</i> is greater than the number of batches, this method displays the first batch.
+
+<P>
+
+<B>See Also:</b> - <b>batchCount</b>, 
+
+- <b>currentBatchIndex</b>, 
+
+- <b>displayBatchContainingSelectedObject</b>, 
+
+- <b>displayNextBatch</b>, 
+
+- <b>displayPreviousBatch</b>, 
+
+- <b>numberOfObjectsPerBatch</B>
+
+
+<hr>
+<!-- key://apple_ref/occ/instm/WODisplayGroup/setDataSource: meth:setDataSource: descr:<TT>- (void)<B>setDataSource:</B>(EODataSource *)<I>dataSource</I> </TT> -->
+<H3><a name="//apple_ref/occ/instm/WODisplayGroup/setDataSource:">setDataSource:</a></H3>
+   <TT>- (void)<B>setDataSource:</B>(EODataSource *)<I>aDataSource</I> </TT>
+<P>
+Sets the receiver's EODataSource to <i>aDataSource</i>. In the process, it performs these actions:
+
+<UL>
+
+<LI>Unregisters itself as an editor and message handler for the previous EODataSource's EOEditingContext, if necessary, and registers itself with <i>aDataSource</i>'s EOEditingContext. If the new EOEditingContext already has a message handler, however, the receiver doesn't assume that role.
+
+<P><LI>
+
+Clears the receiver's array of objects.
+
+<P><LI>
+
+Sends <b>displayGroupDidChangeDataSource:</B> to the delegate if there is one.
+
+</UL>
+
+<!-- ME!!! What about notifications? -->
+
+<P>
+
+<B>See Also:</b> - <b>dataSource</B>
+
+
+<hr>
+<!-- key://apple_ref/occ/instm/WODisplayGroup/setDefaultStringMatchFormat: meth:setDefaultStringMatchFormat: descr:<TT>- (void)<B>setDefaultStringMatchFormat:</B>(NSString *)<I>format</I> </TT> -->
+<H3><a name="//apple_ref/occ/instm/WODisplayGroup/setDefaultStringMatchFormat:">setDefaultStringMatchFormat:</a></H3>
+   <TT>- (void)<B>setDefaultStringMatchFormat:</B>(NSString *)<I>format</I> </TT>
+<P>
+Sets how pattern matching will be performed on NSString values in the <B>queryMatch</B> dictionary. This format is used for properties listed in the <B>queryMatch</B> dictionary that have NSString values and that do not have an associated entry in the <B>queryOperator</B> dictionary. In these cases, the value is matched using pattern matching and <I>format</I> specifies how it will be matched.  
+<P>
+The default format string for pattern matching is "%@*" which means that the string value in the <B>queryMatch</B> dictionary is used as a prefix. For example, if the <B>queryMatch</B> dictionary contains a value "Jo" for the key "Name", the query returns all records whose name values begin with "Jo".
+<P>
+<B>See Also: </B>- <B>defaultStringMatchFormat</B>, - <B>setDefaultStringMatchOperator:</B>
+<hr>
+<!-- key://apple_ref/occ/instm/WODisplayGroup/setDefaultStringMatchOperator: meth:setDefaultStringMatchOperator: descr:<TT>- (void)<B>setDefaultStringMatchOperator:</B>(NSString *)<I>operator</I> </TT> -->
+<H3><a name="//apple_ref/occ/instm/WODisplayGroup/setDefaultStringMatchOperator:">setDefaultStringMatchOperator:</a></H3>
+   <TT>- (void)<B>setDefaultStringMatchOperator:</B>(NSString *)<I>operator</I> </TT>
+<P>
+Sets the operator used to perform pattern matching for NSString values in the <B>queryMatch</B> dictionary.  This operator is used for properties listed in the <B>queryMatch</B> dictionary that have NSString values and that do not have an associated entry in the <B>queryOperator</B> dictionary. In these cases, the operator <I>operator</I> is used to perform pattern matching. 
+<P>
+The default value for the query match operator is <B>caseInsensitiveLike</B>, which means that the query does not consider case when matching letters. The other possible value for this operator is <B>like</B>, which matches the case of the letters exactly.
+<P>
+<B>See Also: </B>- <B>allQualifierOperators</B>, - <B>defaultStringMatchOperator</B>, - <B>relationalQualifierOperators</B>, - <B>setDefaultStringMatchFormat:</B>
+<hr>
+<!-- key://apple_ref/occ/instm/WODisplayGroup/setDelegate: meth:setDelegate: descr:<TT>- (void)<B>setDelegate:</B>(id)<I>anObject</I> </TT> -->
+<H3><a name="//apple_ref/occ/instm/WODisplayGroup/setDelegate:">setDelegate:</a></H3>
+   <TT>- (void)<B>setDelegate:</B>(id)<I>anObject</I> </TT>
+<P>
+Sets the receiver's delegate to <i>anObject</i>, without retaining it. 
+
+<P>
+
+<B>See Also:</b> - <b>delegate</B>, <A HREF="#delegate">Methods Implemented by the Delegate</a>
+
+<hr>
+<!-- key://apple_ref/occ/instm/WODisplayGroup/setDetailKey: meth:setDetailKey: descr:<TT>- (void)<B>setDetailKey:</B>(NSString *)<I>detailKey</I> </TT> -->
+<H3><a name="//apple_ref/occ/instm/WODisplayGroup/setDetailKey:">setDetailKey:</a></H3>
+   <TT>- (void)<B>setDetailKey:</B>(NSString *)<I>detailKey</I> </TT>
+<P>
+Sets the detail key to <I>detailKey</I> for a detail display group. The detail key is the key that retrieves from the master object the objects that this display group manages. You must set a detail key before you set a master object. 
+<P>
+If the receiver is not a detail display group, this method has no effect. A display group is a detail display group if its data source is an EODetailDataSource.  You typically create a detail display group by dragging a to-many relationship from EOModeler to an open component in WebObjects Builder. Doing so sets the detail key and master object, so you rarely need to use this method.
+<P>
+<B>See Also: </B>- <B>hasDetailDataSource</B>, - <B>detailKey</B>, - <B>setMasterObject:</B>
+<hr>
+<!-- key://apple_ref/occ/instm/WODisplayGroup/setFetchesOnLoad: meth:setFetchesOnLoad: descr:<TT>- (void)<B>setFetchesOnLoad:</B>(BOOL)<I>flag</I> </TT> -->
+<H3><a name="//apple_ref/occ/instm/WODisplayGroup/setFetchesOnLoad:">setFetchesOnLoad:</a></H3>
+   <TT>- (void)<B>setFetchesOnLoad:</B>(BOOL)<I>flag</I> </TT>
+<P>
+Controls whether the receiver automatically fetches its objects after being loaded. If <i>flag</i> is YES it does; if <i>flag</i> is NO the receiver must be told explicitly to fetch. The default is NO. You can also set this behavior in WebObjects Builder in the Display Group Options panel.
+<P>
+
+<B>See Also:</b> - <b>fetch</b>, 
+
+- <b>fetchesOnLoad
+</B>
+
+<hr>
+<!-- key://apple_ref/occ/instm/WODisplayGroup/setInQueryMode: meth:setInQueryMode: descr:<TT>- (void)<B>setInQueryMode:</B>(BOOL)<I>flag</I> </TT> -->
+<H3><a name="//apple_ref/occ/instm/WODisplayGroup/setInQueryMode:">setInQueryMode:</a></H3>
+   <TT>- (void)<B>setInQueryMode:</B>(BOOL)<I>flag</I> </TT>
+<P>
+Sets according to <I>flag</I> whether the receiver is in query mode. In query mode, controls in the user interface that normally display values become empty, allowing users to type queries directly into them (this is also known as a "Query by Example" interface). In effect, the receiver's "displayedObjects" are replaced with an empty <B>queryMatch</B> dictionary. When <B>qualifyDisplayGroup</B> or <B>qualifyDataSource</B> is subsequently invoked, the query is performed and the display reverts to displaying values-- this time, the objects returned by the query. 
+<P>
+<B>See Also: </B>- <B>inQueryMode</B>
+<hr>
+<!-- key://apple_ref/occ/instm/WODisplayGroup/setInsertedObjectDefaultValues: meth:setInsertedObjectDefaultValues: descr:<TT>- (void)<B>setInsertedObjectDefaultValues:</B>(NSDictionary *)<I>defaultValues</I> </TT> -->
+<H3><a name="//apple_ref/occ/instm/WODisplayGroup/setInsertedObjectDefaultValues:">setInsertedObjectDefaultValues:</a></H3>
+   <TT>- (void)<B>setInsertedObjectDefaultValues:</B>(NSDictionary *)<I>defaultValues</I> </TT>
+<P>
+Sets default values to be used for newly inserted objects. When you use the <b>insert</b> method to add an object, that object is initially empty. Because the object is empty, there is no value to be displayed on the HTML page, meaning there is nothing for the user to select and modify. You use this method to provide at least one field that can be displayed for the newly inserted object. The possible keys into the dictionary are the properties of the entity managed by this display group. For example, a component that displays a list of movie titles and allows the user to insert new movie titles might contain these statements to ensure that all new objects have something to display as a movie title:
+
+<P><PRE>	[defaultValues setObject:@"New title" forKey:@"title"];
+
+	[movies setInsertedObjectDefaultValues:defaultValues];
+
+</PRE>
+
+<P>
+
+<B>See Also:</b> - <b>insertedObjectDefaultValues</B>
+
+<hr>
+<!-- key://apple_ref/occ/instm/WODisplayGroup/setLocalKeys: meth:setLocalKeys: descr:<TT>- (void)<B>setLocalKeys:</B>(NSArray *)<I>keys</I> </TT> -->
+<H3><a name="//apple_ref/occ/instm/WODisplayGroup/setLocalKeys:">setLocalKeys:</a></H3>
+   <TT>- (void)<B>setLocalKeys:</B>(NSArray *)<I>keys</I> </TT>
+<P>
+Sets the additional keys to which dynamic elements can be bound to <i>keys</i>.
+
+<P>
+
+<B>See Also:</b> - <b>localKeys</B>
+
+<hr>
+<!-- key://apple_ref/occ/instm/WODisplayGroup/setMasterObject: meth:setMasterObject: descr:<TT>- (void)<B>setMasterObject:</B>(id)<I>masterObject</I> </TT> -->
+<H3><a name="//apple_ref/occ/instm/WODisplayGroup/setMasterObject:">setMasterObject:</a></H3>
+   <TT>- (void)<B>setMasterObject:</B>(id)<I>masterObject</I> </TT>
+<P>
+Sets the master object to <I>masterObject</I> for detail display groups and then performs a fetch if the display group is set to fetch on load. The master object owns the objects controlled by this display group. 
+<P>
+Before you use this method, you should use the <B>setDetailKey:</B> to set the key to this relationship.  You typically create a detail display group by dragging a to-Many relationship from EOModeler to an open component in WebObjects Builder. Doing so sets the master object and detail key, so you typically do not have to use this method.
+<P>
+If the receiver is not a detail display group, this method has no effect.  
+<P>
+<B>See Also: </B>- <B>hasDetailDataSource</B>, - <B>masterObject</B>
+<hr>
+<!-- key://apple_ref/occ/instm/WODisplayGroup/setNumberOfObjectsPerBatch: meth:setNumberOfObjectsPerBatch: descr:<TT>- (void)<B>setNumberOfObjectsPerBatch:</B>(unsigned)<I>count</I> </TT> -->
+<H3><a name="//apple_ref/occ/instm/WODisplayGroup/setNumberOfObjectsPerBatch:">setNumberOfObjectsPerBatch:</a></H3>
+   <TT>- (void)<B>setNumberOfObjectsPerBatch:</B>(unsigned)<I>count</I> </TT>
+<P>
+Sets the number of objects the receiver displays at a time. For example, suppose you are displaying one hundred records. Instead of displaying all of these at once, you can set the batch size so that the page displays a more manageable number (for example, 10). WebObjects Builder allows you to set the number of objects per batch on the Display Group Options panel. 
+
+<P>
+
+<B>See Also:</b> - <b>batchCount</b>, 
+
+- <b>displayNextBatch</b>, 
+
+- <b>displayPreviousBatch</b>, 
+
+- <b>numberOfObjectsPerBatch</B>
+
+<hr>
+<!-- key://apple_ref/occ/instm/WODisplayGroup/setObjectArray: meth:setObjectArray: descr:<TT>- (void)<B>setObjectArray:</B>(NSArray *)<I>array</I> </TT> -->
+<H3><a name="//apple_ref/occ/instm/WODisplayGroup/setObjectArray:">setObjectArray:</a></H3>
+   <TT>- (void)<B>setObjectArray:</B>(NSArray *)<I>objects</I> </TT>
+<P>
+Sets the receiver's objects to <i>objects</i>, regardless of what its EODataSource provides. This method doesn't affect the EODataSource's objects at all; specifically, it results in neither inserts nor deletes of objects in the EODataSource. <i>objects</i> should contain objects with the same property names or methods as those accessed by the receiver. This method is used by <b>fetch</b> to set the array of fetched objects; you should rarely need to invoke it directly. 
+
+<P>
+
+After setting the object array, this method restores as much of the original selection as possible. If there's no match and the receiver selects after fetching, then the first object is selected.
+
+<P>
+
+<B>See Also:</b> - <b>allObjects</b>, - <b>displayedObjects</b>, 
+
+- <b>fetch</b>, 
+
+- <b>selectsFirstObjectAfterFetch
+</B>
+
+<hr>
+<!-- key://apple_ref/occ/instm/WODisplayGroup/setQualifier: meth:setQualifier: descr:<TT>- (void)<B>setQualifier:</B>(EOQualifier *)<I>qualifier</I> </TT> -->
+<H3><a name="//apple_ref/occ/instm/WODisplayGroup/setQualifier:">setQualifier:</a></H3>
+   <TT>- (void)<B>setQualifier:</B>(EOQualifier *)<I>aQualifier</I> </TT>
+<P>
+Sets the receiver's qualifier to <i>aQualifier</i>. This qualifier is used to filter the receiver's array of objects for display. Use <b>updateDisplayedObjects</b> to apply the qualifier. 
+
+<P>
+
+If the receiver's delegate responds to <b>displayGroup:displayArrayForObjects:</b>, that method is used instead of the qualifier to filter the objects.
+
+<P>
+
+<B>See Also:</b> - <b>displayedObjects</b>, - <b>qualifier</B>
+
+<hr>
+<!-- key://apple_ref/occ/instm/WODisplayGroup/setSelectionIndexes: meth:setSelectionIndexes: descr:<TT>- (BOOL)<B>setSelectionIndexes:</B>(NSArray *)<I>selection</I> </TT> -->
+<H3><a name="//apple_ref/occ/instm/WODisplayGroup/setSelectionIndexes:">setSelectionIndexes:</a></H3>
+   <TT>- (BOOL)<B>setSelectionIndexes:</B>(NSArray *)<I>selection</I> </TT>
+<P>
+Selects the objects at <i>selection</i> in the receiver's array if possible, returning YES if successful and NO if not (in which case the selection remains unaltered).
+
+This method is the primitive method for altering the selection; all other such methods invoke this one to make the change.
+
+<P>
+
+This method invokes <b>endEditing</b> to wrap up any changes being made by the user. If <b>endEditing</b> returns NO, this method fails and returns NO. This method then checks the delegate with a <b>displayGroup:shouldChangeSelectionToIndexes:</b> message. If the delegate returns NO, this method also fails and returns NO. If the receiver successfully changes the selection, its observers each receive a <b>displayGroupDidChangeSelection:</b> message and, if necessary, a <B>displayGroupDidChangeSelectedObjects</B> message.
+
+<P>
+
+<B>Note:  </b>The selection set here is only a programmatic selection; the objects on the screen are not highlighted in any way.
+
+<P>
+
+<B>See Also:</b> - <b>allObjects</B>
+
+<hr>
+<!-- key://apple_ref/occ/instm/WODisplayGroup/setSelectsFirstObjectAfterFetch: meth:setSelectsFirstObjectAfterFetch: descr:<TT>- (void)<B>setSelectsFirstObjectAfterFetch:</B>(BOOL)<I>flag</I> </TT> -->
+<H3><a name="//apple_ref/occ/instm/WODisplayGroup/setSelectsFirstObjectAfterFetch:">setSelectsFirstObjectAfterFetch:</a></H3>
+   <TT>- (void)<B>setSelectsFirstObjectAfterFetch:</B>(BOOL)<I>flag</I> </TT>
+<P>
+Controls whether the receiver automatically selects its first displayed object after a fetch when there were no selected objects before the fetch. If <i>flag</i> is YES it does; if <i>flag</i> is NO then no objects are selected.
+
+<P>
+
+WODisplayGroups by default do select the first object after a fetch when there was no previous selection. 
+
+<P>
+
+<B>See Also:</b> - <b>displayedObjects</b>, 
+
+- <b>fetch</b>, 
+
+- <b>selectsFirstObjectAfterFetch</B>
+
+<hr>
+<!-- key://apple_ref/occ/instm/WODisplayGroup/setSortOrdering: meth:setSortOrdering: descr:<TT>- (void)<B>setSortOrdering:</B>(NSArray *)<I>keySortOrderArray</I> </TT> -->
+<H3><a name="//apple_ref/occ/instm/WODisplayGroup/setSortOrdering:">setSortOrdering:</a></H3>
+   <TT>- (void)<B>setSortOrdering:</B>(NSArray *)<i>orderings</i> </TT>
+<P>
+Sets the EOSortOrdering objects that <b>updateDisplayedObjects</b> uses to sort the displayed objects to <i>orderings</i>. Use <b>updateDisplayedObjects</b> to apply the sort orderings.You can also set this value using the WebObjects Builder Display Group Options panel.
+<P>
+
+If the receiver's delegate responds to <b>displayGroup:displayArrayForObjects:</b>, that method is used instead of the sort orderings to order the objects.
+
+<P>
+
+<B>See Also:</b> - <b>displayedObjects</b>, 
+
+- <b>sortOrdering</b>, 
+
+- <b>updateDisplayedObjects
+</B>
+
+<hr>
+<!-- key://apple_ref/occ/instm/WODisplayGroup/setValidatesChangesImmediately: meth:setValidatesChangesImmediately: descr:<TT>- (void)<B>setValidatesChangesImmediately:</B>(BOOL)<I>flag</I> </TT> -->
+<H3><a name="//apple_ref/occ/instm/WODisplayGroup/setValidatesChangesImmediately:">setValidatesChangesImmediately:</a></H3>
+   <TT>- (void)<B>setValidatesChangesImmediately:</B>(BOOL)<I>flag</I> </TT>
+<P>
+Controls the receiver's behavior on encountering a validation error. In the Web context, this method has no effect.
+
+<P>
+
+WODisplayGroups by default don't validate changes immediately.
+
+<P>
+
+<B>See Also: 
+</B>
+- <b>saveChanges</B> (in 
+
+<!-- <A HREF="../../eo/EditingContext/EditingContext.html" target=_top>
+
+-->
+
+EOEditingContext),
+
+<!-- 
+
+</a>
+
+-->
+
+- <b>validatesChangesImmediately</B>
+
+<hr>
+<!-- key://apple_ref/occ/instm/WODisplayGroup/sortOrdering meth:sortOrdering descr:<TT>- (NSArray *)<B>sortOrdering</B> </TT> -->
+<H3><a name="//apple_ref/occ/instm/WODisplayGroup/sortOrdering">sortOrdering</a></H3>
+   <TT>- (NSArray *)<B>sortOrdering</B> </TT>
+<P>
+Returns an array of EOSortOrdering objects that <B>updateDisplayedObjects</B> uses to sort the displayed objects, as returned by the <B>displayedObjects</B> method.
+
+<P>
+
+<B>See Also: 
+</b>
+- <b>setSortOrdering:</B>
+
+<hr>
+<!-- key://apple_ref/occ/instm/WODisplayGroup/updateDisplayedObjects meth:updateDisplayedObjects descr:<TT>- (void)<B>updateDisplayedObjects</B> </TT> -->
+<H3><a name="//apple_ref/occ/instm/WODisplayGroup/updateDisplayedObjects">updateDisplayedObjects</a></H3>
+   <TT>- (void)<B>updateDisplayedObjects</B> </TT>
+<P>
+Recalculates the receiver's displayed objects arrays and redisplays. If the delegate responds to <b>displayGroup:displayArrayForObjects:</b>, it's sent this message and the returned array is set as the WODisplayGroup's displayed objects. Otherwise, the receiver applies its qualifier and sort ordering to its array of objects. In either case, any objects that were selected before remain selected in the new displayed object's array.
+
+<P>
+
+<B>See Also:</b> - <b>redisplay</b>, 
+
+- <b>allObjects</b>, 
+
+- <b>displayedObjects</b>, 
+
+- <b>qualifier</b>, 
+
+- <b>selectedObjects</b>, 
+
+- <b>sortOrdering</B>
+
+<hr>
+<!-- key://apple_ref/occ/instm/WODisplayGroup/validatesChangesImmediately meth:validatesChangesImmediately descr:<TT>- (BOOL)<B>validatesChangesImmediately</B> </TT> -->
+<H3><a name="//apple_ref/occ/instm/WODisplayGroup/validatesChangesImmediately">validatesChangesImmediately</a></H3>
+   <TT>- (BOOL)<B>validatesChangesImmediately</B> </TT>
+<P>
+Returns YES if the receiver immediately handles validation errors, or leaves them for the EOEditingContext to handle when saving changes.
+
+<P>
+
+By default, WODisplayGroups don't validate changes immediately.
+
+<P>
+
+<B>See Also:</b> - <b>setValidatesChangesImmediately:</B>
+
+<hr>
+
+
+<a name="delegate"><CENTER><H2>METHODS IMPLEMENTED BY THE DELEGATE</H2></CENTER></a>
+
+
+
+<!-- methKey:displayGroup:createObjectFailedForDataSource(-WODisplayGroup) meth:displayGroup:createObjectFailedForDataSource: descr:<TT>- (void)<b>displayGroup:</b>(WODisplayGroup *)<i>displayGroup</i> <b>createObjectFailedForDataSource:</b><i>dataSource</i>)</TT> -->
+
+<H3><a name="displayGroup:createObjectFailedForDataSource:(-WODisplayGroup)">displayGroup:createObjectFailedForDataSource:</a></H3>
+
+<TT>- (void)<b>displayGroup:</b>(WODisplayGroup *)<I>aDisplayGroup</i> <b>createObjectFailedForDataSource:</b><I>aDataSource</i></TT>
+
+<P>
+
+Invoked from <b>insertObjectAtIndex:</b> to inform the delegate that <i>aDisplayGroup</i> has failed to create a new object for <i>aDataSource</i>. If the delegate doesn't implement this method, the WODisplayGroup instead fails silently. 
+
+<P>
+
+<hr>
+
+<!-- methKey:displayGroup:didDeleteObject(-WODisplayGroup) meth:displayGroup:didDeleteObject: descr:<TT>- (void)<b>displayGroup:</b>(WODisplayGroup *)<i>displayGroup</i> <b>didDeleteObject:</b><i>object</i></TT> -->
+
+<H3><a name="displayGroup:didDeleteObject:(-WODisplayGroup)">displayGroup:didDeleteObject:</a></H3>
+
+<TT>- (void)<b>displayGroup:</b>(WODisplayGroup *)<I>aDisplayGroup</i> <b>didDeleteObject:</b><i>anObject</i></TT>
+
+<P>
+
+Informs the delegate that <i>aDisplayGroup</i> has deleted <i>anObject</i>.
+
+<P>
+
+<hr>
+
+<!-- methKey:displayGroup:didFetchObjects:(-WODisplayGroup) meth:displayGroup:didFetchObjects: descr:<TT>- (void)<b>displayGroup:</b>(WODisplayGroup *)<i>aDisplayGroup</i> <b>didFetchObjects:</b>(NSArray *)<i>objects</i></TT> -->
+
+<H3><a name="displayGroup:didFetchObjects:(-WODisplayGroup)">displayGroup:didFetchObjects:</a></H3>
+
+<TT>- (void)<b>displayGroup:</b>(WODisplayGroup *)<i>aDisplayGroup</i> <b>didFetchObjects:</b>(NSArray *)<i>objects</i></TT>
+
+<P>
+
+Informs the delegate that <i>aDisplayGroup</i> has fetched <i>objects</i>.
+
+<P>
+
+<hr>
+
+<!-- methKey:displayGroup:didInsertObject:(-WODisplayGroup) meth:displayGroup:didInsertObject: descr:<TT>- (void)<b>displayGroup:</b>(WODisplayGroup *)<i>displayGroup</i> <b>didInsertObject:</b><i>object</i></TT> -->
+
+<H3><a name="displayGroup:didInsertObject:(-WODisplayGroup)">displayGroup:didInsertObject:</a></H3>
+
+<TT>- (void)<b>displayGroup:</b>(WODisplayGroup *)<i>aDisplayGroup</i> <b>didInsertObject:</b><i>anObject</i></TT>
+
+<P>
+
+Informs the delegate that <i>aDisplayGroup</i> has inserted <i>anObject</i>.
+
+<P>
+
+<hr>
+
+<!-- methKey:displayGroup:didSetValue:forObject:key:(-WODisplayGroup) meth:displayGroup:didSetValue:forObject:key: descr:<TT>- (void)<b>displayGroup:</b>(WODisplayGroup *)<i>displayGroup</i> <b>didSetValue:</b>(id)<i>value</i> <b>forObject:</b>(id)<i>eo</i> <b>key:</b>(NSString *)<i>key</i></TT> -->
+
+<H3><a name="displayGroup:didSetValue:forObject:key:(-WODisplayGroup)">displayGroup:didSetValue:forObject:key:</a></H3>
+
+<TT>- (void)<b>displayGroup:</b>(WODisplayGroup *)<i>aDisplayGroup</i> <b>didSetValue:</b>(id)<i>value</i> <b>forObject:</b>(id)<i>anObject</i> <b>key:</b>(NSString *)<i>key</i></TT>
+
+<P>
+
+Informs the delegate that <i>aDisplayGroup</i> has altered a property value of <i>anObject</i>. <i>key</i> identifies the property, and <i>value</i> is its new value.
+
+<P>
+
+<hr>
+
+<!-- methKey:displayGroup:displayArrayForObjects:(-WODisplayGroup) meth:displayGroup:displayArrayForObjects: descr:<TT>- (NSArray *)<b>displayGroup:</b>(WODisplayGroup *)<i>displayGroup</i> <b>displayArrayForObjects:</b>(NSArray *)<i>objects</i></TT> -->
+
+<H3><a name="displayGroup:displayArrayForObjects:(-WODisplayGroup)">displayGroup:displayArrayForObjects:</a></H3>
+
+<TT>- (NSArray *)<b>displayGroup:</b>(WODisplayGroup *)<i>aDisplayGroup</i> <b>displayArrayForObjects:</b>(NSArray *)<i>objects</i></TT>
+
+<P>
+
+Invoked from <B>updateDisplayedObjects</b>, this method allows the delegate to filter and sort <i>aDisplayGroup</i>'s array of objects to limit which ones get displayed. <i>objects</i> contains all of <i>aDisplayGroup</i>'s objects. The delegate should filter any objects that shouldn't be shown and sort the remainder, returning a new array containing this group of objects. You can use the NSArray methods <b>filteredArrayUsingQualifier:</b> and <b>sortedArrayUsingKeyOrderingArray:</b> to create the new array.
+
+<P>
+
+If the delegate doesn't implement this method, the WODisplayGroup uses its own qualifier and sort ordering to update the displayed objects array.
+
+<P>
+
+<B>See Also:</b> - <b>displayedObjects</b>, - <b>qualifier</b>, - <b>sortOrdering </B> 
+
+<hr>
+
+<!-- methKey:displayGroup:shouldChangeSelectionToIndexes:(-WODisplayGroup) meth:displayGroup:shouldChangeSelectionToIndexes: descr:<TT>- (BOOL)<b>displayGroup:</b>(WODisplayGroup *)<i>displayGroup</i> <b>shouldChangeSelectionToIndexes:</b>(NSArray *)<i>newIndexes</i></TT> -->
+
+<H3><a name="displayGroup:shouldChangeSelectionToIndexes:(-WODisplayGroup)">displayGroup:shouldChangeSelectionToIndexes:</a></H3>
+
+<TT>- (BOOL)<b>displayGroup:</b>(WODisplayGroup *)<i>aDisplayGroup</i> <b>shouldChangeSelectionToIndexes:</b>(NSArray *)<i>newIndexes</i></TT>
+
+<P>
+
+ Allows the delegate to prevent a change in selection by <i>aDisplayGroup</i>. <i>newIndexes</i> is the proposed new selection. If the delegate returns YES, the selection changes; if the delegate returns NO, the selection remains as it is.
+
+<P>
+
+<hr>
+
+<!-- methKey:displayGroup:shouldDeleteObject:(-WODisplayGroup) meth:displayGroup:shouldDeleteObject: descr:<TT>- (BOOL)<b>displayGroup:</b>(WODisplayGroup *)<i>displayGroup</i> <b>shouldDeleteObject:</b><i>object</i></TT> -->
+
+<H3><a name="displayGroup:shouldDeleteObject:(-WODisplayGroup)">displayGroup:shouldDeleteObject:</a></H3>
+
+<TT><b>displayGroup:</b>(WODisplayGroup *)<i>aDisplayGroup</i> <b>shouldDeleteObject:</b> <i>anObject</i> </TT>
+
+<P>
+
+Allows the delegate to prevent <i>aDisplayGroup</i> from deleting <i>anObject</i>. If the delegate returns YES, <i>anObject</i> is deleted; if the delegate returns NO, the deletion is abandoned.
+
+<P>
+
+<hr>
+
+<!-- methKey:displayGroup:shouldInsertObject:atIndex:(-WODisplayGroup) meth:displayGroup:shouldInsertObject:atIndex: descr:<TT>- (BOOL)<b>displayGroup:</b>(WODisplayGroup *)<i>displayGroup</i> <b>shouldInsertObject:</b><i>object</i> <b>atIndex:</b>(unsigned)<i>newIndex</i></TT> -->
+
+<H3><a name="displayGroup:shouldInsertObject:atIndex:(-WODisplayGroup)">displayGroup:shouldInsertObject:atIndex:</a></H3>
+
+<TT>- (BOOL)<b>displayGroup:</b>(WODisplayGroup *)<i>aDisplayGroup</i> <b>shouldInsertObject:</b><I>anObject</i> <b>atIndex:</b>(unsigned)<I>anIndex</i></TT>
+
+<P>
+
+Allows the delegate to prevent <i>aDisplayGroup</i> from inserting <i>anObject</i> at <i>anIndex</i>. If the delegate returns YES, <i>anObject</i> is inserted; if the delegate returns NO, the insertion is abandoned.
+
+<P>
+
+<hr>
+
+<!-- methKey:displayGroup:shouldRedisplayForEditingContextChangeNotification:(-WODisplayGroup) meth:displayGroup:shouldRedisplayForEditingContextChangeNotification: descr:<TT>- (BOOL)<b>displayGroup:</b>(WODisplayGroup *)<i>displayGroup</i> <b>shouldRedisplayForEditingContextChangeNotification:</b>(NSNotification *)<i>aNotification</i></TT> -->
+
+<H3><a name="displayGroup:shouldRedisplayForEditingContextChangeNotification:(-WODisplayGroup)">displayGroup:shouldRedisplayForEditingContextChangeNotification:</a></H3>
+
+<TT>- (BOOL)<b>displayGroup:</b>(WODisplayGroup *)<I>aDisplayGroup</i> <b>shouldRedisplayForEditingContextChangeNotification:</b>(NSNotification *)<I>aNotification</i></TT>
+
+<P>
+
+Invoked whenever <i>aDisplayGroup</i> receives an EOObjectsChangedInEditingContextNotification, this method allows the delegate to suppress redisplay based on the nature of the change that has occurred. If the delegate returns YES, <i>aDisplayGroup</i> redisplays; if it returns NO, <i>aDisplayGroup</i> doesn't. 
+
+<P>
+
+<B>See Also:</b> - <b>redisplay </B> 
+
+<hr>
+
+<!-- methKey:displayGroup:shouldRefetchForInvalidatedAllObjectsNotification:(-WODisplayGroup) meth:displayGroup:shouldRefetchForInvalidatedAllObjectsNotification: descr:<TT>- (BOOL)<b>displayGroup:</b>(WODisplayGroup *)<i>displayGroup</i> <b>shouldRefetchForInvalidatedAllObjectsNotification:</b>(NSNotification *)<i>aNotification</i></TT> -->
+
+<H3><a name="displayGroup:shouldRefetchForInvalidatedAllObjectsNotification:(-WODisplayGroup)">displayGroup:shouldRefetchForInvalidatedAllObjectsNotification:</a></H3>
+
+<TT>- (BOOL)<b>displayGroup:</b>(WODisplayGroup *)<I>aDisplayGroup</i> <b>shouldRefetchForInvalidatedAllObjectsNotification:</b>(NSNotification *)<I>aNotification</i></TT>
+
+<P>
+
+Invoked whenever <i>aDisplayGroup</i> receives an EOInvalidatedAllObjectsInStoreNotification, this method allows the delegate to suppress the refetching of the invalidated objects. If the delegate returns YES, <i>aDisplayGroup</i> immediately fetches its objects. If the delegate returns NO, <i>aDisplayGroup</i> doesn't immediately fetch, instead delaying until absolutely necessary.
+
+<P>
+
+<B>See Also:</b> - <b>redisplay </B> 
+
+<hr>
+
+<!-- methKey:displayGroupDidChangeDataSource:(-WODisplayGroup) meth:displayGroupDidChangeDataSource: descr:<TT>- (void)<b>displayGroupDidChangeDataSource:</b>(WODisplayGroup *)<i>displayGroup</i></TT> -->
+
+<H3><a name="displayGroupDidChangeDataSource:(-WODisplayGroup)">displayGroupDidChangeDataSource:</a></H3>
+
+<TT>- (void)<b>displayGroupDidChangeDataSource:</b>(WODisplayGroup *)<I>aDisplayGroup</i></TT>
+
+<P>
+
+Informs the delegate that <i>aDisplayGroup</i>'s EODataSource has changed.
+
+<P>
+
+<hr>
+
+<!-- methKey:displayGroupDidChangeSelectedObjects:(-WODisplayGroup) meth:displayGroupDidChangeSelectedObjects: descr:<TT>- (void)<b>displayGroupDidChangeSelectedObjects:</b>(WODisplayGroup *)<i>displayGroup</i></TT> -->
+
+<H3><a name="displayGroupDidChangeSelectedObjects:(-WODisplayGroup)">displayGroupDidChangeSelectedObjects:</a></H3>
+
+<TT>- (void)<b>displayGroupDidChangeSelectedObjects:</b>(WODisplayGroup *)<I>aDisplayGroup</i></TT>
+
+<P>
+
+Informs the delegate that <i>aDisplayGroup</i>'s selected objects have changed, regardless of whether the selection indexes have changed.
+
+<P>
+
+<hr>
+
+<!-- methKey:displayGroupDidChangeSelection:(-WODisplayGroup) meth:displayGroupDidChangeSelection: descr:<TT>- (void)<b>displayGroupDidChangeSelection:</b>(WODisplayGroup *)<i>displayGroup</i></TT> -->
+
+<H3><a name="displayGroupDidChangeSelection:(-WODisplayGroup)">displayGroupDidChangeSelection:</a></H3>
+
+<TT>- (void)<b>displayGroupDidChangeSelection:</b>(WODisplayGroup *)<I>aDisplayGroup</i></TT>
+
+<P>
+
+Informs the delegate that <i>aDisplayGroup</i>'s selection has changed.
+
+<P>
+
+<hr>
+
+<!-- methKey:displayGroupShouldFetch:(-WODisplayGroup) meth:displayGroupShouldFetch: descr:<TT>- (BOOL)<b>displayGroupShouldFetch:</b>(WODisplayGroup *)<i>displayGroup</i></TT> -->
+
+<H3><a name="displayGroupShouldFetch:(-WODisplayGroup)">displayGroupShouldFetch:</a></H3>
+
+<TT>- (BOOL)<b>displayGroupShouldFetch:</b>(WODisplayGroup *)<I>aDisplayGroup</i></TT>
+
+<P>
+
+Allows the delegate to prevent <i>aDisplayGroup</i> from fetching. If the delegate returns YES, <i>aDisplayGroup</i> performs the fetch; if the delegate returns NO, <i>aDisplayGroup</i> abandons the fetch.
+
+<P>
+
+<hr>
+
+</body>
+</html>

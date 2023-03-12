@@ -1,0 +1,209 @@
+<html><head><title>Behind the Scenes</title></head>
+<body bgcolor="#ffffff">
+
+<!--start of banner -->
+<!--#include virtual="/includes/framesetheader" -->
+<!-- end of banner -->
+
+<!--start of path -->
+<font face="Geneva,Helvetica,Arial" size="1">
+<b>PATH<spacer type="horizontal" size="5">&nbsp;</b>
+ <a href="../../../../../webobjects.html" target="_top">WebObjects 4.0 Documentation</a> <b>&gt;</b>
+ <a href="GuideTOC.html" target="_top">EOF Developer's Guide</a>
+</font>
+<br><br>
+<!--end of path -->
+
+ 
+<a href="BehindSc.html"><IMG SRC="ArrowUp.gif">Table of Contents</a> <a href="BehindSc2.html"><IMG SRC="ArrowLeft.gif">Previous Section</a>
+ 
+<a name="241">
+<h1> Saving Changes</h1>
+</a><a name="758">
+In a running application, the changes users make to objects are reflected in the object graph managed by an EOEditingContext and in the user interface. However, the database isn't updated to reflect these changes until there is an explicit request (typically issued by the user) to save. The &#32;sequence of events in a save operation is illustrated in <a href="BehindSc3.html#460">Figure &#32;52</a>.<p>
+</a><a name="460">
+<p><img src="BehindSc4.gif"><p>
+</a><a name="461">
+<p>Figure 52.	  Saving to the Database<p>
+</a><a name="4595">
+When an EOEditingContext receives a request to save in the form of &#32;a &#32;<strong>saveChanges</strong> message, the following sequence of events occurs:<p>
+</a><ol>
+<a name="236">
+<P><li>The editing context sends it editors and delegates the message <strong>editingContextWillSaveChanges</strong>.
+</a><a name="237">
+<P><li>The editing context processes, propagates, and validates deletes.
+</a><a name="238">
+<P><li>The editing context processes and validates changes for saving.
+</a><a name="2816">
+<P><li>The editing context commits the changes made to its objects to &#32;its &#32;parent object store by sending the parent the message <strong>saveChangesInEditingContext</strong> (<strong>saveChangesInEditingContext:</strong> in &#32;Objective-C). If the editing context is not nested, its parent is &#32;typically an EOObjectStoreCoordinator. When an EOObjectStoreCoordinator receives this message, it guides its EOCooperatingObjectStores through a multi-pass save protocol in &#32;which each cooperating store saves its own changes and forwards remaining changes to other cooperating stores.
+</a><a name="233">
+<P><li>After it receives the message <strong>saveChangesInEditingContext</strong>, the object store coordinator sends each of its cooperating stores a <strong>prepareForSaveWithCoordinator</strong> message (<strong>prepareForSaveWithCoordinator:editingContext:</strong> in Objective-C), which informs them that a multi-pass save operation is beginning. When the cooperating store is an EODatabaseContext, it takes this opportunity to generate primary keys for any new objects in the editing context.
+</a><a name="753">
+<P><li>The coordinator sends each of its cooperating stores the message <strong>recordChangesInEditingContext</strong>, which prompts them to examine the changed objects in the editing context, record any operations that need to be performed, and notify the coordinator of any changes that need to be forwarded to other cooperating stores. For &#32;example, if in its <strong>recordChangesInEditingContext</strong> method one &#32;cooperating store notices the removal of an object from an "owning" relationship but that object belongs to another cooperating store, it informs the other store by sending the coordinator a <strong>forwardUpdateForObject </strong>message<strong> </strong>(<strong>forwardUpdateForObject:changes:</strong> in Objective-C). 
+</a><a name="754">
+<P><li>The coordinator sends each of its cooperating stores the message <strong>performChanges</strong>. This tells the stores to transmit their changes to &#32;their underlying databases. When the cooperating store is an EODatabaseContext, it responds to this message by taking the EODatabaseOperations that were constructed in the previous step, constructing EOAdaptorOperations from them, and giving the EOAdaptorOperations to an available EOAdaptorChannel for execution.
+</a><a name="755">
+<P><li>If <strong>performChanges</strong> fails for any of the EOCooperatingObjectStores, all stores are sent the message <strong>rollbackChanges</strong>.
+</a><a name="756">
+<P><li>If <strong>performChanges</strong> succeeds for all EOCooperatingObjectStores, the receiver sends them the message <strong>commitChanges</strong>, which has the effect of telling the adaptor to commit the changes. 
+</a><a name="757">
+<P><li>If <strong>commitChanges</strong> fails for a particular cooperating store, that store and all subsequent ones are sent the message <strong>rollbackChanges</strong>. However, the stores that have already committed their changes do &#32;not roll back. In other words, the EOObjectStoreCoordinator doesn't perform the two-phase commit protocol necessary to guarantee consistent distributed update.
+</a><a name="418">
+<P><li>If the save operation was successful, the editing context updates its object snapshots.
+</a><a name="2690">
+<P><li>Once it has committed its changes to its parent object store, the editing context posts the EditingContextDidSaveChangesNotification (EOEditingContextDidSaveChangesNotification in Objective-C).
+</a></ol>
+<a name="7074">
+<h3> Customizing Framework Behavior</h3>
+</a><a name="7106">
+You can customize the behavior a save operation by assigning delegates to EOEditingContext and EOAdaptorChannel, and implementing the any of the following delegate methods. 
+<Table Border="3">
+<caption></caption>
+<tr><th colspan=3 rowspan=1><a name="7225">
+EOEditingContext Delegate Methods &#32;
+</a></th></tr>
+<tr><th><a name="7231">
+Java Method
+</a></th><th><a name="7233">
+Objective-C Method
+</a></th><th><a name="7235">
+Description
+</a></th></tr>
+<tr><td scope="row"><a name="7237">
+editingContext<br>ShouldValidateChanges
+</a></td><td><a name="7239">
+editingContext<br>ShouldValidateChanges:
+</a></td><td><a name="7241">
+This method is invoked when an EOEditingContext receives a saveChanges message. If the delegate returns <strong>false</strong> (NO), changes are saved without first performing validation. You can use this method to provide your own validation mechanism.
+</a></td></tr>
+<tr><td scope="row"><a name="7243">
+ editingContext<br>WillSaveChanges
+</a></td><td><a name="7247">
+editingContext<br>WillSaveChanges:
+</a></td><td><a name="7249">
+This method is invoked when an EOEditingContext receives a saveChanges message. You can use this method to perform other pre-save validation.
+</a></td></tr>
+
+</Table>
+
+<Table>
+<tr><td scope="row">
+</Table>
+ 
+<Table Border="3">
+<caption></caption>
+<tr><th colspan=3 rowspan=1><a name="8554">
+EOAdaptorChannel Delegate Methods
+</a></th></tr>
+<tr><th><a name="8560">
+Java Method
+</a></th><th><a name="8562">
+Java Method
+</a></th><th><a name="8564">
+Description
+</a></th></tr>
+<tr><td scope="row"><a name="8566">
+databaseContextWillOrder<br>AdaptorOperations
+</a></td><td><a name="8568">
+databaseContext:<br>willOrder<br>AdaptorOperations<br>FromDatabaseOperations:
+</a></td><td><a name="8570">
+This method is invoked when EODatabaseContext receives a performChanges message. You can use this method to construct your own adaptor operations, for instance, possibly transform a delete operation into an update, or a stored procedure invocation.
+</a></td></tr>
+<tr><td scope="row"><a name="8572">
+databaseContext<br>WillPerform<br>AdaptorOperations
+</a></td><td><a name="8574">
+databaseContext:<br>willPerform<br>AdaptorOperations:<br>adaptorChannel:
+</a></td><td><a name="8576">
+This method is invoked from the EODatabaseContext performChanges method. This method is useful for applications that need a special ordering of adaptor operations; for example, to avoid violating any database referential integrity constraints.
+</a></td></tr>
+
+</Table>
+
+<Table>
+<tr><td scope="row">
+</Table>
+<p>
+</a><a name="7163">
+You can also register to receive the notifications listed below 
+<Table Border="3">
+<caption></caption>
+<tr><th colspan=2 rowspan=1><a name="7147">
+EOEditingContext Notifications
+</a></th></tr>
+<tr><th><a name="7151">
+Notification
+</a></th><th><a name="7153">
+Description
+</a></th></tr>
+<tr><td scope="row"><a name="7155">
+EditingContextDidSaveChangesNotification
+</a><a name="7156">
+(EOEditingContextDidSaveChangesNotification in Objective-C)
+</a></td><td><a name="7158">
+This notification is broadcast after changes are saved to the editing context's parent object store.
+</a></td></tr>
+<tr><td scope="row"><a name="7160">
+ObjectsChangedInStoreNotification (EOObjectsChangedInStoreNotification in Objective-C)
+</a></td><td><a name="7162">
+This notification is broadcast by the database context when object updates are committed to the database.
+</a></td></tr>
+
+</Table>
+
+<Table>
+<tr><td>
+</Table>
+<p>
+</a><a name="7166">
+<h2> Locking and Update Strategies</h2>
+</a><a name="785">
+An update operation includes the following ingredients:<p>
+</a><ul><a name="4376">
+<p><li>An enterprise object whose data values have been changed
+</a><a name="4377">
+<p><li>A means of identifying the row in the database that corresponds to the object
+</a><a name="4380">
+<p><li>A strategy for handling update conflicts-either by preventing them from occurring, or by detecting and handling them when they do occur. 
+</a></ul><a name="4381">
+There must also be a transaction in progress.<p>
+</a><a name="786">
+The "means of identifying" a row is the primary key or global ID.<p>
+</a><a name="245">
+An <em>update strategy</em> determines how updates should be made in the face of &#32;changes by others. For example, one strategy is to lock a row when it is &#32;read so that no one else can change it until you're done with it; this is called <em>pessimistic locking</em>. Another strategy is to compare the state of a row as you fetched it-that is, the row's snapshot-with the database row at update time to confirm that the database row hasn't been changed by &#32;someone else. This is called <em>optimistic locking</em>, because it assumes a conflicting update won't occur, but does check at the last minute. You can &#32;set your update strategy using the EODatabaseContext method <strong>setUpdateStrategy</strong> (<strong>setUpdateStrategy:</strong> in Objective-C). Optimistic locking is the default.<p>
+</a><a name="4516">
+Enterprise Objects Framework also supports "on-demand" locking, in which specific optimistic locks can be promoted to database locks during the course of program execution. In other words, you can lock single objects. There are three ways to use on-demand locking. Use the EODatabaseContext method <strong>lockObjectWithGlobalID</strong> (<strong>lockObjectWithGlobalID:editingContext: </strong>in Objective-C) to lock a database row for a particular object. Use the EODatabaseContext method <strong>objectsWithFetchSpecification</strong> (<strong>objectsWithFetchSpecification:editingContext:</strong> in Objective-C) with a &#32;fetch specification that's configured to lock rows as they're fetched. Or &#32;use the EOEditingContext method <strong>lockObject</strong> (<strong>lockObject:</strong> in Objective-C).<p>
+</a><a name="3158">
+<h3> Handling Conflicts</h3>
+</a><a name="3159">
+The locking approach you use determines at what point conflicts are detected and how you can handle them.<p>
+</a><ul><a name="3164">
+<p><li>Pessimistic locking
+</a><a name="3165">
+<p>When you use pessimistic locking, conflicts are detected as soon as &#32;you fetch a row. This is because when you fetch a row with pessimistic locking, you attempt to put a lock on it. If someone else has a lock on the row, the lock (and hence, the fetch operation) is refused. Your application can display a panel at that point telling the user to try again later. <p>
+</a><a name="3174">
+<p>Since pessimistic locking puts a lock on a row when it fetches it, you can generally assume that you won't experience conflicts when you save changes. However, this behavior is ultimately dependent on how the database server handles locks.<p>
+</a><a name="3202">
+<p><li>Optimistic locking
+</a><a name="3203">
+<p>When you use optimistic locking, conflicts aren't detected until you attempt to save. At that point, the database row is checked against the snapshot to make sure the row hasn't changed. If the row and the snapshot don't match, the save operation is aborted, the transaction is rolled back, and an exception is thrown. To &#32;handle the error you can catch the exception, refresh the conflicted object from the updated database data, and save again.<p>
+</a><a name="3204">
+<p><li>On-demand locking
+</a><a name="3205">
+<p>On-demand locking mixes characteristics of both pessimistic and optimistic locking. With on-demand locking, you've already fetched the object, and you're trying to get a lock on it after the fact. When you try to get a lock on the object's corresponding database row, you can get a failure for one of two reasons: either because the row doesn't match the snapshot (optimistic locking), or because someone else has a lock on the row on the server (pessimistic locking).<p>
+</a><a name="3208">
+<p>When on-demand locking fails for either reason, it throws an exception. To handle the error you can catch the exception, refresh the conflicted object from the updated database data, and try to get a lock on it again.<p>
+</a><a name="3219">
+<p>As with pessimistic locking, because on-demand locking locks the row, you can generally assume that you won't experience conflicts when you save changes. Again, this behavior is ultimately dependent on how the database server handles locks.<p>
+</a></ul>
+<P>
+ 
+<a href="BehindSc.html"><IMG SRC="ArrowUp.gif">Table of Contents</a> <a href="BehindSc4.html"><IMG SRC="ArrowRight.gif">Next Section</a>
+<P>
+
+
+<!--start of footer -->
+<!--#include virtual="/includes/framesetfooter" -->
+<!-- end of footer -->
+
+</body>
+</html>

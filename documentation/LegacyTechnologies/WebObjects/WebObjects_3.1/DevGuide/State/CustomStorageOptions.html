@@ -1,0 +1,83 @@
+<BODY bgcolor=#FFFFFF>
+<P><A HREF="ManagingState.book.html"><IMG SRC="ArrowUp.gif" border=0>Table of Contents</A>
+<A HREF="StateInCookies.html"><IMG SRC="ArrowLeft.gif" border=0>Previous Section</A>
+<!-- This file was created with the fm2html filter.
+The filter is copyright Norwegian Telecom Research and
+was programmed by Jon Stephenson von Tetzchner. -->
+
+
+<H1><A NAME="REF17283">Custom State Storage Options</A></H1>
+<P>WebObjects provides direct support for storing state in the application, in the page, and in cookies. In addition, you can implement your own state storage---for example, you might want to store state in a file or database. The SessionStores application provides an example of a state storage mechanism that uses the filesystem. Let's take a look at how it's done.
+<P>In WebObjects, an application saves and restores sessions by sending the session store object these messages:
+
+<UL>
+<LI>saveSession:
+<LI>restoreSession
+</UL>
+
+
+<P>This is the minimum interface that a custom session store must present to the application object. In the SessionStores example, the custom storage class FileSessionStore presents this interface:
+<PRE>@interface FileSessionStore:NSObject  {
+    id archiveDirectory;
+}
+- init;
+- archiveFileForSessionID:aSessionID;
+- archiveForSessionID:aSessionID;
+- restoreSession;
+- saveSession:aSession;
+@end<BR></PRE>
+<P>These methods have the following implementation:
+<PRE>@implementation FileSessionStore
+
+- init {
+    self = [super init];
+    archiveDirectory = [WOApp pathForResourceNamed:@"SessionArchives" ofType:nil];
+    return self;
+}
+
+- archiveFileForSessionID:aSessionID {
+    return [NSString stringWithFormat:@"%@/%@", archiveDirectory, aSessionID];
+}
+
+- archiveForSessionID:aSessionID {
+    id archiveFile = [self archiveFileForSessionID:aSessionID];
+    return [NSData dataWithContentsOfFile:archiveFile];
+}
+
+- restoreSession {
+    id request = [[WOApp context] request];
+    id archivedSession;
+    id restoredSession;
+    
+    // Allow requests in this session to go to any application instance.
+    [[WOApp context] setDistributionEnabled:YES];
+    
+    // Get archived session (as an NSData object)
+    archivedSession = [self archiveForSessionID:[request sessionID]];
+    
+    // Unarchive session
+    restoredSession = [NSUnarchiver unarchiveObjectWithData:archivedSession];
+    return restoredSession;
+}
+
+- saveSession:aSession {
+    id request = [[WOApp context] request];
+    
+    // Store data corresponding to session only if necessary.
+    if (![aSession isTerminating] &amp;&amp; ![request isFromClientComponent]) {
+      id sessionData = [NSArchiver archivedDataWithRootObject:aSession];
+      id sessionFilePath = [self archiveFileForSessionID:[aSession sessionID]];
+      [sessionData writeToFile:sessionFilePath atomically:YES];
+    }
+}
+
+@end</PRE>
+
+
+<P>As you can see, when the FileSessionStore receives a <B>saveSession:</B> message, it checks to see if the session object needs to be archived, and if so, it asks NSArchiver to create a binary archive of the session object and all of the components it contains. It then invokes its own<B> archiveFileForSessionID:</B> to determine the path for the archive file. Finally, it writes the data to the file. Notice that the session data is written to a file whose name is the session ID itself.
+
+<P>FileSessionStore <B>restoreSession</B> is responsible for restoring the state for a particular session. An interesting point in the <B>restoreSession</B> method implementation is the <B>setDistributionEnabled:</B> message to the application object. By enabling distribution, you let any instance of the application process handle a request. (See <I>Serving WebObjects</I> for information on using multiple application instances as a means of load balancing.) More specifically, if distribution is enabled, the application instance number is not appended to the response URL. Since session state is store in the file system and not in the application's memory, it's possible for any application instance to handle any request.
+
+<P><A HREF="ManagingState.book.html"><IMG SRC="ArrowUp.gif" border=0>Table of Contents</A>
+<A HREF="StateForCustomObjects.html"><IMG SRC="ArrowRight.gif" border=0>Next Section</A>
+</BODY >

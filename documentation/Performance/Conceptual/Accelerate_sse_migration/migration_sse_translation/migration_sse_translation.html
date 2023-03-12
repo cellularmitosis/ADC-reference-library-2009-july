@@ -1,0 +1,1249 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+<head>
+	<title>AltiVec/SSE Migration Guide: Translating Altivec to SSE</title>
+	<meta id="Generator" name="Generator" content="Gutenberg"/>
+	<meta id="GeneratorVersion" name="GeneratorVersion" content="v132"/>
+	<meta http-equiv="content-type" content="text/html;charset=utf-8"/>
+	<meta id="Copyright" name="Copyright" content="Copyright 2009 Apple Inc. All Rights Reserved."/>
+	<meta id="IndexTitle" name="IndexTitle" content="Translating Altivec to SSE"/>
+	<meta id="xcode-display" name="xcode-display" content="render"/>
+	<meta id="toc-file" name="toc-file" content="../toc.html"/>
+	<meta id="RESOURCES" content="../../../../Resources" />
+	
+	<link rel="stylesheet" type="text/css" href="../../../../Resources/CSS/frameset_styles.css"/>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/lib/prototype.js"></script>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/lib/scriptaculous.js"></script>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/page.js"></script>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/pedia.js"></script>
+	<!--[if lte IE 6]>
+		<style type="text/css">
+			/*<![CDATA[*/ 
+			html {overflow-x:auto; overflow-y:hidden;  }
+			/*]]>*/
+		</style>
+	<![endif]-->
+</head>    
+<body bgcolor="#ffffff" onload="initialize_page();"><a name="//apple_ref/doc/uid/TP40002729-CH248" title="Translating Altivec to SSE"></a>
+    <noscript>
+    <div id="tocMenu">
+        <iframe id="toc_content" name="toc_content" SRC="../toc.html" width="210" height="100%" align="left" frameborder="0">This document set is best viewed in a browser that supports iFrames.</iframe>
+    </div>
+    </noscript>
+    <div id="bodyText">
+        <a name="top"></a>
+        <div class="hideOnPrint hideInXcode">
+        <!-- start of header -->
+        <!--#include virtual="/includes/framesetheader" -->
+        <!-- end of header -->
+        </div>
+        
+        <!-- start of path -->
+<div class="breadcrumb hideOnPrint hideInXcode"><a href="http://developer.apple.com/" target="_top">ADC Home</a> &gt; <a href="../../../../../referencelibrary/index.html#//apple_ref/doc/uid/TP30000943" target="_top">Reference Library</a> &gt; <a href="../../../../index.html#//apple_ref/doc/uid/TP30000440" target="_top">Guides</a> &gt; <a href="../../../index.html#//apple_ref/doc/uid/TP30000440-TP30000430" target="_top">Performance</a> &gt; <a href="../../../VelocityEngine-date.html#//apple_ref/doc/uid/TP30000440-TP30000430-TP30000587" target="_top">Vector Engines</a> &gt; <a href="../migration_intro/migration_intro.html#//apple_ref/doc/uid/TP40002729-CH204-DontLinkElementID_1">AltiVec/SSE Migration Guide</a> &gt; </div><br class="hideInXcode"/><!-- end of path -->
+        
+        <div class="mini_nav_text" align="left">
+        <span class="navButtons">
+        <a href="../migration_sse_C/migration_sse_C.html">&lt; Previous Page</a><span style="margin-left: 8px"><a href="../migration_revhx/migration_revhx.html">Next Page &gt;</a></span>
+        </span>
+        <span id="showHideTOCUpperSpan">
+        <a href="#" onclick="showHideTOC();"><img src="../../../../Resources/Images/show_toc_icon.gif" width="15" height="14" border="0" style="margin-bottom: -2px;" alt="" hideText="Hide TOC" showText="Show TOC" /></a> <a href="#" onclick="showHideTOC();">Hide TOC</a>
+        </span>
+        </div>
+
+        <hr />
+        
+        
+        <a name="//apple_ref/doc/uid/TP40002729-CH248-DontLinkElementID_11" title="Translating Altivec to SSE"></a><h1><a name="//apple_ref/doc/uid/TP40002729-CH248-TPXREF101" title="Translating Altivec to SSE"></a>Translating Altivec to SSE</h1>
+<p>Translating AltiVec to SSE is not especially difficult to do. There is "pretty good" instruction parity between the two. AltiVec has more operations, but generally speaking, the operations that SSE provides mostly match up 1:1 with AltiVec equivalents. So, for example, where AltiVec has a <code><!--a-->vadduwm<!--/a--></code> (vector add, unsigned word modulo — 32-bit int modulo add), SSE2 has a <code><!--a-->PADDD<!--/a--></code> (Packed ADD Doubleword). Similar parity exists over the 60 or 70% of the AltiVec ISA that is the most commonly used part of AltiVec. In many cases, where the SSE ISA comes up short, there is a 2-3 instruction work around to deliver the same results. However, in some especially difficult cases, a new algorithm may be required.</p>
+<p>Because both architectures share the same fundamental design (128-bit SIMD that prefers 16 byte aligned data), the work required beyond simple coding of intrinsics to make use of the two vector architectures is quite similar. Principally, these are development of parallel algorithms, changing data layouts, and dealing with misalignment. In our experience translating AltiVec to SSE for Accelerate.framework, this was by far the most time consuming part of writing the AltiVec segment. All of this work is directly reusable without further effort for the SSE version. As a result, translating AltiVec to SSE has taken perhaps 10-20% of the time that it took to vectorize for AltiVec in the first place for Accelerate.framework. This allows us to support both architectures in Accelerate.framework with a minimum of extra effort. Hopefully your experience will be similar.</p>
+
+<!-- This template is being used for both PDF and HTML. -->
+
+    
+    <h4>In this section:</h4>
+    
+    
+    <p class="blockquote">
+    
+        
+			
+			
+				<a href="migration_sse_translation.html#//apple_ref/doc/uid/TP40002729-CH248-279676">Translating Floating Point Operations</a>
+				
+			<br/>
+			
+        
+			
+			
+				<a href="migration_sse_translation.html#//apple_ref/doc/uid/TP40002729-CH248-288630">Translating Integer Operations</a>
+				
+			<br/>
+			
+        
+			
+			
+				<a href="migration_sse_translation.html#//apple_ref/doc/uid/TP40002729-CH248-311165">Translating Compare Operations</a>
+				
+			<br/>
+			
+        
+			
+			
+				<a href="migration_sse_translation.html#//apple_ref/doc/uid/TP40002729-CH248-301149">Translating Conversion Operations</a>
+				
+			<br/>
+			
+        
+			
+			
+				<a href="migration_sse_translation.html#//apple_ref/doc/uid/TP40002729-CH248-312317">Translating Permute Operations</a>
+				
+			<br/>
+			
+        
+			
+			
+				<a href="migration_sse_translation.html#//apple_ref/doc/uid/TP40002729-CH248-312704">Loads and Stores</a>
+				
+			<br/>
+			
+        
+			
+			
+				<a href="migration_sse_translation.html#//apple_ref/doc/uid/TP40002729-CH248-311761">Performance Tips</a>
+				
+			<br/>
+			
+        
+
+    </p><br/>
+
+<a name="//apple_ref/doc/uid/TP40002729-CH248-279676" title="Translating Floating Point Operations"></a><h2>Translating Floating Point Operations</h2>
+<p>Both AltiVec and SSE do single precision floating point arithmetic. SSE2 also does double precision floating point arithmetic. Finally, for each packed vector floating point operation on SSE or SSE2, there is also a scalar version that can be done by the vector unit that operates on only one element in the vector:</p><a name="//apple_ref/doc/uid/TP40002729-CH248-DontLinkElementID_12" title="Table 3-1Floating Point Capabilities of AltiVec and SSE"></a><div class="tableholder"><table class="graybox" border = "0" cellspacing="0" cellpadding="5">
+<caption class="tablecaption"><a name="//apple_ref/doc/uid/TP40002729-CH248-279688" title="Table 3-1Floating Point Capabilities of AltiVec and SSE"></a><strong>Table 3-1&nbsp;&nbsp;</strong>Floating Point Capabilities of AltiVec and SSE</caption>
+
+<tr>
+<th scope="col" align="left" style="font-weight: bold" bgcolor="#CCCCCC"><p></p></th>
+<th scope="col" align="left" style="font-weight: bold" bgcolor="#CCCCCC"><p>packed vector</p></th>
+<th scope="col" align="left" style="font-weight: bold" bgcolor="#CCCCCC"><p>scalar on vector</p></th>
+</tr>
+
+
+<tr>
+<td  scope="row"><p>float</p></td>
+<td ><p>AltiVec + SSE</p></td>
+<td ><p>SSE</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>double</p></td>
+<td ><p>SSE2</p></td>
+<td ><p>SSE2</p></td>
+</tr>
+
+</table></div>
+<p>The scalar-on-vector feature is used by MacOS X on Intel to do most scalar floating point arithmetic. So, if you write a normal floating point expression, such as <code>float a = 2.0f;</code> that will be done on XMM. (For compiler illuminati, the GCC compiler flag, <code>-mfpmath=sse</code>, is on by default.) Single and double precision scalar floating point arithmetic is done on the SSE unit both for speed and also so as to deliver computational results much more like those obtained from PowerPC. The legacy x87 scalar floating point unit is still used for long double, because of its enhanced precision.</p>
+<p>Please note that the results of floating point calculations will likely not be exactly the same between PowerPC and Intel, because the PowerPC scalar and vector FPU cores are designed around a fused multiply add operation. The Intel chips have separate multiplier and adder, meaning that those operations must be done separately. This means that for some steps in a calculation, the Intel CPU may incur an extra rounding step, which may introduce 1/2 ulp errors at the multiplication stage in the calculation. Please note that in cases involving catastrophic cancellation, this may give results that are vastly different after the addition or subtraction has completed.</p>
+<p><em>SSE Floating Point Environment</em></p>
+<p>The floating point environments on SSE and AltiVec are very similar. Both vector floating point units are heavily influenced by IEEE-754. Both units store their data in IEEE-754 floating point format, though, in memory, the Intel architecture stores the bytes in little endian order. Both deliver nearly the same feature set of correctly rounded basic operations, such as addition, subtraction and multiplication. (Intel is slightly richer.) For more complicated functions such as the vector versions of the standard libm transcendental operations (<code><!--a-->sin()<!--/a--></code>, <code><!--a-->cos()<!--/a--></code>, <code><!--a-->pow()<!--/a--></code>, etc.), look to Accelerate.framework. (<code>#include &lt;Accelerate/Accelerate.h></code>). Accelerate.framework actually provides this class of operations in two different flavors:</p>
+<ul class="ul"><li class="li"><p>For simple long array computation, look to vForce.h, new for MacOS X.4.</p></li>
+<li class="li"><p>For vector transcendentals involving 128-bit SIMD vectors, look to vfp.h (available on all MacOS X versions).</p></li></ul>
+<p>When it comes to other aspects of IEEE-754 compliance, SSE is a bit of a step up. While AltiVec delivers the Java subset of IEEE-754, the Intel vector unit is a fully IEEE-754 compliant machine, delivering full rounding modes, exceptions and flags.</p>
+<p>A feature comparison chart follows:</p><a name="//apple_ref/doc/uid/TP40002729-CH248-DontLinkElementID_13" title="Table 3-2Features: AltiVec vs. SSE"></a><div class="tableholder"><table class="graybox" border = "0" cellspacing="0" cellpadding="5">
+<caption class="tablecaption"><a name="//apple_ref/doc/uid/TP40002729-CH248-279800" title="Table 3-2Features: AltiVec vs. SSE"></a><strong>Table 3-2&nbsp;&nbsp;</strong>Features: AltiVec vs. SSE</caption>
+
+<tr>
+<th scope="col" align="left" style="font-weight: bold" bgcolor="#CCCCCC"><p></p></th>
+<th scope="col" align="left" style="font-weight: bold" bgcolor="#CCCCCC"><p>AltiVec</p></th>
+<th scope="col" align="left" style="font-weight: bold" bgcolor="#CCCCCC"><p>SSE</p></th>
+</tr>
+
+
+<tr>
+<td  scope="row"><p>rounding modes</p></td>
+<td ><p>round to nearest only</p></td>
+<td ><p>all four (nearest, zero, Inf, -Inf)</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>exceptions</p></td>
+<td ><p>denormals</p></td>
+<td ><p>all IEEE-754 + denormals</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>flags</p></td>
+<td ><p>none</p></td>
+<td ><p>all IEEE-754 + denormals</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>square root</p></td>
+<td ><p>software</p></td>
+<td ><p>hardware</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>divide</p></td>
+<td ><p>software</p></td>
+<td ><p>hardware</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>compare bounds</p></td>
+<td ><p>yes</p></td>
+<td ><p>no</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>log2(x) and 2^x estimates</p></td>
+<td ><p>yes</p></td>
+<td ><p>no</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>reciprocal estimate</p></td>
+<td ><p>yes</p></td>
+<td ><p>yes</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>reciprocal sqrt estimate</p></td>
+<td ><p>yes</p></td>
+<td ><p>yes</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>scalar on vector</p></td>
+<td ><p>no</p></td>
+<td ><p>yes</p></td>
+</tr>
+
+</table></div>
+<p>All hardware supported operations (that aren't estimates) are correctly rounded to 24 bits (float) or 53 bits (double) of precision. (The other 9/12 bits are used for exponent and sign information, exactly like PowerPC.) The accuracy of the estimates is very close to that of AltiVec, approximately 12 bits for reciprocal estimate and reciprocal square root estimate.</p>
+<p><em>Denormal Handling</em></p>
+<p>Neither AltiVec or SSE currently provide fast hardware support for denormals. In each case, a vector status and control register is available, with some bits that can be changed to turn on and off denormal handling. If denormal handling is turned on on a PowerPC machine and a denormal is encountered, the calculation is handled in a fast kernel trap. On a SSE enabled Intel chip the denormal is handled in hardware. As shown below, the denormal is expensive to handle in both cases:</p><a name="//apple_ref/doc/uid/TP40002729-CH248-DontLinkElementID_14" title="Table 3-3Costs of Denormal Handling"></a><div class="tableholder"><table class="graybox" border = "0" cellspacing="0" cellpadding="5">
+<caption class="tablecaption"><a name="//apple_ref/doc/uid/TP40002729-CH248-279946" title="Table 3-3Costs of Denormal Handling"></a><strong>Table 3-3&nbsp;&nbsp;</strong>Costs of Denormal Handling</caption>
+
+<tr>
+<th scope="col" align="left" style="font-weight: bold" bgcolor="#CCCCCC"><p></p></th>
+<th scope="col" align="left" style="font-weight: bold" bgcolor="#CCCCCC"><p>G5</p></th>
+<th scope="col" align="left" style="font-weight: bold" bgcolor="#CCCCCC"><p>Pentium 4 (P4 660)</p></th>
+</tr>
+
+
+<tr>
+<td  scope="row"><p>By default, denormals are:</p></td>
+<td ><p>OFF</p></td>
+<td ><p>ON</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>Cost for handling a denormal:</p></td>
+<td ><p>1100 cycles</p></td>
+<td ><p>1550 cycles</p></td>
+</tr>
+
+</table></div>
+<p>In the table above, OFF means denormals are not handled; they are flushed to zero. ON means denormals are handled, with a 1100-1550 cycle penalty.</p>
+<p>If one turns off denormal handling, then the two machines flush the denormals to zero and proceed as if the data they are operating on is zero. This path operates at the same cost as arithmetic on normalized numbers, at the expense of incorrect results for denormalized inputs or outputs (which are flushed to zero).</p>
+<p>Historical use of denormals has been varied. Under MacOS 9, operating system handling of denormals was on by default, meaning that ever time you hit a denormal on MacOS 9, the machine would take a large stall while the correct result was calculated for the vector unit by the operating system. MacOS X for PowerPC ships with denormals off for AltiVec by default. (We did explore turning them on briefly in the safety and comfort of our own test labs in order to deliver more correct results for MacOS X.3, but found we were breaking some 3rd party audio code with real time data delivery needs.) However, denormal handling is on by default for PowerPC scalar floating point, where denormals are handled in hardware at no additional cost.</p>
+<p>Under MacOS X for Intel, denormal handling is back ON by default. This is required for standards compliant operation of normal scalar floating point code, which, if you will recall, is being done by the vector unit. Since the SSE vector status and control register (MXCSR) does not differentiate between scalar and vector operations done on the vector engine, this means that the denormal handling is on by default for packed vector arithmetic too.</p>
+<p>If you are writing code with real time delivery needs, especially audio code, you may consider turning denormals off. Please be aware that if you do so, your code, both scalar and vector (except long double) will flush denormals to zero, meaning that strictly speaking, the results will be incorrect for the set of denormalized numbers. For certain classes of computations, particularly audio, this is generally not a problem — listeners are likely unable to hear the difference between the range of denormalized numbers (0 &lt; x &lt; 2^126) and zero. For others, it is a problem. <em>Proceed wisely</em>. We recommend leaving denormal handling enabled unless you actually have a problem. Generally speaking, denormals do not happen often enough to cause trouble. However, certain classes of algorithms (most notably IIR filters) may produce nothing but denormals in certain situations (input gain goes to zero). If that occurs in a real time thread, system responsiveness may be adversely affected. Results may not be delivered on time.</p>
+<p>To turn denormals off on AltiVec, set the Non-Java bit in the AltiVec VSCR. To turn denormals off on SSE, turn on the Denormals Are Zero and Flush to Zero (DAZ and FZ) bits in the MXCSR:</p>
+<div class="codesample"><table><tr><td scope="row"><pre>#include &lt;xmmintrin.h><span></span></pre></td></tr><tr><td scope="row"><pre>int oldMXCSR = _mm_getcsr(); //read the old MXCSR setting<span></span></pre></td></tr><tr><td scope="row"><pre>int newMXCSR = oldMXCSR | 0x8040; // set DAZ and FZ bits<span></span></pre></td></tr><tr><td scope="row"><pre>_mm_setcsr( newMXCSR ); //write the new MXCSR setting to the MXCSR<span></span></pre></td></tr><tr><td scope="row"><pre>... // do your work with denormals off here<span></span></pre></td></tr><tr><td scope="row"><pre>//restore old MXCSR settings to turn denormals back on if they were on<span></span></pre></td></tr><tr><td scope="row"><pre>_mm_setcsr( oldMXCSR );<span></span></pre></td></tr></table></div>
+<p>You may also use the C99 Standard fenv.h, with the Mac OS X for Intel specific default denormals-off floating point environment.</p>
+<div class="codesample"><table><tr><td scope="row"><pre>#include &lt;fenv.h><span></span></pre></td></tr><tr><td scope="row"><pre>#pragma STDC FENV_ACCESS ON<span></span></pre></td></tr><tr><td scope="row"><pre>fenv_t oldEnv;<span></span></pre></td></tr><tr><td scope="row"><pre>//Read the old environment and set the new environment using default flags and denormals off<span></span></pre></td></tr><tr><td scope="row"><pre>fegetenv( &amp;oldEnv );<span></span></pre></td></tr><tr><td scope="row"><pre>fesetenv( FE_DFL_DISABLE_SSE_DENORMS_ENV );<span></span></pre></td></tr><tr><td scope="row"><pre>... //do work here<span></span></pre></td></tr><tr><td scope="row"><pre>//Restore old floating point environment<span></span></pre></td></tr><tr><td scope="row"><pre>fesetenv( &amp;oldEnv );<span></span></pre></td></tr></table></div>
+<div class="notebox"><a name="//apple_ref/doc/uid/TP40002729-CH248-DontLinkElementID_15" title="Note"></a><p><strong>Note:</strong>&nbsp;Both of the above code examples lose track of floating point status flag changes that occur while denormals are turned off. Rather than simply swapping floating point environments, it is possible to preserve floating point state across this series of operations by doing various bitwise boolean operations to copy information between states. This may be required if you are relying on floating point state flags for diagnostic information or are using SIGFPE.</p></div>
+<p>Setting and checking other bits in the MXCSR will allow you to take an exception if you hit a denormal (DM) and check to see whether you have previously hit a denormal (DE) in the vector unit, in addition to the typical IEEE-754 exceptions and flags.</p>
+<p>Denormals also cause large stalls on the x87 scalar floating point unit. Simply loading and storing denormals in and out of the x87 unit may cause a stall. The processor has to convert them to 80-bit extended format and back during these operations. There is no way to disable denormal handling on x87.</p>
+<p><em>Algorithms and Conversions</em></p>
+<p>Here is a table of standard conversions for floating point operations in AltiVec and SSE:</p><a name="//apple_ref/doc/uid/TP40002729-CH248-DontLinkElementID_16" title="Table 3-4Converting Floating Point Operations from AltiVec to SSE"></a><div class="tableholder"><table class="graybox" border = "0" cellspacing="0" cellpadding="5">
+<caption class="tablecaption"><a name="//apple_ref/doc/uid/TP40002729-CH248-280154" title="Table 3-4Converting Floating Point Operations from AltiVec to SSE"></a><strong>Table 3-4&nbsp;&nbsp;</strong>Converting Floating Point Operations from AltiVec to SSE</caption>
+
+<tr>
+<th scope="col" align="left" style="font-weight: bold" bgcolor="#CCCCCC"><p>AltiVec</p></th>
+<th scope="col" align="left" style="font-weight: bold" bgcolor="#CCCCCC"><p>SSE</p></th>
+</tr>
+
+
+<tr>
+<td  scope="row"><p>vec_add(a, b)</p></td>
+<td ><p>_mm_add_ps(a, b)</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_and(a, b)</p></td>
+<td ><p>_mm_and_ps(a, b)</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_andc(a, b)</p></td>
+<td ><p>_mm_andnot_ps(b, a)</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_ceil(a)</p></td>
+<td ><p>see below</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_expte(a)</p></td>
+<td ><p>none (use vexpf in Accelerate.framework, vfp.h)</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_floor(a)</p></td>
+<td ><p>see below</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_loge(a)</p></td>
+<td ><p>none (use vlogf in Accelerate.framework, vfp.h)</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_madd(a, b, c)</p></td>
+<td ><p>_mm_add_ps( _mm_mul_ps(a,b), c)</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_max(a, b)</p></td>
+<td ><p>_mm_max_ps(a, b)</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_min(a, b)</p></td>
+<td ><p>_mm_min_ps(a, b)</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_nmsub(a, b, c)</p></td>
+<td ><p>_mm_sub_ps(c, _mm_mul_ps(a, b))</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_nor(a, b)</p></td>
+<td ><p>_mm_xor_ps( _mm_or_ps(a, b), 0xFFFFFFFF )</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_or(a,b)</p></td>
+<td ><p>_mm_or_ps(a, b)</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_re(a)</p></td>
+<td ><p>_mm_rcp_ps(a)</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_round(a)</p></td>
+<td ><p>see below</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_rsqrte(a)</p></td>
+<td ><p>_mm_rsqrt_ps(a)</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_sel(a,b,c)</p></td>
+<td ><p>_mm_or_ps(_mm_andnot_ps(c,a), _mm_and_ps(c,b))</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_sub(a,b)</p></td>
+<td ><p>_mm_sub_ps(a,b)</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_trunc(a)</p></td>
+<td ><p>see below</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_xor(a,b)</p></td>
+<td ><p>_mm_xor_ps(a,b)</p></td>
+</tr>
+
+</table></div>
+<p>Don't forget to convert all of those vec_madd( a, b, -0.0f) calls to _mm_mul_ps(a, b). It will save an instruction.</p>
+<p>The most notable missing conversion in the table above is explicit floating point rounding to integer. In many cases, this can be solved by setting the appropriate rounding mode in the MXCSR and converting the vFloat to a vSInt32. This process is covered more in depth in the conversions section below. However, that only works if the floating point value is representable as a 32-bit integer. Since many do not fit into the 32-bit signed integer range, it may be necessary to use a full precision floor function. The basic operation involves adding a large magic number to the vFloat, then subtracting it away again. The number is chosen such that the unit in the last place of the magic number corresponds to the 1's binary digit. This value is 2^23, 0x1.0p23f. This causes rounding at that position according to the processor's rounding mode after the addition. When 2^23 is subtracted away again, the value will be restored, but correctly rounded to integer value.</p>
+<p>There are some tricks to this process. Negative numbers may require that you reverse the order of the add and subtract, or use 2^24. With some clever programming you may be able to avoid toggling the MXCSR to set rounding modes and come up with an algorithm that works for all four rounding modes. Depending on your specific application, you may be able to avoid some or all of these steps. In the simplest case, it is just an add and a subtract. Here is some sample code for <code><a href="../../../../Carbon/Reference/Mathematical_al_Utilities/Reference/reference.html#//apple_ref/doc/c_ref/floor" target="_top">floor</a></code> and <code><a href="../../../../Carbon/Reference/Mathematical_al_Utilities/Reference/reference.html#//apple_ref/doc/c_ref/trunc" target="_top">trunc</a></code>.</p>
+<div class="codesample"><table><tr><td scope="row"><pre>static inline vFloat _mm_floor_ps( vFloat v ) __attribute__ ((always_inline));<span></span></pre></td></tr><tr><td scope="row"><pre>static inline vFloat _mm_floor_ps( vFloat v )<span></span></pre></td></tr><tr><td scope="row"><pre>{<span></span></pre></td></tr><tr><td scope="row"><pre>    static const vFloat twoTo23 = (vFloat){ 0x1.0p23f, 0x1.0p23f, 0x1.0p23f, 0x1.0p23f };<span></span></pre></td></tr><tr><td scope="row"><pre>    vFloat b = (vFloat) _mm_srli_epi32( _mm_slli_epi32( (vUInt32) v, 1 ), 1 ); //fabs(v)<span></span></pre></td></tr><tr><td scope="row"><pre>    vFloat d = _mm_sub_ps( _mm_add_ps( _mm_add_ps( _mm_sub_ps( v, twoTo23 ), twoTo23 ), twoTo23 ), twoTo23 ); //the meat of floor<span></span></pre></td></tr><tr><td scope="row"><pre>    vFloat largeMaskE = (vFloat) _mm_cmpgt_ps( b, twoTo23 ); //-1 if v >= 2**23<span></span></pre></td></tr><tr><td scope="row"><pre>    vFloat g = (vFloat) _mm_cmplt_ps( v, d ); //check for possible off by one error<span></span></pre></td></tr><tr><td scope="row"><pre>    vFloat h = _mm_cvtepi32_ps( (vUInt32) g ); //convert positive check result to -1.0, negative to 0.0<span></span></pre></td></tr><tr><td scope="row"><pre>    vFloat t = _mm_add_ps( d, h ); //add in the error if there is one<span></span></pre></td></tr><tr><td scope="row"><pre>    //Select between output result and input value based on v >= 2**23<span></span></pre></td></tr><tr><td scope="row"><pre>    v = _mm_and_ps( v, largeMaskE );<span></span></pre></td></tr><tr><td scope="row"><pre>    t = _mm_andnot_ps( largeMaskE, t );<span></span></pre></td></tr><tr><td scope="row"><pre>    return _mm_or_ps( t, v );<span></span></pre></td></tr><tr><td scope="row"><pre>}<span></span></pre></td></tr><tr><td scope="row"><pre>static inline vFloat _mm_trunc_ps( vFloat v ) __attribute__ ((always_inline));<span></span></pre></td></tr><tr><td scope="row"><pre>static inline vFloat _mm_trunc_ps( vFloat v )<span></span></pre></td></tr><tr><td scope="row"><pre>{<span></span></pre></td></tr><tr><td scope="row"><pre>    static const vFloat twoTo23 = (vFloat){ 0x1.0p23f, 0x1.0p23f, 0x1.0p23f, 0x1.0p23f };<span></span></pre></td></tr><tr><td scope="row"><pre>    vFloat b = (vFloat) _mm_srli_epi32( _mm_slli_epi32( (vUInt32) v, 1 ), 1 ); //fabs(v)<span></span></pre></td></tr><tr><td scope="row"><pre>    vFloat d = _mm_sub_ps( _mm_add_ps( b, twoTo23 ), twoTo23 ); //the meat of floor<span></span></pre></td></tr><tr><td scope="row"><pre>    vFloat largeMaskE = (vFloat) _mm_cmpgt_ps( b, twoTo23 ); //-1 if v >= 2**23<span></span></pre></td></tr><tr><td scope="row"><pre>    vFloat g = (vFloat) _mm_cmplt_ps( b, d ); //check for possible off by one error<span></span></pre></td></tr><tr><td scope="row"><pre>    vFloat h = _mm_cvtepi32_ps( (vUInt32) g ); //convert positive check result to -1.0, negative to 0.0<span></span></pre></td></tr><tr><td scope="row"><pre>    vFloat t = _mm_add_ps( d, h ); //add in the error if there is one<span></span></pre></td></tr><tr><td scope="row"><pre>    //put the sign bit back<span></span></pre></td></tr><tr><td scope="row"><pre>    vFloat sign = (vFloat) _mm_slli_epi31( _mm_srli128( (vUInt32) v, 31), 31 );<span></span></pre></td></tr><tr><td scope="row"><pre>    t = _mm_or_ps( t, sign );<span></span></pre></td></tr><tr><td scope="row"><pre>    //Select between output result and input value based on fabs(v) >= 2**23<span></span></pre></td></tr><tr><td scope="row"><pre>    v = _mm_and_ps( v, largeMaskE );<span></span></pre></td></tr><tr><td scope="row"><pre>    t = _mm_andnot_ps( largeMaskE, t );<span></span></pre></td></tr><tr><td scope="row"><pre>    return _mm_or_ps( t, v );<span></span></pre></td></tr><tr><td scope="row"><pre>}<span></span></pre></td></tr></table></div>
+<a name="//apple_ref/doc/uid/TP40002729-CH248-288630" title="Translating Integer Operations"></a><h2>Translating Integer Operations</h2>
+<p>Most integer operations on SSE are in the SSE2 segment of the vector extensions. Packed vector integer arithmetic first debuted on the Intel platform in MMX. The same operations were later redeployed on the XMM register file in SSE2. All vector integer instructions generally start with the letter P (for packed). Most integer instructions come in two flavors with the same name, one for MMX and one for XMM. For a complete list, please see the Intel Architecture Software Developer's Manual, Volumes 2. (Link available at the top of this page.) Because the two share the same name and use of MMX can damage x87 floating point state, it may be advisable in certain circumstances to employ GCC compiler flags such as <code>-mno-mmx</code>, to avoid inadvertently using MMX.</p>
+<p><em>Integer Add / Subtract / Min / Max</em></p>
+<p>You will find the full complement of modulo adds and subtracts on SSE2. In addition, SSE2 also does 64-bit modulo addition and subtraction. The AltiVec <code><!--a-->vec_addc<!--/a--></code> and <code><!--a-->vec_subc<!--/a--></code> for large-precision unsigned integer addition and subtraction do not have SSE counterparts, however. It is suggested that you use the 64-bit adder to handle your extended integer precision.</p>
+<p>SSE2 supports saturated addition for 8- and 16-bit element sizes only. Min and Max functions are available for vUInt8 and vSInt16, only.</p>
+<p><em>Integer Multiplication</em></p>
+<p>One of the more difficult problems to solve when translating AltiVec to SSE is what to do about integer multiplication. There is almost no overlap between AltiVec and SSE for integer multiplication. The AltiVec <code><!--a-->vec_mladd<!--/a--></code> operation is a little bit like <code><!--a-->_mm_mullo_epi16<!--/a--></code>, and <code><!--a-->vec_msum<!--/a--></code> is a little bit like <code><!--a-->_mm_madd_epi16<!--/a--></code>, but they are by no means a close match. There are 5 integer multipliers on SSE2:</p><a name="//apple_ref/doc/uid/TP40002729-CH248-DontLinkElementID_17" title="Table 3-5SSE Integer Multiplication Operations"></a><div class="tableholder"><table class="graybox" border = "0" cellspacing="0" cellpadding="5">
+<caption class="tablecaption"><a name="//apple_ref/doc/uid/TP40002729-CH248-288703" title="Table 3-5SSE Integer Multiplication Operations"></a><strong>Table 3-5&nbsp;&nbsp;</strong>SSE Integer Multiplication Operations</caption>
+
+<tr>
+<td  scope="row"><p>_mm_mullo_epi16(a,b)</p></td>
+<td ><p>vSInt16 or vUInt16</p></td>
+<td ><p>low 16 bits of the product of two 16-bit integers</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>_mm_mulhi_epi16(a,b)</p></td>
+<td ><p>vSInt16</p></td>
+<td ><p>high 16 bits of the product of two 16-bit signed integers</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>_mm_mulhi_epu16(a,b)</p></td>
+<td ><p>vUInt16</p></td>
+<td ><p>high 16 bits of the product of two 16-bit unsigned integers</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>_mm_mul_epu32(a,b)</p></td>
+<td ><p>vUInt32</p></td>
+<td ><p>64-bit product of two vUInt32's (odd elements)</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>_mm_madd_epi16(a,b)</p></td>
+<td ><p>vSInt16</p></td>
+<td ><p>sum of adjacent signed 32-bit products of int16_t</p></td>
+</tr>
+
+</table></div>
+<p>One shared calculation motif that works reasonably well between AltiVec and SSE is the concept of full precision multiplies, where two vectors with element of size N, multiply to create two product vectors with element size 2N. On AltiVec, this is done with <code><!--a-->vec_mule<!--/a--></code> and <code><!--a-->vec_mulo<!--/a--></code>, followed by <code><!--a-->vec_merge<!--/a--></code> to interleave even and odd results. On SSE, you can use the low and high 16 bit multiplies, with a merge operation (see <code><!--a-->_mm_unpacklo_epi16<!--/a--></code> and <code><!--a-->_mm_unpackhi_epi16<!--/a--></code>).</p>
+<p>The other shared calculation motif that works well is to exploit commonalities between <code><!--a-->_mm_madd_epi16<!--/a--></code> and <code>vec_msum( vSInt16, vSInt16, vSInt32 )</code>. Finally, in a very small number of cases, you can use <code>_mm_mullo_epi16(a,b)</code> interchangeably with <code>vec_mladd(a,b,0)</code>.</p>
+<p><em>Integer Algorithms and Conversions</em></p>
+<p>Here is a table of simple AltiVec to SSE translations for integer arithmetic:</p><a name="//apple_ref/doc/uid/TP40002729-CH248-DontLinkElementID_18" title="Table 3-6Converting Integer Arithmetic Operations from AltiVec to SSE"></a><div class="tableholder"><table class="graybox" border = "0" cellspacing="0" cellpadding="5">
+<caption class="tablecaption"><a name="//apple_ref/doc/uid/TP40002729-CH248-288822" title="Table 3-6Converting Integer Arithmetic Operations from AltiVec to SSE"></a><strong>Table 3-6&nbsp;&nbsp;</strong>Converting Integer Arithmetic Operations from AltiVec to SSE</caption>
+
+<tr>
+<th scope="col" align="left" style="font-weight: bold" bgcolor="#CCCCCC"><p>AltiVec</p></th>
+<th scope="col" align="left" style="font-weight: bold" bgcolor="#CCCCCC"><p>Type</p></th>
+<th scope="col" align="left" style="font-weight: bold" bgcolor="#CCCCCC"><p>SSE2</p></th>
+</tr>
+
+
+<tr>
+<td  scope="row"><p>vec_abs(a)</p></td>
+<td ><p>vSInt8</p></td>
+<td ><p>vSInt8 t = _mm_cmpgt_epi8(0,a); return _mm_sub_epi8(_mm_xor_si128( a, t), t);</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_abs(a)</p></td>
+<td ><p>vSInt16</p></td>
+<td ><p>_mm_max_epi16( a, _mm_sub_epi16( 0, a ) )</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_abs(a)</p></td>
+<td ><p>vSInt32</p></td>
+<td ><p>vSInt8 t = _mm_srai_epi32(a,31);return _mm_sub_epi32(_mm_xor_si128( a, t), t);</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_abss(a)</p></td>
+<td ><p>vSInt8</p></td>
+<td ><p>vSInt8 t = _mm_cmpgt_epi8(0,a);return _mm_subs_epi8(_mm_xor_si128( a, t), t);</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_abss(a)</p></td>
+<td ><p>vSInt16</p></td>
+<td ><p>_mm_max_epi16( a, _mm_subs_epi16( 0, a ) )</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_abss(a)</p></td>
+<td ><p>vSInt32</p></td>
+<td ><p>none</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_add(a,b)</p></td>
+<td ><p>vSInt8</p></td>
+<td ><p>_mm_add_epi8(a,b)</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_add(a,b)</p></td>
+<td ><p>vUInt8</p></td>
+<td ><p>_mm_add_epi8(a,b)</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_add(a,b)</p></td>
+<td ><p>vSInt16</p></td>
+<td ><p>_mm_add_epi16(a,b)</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_add(a,b)</p></td>
+<td ><p>vUInt16</p></td>
+<td ><p>_mm_add_epi16(a,b)</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_add(a,b)</p></td>
+<td ><p>vSInt32</p></td>
+<td ><p>_mm_add_epi32(a,b)</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_add(a,b)</p></td>
+<td ><p>vUInt32</p></td>
+<td ><p>_mm_add_epi32(a,b)</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_adds(a,b)</p></td>
+<td ><p>vSInt8</p></td>
+<td ><p>_mm_adds_epi8(a,b)</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_adds(a,b)</p></td>
+<td ><p>vUInt8</p></td>
+<td ><p>_mm_adds_epu8(a,b)</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_adds(a,b)</p></td>
+<td ><p>vSInt16</p></td>
+<td ><p>_mm_adds_epi16(a,b)</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_adds(a,b)</p></td>
+<td ><p>vUInt16</p></td>
+<td ><p>_mm_adds_epu16(a,b)</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_adds(a,b)</p></td>
+<td ><p>vSInt32</p></td>
+<td ><p>none</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_adds(a,b)</p></td>
+<td ><p>vUInt32</p></td>
+<td ><p>none</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_and(a,b)</p></td>
+<td ><p>any int type</p></td>
+<td ><p>_mm_and_si128(a,b)</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_andc(a,b)</p></td>
+<td ><p>any int type</p></td>
+<td ><p>_mm_andnot_si128(b,a)</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_avg(a,b)</p></td>
+<td ><p>vSInt8</p></td>
+<td ><p>none</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_avg(a,b)</p></td>
+<td ><p>vUInt8</p></td>
+<td ><p>_mm_avg_epu8(a,b)</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_avg(a,b)</p></td>
+<td ><p>vSInt16</p></td>
+<td ><p>none</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_avg(a,b)</p></td>
+<td ><p>vUInt16</p></td>
+<td ><p>_mm_avg_epu16(a,b)</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_avg(a,b)</p></td>
+<td ><p>vSInt32</p></td>
+<td ><p>none</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_avg(a,b)</p></td>
+<td ><p>vUInt32</p></td>
+<td ><p>none</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_madds(a,b,c)</p></td>
+<td ><p>vSInt16</p></td>
+<td ><p>none (see note 1 below)</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_max(a,b)</p></td>
+<td ><p>vSInt8</p></td>
+<td ><p>vSInt8 t = _mm_cmpgt_epi8(a,b);return _mm_or_si128( _mm_andnot_si128(t,b),_mm_and_si128(t,a));</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_max(a,b)</p></td>
+<td ><p>vUInt8</p></td>
+<td ><p>_mm_max_epu8(a,b)</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_max(a,b)</p></td>
+<td ><p>vSInt16</p></td>
+<td ><p>_mm_max_epi16(a,b)</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_max(a,b)</p></td>
+<td ><p>vUInt16</p></td>
+<td ><p>none</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_max(a,b)</p></td>
+<td ><p>vSInt32</p></td>
+<td ><p>vSInt32 t = _mm_cmpgt_epi32(a,b);return _mm_or_si128( _mm_andnot_si128(t,b),_mm_and_si128(t,a));</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_max(a,b)</p></td>
+<td ><p>vUInt32</p></td>
+<td ><p>none</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_min(a,b)</p></td>
+<td ><p>vSInt8</p></td>
+<td ><p>vSInt8 t = _mm_cmpgt_epi8(a,b);return _mm_or_si128( _mm_and_si128(t,b),_mm_andnot_si128(t,a));</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_min(a,b)</p></td>
+<td ><p>vUInt8</p></td>
+<td ><p>_mm_min_epu8(a,b)</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_min(a,b)</p></td>
+<td ><p>vSInt16</p></td>
+<td ><p>_mm_min_epi16(a,b)</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_min(a,b)</p></td>
+<td ><p>vUInt16</p></td>
+<td ><p>none</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_min(a,b)</p></td>
+<td ><p>vSInt32</p></td>
+<td ><p>vSInt32 t = _mm_cmpgt_epi32(a,b);return _mm_or_si128( _mm_and_si128(t,b),_mm_andnot_si128(t,a));</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_min(a,b)</p></td>
+<td ><p>vUInt32</p></td>
+<td ><p>none</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_mladd(a,b,c)</p></td>
+<td ><p>vSInt16 or vUInt16</p></td>
+<td ><p>_mm_add_epi16( _mm_mullo_epi16(a,b),c)</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_mradds(a,b,c)</p></td>
+<td ><p>vSInt16</p></td>
+<td ><p>none (see note 1 below)</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_msum(a,b,c)</p></td>
+<td ><p>vSInt16 or vUInt16</p></td>
+<td ><p>none</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_msum(a,b,c)</p></td>
+<td ><p>vSInt16</p></td>
+<td ><p>_mm_add_epi32( _mm_madd_epi16(a,b), c )</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_msum(a,b,c)</p></td>
+<td ><p>vUInt16</p></td>
+<td ><p>none</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_msums(a,b,c)</p></td>
+<td ><p>vSInt16 or vUInt16</p></td>
+<td ><p>none (saturated 32-bit add missing)</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_mule(a,b)</p></td>
+<td ><p>any</p></td>
+<td ><p>none (see note 2 below)</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_mulo(a,b)</p></td>
+<td ><p>any</p></td>
+<td ><p>none (see note 2 below)</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_nor(a,b)</p></td>
+<td ><p>any</p></td>
+<td ><p>_mm_xor_si128( _mm_or_si128(a,b), -1)</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_or(a,b)</p></td>
+<td ><p>any</p></td>
+<td ><p>_mm_or_si128(a,b)</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_sel(a,b,c)</p></td>
+<td ><p>any</p></td>
+<td ><p>_mm_or_si128( _mm_and_si128(c,b), _mm_andnot_si128(c,a))</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_sub(a,b)</p></td>
+<td ><p>vSInt8 or vUInt8</p></td>
+<td ><p>_mm_sub_epi8(a,b)</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_sub(a,b)</p></td>
+<td ><p>vSInt16 or vUInt16</p></td>
+<td ><p>_mm_sub_epi16(a,b)</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_sub(a,b)</p></td>
+<td ><p>vSInt32 or vUInt32</p></td>
+<td ><p>_mm_sub_epi32(a,b)</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_subs(a,b)</p></td>
+<td ><p>vSInt8</p></td>
+<td ><p>_mm_subs_epi8(a,b)</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_subs(a,b)</p></td>
+<td ><p>vUInt8</p></td>
+<td ><p>_mm_subs_epu8(a,b)</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_subs(a,b)</p></td>
+<td ><p>vSInt16</p></td>
+<td ><p>_mm_subs_epi16(a,b)</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_subs(a,b)</p></td>
+<td ><p>vUInt16</p></td>
+<td ><p>_mm_subs_epu16(a,b)</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_subs(a,b)</p></td>
+<td ><p>vSInt32</p></td>
+<td ><p>none</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_subs(a,b)</p></td>
+<td ><p>vUInt32</p></td>
+<td ><p>none</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_sum4s(a,b)</p></td>
+<td ><p>any</p></td>
+<td ><p>none</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_sum2s(a,b)</p></td>
+<td ><p>vSInt32</p></td>
+<td ><p>none</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_sums(a,b)</p></td>
+<td ><p>vSInt32</p></td>
+<td ><p>none</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_xor(a,b)</p></td>
+<td ><p>any</p></td>
+<td ><p>_mm_xor_si128(a,b)</p></td>
+</tr>
+
+</table></div>
+<p>Note 1: Something similar can be done with <code><!--a-->_mm_mulhi_epi16<!--/a--></code> and <code><!--a-->vec_add(s)_epi16<!--/a--></code>. However, <code><!--a-->_mm_mulhi_epi16<!--/a--></code> shifts right by 16, and the AltiVec instruction shifts right by 15, so some change in fixed point format will be required.</p>
+<div class="codesample"><table><tr><td scope="row"><pre>//AltiVec: multiply a * b and return double wide result in high and low result<span></span></pre></td></tr><tr><td scope="row"><pre>void vec_mul_full( vSInt32 *highResult, vSInt32 *lowResult, vSInt16 a, vSInt16 b)<span></span></pre></td></tr><tr><td scope="row"><pre>{<span></span></pre></td></tr><tr><td scope="row"><pre>    vSInt32 even = vec_mule( a, b );<span></span></pre></td></tr><tr><td scope="row"><pre>    vSInt32 odd = vec_mulo( a, b );<span></span></pre></td></tr><tr><td scope="row"><pre>    *highResult = vec_mergeh( even, odd );<span></span></pre></td></tr><tr><td scope="row"><pre>    *lowResult = vec_mergel( even, odd );<span></span></pre></td></tr><tr><td scope="row"><pre>}<span></span></pre></td></tr><tr><td scope="row"><pre>//SSE2: multiply a * b and return double wide result in high and low result<span></span></pre></td></tr><tr><td scope="row"><pre>void _mm_mul_full( vSInt32 *highResult, vSInt32 *lowResult, vSInt16 a, vSInt16 b)<span></span></pre></td></tr><tr><td scope="row"><pre>{<span></span></pre></td></tr><tr><td scope="row"><pre>    vSInt32 hi = _mm_mulhi_epi16( a, b );<span></span></pre></td></tr><tr><td scope="row"><pre>    vSInt32 low = _mm_mullo_epi16( a, b );<span></span></pre></td></tr><tr><td scope="row"><pre>    *highResult = _mm_unpacklo_epi16( hi, low );<span></span></pre></td></tr><tr><td scope="row"><pre>    *lowResult = _mm_unpackhi_epi16( hi, low );<span></span></pre></td></tr><tr><td scope="row"><pre>}<span></span></pre></td></tr></table></div>
+<a name="//apple_ref/doc/uid/TP40002729-CH248-311165" title="Translating Compare Operations"></a><h2>Translating Compare Operations</h2>
+<p><em>Testing Inequalities</em></p>
+<p>Vector compares are done on SSE in substantially the same way as for AltiVec. The same basic set of compare instructions (similar to <code>vec_cmp*</code>) are available. They return a vector containing like sized elements with -1 for a true result and 0 for a false result in the corresponding element. The floating point compares provide the full set that AltiVec provides (except <code><!--a-->vec_cmpb<!--/a--></code>) and in addition provide ordered and unordered compares and the != test. In addition, all vector floating point compares come in both scalar and packed versions.</p>
+<p>The integer compares test for equality and inequality. The inequality test are for signed integers only. There are no unsigned compare greater than instruction. There are no compare instructions for 64-bit types.</p>
+<p><em>Conditional Execution</em></p>
+<p>Branching based on the result of a compare is handled differently from AltiVec, however. The AltiVec compares set some bits in the condition register, upon which the processor can branch directly. SSE compares set no analogous bits. Instead, use <code><!--a-->MOVMSKPD<!--/a--></code>, <code><!--a-->MOVMSKPS<!--/a--></code> or <code><!--a-->PMOVMSKB<!--/a--></code> instruction to copy the top bit out of each element, crunch them together into a 2- ,4- or 16-bit int for double, float and integer data respectively, and copy to an integer register. You may then test that bit field to decide whether or not to branch. This example implements the SSE version of AltiVec's <code><!--a-->vec_any_eq<!--/a--></code> intrinsic for vFloat:</p>
+<div class="codesample"><table><tr><td scope="row"><pre>int _mm_any_eq( vFloat a, vFloat b )<span></span></pre></td></tr><tr><td scope="row"><pre>{<span></span></pre></td></tr><tr><td scope="row"><pre>    //test a==b for each float in a &amp; b<span></span></pre></td></tr><tr><td scope="row"><pre>    vFloat mask = _mm_cmpeq_ps( a, b );<span></span></pre></td></tr><tr><td scope="row"><pre>    //copy top bit of each result to maskbits<span></span></pre></td></tr><tr><td scope="row"><pre>    int maskBits = _mm_movemask_ps( mask );<span></span></pre></td></tr><tr><td scope="row"><pre>    return maskBits != 0;<span></span></pre></td></tr><tr><td scope="row"><pre>}<span></span></pre></td></tr></table></div>
+<p>If you are branching based on the result of a compare of one element only, then you can do the whole thing in one instruction using either <code><!--a-->UCOMISD<!--/a--></code>/<code><!--a-->UCOMISS<!--/a--></code> or COMISD/COMISS.</p>
+<p><em>Select</em></p>
+<p>Branching is expensive on Intel, just as it is on PowerPC. Most of the time that a test is done, the developer on either platform will elect not to do conditional execution, but instead evaluate both sides of the branch and select the correct result based on the value of the test. In AltiVec, this would look like this:</p>
+<div class="codesample"><table><tr><td scope="row"><pre>// if (a > 0 ) a += a;<span></span></pre></td></tr><tr><td scope="row"><pre>vUInt32 mask = vec_cmpgt( a, zero );<span></span></pre></td></tr><tr><td scope="row"><pre>vFloat twoA = vec_add( a, a);<span></span></pre></td></tr><tr><td scope="row"><pre>a = vec_sel( a, twoA, mask );<span></span></pre></td></tr></table></div>
+<p>In SSE, the same algorithm is used. However, SSE has no select instruction. One must use <code><!--a-->AND<!--/a--></code>, <code><!--a-->ANDNOT<!--/a--></code>,, <code><!--a-->OR<!--/a--></code> instead:</p>
+<div class="codesample"><table><tr><td scope="row"><pre>vFloat _mm_sel_ps( vFloat a, vFloat b, vFloat mask )<span></span></pre></td></tr><tr><td scope="row"><pre>{<span></span></pre></td></tr><tr><td scope="row"><pre>    b = _mm_and_ps( b, mask );<span></span></pre></td></tr><tr><td scope="row"><pre>    a = _mm_andnot_ps( mask, a );<span></span></pre></td></tr><tr><td scope="row"><pre>    return _mm_or_ps( a, b );<span></span></pre></td></tr><tr><td scope="row"><pre>}<span></span></pre></td></tr></table></div>
+<p>Then, the SSE version of the above AltiVec code may be written:</p>
+<div class="codesample"><table><tr><td scope="row"><pre>// if (a > 0 ) a += a<span></span></pre></td></tr><tr><td scope="row"><pre>vFloat mask = _mm_cmpgt_ps( a, zero );<span></span></pre></td></tr><tr><td scope="row"><pre>vFloat twoA = _mm_add_ps( a, a);<span></span></pre></td></tr><tr><td scope="row"><pre>a = _mm_sel_ps( a, twoA, mask );<span></span></pre></td></tr></table></div>
+<p>We have found that in practice, it is sometimes possible to cleverly replace <code><!--a-->select<!--/a--></code> with simpler Boolean operators like a single <code><!--a-->AND<!--/a--></code>, <code><!--a-->OR<!--/a--></code> or <code><!--a-->XOR<!--/a--></code>, especially in vector floating point code. While not a performance win for AltiVec (it's a wash), for SSE this replaces three instructions with one, and can be a large win for code that uses <code><!--a-->select<!--/a--></code> frequently. Very infrequently, sleepy AltiVec programmers may momentarily forget about <code><!--a-->vec_min<!--/a--></code> and <code><!--a-->vec_max<!--/a--></code>, and use compare / select instead. Those are a nice win too, when you can find them.</p>
+<p><em>Algorithms and Conversions</em></p>
+<p>Here is a conversion table for AltiVec to SSE translation for vector compares and select:</p><a name="//apple_ref/doc/uid/TP40002729-CH248-DontLinkElementID_19" title="Table 3-7Converting Vector Compare and Select Operations from AltiVec to SSE"></a><div class="tableholder"><table class="graybox" border = "0" cellspacing="0" cellpadding="5">
+<caption class="tablecaption"><a name="//apple_ref/doc/uid/TP40002729-CH248-296141" title="Table 3-7Converting Vector Compare and Select Operations from AltiVec to SSE"></a><strong>Table 3-7&nbsp;&nbsp;</strong>Converting Vector Compare and Select Operations from AltiVec to SSE</caption>
+
+<tr>
+<th scope="col" align="left" style="font-weight: bold" bgcolor="#CCCCCC"><p>AltiVec</p></th>
+<th scope="col" align="left" style="font-weight: bold" bgcolor="#CCCCCC"><p>Type</p></th>
+<th scope="col" align="left" style="font-weight: bold" bgcolor="#CCCCCC"><p>SSE</p></th>
+</tr>
+
+
+<tr>
+<td  scope="row"><p>vec_cmpeq(a,b))</p></td>
+<td ><p>vSInt8</p></td>
+<td ><p>_mm_cmpeq_epi8(a,b)</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_cmpeq(a,b)</p></td>
+<td ><p>vUInt8</p></td>
+<td ><p>_mm_cmpeq_epi8(a,b)</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_cmpeq(a,b)</p></td>
+<td ><p>vSInt16</p></td>
+<td ><p>_mm_cmpeq_epi16(a,b)</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_cmpeq(a,b)</p></td>
+<td ><p>vUInt16</p></td>
+<td ><p>_mm_cmpeq_epi16(a,b)</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_cmpeq(a,b)</p></td>
+<td ><p>vSInt32</p></td>
+<td ><p>_mm_cmpeq_epi32(a,b)</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_cmpeq(a,b)</p></td>
+<td ><p>vUInt32</p></td>
+<td ><p>_mm_cmpeq_epi32(a,b)</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_cmpeq(a,b)</p></td>
+<td ><p>vFloat</p></td>
+<td ><p>_mm_cmpeq_ps(a,b)</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_cmpge(a,b)</p></td>
+<td ><p>vFloat</p></td>
+<td ><p>_mm_cmpge_ps(a,b)</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_cmpgt(a,b)</p></td>
+<td ><p>vSInt8</p></td>
+<td ><p>_mm_cmpgt_epi8(a,b)</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_cmpgt(a,b)</p></td>
+<td ><p>vUInt8</p></td>
+<td ><p>_mm_max_epu8(a,b) != b</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_cmpgt(a,b)</p></td>
+<td ><p>vSInt16</p></td>
+<td ><p>_mm_cmpgt_epi16(a,b)</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_cmpgt(a,b)</p></td>
+<td ><p>vUInt16</p></td>
+<td ><p>_mm_cmpgt_epi16(a+0x8000, b+0x8000)</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_cmpgt(a,b)</p></td>
+<td ><p>vSInt32</p></td>
+<td ><p>_mm_cmpgt_epi32(a,b)</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_cmpgt(a,b)</p></td>
+<td ><p>vUInt32</p></td>
+<td ><p>_mm_cmpgt_epi32(a+0x80000000, b+0x80000000)</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_cmpgt(a,b)</p></td>
+<td ><p>vFloat</p></td>
+<td ><p>_mm_cmpgt_ps(a,b)</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_cmple(a,b)</p></td>
+<td ><p>vFloat</p></td>
+<td ><p>_mm_cmple_ps(a,b)</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_cmplt(a,b)</p></td>
+<td ><p>vSInt8</p></td>
+<td ><p>_mm_cmpgt_epi8(b,a)</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_cmplt(a,b)</p></td>
+<td ><p>vUInt8</p></td>
+<td ><p>_mm_min_epu8(a,b) != b</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_cmplt(a,b)</p></td>
+<td ><p>vSInt16</p></td>
+<td ><p>_mm_cmpgt_epi16(b,a)</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_cmplt(a,b)</p></td>
+<td ><p>vUInt16</p></td>
+<td ><p>_mm_cmpgt_epi16(b+0x8000, a+0x8000)</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_cmplt(a,b)</p></td>
+<td ><p>vSInt32</p></td>
+<td ><p>_mm_cmpgt_epi32(b,a)</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_cmplt(a,b)</p></td>
+<td ><p>vUInt32</p></td>
+<td ><p>_mm_cmpgt_epi32(b+0x80000000, a+0x80000000)</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_cmplt(a,b)</p></td>
+<td ><p>vFloat</p></td>
+<td ><p>_mm_cmplt_ps(a,b)</p></td>
+</tr>
+
+</table></div>
+<a name="//apple_ref/doc/uid/TP40002729-CH248-301149" title="Translating Conversion Operations"></a><h2>Translating Conversion Operations</h2>
+<p>SSE has a wide variety of data type conversions. Like AltiVec, if you wish to simply use a vector of one type (e.g. vFloat) as a vector of another type (e.g. vSInt32) without changing the bits, you can do that with a simple typecast:</p>
+<div class="codesample"><table><tr><td scope="row"><pre>vFloat one = (vFloat) {1.0f, 1.0f, 1.0f, 1.0f };<span></span></pre></td></tr><tr><td scope="row"><pre>vSInt32 oneBits = (vSInt32) one;<span></span></pre></td></tr></table></div>
+<p>The variable <code>oneBits</code> will now contain {0x3f800000, 0x3f800000, 0x3f800000, 0x3f800000}, the bit pattern for a vector full of 1.0f. This is a free operation, requiring at most one instruction to copy the data between registers, but in the optimum case no work needs to be done. (Note: please see caution about moving data between vector int, float and double types, under “MMX” in the<span class="content_text"><a href="../migration_sse_overview/migration_sse_overview.html#//apple_ref/doc/uid/TP40002729-CH206-244096">“Instruction Overview”</a></span> section.)</p>
+<p>However, if you wish to convert one type of vector to another with retention of numerical value (instead of bit pattern) then you will wish to use the appropriate conversion instruction. Conversions among different types generally follow the same pathway as for AltiVec, except that 16 bit pixels are not really a native data type for SSE. There is no hardware conversion between 16-bit pixel and <code>vUInt8</code>. The rest of the conversions are described below:</p>
+<p><em>Float - Int Conversions</em></p>
+<p>Conversions between floating point and integer types are similar to AltiVec with a few differences:</p>
+<ul class="ul"><li class="li"><p>The <code><!--a-->vec_ctf<!--/a--></code>, <code><!--a-->vec_ctu<!--/a--></code> and <code><!--a-->vec_cts<!--/a--></code> instructions take a second parameter, an immediate to be used to adjust the power of two of the result. The SSE conversion functions take no second parameter. To do this power of 2 scaling on SSE, multiply the floating point input or output by the appropriate power of 2.</p></li>
+<li class="li"><p>In the <code>float</code>-to-<code>int</code> direction, floating point input values larger than the largest representable <code>int</code> result in 0x80000000 (a very negative number) rather than the largest representable <code>int</code> on PowerPC.</p></li>
+<li class="li"> <p>There are no unsigned conversions between <code>int</code> and <code>float</code></p></li>
+<li class="li"><p>All four rounding modes are available directly through the MXCSR. You won't need <code><!--a-->vec_floor<!--/a--></code>, <code><!--a-->vec_trunc<!--/a--></code>, <code><!--a-->vec_ceil<!--/a--></code>, <code><!--a-->vec_round<!--/a--></code> to round before you do the conversion to <code>int</code>. There are two different flavors of <code>float</code>-to-<code>int</code> conversion: <code><!--a-->_mm_cvtps_epi32<!--/a--></code> and <code><!--a-->_mm_cvttps_epi32<!--/a--></code>. The first rounds according to the MXCSR rounding bits. The second one always uses round towards zero.</p></li>
+<li class="li"><p>Conversions between <code>vDouble</code> and <code>vSInt32</code> are also available.</p></li></ul>
+<p>Here is how to fix the overflow saturation difference for vFloat to vSInt32 conversions:</p>
+<div class="codesample"><table><tr><td scope="row"><pre>const vFloat two31 = (const vFloat) {0x1.0p31f,0x1.0p31f,0x1.0p31f,0x1.0p31f};<span></span></pre></td></tr><tr><td scope="row"><pre>//Convert float to signed int, with AltiVec style overflow<span></span></pre></td></tr><tr><td scope="row"><pre>//(i.e. large float -> 0x7fffffff instead of 0x80000000)<span></span></pre></td></tr><tr><td scope="row"><pre>vSInt32 _mm_cts( vFloat v )<span></span></pre></td></tr><tr><td scope="row"><pre>{<span></span></pre></td></tr><tr><td scope="row"><pre>    vFloat overflow = _mm_cmpge_ps( v, two31);<span></span></pre></td></tr><tr><td scope="row"><pre>    vSInt32 result = _mm_cvtps_epi32( v );<span></span></pre></td></tr><tr><td scope="row"><pre>    return _mm_xor_ps( result, overflow );<span></span></pre></td></tr><tr><td scope="row"><pre>}<span></span></pre></td></tr></table></div>
+<p>Here is a function that does vFloat to vUInt32 conversion, that gives the correct results, with AltiVec saturation for out of range inputs. You can write faster functions if you are willing to sacrifice correctness or saturate differently:</p>
+<div class="codesample"><table><tr><td scope="row"><pre>static inline vUInt32 _mm_ctu_ps( vFloat f )<span></span></pre></td></tr><tr><td scope="row"><pre>{<span></span></pre></td></tr><tr><td scope="row"><pre>    vFloat two32 = _mm_add_ps( two31, two31);<span></span></pre></td></tr><tr><td scope="row"><pre>    vFloat zero = _mm_xor_ps(f,f);<span></span></pre></td></tr><tr><td scope="row"><pre>    //check for overflow before conversion to int<span></span></pre></td></tr><tr><td scope="row"><pre>    vFloat overflow = _mm_cmpge_ps( f, two31 );<span></span></pre></td></tr><tr><td scope="row"><pre>    vFloat overflow2 = _mm_cmpge_ps( f, two32 );<span></span></pre></td></tr><tr><td scope="row"><pre>    vFloat subval = _mm_and_ps( overflow, two31 );<span></span></pre></td></tr><tr><td scope="row"><pre>    vUInt32 addval = _mm_slli_epi32((vUInt32)overflow, 31);<span></span></pre></td></tr><tr><td scope="row"><pre>    vUInt32 result;<span></span></pre></td></tr><tr><td scope="row"><pre>    //bias the value to signed space if it is >= 2**31<span></span></pre></td></tr><tr><td scope="row"><pre>    f = _mm_sub_ps( f, subval );<span></span></pre></td></tr><tr><td scope="row"><pre>    //clip at zero<span></span></pre></td></tr><tr><td scope="row"><pre>    f = _mm_max_ps( f, zero );<span></span></pre></td></tr><tr><td scope="row"><pre>    //convert to int with saturation<span></span></pre></td></tr><tr><td scope="row"><pre>    result = _mm_cvtps_epi32( f ); //rounding mode should be round to nearest<span></span></pre></td></tr><tr><td scope="row"><pre>    //unbias<span></span></pre></td></tr><tr><td scope="row"><pre>    result = _mm_add_epi32( result, addval );<span></span></pre></td></tr><tr><td scope="row"><pre>    //patch up the overflow case<span></span></pre></td></tr><tr><td scope="row"><pre>    result = _mm_or_si128( result, (vUInt32)overflow2 );<span></span></pre></td></tr><tr><td scope="row"><pre>    return result;<span></span></pre></td></tr><tr><td scope="row"><pre>}<span></span></pre></td></tr></table></div>
+<p>Some special case short-cuts for <code>float</code>-to-<code>unsigned int</code> conversion:</p>
+<ul class="ul"><li class="li"><p>If you do not need the complete unsigned range, you may consider just using the float to signed conversion, with some possible preclipping using <code><!--a-->_mm_min_ps<!--/a--></code> and <code><!--a-->_mm_max_ps<!--/a--></code>.</p></li>
+<li class="li"><p>If you do not mind throwing away the least significant (up to) 8 bits of your result for values in the range -2^24 &lt; f &lt; 2^24, this can be done more quickly by subtracting 0x1.0p31f from your floating point input, doing the signed conversion, then subtracting 0x80000000 from the result.</p></li></ul>
+<p>Finally, the vUInt32 to vFloat conversion can be done using the signed conversion, 16-bits at a time:</p>
+<div class="codesample"><table><tr><td scope="row"><pre>const vFloat two16 = (const vFloat) {0x1.0p16f,0x1.0p16f,0x1.0p16f,0x1.0p16f};<span></span></pre></td></tr><tr><td scope="row"><pre>//Convert vUInt32 to vFloat according to the current rounding mode<span></span></pre></td></tr><tr><td scope="row"><pre>static inline vFloat _mm_ctf_epu32( vUInt32 v )<span></span></pre></td></tr><tr><td scope="row"><pre>{<span></span></pre></td></tr><tr><td scope="row"><pre>    // Avoid double rounding by doing two exact conversions<span></span></pre></td></tr><tr><td scope="row"><pre>    //of high and low 16-bit segments<span></span></pre></td></tr><tr><td scope="row"><pre>    vSInt32 hi = _mm_srli_epi32( (vSInt32) v, 16 );<span></span></pre></td></tr><tr><td scope="row"><pre>    vSInt32 lo = _mm_srli_epi32( _mm_slli_epi32( (vSInt32) v, 16 ), 16 );<span></span></pre></td></tr><tr><td scope="row"><pre>    vFloat fHi = _mm_mul_ps( _mm_cvtepi32_ps( hi ), two16);<span></span></pre></td></tr><tr><td scope="row"><pre>    vFloat fLo = _mm_cvtepi32_ps( lo );<span></span></pre></td></tr><tr><td scope="row"><pre>    // do single rounding according to current rounding mode<span></span></pre></td></tr><tr><td scope="row"><pre>    // note that AltiVec always uses round to nearest. We use current<span></span></pre></td></tr><tr><td scope="row"><pre>    // rounding mode here, which is round to nearest by default.<span></span></pre></td></tr><tr><td scope="row"><pre>    return _mm_add_ps( fHi, fLo );<span></span></pre></td></tr><tr><td scope="row"><pre>}<span></span></pre></td></tr></table></div>
+<p>Once again, if you don’t care about the last few bits of precision and correctly rounded results or the high half of the unsigned int range, then you can probably speed things up a bit.</p>
+<p><em>Int - Int Conversions</em></p>
+<p>Int - Int conversions change the size of vector elements. This in turn changes the number of vectors required to hold the data to either twice as many or half as many, depending on whether the elements are getting larger or smaller. The basic method by which data conversions are done is the same between AltiVec and SSE. A few details differ.</p>
+<p><em>Int - Int Conversions (Large to Small)</em></p>
+<p>Conversion of larger int types into smaller int types will mean converting two vectors to one. Formally, these come in saturating and non-saturating variants, to take care of the case where the value of the integer input exceeds the value representable in the smaller result integer. AltiVec provides both styes. SSE provides only the saturating variety. To do unsaturated pack on SSE, use a left and right shift to truncate the data into the appropriate range. (For signed data, use a right algebraic shift. For unsigned data, use a right logical shift.) This will prevent the saturated pack instructions from doing any saturation. Example, pack two vUInt16's down into a vUInt8 without saturation:</p>
+<div class="codesample"><table><tr><td scope="row"><pre>vUInt8 vec_pack_epu16( vUInt16 hi, vUInt16 lo );<span></span></pre></td></tr></table></div>
+<p>We would like to use <code><!--a-->_mm_packus_epi16<!--/a--></code> for this. Unfortunately, values outside the range [0,255] will pack with saturation yielding 0 or 255 as the result. What is more, since the instruction takes signed input, and we have unsigned inputs, values larger than 32768 will get truncated to 0 instead of 255. To fix that, we whack off the high bits. This can be done by <code><!--a-->AND<!--/a--></code>-ing with (<code>vUInt16</code>)(0x00FF). :</p>
+<div class="codesample"><table><tr><td scope="row"><pre>vUInt8 vec_pack_epu16( vUInt16 hi, vUInt16 lo )<span></span></pre></td></tr><tr><td scope="row"><pre>{<span></span></pre></td></tr><tr><td scope="row"><pre>    const vUInt16 mask = (const vUInt16){0x00ff, 0x00ff, 0x00ff, 0x00ff, 0x00ff, 0x00ff, 0x00ff, 0x00ff };<span></span></pre></td></tr><tr><td scope="row"><pre>    // mask off high byte<span></span></pre></td></tr><tr><td scope="row"><pre>    hi = _mm_and_si128( hi, mask );<span></span></pre></td></tr><tr><td scope="row"><pre>    lo = _mm_and_si128( lo, mask );<span></span></pre></td></tr><tr><td scope="row"><pre>    return _mm_packus_epi16( hi, lo );<span></span></pre></td></tr><tr><td scope="row"><pre>}<span></span></pre></td></tr></table></div>
+<p>If you need to return a signed unsaturated result, then use a right algebraic shift instead, and the appropriate signed saturated pack. In this case, we have to use the shift. The AND won't do the appropriate sign extension:</p>
+<div class="codesample"><table><tr><td scope="row"><pre>vSInt8 vec_pack_epu16( vUInt16 hi, vUInt16 lo )<span></span></pre></td></tr><tr><td scope="row"><pre>{<span></span></pre></td></tr><tr><td scope="row"><pre>    // shift hi and lo left by 8 to chop off high byte<span></span></pre></td></tr><tr><td scope="row"><pre>    hi = _mm_slli_epi16( hi, 8 );<span></span></pre></td></tr><tr><td scope="row"><pre>    lo = _mm_slli_epi16( lo, 8 );<span></span></pre></td></tr><tr><td scope="row"><pre>    // shift hi and lo back right again (algebraic)<span></span></pre></td></tr><tr><td scope="row"><pre>    hi = _mm_srai_epi16( hi, 8 );<span></span></pre></td></tr><tr><td scope="row"><pre>    lo = _mm_srai_epi16( lo, 8 );<span></span></pre></td></tr><tr><td scope="row"><pre>    return _mm_packs_epi16( hi, lo );<span></span></pre></td></tr><tr><td scope="row"><pre>}<span></span></pre></td></tr></table></div>
+<p>A number of saturated packing instructions are missing, such as <code>vSInt32</code> to <code>vUInt16</code>. In such cases, it may be required that you add / subtract small biases from the value so that the pack operation works correctly, then subtract / add them back out after the pack is complete. In some circumstances, this may be further complicated by the lack of a 32-bit saturated add.</p>
+<p><em>Int - Int Conversions (Small to Large)</em></p>
+<p>Conversion of smaller int types to larger int types will mean converting one vector into two. SSE handles this in the same way AltiVec does, using high and low flavors of the conversion to handle the high and low halves of the vector. While AltiVec provides both signed and unsigned unpack primitives (the unsigned ones are <code>vec_merge(0,v)</code>), SSE provides only the unsigned variety.</p>
+<p>To convert unsigned ints to larger unsigned ints, simply unpack with zero:</p>
+<div class="codesample"><table><tr><td scope="row"><pre>//SSE translation of vec_mergeh( 0, v )<span></span></pre></td></tr><tr><td scope="row"><pre>vUInt32 vec_unpackhi_epu16( vUInt16 v )<span></span></pre></td></tr><tr><td scope="row"><pre>{<span></span></pre></td></tr><tr><td scope="row"><pre>    vUInt16 zero = _mm_xor_si128( v, v );<span></span></pre></td></tr><tr><td scope="row"><pre>    return (vUInt32) _mm_unpackhi_epi16( v, zero );<span></span></pre></td></tr><tr><td scope="row"><pre>}<span></span></pre></td></tr></table></div>
+<p>Observe that the argument order for the unpack instruction is backwards from AltiVec. As discussed later, this may become further confused by byte swapping.</p>
+<p>To convert signed ints into larger signed ints, simply merge with itself, then right algebraic shift to do the sign extension:</p>
+<div class="codesample"><table><tr><td scope="row"><pre>//SSE translation of vec_unpackh( 0, v )<span></span></pre></td></tr><tr><td scope="row"><pre>vSInt32 vec_unpackhi_epi16( vSInt16 v )<span></span></pre></td></tr><tr><td scope="row"><pre>{<span></span></pre></td></tr><tr><td scope="row"><pre>    //depending on your view of the world, you may want<span></span></pre></td></tr><tr><td scope="row"><pre>    //_mm_unpacklo_epi16 here instead<span></span></pre></td></tr><tr><td scope="row"><pre>    vSInt32 t = (vSInt32) _mm_unpackhi_epi16( v,v );<span></span></pre></td></tr><tr><td scope="row"><pre>    return _mm_srai_epi32( t, 16 );<span></span></pre></td></tr><tr><td scope="row"><pre>}<span></span></pre></td></tr></table></div>
+<p><em>Algorithms and Conversions</em></p>
+<p>Here is a conversion table for AltiVec to SSE translation for data type conversions:</p><a name="//apple_ref/doc/uid/TP40002729-CH248-DontLinkElementID_20" title="Table 3-8Converting Data Types"></a><div class="tableholder"><table class="graybox" border = "0" cellspacing="0" cellpadding="5">
+<caption class="tablecaption"><a name="//apple_ref/doc/uid/TP40002729-CH248-301943" title="Table 3-8Converting Data Types"></a><strong>Table 3-8&nbsp;&nbsp;</strong>Converting Data Types</caption>
+
+<tr>
+<th scope="col" align="left" style="font-weight: bold" bgcolor="#CCCCCC"><p>AltiVec</p></th>
+<th scope="col" align="left" style="font-weight: bold" bgcolor="#CCCCCC"><p>Type</p></th>
+<th scope="col" align="left" style="font-weight: bold" bgcolor="#CCCCCC"><p>SSE</p></th>
+</tr>
+
+
+<tr>
+<td  scope="row"><p>vec_ctf(a,0)</p></td>
+<td ><p>vSInt32</p></td>
+<td ><p>_mm_cvtepi32_ps(a)</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_ctf(a,0)</p></td>
+<td ><p>vUInt32</p></td>
+<td ><p>see _mm_ctf (Note 1)</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_cts(a,0)</p></td>
+<td ><p>vFloat</p></td>
+<td ><p>see _mm_cts (Note 1)</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_ctu(a,0)</p></td>
+<td ><p>vFloat</p></td>
+<td ><p>see _mm_ctu (Note 1)</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_mergeh(0,a)</p></td>
+<td ><p>vUInt8</p></td>
+<td ><p>_mm_unpackhi_epi8( a, 0 )</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_mergeh(0,a)</p></td>
+<td ><p>vUInt16</p></td>
+<td ><p>_mm_unpackhi_epi16( a, 0)</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_mergel(0,a)</p></td>
+<td ><p>vUInt8</p></td>
+<td ><p>_mm_unpacklo_epi8( a, 0 )</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_mergel(0,a)</p></td>
+<td ><p>vUInt16</p></td>
+<td ><p>_mm_unpacklo_epi16( a, 0 )</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_pack(a,b)</p></td>
+<td ><p>vSInt16</p></td>
+<td ><p>_mm_packs_epi16( _mm_srai_epi16( _mm_slli_epi16( a, 8), 8),_mm_srai_epi16( _mm_slli_epi16( b, 8), 8) );</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_pack(a,b)</p></td>
+<td ><p>vUInt16</p></td>
+<td ><p>_mm_packs_epi16( _mm_and_si128( a, 0x00FF),_mm_and_si128( b, 0x00FF) );</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_pack(a,b)</p></td>
+<td ><p>vSInt32</p></td>
+<td ><p>_mm_packs_epi32( _mm_srai_epi32( _mm_slli_epi16( a, 16), 16),_mm_srai_epi32( _mm_slli_epi32( a, 16), 16) );</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_pack(a,b)</p></td>
+<td ><p>vUInt32</p></td>
+<td ><p>_mm_packs_epi32( _mm_srai_epi32( _mm_slli_epi32( a, 16), 16),_mm_srai_epi32( _mm_slli_epi32( a, 16), 16) );</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_packs(a,b)</p></td>
+<td ><p>vSInt16</p></td>
+<td ><p>_mm_packs_epi16(a,b)</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_packs(a,b)</p></td>
+<td ><p>vUInt16</p></td>
+<td ><p>none</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_packs(a,b)</p></td>
+<td ><p>vSInt32</p></td>
+<td ><p>_mm_packs_epi32(a,b)</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_packs(a,b)</p></td>
+<td ><p>vUInt32</p></td>
+<td ><p>none</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_packsu(a,b)</p></td>
+<td ><p>vSInt16</p></td>
+<td ><p>_mm_packus_epi16(a,b)</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_packsu(a,b)</p></td>
+<td ><p>vUInt16</p></td>
+<td ><p>none</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_packsu(a,b)</p></td>
+<td ><p>vSInt32</p></td>
+<td ><p>none</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_packsu(a,b)</p></td>
+<td ><p>vUInt32</p></td>
+<td ><p>none</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_unpackh(a)</p></td>
+<td ><p>vSInt8</p></td>
+<td ><p>_mm_srai_epi16( _mm_unpackhi_epi8(a,a), 8)</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_unpackh(a)</p></td>
+<td ><p>vSInt16</p></td>
+<td ><p>_mm_srai_epi32( _mm_unpackhi_epi16(a,a), 16)</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_unpackl(a)</p></td>
+<td ><p>vSInt8</p></td>
+<td ><p>_mm_srai_epi16( _mm_unpacklo_epi8(a,a), 8)</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_unpackl(a)</p></td>
+<td ><p>vSInt16</p></td>
+<td ><p>_mm_srai_epi32( _mm_unpacklo_epi16(a,a), 16)</p></td>
+</tr>
+
+</table></div>
+<p>Note 1: Sample code appears under “Float - Int Conversions”</p>
+<p>It is likely that a number of the <code><!--a-->vec_packs<!--/a--></code> and <code><!--a-->vec_packsu<!--/a--></code> translations above reported as "none" do exist. However, we haven't found any that simultaneously work for all possible inputs and which also perform satisfactorily. Where possible, the first choice is to find some other format to pack the data into that is supported well by the Intel vector ISA. In other cases, you may be aware that certain classes of inputs do not happen in your particular function. This may reduce the problem space a bit and allow for a much more efficient solution.</p>
+<a name="//apple_ref/doc/uid/TP40002729-CH248-312317" title="Translating Permute Operations"></a><h2>Translating Permute Operations</h2>
+<p>As we shall describe in the <code><!--a-->vec_perm<!--/a--></code> and <code><!--a-->shuffle<!--/a--></code> section to follow, the Intel permute capability isn't as flexible as AltiVec. Generally speaking, it is not possible to permute data in a data dependent way — that is, except for self-modifying code, the order of the reshuffling must be known at compile time. This means that the Intel permute unit (as defined by the series of instructions in MMX, SSE, SSE2, and SSE3) cannot be used for lookup tables, to select pivot elements in register, to do misalignment handling, etc., unless the exact nature of the permute is known at compile time.</p>
+<p>Things are not quite so bleak as they may appear at first. It is frequently true that there is a workaround for this sort of untranslatable functionality. Left or right 128-bit octet shifts which used to be handled by <code><!--a-->lvsl<!--/a--></code> and <code><!--a-->vperm<!--/a--></code> might instead be handled with some clever misaligned loads. MMX has arbitrary left and right shifts on its 64-bit registers. Lookup tables can still be done the old fashioned way, with separate loads for each element. (This is a bit easier under Intel, because scalar loads go to a defined place in the vector. Loading and splatting a scalar on AltiVec is perhaps unnecessarily unwieldy.) Finally, certain transformations (e.g. byte swapping) can be accomplished in a few vector instructions, in place of one permute.</p>
+<p>Caution: Would be users of the Intel permute unit should be aware that the x86 memory architecture is little endian. Data is byte-swapped on load and store in and out of the vector unit. The swap occurs over the entire 16-byte vector, like this:</p>
+<br/><div><a name="//apple_ref/doc/uid/TP40002729-CH248-DontLinkElementID_21" title="Figure 3-1Vector elements in memory order compared to register order"></a><p><a name="//apple_ref/doc/uid/TP40002729-CH248-312356" title="Figure 3-1Vector elements in memory order compared to register order"></a><a name="//apple_ref/doc/uid/TP40002729-CH248-BBCHAHHI" title="Figure 3-1Vector elements in memory order compared to register order"></a><strong>Figure 3-1&nbsp;&nbsp;</strong>Vector elements in memory order compared to register order</p><img src = "../art/mem_register.gif" alt = "" width="333" height="123"></div><br/>
+<p>As described more fully in the loads and stores segment below, this means that both the ordering of bytes within each elements and the order of elements within the vector are reversed. This can make permutes confusing. If your left shifts go right, and your right shifts go left, and all your attempts at permute do the wrong thing, you may have forgotten that you are working on a little endian machine.</p>
+<p><em>Merge</em></p>
+<p>AltiVec's <code><!--a-->vec_mergeh<!--/a--></code> and <code><!--a-->vec_mergel<!--/a--></code> intrinsics translate directly to <code><!--a-->_mm_unpackhi<!--/a--></code> and <code><!--a-->_mm_unpacklo<!--/a--></code>. Vector unpacks are available for 8-, 16-, 32- and 64-bit data varieties.</p>
+<p>Which flavor (high or low) to use and what order to place the arguments in is complicated by the little endian storage format. Under AltiVec, <code>vec_mergeh(even,odd)</code> could be used for a wide variety of purposes. On a big endian system, these are all degenerate. On a little endian system, they fall into a couple of classes for interleaving and unpacking data, which to further complicate things can be viewed based on the order of data as it appears in register, or following a store to memory:</p>
+<ul class="ul"><li class="li"><p>Interleaving data — let's say you start with left and right audio channels, each in its own vector, and you need to make an interleaved audio stream consisting of data in the order {left, right, left, right, ...}. On AltiVec, you'd just use <code>vec_merge(left, right)</code> and be done with it. On SSE you must first take into account the fact that this is a little endian system and memory order is the important one! This means that you actually want { ..., right2, left2, right1, left1, right0, left0} in register, so that you get {left0, right0, left1, right1, left2, right3, ...} when you store it out. That means you will be using <code><!--a-->_mm_unpacklo<!--/a--></code> to replace <code><!--a-->vec_mergeh<!--/a--></code>. In addition, the first argument of <code><!--a-->_mm_unpacklo<!--/a--></code> is the one that goes in the odd position, whereas for <code><!--a-->vec_mergeh<!--/a--></code>, the first argument would go into the even position. This means that <code>vec_mergeh( even, odd)</code> translates to <code>_mm_unpacklo(even,odd)</code> for data viewed in memory order, and <code>_mm_unpackhi( odd, even )</code> to replace <code><!--a-->vec_mergeh<!--/a--></code> if the data is viewed in register order.</p></li>
+<li class="li"><p>Enlarging data — if you are using <code><!--a-->vec_mergeh<!--/a--></code> to convert ints to larger ints (e.g. the SSE equivalent of converting a <code>vector unsigned short</code> to a pair of <code>vector unsigned int</code>s), then everything changes. In this case, one wants a different set of swaps to occur on storage to memory, so as to preserve the high / low order of the two elements. To be brief, <code>vec_mergeh( high, low )</code> maps to <code>_mm_unpacklo( low, high )</code> for data viewed in memory order, and <code>_mm_unpackhi( low, high )</code> for data viewed in register order.</p></li></ul>
+<p><em>Shifts and Rotations</em></p>
+<p>SSE provides a series of shift operations for most vector types, including 64-bit shifts and 128-bit octet shifts. The exception is 8-bit vector types, for which no shifts are available. For the rest, you may shift left or right. Right shifts come in the familiar logical (zero fill) and algebraic (sign extend) formats. Algebraic shifts are only available for 16- and 32-bit element sizes. A feature table follows:</p><a name="//apple_ref/doc/uid/TP40002729-CH248-DontLinkElementID_22" title="Table 3-9Vector Shift Operations"></a><div class="tableholder"><table class="graybox" border = "0" cellspacing="0" cellpadding="5">
+<caption class="tablecaption"><a name="//apple_ref/doc/uid/TP40002729-CH248-312500" title="Table 3-9Vector Shift Operations"></a><strong>Table 3-9&nbsp;&nbsp;</strong>Vector Shift Operations</caption>
+
+<tr>
+<th scope="col" align="left" style="font-weight: bold" bgcolor="#CCCCCC"><p></p></th>
+<th scope="col" align="left" style="font-weight: bold" bgcolor="#CCCCCC"><p>8-bit</p></th>
+<th scope="col" align="left" style="font-weight: bold" bgcolor="#CCCCCC"><p>16-bit</p></th>
+<th scope="col" align="left" style="font-weight: bold" bgcolor="#CCCCCC"><p>32-bit</p></th>
+<th scope="col" align="left" style="font-weight: bold" bgcolor="#CCCCCC"><p>64-bit</p></th>
+<th scope="col" align="left" style="font-weight: bold" bgcolor="#CCCCCC"><p>128-bit</p></th>
+</tr>
+
+
+<tr>
+<td  scope="row"><p>left logical</p></td>
+<td ><p>none</p></td>
+<td ><p>yes</p></td>
+<td ><p>yes</p></td>
+<td ><p>yes</p></td>
+<td ><p>by octet</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>right logical</p></td>
+<td ><p>none</p></td>
+<td ><p>yes</p></td>
+<td ><p>yes</p></td>
+<td ><p>yes</p></td>
+<td ><p>by octet</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>right algebraic</p></td>
+<td ><p>none</p></td>
+<td ><p>yes</p></td>
+<td ><p>yes</p></td>
+<td ><p>none</p></td>
+<td ><p>none</p></td>
+</tr>
+
+</table></div>
+<p>For all supported types except 128-bit shifts, you may shift either by an immediate value, known at compile time, or by a value present in a XMM vector. 128-bit shifts are by immediate only. The shift by value capability is different from AltiVec, however, in that while AltiVec allows you to shift each element in the vector a different amount from its fellows, on SSE all elements must be shifted by the same amount, the quantity held in the right-most element (register element order).</p>
+<p>SSE has no rotate instructions. If you need to rotate a M-bit element by N-bits, you'll need to shift left by N bits, shift another copy right by M-N bits and OR the results together.</p>
+<p><em>vec_perm and shuffle</em></p>
+<p>In certain cases, it is possible to translate <code><!--a-->vec_perm<!--/a--></code> to <code>SHUFPS</code>, <code>SHUFPD</code>, <code>PSHUFHW</code>, <code>PSHUFLW</code> or <code>PSHUFD</code>. The permute map must be known at compile time, and the data movement pattern must be supported by one of the above instructions. There are no shuffles capable of data organization at the byte level (apart from <code><!--a-->_mm_unpack<!--/a--></code>). They all operate on 16-, 32- or 64-bit elements.</p>
+<p>Many uses of <code><!--a-->vec_perm<!--/a--></code> are not supported by SSE. It is frequently necessary to abandon permute based algorithms, when moving to SSE. In some cases, it may even be necessary to abandon SSE altogether and fall back on scalar code. However, in most cases this is not necessary. Most of the tough permute cases are linked to misalignment handling or scatter loading. Typically the best approach for these sorts of problems is to use the misaligned vector loads or scalar loads in SSE to do the work, rather than rely on the permute unit. Since scalar loads place data in a defined place in the register, it is typically easier on SSE to do scatter loading.</p>
+<a name="//apple_ref/doc/uid/TP40002729-CH248-312704" title="Loads and Stores"></a><h2>Loads and Stores</h2>
+<p>A point should probably be made at the outset of this discussion, because it is one that is underemphasized in discussions about SIMD vector units in general. The Load / Store Units (LSUs) underlying most SIMD architectures (including both AltiVec and SSE) are not in themselves SIMD units. That is, you can't load or store to multiple addresses in parallel in a single instruction (unless they are contiguous, and therefore representable by a single address). Each LSU operates on only one address at a time. Your only opportunity to increase apparent parallelism is to make your single load or store do more work by loading or storing more bytes at a time. Apart from that, there is no SIMD-style parallelism in the LSU.</p>
+<p>Why is this relevant? It is important to understand that while the vector unit is highly efficient for arithmetic, there should be no expectation of enhanced speed from the LSU portion of the AltiVec or SSE vector hardware compared to scalar code, except where loads or stores of large (up to 128-bit) chunks do the work of multiple smaller scalar loads or stores. Since every bit of data that you do arithmetic on must be first loaded into register, the LSU is potentially a bottleneck. If you want enhanced parallelism from the LSU, the only way to do that is to arrange your data in a contiguous format so that you can load in as much data as possible in as large a chunk as possible using a single address, do the calculation, then store the result out in a single big contiguous chunk. If your data is scattered throughout memory, this is not possible. Your vector code will spend a lot of time doing lots of little loads trying to coalesce scattered data into vectors and then even more time trying to scatter the results back out to memory using lots of little stores. If that isn't enough, there are also profound cache inefficiencies to accessing your data that way. Poor data layouts can nullify the vector advantage and even make vector code run slower than scalar code in some cases.</p>
+<p>Vector data should be kept together, preferably in aligned, uniform arrays so that it can be accessed in as big a chunk as possible. This is doubly important on SSE, where misaligned loads and stores cannot reach the same peak theoretical throughput as aligned loads and stores, and where the permute unit is much less capable at reordering data. If you are vectorizing a body of code for the first time, you should give serious thought to how your data is organized into memory. If you already have AltiVec code, then translating to SSE should be a snap, because you probably already did that work when writing the AltiVec code.</p>
+<p><em>Misalignment</em></p>
+<p>SSE provides aligned and misaligned loads and stores in three different flavors: integer, single precision floating point and double precision floating point. It is suggested that you use the appropriate load and store for the data that you are working on. The aligned and misaligned loads and stores are simple and easy to use and shouldn't require too much explanation, except for the caution that the aligned variants will trigger an illegal instruction exception if they are passed a misaligned address.</p><a name="//apple_ref/doc/uid/TP40002729-CH248-DontLinkElementID_23" title="Table 3-10Misaligned Load and Store Instructions"></a><div class="tableholder"><table class="graybox" border = "0" cellspacing="0" cellpadding="5">
+<caption class="tablecaption"><a name="//apple_ref/doc/uid/TP40002729-CH248-313136" title="Table 3-10Misaligned Load and Store Instructions"></a><strong>Table 3-10&nbsp;&nbsp;</strong>Misaligned Load and Store Instructions</caption>
+
+<tr>
+<th scope="col" align="left" style="font-weight: bold" bgcolor="#CCCCCC"><p>AltiVec</p></th>
+<th scope="col" align="left" style="font-weight: bold" bgcolor="#CCCCCC"><p>Type</p></th>
+<th scope="col" align="left" style="font-weight: bold" bgcolor="#CCCCCC"><p>SSE</p></th>
+</tr>
+
+
+<tr>
+<td  scope="row"><p>vec_ld(0,p)</p></td>
+<td ><p>vSInt8</p></td>
+<td ><p>_mm_load_si128((__m128i*)p) or _mm_loadu_si128((__m128i*)p)</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_ld(0,p)</p></td>
+<td ><p>vUInt8</p></td>
+<td ><p>_mm_load_si128((__m128i*)p) or _mm_loadu_si128((__m128i*)p)</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_ld(0,p)</p></td>
+<td ><p>vSInt16</p></td>
+<td ><p>_mm_load_si128((__m128i*)p) or _mm_loadu_si128((__m128i*)p)</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_ld(0,p)</p></td>
+<td ><p>vUInt16</p></td>
+<td ><p>_mm_load_si128((__m128i*)p) or _mm_loadu_si128((__m128i*)p)</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_ld(0,p)</p></td>
+<td ><p>vSInt32</p></td>
+<td ><p>_mm_load_si128((__m128i*)p) or _mm_loadu_si128((__m128i*)p)</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_ld(0,p)</p></td>
+<td ><p>vUInt32</p></td>
+<td ><p>_mm_load_si128((__m128i*)p) or _mm_loadu_si128((__m128i*)p)</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_ld(0,p)</p></td>
+<td ><p>vFloat</p></td>
+<td ><p>_mm_load_ps(p) or _mm_loadu_ps(p)</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_st(v,0,p)</p></td>
+<td ><p>vSInt8</p></td>
+<td ><p>_mm_store_si128((__m128i*)p, v) or _mm_storeu_si128((__m128i*)p, v)</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_st(v,0,p)</p></td>
+<td ><p>vUInt8</p></td>
+<td ><p>_mm_store_si128((__m128i*)p, v) or _mm_storeu_si128((__m128i*)p, v)</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_st(v,0,p)</p></td>
+<td ><p>vSInt16</p></td>
+<td ><p>_mm_store_si128((__m128i*)p, v) or _mm_storeu_si128((__m128i*)p, v)</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_st(v,0,p)</p></td>
+<td ><p>vUInt16</p></td>
+<td ><p>_mm_store_si128((__m128i*)p, v) or _mm_storeu_si128((__m128i*)p, v)</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_st(v,0,p)</p></td>
+<td ><p>vSInt32</p></td>
+<td ><p>_mm_store_si128((__m128i*)p, v) or _mm_storeu_si128((__m128i*)p, v)</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_st(v,0,p)</p></td>
+<td ><p>vUInt32</p></td>
+<td ><p>_mm_store_si128((__m128i*)p, v) or _mm_storeu_si128((__m128i*)p, v)</p></td>
+</tr>
+<tr>
+<td  scope="row"><p>vec_st(v,0,p)</p></td>
+<td ><p>vFloat</p></td>
+<td ><p>_mm_store_ps(p, v) or _mm_storeu_ps(p, v)</p></td>
+</tr>
+
+</table></div>
+<p>There are no Least Recently Used variants on the loads and stores. (Note: the G5 ignores the LRU amendment and treats <code><!--a-->lvxl<!--/a--></code> and <code><!--a-->stvxl<!--/a--></code> as <code><!--a-->lvx<!--/a--></code> and <code><!--a-->stvx<!--/a--></code>.) There are however non-temporal stores. These cause the store to be written directly to memory. If the address maps to entries in the cache, the cache data is flushed out with the store. These can provide large performance increases, but should be used with caution. You only want to use them with data that you aren't going to need again for a while. Non-temporal stores require use of a SFENCE synchronization primitive before the data may be loaded back in again to ensure a coherent memory state.</p>
+<p>The method of handling misaligned 128-bit vector loads and stores is nearly orthogonal between AltiVec and SSE. While you can do aligned loads on SSE like AltiVec, SSE lacks the concatenate-and-shift-by-variable capability that AltiVec has (done with <code><!--a-->lvsl<!--/a--></code>, <code><!--a-->vperm<!--/a--></code>). Though SSE has 128-bit shifts (by octet), they take immediates which must be known at compile time, preventing their use for misalignment. In most cases, it is required to use the misaligned load and store instructions when one needs to access data of unknown alignment. This means that your AltiVec misalignment handling code is probably not directly translatable to SSE. You'll likely need to rewrite that segment of the function with entirely new code to handle misalignment the SSE way.</p>
+<p>Misaligned stores are much slower than misaligned loads. They should be avoided whenever possible. Typically the right thing to do with misaligned arrays is have a small scalar loop that iterates until it reaches a store address that is aligned, then skip to vector code to do as many aligned stores as possible, then do a bit more scalar calculation at the end. With some clever code design, it is also possible to use misaligned stores at either end of the array and aligned stores for the middle. This can be a little complicated if the function operates in place.</p>
+<p>Keep in mind that the different misalignment handling strategies carry along with them different rules about when it is safe to do what. For example, it is always safe to load an aligned vector as long as at least one byte in the vector is valid data. However, it is only safe to load a misaligned vector if all the bytes in the misaligned vector are valid data. Thus, while you may have frequently read a few bytes past the end of misaligned arrays with AltiVec (which only supports aligned vector loads — misalignment is handled in software), you may not do that safely using SSE, where misaligned loads are directly supported in hardware and using aligned loads to access misaligned data is generally not done because the requisite shift instruction is missing.</p>
+<p>The Intel hardware prefetchers are generally much more agile and able than similar hardware on PowerPC. If you do need to prefetch, you may use the GCC extension <code>__builtin_prefetch( ptr )</code>. This works on PowerPC, as well. It fetches a cacheline containing the address pointed to by <em>ptr</em>.</p>
+<p><em>Scalar Loads and Stores</em></p>
+<p>SSE provides a rich set of scalar loads and stores. <code>MOVQ</code> and <code>MOVD</code> can be used to move 8- and 4-byte integers to and from the low element on the XMM vector. These instructions can also be used to move the same amount of data to and from the MMX and r32 registers, which is a feature unknown to PowerPC. So, while there are no 16-bit and 8-bit element loads and stores, one can do a byte or 16-bit word load or store using the scalar integer registers, and use <code>MOVD</code> to move data between the integer registers and the vector unit.</p>
+<p>Similarly, there are scalar floating point move instructions for single and double precision floating point, <code>MOVSS</code> and <code>MOVSD</code>. These likewise place or use the data in the low element of the XMM register. They can be used to move data between XMM registers as well.</p>
+<p>Be aware that when the destination operand is an XMM register, the move element instructions will zero the rest of the destination register. Element loads and stores do not have alignment restrictions. Because alignment is handled so differently between AltiVec vector element loads and stores and SSE vector element loads and stores, segments of code that rely on these operations will in many cases need to be rewritten.</p>
+<p>SSE element loads and stores are very important to the SSE architecture. More so than for AltiVec, element loads and stores are frequently the solution to difficult permute problems.</p>
+<p><em>x86 is Little Endian!</em></p>
+<p>As mentioned before (see <span class="content_text"><a href="migration_sse_translation.html#//apple_ref/doc/uid/TP40002729-CH248-312356">Figure 4-1</a></span>), elements of a vector and the bytes within the elements are reversed when stored in register. If your data looks like this in code:</p>
+<div class="codesample"><table><tr><td scope="row"><pre>float f[4]= { 0.0f, 1.0f, 2.0f, 3.0f };<span></span></pre></td></tr><tr><td scope="row"><pre>vFloat v = _mm_loadu_ps( f );<span></span></pre></td></tr></table></div>
+<p>The data in <code>v</code> will look like this:</p>
+<div class="codesample"><table><tr><td scope="row"><pre>v = { 3.0f, 2.0f, 1.0f, 0.0f }<span></span></pre></td></tr></table></div>
+<p>Don't worry! If you store the data back out, it will be swapped again and appear in the original order shown by <code>f[4]</code>. The order is only backwards in register. (The bytes inside the elements themselves are in big endian byte order in register. The swap on store, makes the bytes in the elements little endian and restores the order of the elements to the expected order.)</p>
+<p>If your permutes all seem to be broken, and left shifts go right and right shifts go left, it is likely you've forgotten about this element ordering reversal.</p>
+<a name="//apple_ref/doc/uid/TP40002729-CH248-311761" title="Performance Tips"></a><h2>Performance Tips</h2>
+<ul class="ul"><li class="li"><p>Shark it! Shark is still the best way to identify performance problems. This will help you determine what to vectorize. The system trace facility will show you what other problems need to fixed to make vectorization the win it should be. There is no cycle accurate simulator available for Intel at this time.</p></li>
+<li class="li"><p>Unroll Different. You may have unrolled N-way in parallel on PowerPC. The Intel architecture is much narrower, and tolerates serial data dependencies better. Indeed, serial data dependencies get better throughput for some stages of the pipeline (register allocation) than does simple access of named registers. Generally speaking, the compiler can handle this form of unrolling for you, saving you time. There are no aliasing problems to worry about.</p></li>
+<li class="li"><p>Register spillage is expensive. Don't believe everything you read about really fast loads and stores. They are fast, but they still take time. If you are spilling data out on the stack, those loads and stores usually are taking significant time that could have been used for something else.</p></li>
+<li class="li"><p>Reduce or eliminate your need for the permute unit. It is not as strong as on AltiVec. You could find yourself spending all your CPU time solving permute problems rather than doing actual work. (This was already a problem for AltiVec!) Reorganize your data in memory so that it doesn't need to be reorganized in the permute unit. Align data whenever possible. Many permute problems can be solved a different way by loading in data differently, taking advantage of Intel's many different MOV instructions.</p></li>
+<li class="li"><p>Don't bother synthesizing constants on the fly like you did for AltiVec. Most of the time, you won't have register space to keep those constants in register. You also don't have <code>vec_splat_*</code>, so synthesizing constants takes a lot longer.</p></li>
+<li class="li"><p>See if you can replace vec_sel with simpler Boolean operations like <code><!--a-->AND<!--/a--></code>, <code><!--a-->ANDNOT<!--/a--></code>, <code><!--a-->XOR<!--/a--></code> or <code><!--a-->OR<!--/a--></code>. You can save two instructions and maybe a register or two every time you manage to do that.</p></li>
+<li class="li"><p>It is still just as worthwhile to pay attention to cache usage. You can prefetch data using the GCC extension, __builtin_prefetch(). If you need to store out data and won't need to use it again for a while, the non-temporal stores might be a large win. These flush the cash, so be careful. They aren't always a win!</p></li>
+<li class="li"><p>If you store out multiple small pieces of data (e.g. four floats in float[4]) and then load in a large piece of data (e.g. a vFloat) that covers that same area, this causes a large stall, because the floating point stores need to flush out all the way to the caches before the data is available. Store forwarding doesn't work in that case. While unions are a handy way to do data transfer, they can get you into trouble too.</p></li>
+<li class="li"><p>Just like AltiVec, denormal stalls can be very expensive. Unlike AltiVec, you are much more likely to encounter them.</p></li>
+<li class="li"><p>While translating code from AltiVec to SSE, pay attention to the expense of each translation. Some AltiVec instructions translate directly to a single SSE equivalent, while another potentially very similar instruction may take a dozen SSE instructions to do. Sometimes, it is better to be flexible about which one you use, rather than translate verbatim — convert floats to signed ints, rather than unsigned, if you don't need the extra range. Other times, you might want to rewrite the core logic of an algorithm to emphasize the strengths of both vector architectures, not just one.</p></li>
+<li class="li"><p>AltiVec is a rich ISA. This gives you a lot of freedom. There are frequently three ways to do anything, one of which is highly unintuitive but delivers a miracle in two instructions. SSE is smaller. Usually, the obvious way to do something is the best way. Keep it simple.</p></li>
+<li class="li"><p>SSE involves destructive instructions most of the time. If you can phrase your algorithm in terms of destructive logic, you can probably save some unnecessary copies, and possibly some register spillage. (This will probably preclude software pipelining. However, software pipelining may not be necessary because the Intel processors are highly out-of-order.)</p></li>
+<li class="li"><p>Heed cautions and tips in the Intel Processor Optimization Reference Manual.</p></li></ul>
+
+        <br /><br /> 
+        
+        <div class="mini_nav_text" align="left">
+        <span class="navButtons">
+        <a href="../migration_sse_C/migration_sse_C.html">&lt; Previous Page</a><span style="margin-left: 8px"><a href="../migration_revhx/migration_revhx.html">Next Page &gt;</a></span>
+        </span>
+        <span id="showHideTOCLowerSpan">
+        <a href="#" onclick="showHideTOC();"><img src="../../../../Resources/Images/show_toc_icon.gif" width="15" height="14" border="0" style="margin-bottom: -2px;" alt="" /></a> <a href="#" onclick="showHideTOC();">Hide TOC</a>
+        </span>
+        </div>
+
+        <br/><hr /><div align="center"><p class="content_text" lang="en" dir="ltr"> <!--#if expr="0=1" -->&#x00a9; 2005 Apple Computer, Inc. All Rights Reserved. &#40;<!--#endif -->Last updated: 2005-09-08<!--#if expr="0=1" -->&#041;<!--#endif --></p></div>
+
+        
+        <div class="hideOnPrint hideInXcode">
+        <!-- start of footer -->
+        	<table width="100%" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/documentation/Performance/Conceptual/Accelerate_sse_migration/migration_sse_translation/migration_sse_translation.html%3Fid%3DTP40002729-1.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/documentation/Performance/Conceptual/Accelerate_sse_migration/migration_sse_translation/migration_sse_translation.html%3Fid%3DTP40002729-1.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/documentation/Performance/Conceptual/Accelerate_sse_migration/migration_sse_translation/migration_sse_translation.html%3Fid%3DTP40002729-1.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+
+        <!--#include virtual="/includes/framesetfooter" -->
+        <!-- end of footer -->
+        </div>
+    </div>
+</body>
+</html>

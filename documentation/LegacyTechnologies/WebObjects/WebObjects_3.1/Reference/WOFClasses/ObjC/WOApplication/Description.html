@@ -1,0 +1,1885 @@
+<html>
+
+<body bgcolor="#FFFFFF">
+
+<CENTER><H1>Class WOApplication</H1></CENTER>
+
+<!-- inherits from:NSObject -->
+
+<DL>
+
+<DT><B>Inherits From:</B></DT><DD>NSObject</DD>
+
+<DT><B>Conforms To:</B></DT><DD>NSObject (NSObject)</DD>
+
+</DL>
+
+<P>
+
+
+
+<HR>
+
+<A name="classAtAGlance"></A>
+
+<CENTER>
+
+  <H2>
+
+    CLASS AT A GLANCE
+
+  </H2>
+
+</CENTER>
+
+<P>
+
+<h4>Purpose</h4>
+
+<P>
+
+A WOApplication object receives an HTTP request from an adaptor, manages the request-response loop that processes the request, and returns a response to the adaptor. It also manages sessions, caches component definitions and page instances, and offers localization, debugging, and error-handling support.
+
+<H4>Principal Attributes</h4>
+
+<UL>
+
+<LI>Application bundle
+
+<LI>Session store
+
+<LI>Page and component-definition caches
+
+<LI>Current adaptors
+
+</UL>
+
+<H4>Creation</H4>
+
+WebObjects Builder (Application.wos)
+
+<br>
+
+<b>application</b>
+
+<H4>Commonly Used Methods</H4>
+
+<TABLE><TR>
+
+<TD> pageWithName: </td>
+
+<td>Returns a Component (page) instance identified by name.</td>
+
+</TR><TR>
+
+<TD>awake</td><TD>Allows custom application initializations during the start of a request-response cycle.</td>
+
+</TR><TR>
+
+<td>takeValuesFromRequest:inContext:<BR>invokeActionForRequest:inContext:<BR>appendToResponse:inContext: </td><td>These three methods allow custom application logic during the value-extraction, action-invocation, and HTML-generation phases of the request-reponse loop.</td>
+
+</TR><TR>
+
+<td> setTimeOut: </td><td>Sets the period of inactivity after which the application process stops executing.</td>
+
+</TR><TR>
+
+<td> setPageCacheSize: </td><td>Sets the number of page instances cached in the session by the application.</td>
+
+</TR><TR>
+
+<td> setCachingEnabled:</td><td>Controls whether the application caches component definitions.</td>
+
+</TR>
+
+</table>
+
+<BR>
+
+<hr>	
+
+<BR>
+
+<A name="description"></A><CENTER><H2>CLASS DESCRIPTION</H2></CENTER>
+
+
+
+
+
+<P>
+
+The primary role of the WOApplication class is to coordinate the handling
+
+of HTTP requests. Each application must have exactly one WOApplication object
+
+(or, simply, <I>application object</I>). The application object receives client
+
+requests from an HTTP server adaptor, manages the processing that generates
+
+a response, and returns that response--typically an object representing a
+
+Web page--to the adaptor. The adaptor, in turn, forwards the response in
+
+a suitable form to the HTTP server that originated the request.
+
+<P>
+
+In handling requests, an application object creates and manages one or more
+
+sessions; a session (represented by a WOSession object) dedicates resources
+
+to a period of access by a single user, and stores persistent state during that period.
+Conceptually, each cycle of the request-response loop (or <I>transaction</I>)
+
+takes place within a session.
+
+<P>
+
+Besides acting as a facilitator between the adaptor and the rest of the
+
+application during request handling, WOApplication performs many secondary
+
+functions. It returns pages based on component name, caches page instances
+
+and component definitions, gives access to localized resources, provides
+
+some facilities for error handling and script debugging, and furnishes a
+
+variety of data, such as the base URL and the current WOContext object.
+
+<P>
+
+Typical deployment schemes balance the processing load by having multiple
+
+application instances per server adaptor. A single application, in turn,
+
+can interact with multiple adaptors; for example, an application can
+
+simultaneously communicate with secure-socket and Distributed Object adaptors
+
+as well as HTTP adaptors.
+
+<P>
+
+You can instantiate ready-made application objects from the WOApplication class or you can obtain the application object from a custom subclass of WOApplication. Custom WOApplication subclasses are common in WebObjects applications since there is often a need to override the <b>awake</b>, <b>sleep</b>, <b>init</b>, and request-handling methods. Compiled WOApplication subclasses can take any name, but if the name is anything other than "Application" you must modify the application's <b>main</b> function to instantiate the application object from this class. However, if the class name is "Application," you don't need to modify <b>main</b>. In scripted
+applications, the code in the <B>Application.wos</B> file becomes the
+implementation logic of a WOApplication subclass automatically created at
+run time; the application object is instantiated from this subclass. <BR>
+
+<BR>
+
+<H2>
+
+  The Application Run Loop
+
+</H2>
+
+<P>
+
+When a WebObjects application is launched from the command line, either manually
+
+or automatically ("autostarting"), the <B>main</B> function is called. In
+
+<B>main</B> the WOApplication subclass for the application is loaded. This
+
+class sets up for request handling by:
+
+<OL>
+
+  <LI>
+
+    Parsing the command-line arguments <BR>
+
+  <LI>
+
+    Creating and initalizing an application instance <BR>
+
+  <LI>
+
+    Instantiating the adaptors with which the application will communicate <BR>
+
+</OL>
+
+<P>
+
+The application instance then has its <B>run</B> method invoked; in this
+
+method it registers its adaptors to receive run-loop events and then starts
+
+a run loop. The application remains in this run loop until it either times
+
+out, receives a <B>terminate</B> message, or has its process externally stopped.
+
+<P>
+
+The events that initiate each cycle of the run loop are not, as in a typical
+
+non-Web application, user actions such as mouse clicks or key presses. Instead
+
+they are HTTP requests originating from client browsers. A browser sends
+
+an HTTP request (according to the URL specified) to an HTTP server, which
+
+then "talks" with a WebObjects adaptor customized for that server. The adaptor
+
+packages the request in a WORequest object and invokes the application object's
+
+<B>handleRequest:</B> method. The receipt of this message initiates a cycle
+
+of the <I>request-response</I> loop, a three-phase cycle that handles the
+
+request and returns (in most cases) a response in the form of a Web page.
+
+Each phase of the cycle centers around a message propagated from the application
+
+object to all other "interested" objects in the application:
+
+<UL>
+
+  <LI>
+
+    takeValuesFromRequest:inContext:
+
+  <LI>
+
+    invokeActionForRequest:inContext:
+
+  <LI>
+
+    appendToResponse:inContext:
+
+</UL>
+
+<!--Need to provide links for the following chapters, or just to the DevGuide and Serving WO -->
+
+<P>
+
+For more on the request-response loop, see the <i>WebObjects Developers Guide</i>,
+
+particularly the chapters "<a href="../../../../DevGuide/Intro/Start.book.html" target=_top>Introduction</a>," "<a href="../../../../DevGuide/HowWOWorks/HowWOWorks.mif.book.html" target=_top>How WebObjects Works</a>," and
+"<a href="../../../../DevGuide/RunLoop/RunLoop.book.html" target=_top>Integrating Your Code Into the Request-Response Loop</a>." For information on
+
+valid command-line arguments for launching an application, see the "<a href="../../../../ServingWebObjects/ManualStarting.html" target=_top>Manually
+
+Starting WebObjects Applications</a>" section of the <i>Serving WebObjects</i> document.
+
+<BR>
+
+<BR>
+
+<A name="Caching"></A>
+
+<H2>
+
+  <A name="Caching">Caching Strategies</A>
+
+</H2>
+
+<P>
+
+The WOApplication object implements or controls three kinds of caching.
+
+You turn caching off or on in each case for reasons ranging from performance
+
+enhancement to page integrity or ease of debugging.
+
+<DL>
+
+  <DT>
+
+    <B>Component-definition caching</B> <BR>
+
+  <DD>
+
+    Component definitions are compact programmatic descriptions of components
+
+    (pages or subcomponents), and are used to create instances of those components.
+
+    When a page of an application is requested the first time, an application
+
+    parses the HTML, declaration (".wod"), and implementation files in the component
+
+    directory (".wo"), creates an internal representation of the component (the
+
+    component definition), and instantiates the Component object from it. If
+
+    caching is enabled, it stores the component definition in memory. If not,
+
+    the application must reparse the files in the component directory every time
+
+    that page is revisited.
+
+    <P>
+
+    You turn component-definition caching off and on with the
+
+    <B>setCachingEnabled:</B> method. By default, it is disabled. The advantage
+
+    of having this kind of caching disabled is that you can edit a scripted component
+
+    without having to relaunch the application every time to check the results.
+
+    However, you should always enable component-definition caching when you deploy
+
+    an application since performance improves significantly when you do. You
+
+    can also control caching of individual component definitions using an identically
+
+    named WOComponent method. Selective caching is an especially valuable technique
+
+    for very large applications where only the most common components and pages
+
+    should be cached. <BR>
+
+    <BR>
+
+  <DT>
+
+    <B>Page-instance caching</B> <BR>
+
+  <DD>
+
+    In normal processing of requests, an application caches at least one page instance. It does this because the lifecycle of a page overlaps transaction boundaries: a page "begins" by having its HTML generated and "ends" when the user navigates to a new page, which replaces the previous page in the browser. Because the application caches the page instance that once represented the response page, it can easily make it the request page for the next transaction.
+
+<P>
+
+Page-instance caching also facilitates backtracking in the client browser. It
+
+    works like this: At the end of a request-response cycle, the application
+
+    object stores the WOComponent instance representing the response page in the
+
+    session. When the user backtracks to this page, the instance is restored
+
+    from the session object, enabling the page to display things as they were
+
+    when the user visited it the previous time. By default, page-instance caching
+
+    is enabled, with a cache limit of 30 pages.
+
+    <P>
+
+    You turn page-instance caching off by sending <B>setPageCacheSize:</B> to
+
+    the application object with an argument of zero. In this case, when the user
+
+    backtracks to a page, the page is not stored in the session and so must be
+
+    re-created "from scratch"; it will show none of its previous state. This
+
+    situation is sometimes what is appropriate for certain applications. If you
+
+    wish, you can also turn this feature off and implement your own selective
+
+    page-caching scheme. Because page storage uses up application memory, you
+
+    should test for the optimum cache size before you deploy an application with
+
+    page-instance caching turned on. <BR>
+
+    <BR>
+
+  <DT>
+
+    <B>Client caching</B> <BR>
+
+  <DD>
+
+    Usually client browsers cache pages (as HTML code) so they can redisplay
+
+    them when users backtrack to them. You can turn off client caching by setting
+
+    the date and the expiration time in the response page's headers to the current
+
+    date and time. The client, however, retains the URL for the page. When the
+
+    user backtracks to the page, the client resends the URL to the server, which
+
+    returns a page based on a restored component instance. 
+
+    <P>
+
+    WebObjects turns off client caching for you when you send the application
+
+    object <B>setPageRefreshOnBacktrackEnabled:</B> with an argument of
+
+    YES. This setting is valuable when you do not want the client to
+
+    backtrack to a page that would be obsolete because of changes that might
+
+    occur in the session. In particular, if you are using WODisplayGroup's batch
+
+    and selection-management functionality, you should turn off client caching.
+
+</DL>
+
+<P>
+
+<BR>
+
+<BR>
+
+<H2>
+
+  <A name="Localization">Localization and Resource Access</A>
+
+</H2>
+
+<P>
+
+WOApplication objects, as well as the WOComponent objects that they manage,
+
+are <I>bundles</I>. Bundles organize resources
+
+used by an executable in a file system and provide means to access those
+
+resources. For WOApplication, these means include:
+
+<UL>
+
+  <LI>
+
+    A method to access application resources (including components) through a
+
+    file-system path (<B>pathForResourceNamed:ofType:</B>)<BR>
+
+    <BR>
+
+  <LI>
+
+    A method to access application resources (including components) through a
+
+    URL (<B>urlForResourceNamed:ofType:</B>)<BR>
+
+    <BR>
+
+  <LI>
+
+    A method to access localized strings from a table
+
+    (<B>stringForKey:InTableNamed:withDefaultValue:</B>)
+
+</UL>
+
+<P>
+
+All three methods first look for localized versions of the application resource
+
+in <I>Language</I>.lproj subdirectories of the application wrapper (".woa"). They search the
+
+".lproj" directories (if they exist) in the preferred order of languages.
+
+If no resource is found in a language-specific subdirectory, the search continues
+
+directly under the application wrapper for the resource.
+
+<P>
+
+Localization in WebObjects depends on an array of languages stored (as String
+
+objects) in the WOSession object using WOSession's <B>setLanguages:</B>.
+
+The order of languages in the array indicates the preferred order. The language
+
+names in the array should map to "<I>Language</I>.lproj" subdirectories of
+
+the ".woa" directory. Thus, if there is a "French" item in the array, there
+
+should be a French.lproj subdirectory. The ".lproj" directories should contain
+
+everything that has localized content: ".strings" tables, sounds, images,
+
+and so on. Because the application first looks for resources in localized
+
+".lproj" directories and then in a non-localized location, be sure there
+
+are no files of the same name in localized locations when no localization
+
+is supposed to occur.
+
+<P>
+
+The ".strings" file contains a simple property list that maps common keys
+
+to words, phrases, or sentences in a particular language. For instance, a
+
+Session.strings file in English.lproj might have the following content:<BR>
+
+<PRE>{
+
+    buttonTitle = "Submit your request";
+
+}
+
+</PRE>
+
+<P>
+
+<BR>
+
+<P>
+
+The Session.strings file in French.lproj would have the following:<BR>
+
+<PRE>{
+
+    buttonTitle = "Soumettez votre requete";
+
+}
+
+</PRE>
+
+<P>
+
+<BR>
+
+<P>
+
+<B>Note</B>: You can determine the language of the request sender by getting
+
+the value of the WORequest object's "accept-language" header. This returns
+
+a two-character value ("en", "fr", and so on) that you can then map to the
+
+language subdirectory.<BR>
+
+<BR>
+
+<BR>
+
+<H2>
+
+  Error Handling and Debugging
+
+</H2>
+
+<P>
+
+WOApplication offers developers some assistance in the areas of debugging
+
+and error handling.
+
+<UL>
+
+  <LI>
+
+    You can invoke the <B>logWithFormat:</B> method at critical points in your code
+
+    to print debugging messages to the standard error device. You can also use the 
+    <b>trace...</b> methods to print messages to standard error whenever statements of 
+    a certain type are executed. <BR>
+
+    <BR>
+
+  <LI>
+
+    For handling exceptions that arise during request handling, WOApplication
+
+    gives the <B>handleException:</B> method as well as methods for handling errors
+
+    occuring at specific points in the request-response loop (for example,
+
+    <B>handlePageRestorationError</B>). The default implementation of these methods
+
+    prints debugging information on the browser page; you can override them to
+
+    implement "friendlier" or more elaborate error handling.<BR>
+
+    <BR>
+
+  <LI>
+
+    A WebObjects application can print diagnostic messages to the standard output
+
+    device when it parses HTML code, (for example, when it encounters unbalanced
+
+    containers). You can turn this feature off and on with the
+
+    <B>PrintsHTMLParserDiagnostics</B> method.
+
+</UL>
+
+<P>
+
+
+
+<HR>
+
+
+
+<!-- class methods -->
+
+<a name="class methods"><CENTER><H2>CLASS METHODS</H2></CENTER></a>
+
+<!-- key:application(+WOApplication) cons:application descr:<TT>+ (WOApplication *)<B>application</B> </TT> -->
+
+<H3><a name="application(+WOApplication)">application</a></H3>
+
+   <TT>+ (WOApplication *)<B>application</B> </TT>
+
+<P>
+
+Initializes and returns a WOApplication object.This initializes
+
+application attributes, reads in the archive file (Application.woo), and
+
+initializes the adaptor or adaptors specified on the command line. If no
+
+adaptor is specified, WODefaultAdaptor is made the default adaptor. Some
+
+of the more interesting attribute initializations are:
+
+<UL>
+
+  <LI>
+
+    Session store is in the server.
+
+  <LI>
+
+    Page cache size is 30 pages.
+
+  <LI>
+
+    Client caching of pages is enabled (<B>isPageRefreshOnBacktrackEnabled</B>
+
+    returns NO).
+
+  <LI>
+
+    Component-definition caching is disabled (<B>isCachingEnabled</B> returns
+
+    NO).
+
+  <LI>
+
+    Application time out is set to a very long period.
+
+</UL>
+
+<P>
+
+A exception is raised if initialization does not succeed. 
+
+
+
+<hr>
+
+</body>
+
+</html><html>
+
+<body bgcolor="#FFFFFF"><!-- instance methods -->
+
+<a name="instance methods"><CENTER><H2>INSTANCE METHODS</H2></CENTER></a>
+
+<!-- key:adaptorWithName:arguments:(-WOApplication) meth:adaptorWithName:arguments: descr:<TT>- (WOAdaptor *)<B>adaptorWithName:</B>(NSString *)<I>aName</I> <B>arguments:</B>(NSArray *)<I>arguments</I> </TT> -->
+
+<H3><a name="adaptorWithName:arguments:(-WOApplication)">adaptorWithName:arguments:</a></H3>
+
+   <TT>- (WOAdaptor *)<B>adaptorWithName:</B>(NSString *)<I>aName</I> <B>arguments:</B>(NSArray *)<I>someArguments</I> </TT>
+
+<P>
+
+Invoked during the <b>init</b> method to create an adaptor. If you subclass WOAdaptor, you specify the WOAdaptor subclass you want the application to use with the <b>-a</b> option on the application's command line. When WOApplication encounters the <b>-a</b> option, it invokes this method. This method looks for a subclass of WOAdaptor with the name <i>aName</i> (which was supplied as the <b>-a</b> option's argument), and if such a class exists, a new instance is initialized using the WOAdaptor method <b>initWithName:arguments:application:</b>. The <i>someArguments</i> array is populated with any adaptor-specific options (such as <b>-p</b> or <b>-q</b>) that follow the adaptor name on the command line. See the <a href="../WOAdaptor/WOAdaptor.html" target="_top">WOAdaptor</a> class for more information. 
+<P>
+
+<B>See Also: </B>- <b>adaptors</b>
+<hr>
+
+<!-- key:adaptors(-WOApplication) meth:adaptors descr:<TT>- (NSArray *)<B>adaptors</B> </TT> -->
+
+<H3><a name="adaptors(-WOApplication)">adaptors</a></H3>
+
+   <TT>- (NSArray *)<B>adaptors</B> </TT>
+
+<P>
+
+Returns the current list of application adaptors. A WOApplication can have multiple adaptors. (To associate the WOApplication with multiple adaptors, you specify each adaptor on the application's command line using the <b>-a</b> option.) This allows you to design an application that can not only listen to a socket for incoming HTTP requests (using the WODefaultAdaptor), but can also receive remote request messages using more advanced RPC mechanisms such as DO, CORBA, and DCOM.
+
+<P>
+
+
+<hr>
+
+<!-- key:appendToResponse:inContext:(-WOApplication) meth:appendToResponse:inContext: descr:<TT>- (void)<B>appendToResponse:</B>(WOResponse *)<I>aResponse</I> <B>inContext:</B>(WOContext *)<I>aContext</I> </TT> -->
+
+<H3><a name="appendToResponse:inContext:(-WOApplication)">appendToResponse:inContext:</a></H3>
+
+   <TT>- (void)<B>appendToResponse:</B>(WOResponse *)<I>aResponse</I> <B>inContext:</B>(WOContext *)<I>aContext</I> </TT>
+
+<P>
+
+The WOApplication object sends this message to itself to initiate the last
+
+phase of request handling. This occurs right after the
+
+<B>invokeActionForRequest:inContext:</B> method has completed, typically with the return
+
+a response page. In the append-to-response phase, the application objects
+
+(particularly the response component itself) generate the HTML content of
+
+the page. WOApplication's default implementation of this method forwards
+
+the message to the session object.
+
+<P>
+
+<B>See Also: </b>- <b>invokeActionForRequest:inContext:</B>, - <B>takeValuesFromRequest:inContext:</B> 
+
+<hr>
+
+<!-- key:awake(-WOApplication) meth:awake descr:<TT>- (void)<B>awake</B> </TT> -->
+
+<H3><a name="awake(-WOApplication)">awake</a></H3>
+
+   <TT>- (void)<B>awake</B> </TT>
+
+<P>
+
+Invoked at the beginning of each cycle of the request-response loop, affording
+
+the opportunity to perform initializations with application-wide scope. Since the
+
+default implementation does nothing, overriden implementations do not have to call super.
+
+<P>
+
+<B>See Also: </b>- <b>sleep</B> 
+
+<hr>
+
+<!-- key:baseURL(-WOApplication) meth:baseURL descr:<TT>- (NSString *)<B>baseURL</B> </TT> -->
+
+<H3><a name="baseURL(-WOApplication)">baseURL</a></H3>
+
+   <TT>- (NSString *)<B>baseURL</B> </TT>
+
+<P>
+
+Returns the application URL relative to the server's document root, for example:
+
+<B>WebObjects/Examples/HelloWorld.woa</B>.
+
+<P>
+
+<B>See Also: </b>- <b>name</B>, - <b>path</B> 
+
+<hr>
+
+<!-- key:context(-WOApplication) meth:context descr:<TT>- (WOContext *)<B>context</B> </TT> -->
+
+<H3><a name="context(-WOApplication)">context</a></H3>
+
+   <TT>- (WOContext *)<B>context</B> </TT>
+
+<P>
+
+Returns the application's current WOContext object. May not be overridden.
+
+<P>
+
+<B>See Also: </B><!-- <A href="../Context/Context.html" target=_top>Context</A>
+
+class, --> + <B>application</B>, - <B>session</B> 
+
+<hr>
+
+<!-- key:createSession(-WOApplication) meth:createSession descr:<TT>- (WOSession *)<B>createSession</B> </TT> -->
+
+<H3><a name="createSession(-WOApplication)">createSession</a></H3>
+
+   <TT>- (WOSession *)<B>createSession</B> </TT>
+
+<P>
+
+Creates and returns a WOSession object to manage a session for the application.
+
+The method goes through several steps to locate the class to use for
+
+instantiating this object:
+
+<OL>
+
+  <LI>
+
+    First it looks for a compiled class of name "Session" that is a subclass
+
+    of WOSession (or WebSession if a Java application). 
+
+<BR>
+
+<BR>
+
+  <LI>
+
+    If such a class does not exist, it looks for a ".wos" script with the name
+
+    of "Session" in the application wrapper (".woa" directory). 
+
+<BR>
+
+<BR>
+
+  <LI>
+
+    If the <B>Session.wos</B> script exists, the method parses the script and
+
+    dynamically adds a scripted-class subclass of WOSession to the run time.
+
+</OL>
+
+<P>
+
+The method then returns an allocated and initialized (using the default
+
+WOSession initializer) session instance of the selected class. It raises
+
+an exception if it is unable to create a new session.
+
+<P>
+
+<B>Note: </B>An implication of the foregoing description is that the names
+
+of compiled WOSession subclasses should be "Session"; if not, you will have
+
+to override this method to use the proper class to create the session object.
+
+<P>
+
+<B>See Also: </b>- <b>restoreSession</B>, - <B>saveSession:</B> 
+
+<hr>
+
+<!-- key:dynamicElementWithName:associations:template:(-WOApplication) meth:dynamicElementWithName:associations:template: descr:<TT>- (WODynamicElement *)<B>dynamicElementWithName:</B>(NSString *)<I>aName</I> <B>associations:</B>(NSDictionary *)<I>someAssociations</I> <B>template:</B>(WOElement *)<I>anElement</I> </TT> -->
+
+<H3><a name="dynamicElementWithName:associations:template:(-WOApplication)">dynamicElementWithName:associations:template:</a></H3>
+
+   <TT>- (WODynamicElement *)<B>dynamicElementWithName:</B>(NSString *)<I>aName</I> <B>associations:</B>(NSDictionary *)<I>someAssociations</I> <B>template:</B>(WOElement *)<I>anElement</I> </TT>
+
+<P>
+
+Creates and returns a WODynamicElement object based on the element's name, a dictionary of associations, and a template of elements. This method is invoked automatically to provide a WODynamicElement object that represents a WEBOBJECT element in the HTML template. You don't ordinarily invoke <B>dynamicElementWithName:associations:template:</B>, but you might override it to substitute your own WODynamicElement or reusable component for one of the built-in WODynamicElements.
+<P>The arguments <I>aName</I> and <I>someAssociations</I> are derived from a corresponding line in the declarations file. <I>aName</I> is an NSString that identifies the kind of element to create.  Generally <I>aName</I> specifies a built-in WODynamicElement such as WOString, but it may also identify a reusable component. (For more information, see the chapter "<A HREF="../../../../DevGuide/Reuse/Reuse.book.html" target="_top">Using Reusable Components</A>" in the <i>WebObjects Developer's Guide</i>.) For example, in the <B>dynamicElementWithName:associations:template:</B> message for the following declaration:
+<PRE>APP_STRING: WOString {value = applicationString;};
+</PRE>
+<P><I>aName</I> contains the string "WOString".
+<P>The <I>someAssociations</I> dictionary contains an entry for each attribute specified in the corresponding declaration. For the declaration above, <I>someAssociations</I> contains a single entry for WOString's <B>value</B> attribute. The keys of <I>someAssociations</I> are the attribute names and the values are WOAssociation objects.
+<P>WOApplication's implementation of <B>dynamicElementWithName:associations:template:</B> first searches for a WODynamicElement named <I>aName</I>. If a WODynamicElement is found, the method creates an instance using the method <b>initWithName:associations:template:</b> and returns it. Otherwise, it searches for a component--either scripted or compiled--to return instead. If neither are found, this method returns <B>nil</B>.
+
+<P>
+
+<hr>
+
+<!-- key:handleException:(-WOApplication) meth:handleException: descr:<TT>- (WOResponse *)<B>handleException:</B>(NSException *)<I>anException</I> </TT> -->
+
+<H3><a name="handleException:(-WOApplication)">handleException:</a></H3>
+
+   <TT>- (WOResponse *)<B>handleException:</B>(NSException *)<I>anException</I> </TT>
+
+<P>
+
+Invoked when an exception occurs within the request-response loop. The default
+
+behavior displays a page with debugging information. You can override this
+
+method to catch exceptions and display a "friendlier" error page.
+
+<P>
+
+<B>See Also: </b>- <b>handlePageRestorationError</B>, - 
+
+<B>handleSessionCreationError</B>, - <B>handleSessionRestorationError</B> 
+
+<hr>
+
+<!-- key:handlePageRestorationError(-WOApplication) meth:handlePageRestorationError descr:<TT>- (WOResponse *)<B>handlePageRestorationError</B> </TT> -->
+
+<H3><a name="handlePageRestorationError(-WOApplication)">handlePageRestorationError</a></H3>
+
+   <TT>- (WOResponse *)<B>handlePageRestorationError</B> </TT>
+
+<P>
+
+Invoked when a page (WOComponent) instance cannot be restored, which typically
+
+happens when a user backtracks too far. Specifically, this method is invoked
+
+when the following occurs: the request is not the first of a session, page
+
+restoration by context ID fails, and page re-creation is disabled. The default
+
+behavior displays a page with debugging information. You can override this
+
+method to display a "friendlier" error page.
+
+<P>
+
+<B>See Also: </b>- <b>handleException:</B>, - <B>handleSessionCreationError</B>,
+
+- <B>handleSessionRestorationError</B> 
+
+<hr>
+
+<!-- key:handleRequest:(-WOApplication) meth:handleRequest: descr:<TT>- (WOResponse *)<B>handleRequest:</B>(WORequest *)<I>aRequest</I> </TT> -->
+
+<H3><a name="handleRequest:(-WOApplication)">handleRequest:</a></H3>
+
+   <TT>- (WOResponse *)<B>handleRequest:</B>(WORequest *)<I>aRequest</I> </TT>
+
+<P>
+
+Prepares for and manages the handling of a request. The method
+
+creates the WOResponse and WOContext objects used in the request-response loop
+
+and causes <B>awake</B> and <B>sleep</B> to be sent to application objects
+
+at the appropriate times. This method is invoked by the HTTP server adaptor.
+
+<hr>
+
+<!-- key:handleSessionCreationError(-WOApplication) meth:handleSessionCreationError descr:<TT>- (WOResponse *)<B>handleSessionCreationError</B> </TT> -->
+
+<H3><a name="handleSessionCreationError(-WOApplication)">handleSessionCreationError</a></H3>
+
+   <TT>- (WOResponse *)<B>handleSessionCreationError</B> </TT>
+
+<P>
+
+Invoked when a session (WOSession) instance cannot be created. The default
+
+behavior displays a page with debugging information. You can override this
+
+method to display a "friendlier" error page.
+
+<P>
+
+<B>See Also: </b>- <b>handleException:</B>, - <B>handlePageRestorationError</B>,
+
+- <B>handleSessionRestorationError</B> 
+
+<hr>
+
+<!-- key:handleSessionRestorationError(-WOApplication) meth:handleSessionRestorationError descr:<TT>- (WOResponse *)<B>handleSessionRestorationError</B> </TT> -->
+
+<H3><a name="handleSessionRestorationError(-WOApplication)">handleSessionRestorationError</a></H3>
+
+   <TT>- (WOResponse *)<B>handleSessionRestorationError</B> </TT>
+
+<P>
+
+Invoked when a session (WOSession) instance cannot be restored, which typically
+
+happens when the session times out. The default behavior displays a page
+
+with debugging information. You can override this method to display a
+
+"friendlier" error page.
+
+<P>
+
+<B>See Also: </b>- <b>handleException:</B>, - <B>handlePageRestorationError</B>,
+
+- <B>handleSessionCreationError</B> 
+
+<hr>
+
+<!-- key:init(-WOApplication) meth:init descr:<TT>- (id)<B>init</B> </TT> -->
+
+<H3><a name="init(-WOApplication)">init</a></H3>
+
+   <TT>- (id)<B>init</B> </TT>
+
+<P>
+
+Initializes application attributes, reads in the archive file (Application.woo), and
+
+initializes the adaptor or adaptors specified on the command line. If no
+
+adaptor is specified, WODefaultAdaptor is made the default adaptor. Some
+
+of the more interesting attribute initializations are:
+
+<UL>
+
+  <LI>
+
+    Session store is in the server.
+
+  <LI>
+
+    Page cache size is 30 pages.
+
+  <LI>
+
+    Client caching of pages is enabled (<B>isPageRefreshOnBacktrackEnabled</B>
+
+    returns NO).
+
+  <LI>
+
+    Component-definition caching is disabled (<B>isCachingEnabled</B> returns
+
+    NO).
+
+  <LI>
+
+    Application time out is set to a very long period.
+
+</UL>
+
+<P>
+
+A exception is raised if initialization does not succeed. 
+
+<P>
+<hr>
+
+<!-- key:invokeActionForRequest:inContext:(-WOApplication) meth:invokeActionForRequest:inContext: descr:<TT>- (WOElement *)<B>invokeActionForRequest:</B>(WORequest *)<I>aRequest</I> <B>inContext:</B>(WOContext *)<I>aContext</I> </TT> -->
+
+<H3><a name="invokeActionForRequest:inContext:(-WOApplication)">invokeActionForRequest:inContext:</a></H3>
+
+   <TT>- (WOElement *)<B>invokeActionForRequest:</B>(WORequest *)<I>aRequest</I> <B>inContext:</B>(WOContext *)<I>aContext</I> </TT>
+
+<P>
+
+The WOApplication object sends this message to itself to initiate the middle
+
+phase of request handling. In this phase, the message is propagated through
+
+the objects of the application until the dynamic element that has received
+
+the user action (for instance, a click on a button) responds to the message
+
+by triggering the method in the request component that is bound to the action.
+
+This phase occurs right after the <B>takeValuesFromRequest:inContext:</B> method has
+
+completed. The default WOApplication implementation of this method forwards
+
+the message to the session object.
+
+<P>
+
+<B>See Also: </b>- <b>appendToResponse</B>, - <B>takeValuesFromRequest:inContext:</B> 
+
+<hr>
+
+<!-- key:isCachingEnabled(-WOApplication) meth:isCachingEnabled descr:<TT>- (BOOL)<B>isCachingEnabled</B> </TT> -->
+
+<H3><a name="isCachingEnabled(-WOApplication)">isCachingEnabled</a></H3>
+
+   <TT>- (BOOL)<B>isCachingEnabled</B> </TT>
+
+<P>
+
+Returns whether component-definition caching is enabled. The default is NO.
+
+<P>
+
+<B>See Also: </b>- <b>setCachingEnabled:</B> 
+
+<hr>
+
+<!-- key:isPageRefreshOnBacktrackEnabled(-WOApplication) meth:isPageRefreshOnBacktrackEnabled descr:<TT>- (BOOL)<B>isPageRefreshOnBacktrackEnabled</B> </TT> -->
+
+<H3><a name="isPageRefreshOnBacktrackEnabled(-WOApplication)">isPageRefreshOnBacktrackEnabled</a></H3>
+
+   <TT>- (BOOL)<B>isPageRefreshOnBacktrackEnabled</B> </TT>
+
+<P>
+
+Returns whether caching of pages is disabled in the client. If so, the client
+
+does not restore request pages from its cache but re-creates them "from scratch"
+
+by resending the URL to the server. This flag is set to NO by default.
+
+<P>
+
+<B>See Also: </b>- <b>setPageRefreshOnBacktrackEnabled:</B> 
+
+<hr>
+
+<!-- key:isTerminating(-WOApplication) meth:isTerminating descr:<TT>- (BOOL)<B>isTerminating</B> </TT> -->
+
+<H3><a name="isTerminating(-WOApplication)">isTerminating</a></H3>
+
+   <TT>- (BOOL)<B>isTerminating</B> </TT>
+
+<P>
+
+Returns whether the application will terminate at the end of the current
+
+request-response loop.
+
+<P>
+
+<B>See Also: </b>- <b>setTimeOut:</B>, - <B>terminate</B>, - <B>timeOut</B> 
+
+<hr>
+
+<!-- key:logWithFormat:(-WOApplication) meth:logWithFormat: descr:<TT>- (void)<B>logWithFormat:</B>(NSString *)<I>aFormat</I> </TT> -->
+
+<H3><a name="logWithFormat:(-WOApplication)">logWithFormat:</a></H3>
+
+   <TT>- (void)<B>logWithFormat:</B>(NSString *)<I>aFormat</I> </TT>
+
+<P>
+
+Prints a message to the standard error device (stderr). The message can include
+
+formatted variable data using <b>printf</b>-style conversion specifiers, for example:
+
+<PRE>    id i = 500;
+
+    id f = 2.045;
+
+    [self logWithFormat:@"Amount = %@, Rate = %@, Total = %@", 
+         i, f, i*f];
+
+</PRE>
+
+<P>
+
+Note that in WebScript, all variables are objects, so the only conversion specifier allowed is <TT>%@</TT> as shown above. In compiled Objective-C code, all <b>printf</b> conversion specifiers are allowed. The equivalent 
+method in Java is <B>logString</B>. 
+<hr>
+
+<!-- key:name(-WOApplication) meth:name descr:<TT>- (NSString *)<B>name</B> </TT> -->
+
+<H3><a name="name(-WOApplication)">name</a></H3>
+
+   <TT>- (NSString *)<B>name</B> </TT>
+
+<P>
+
+Returns the name of the application, which includes all directories under
+
+<I>DOCUMENT_ROOT</I><B>/WebObjects</B> and is minus the ".woa" extension;
+
+for example "Examples/HelloWorld" is a typical application name.
+
+<P>
+
+<B>See Also: </b>- <b>baseURL</B>, - <B>path</B> 
+
+<hr>
+
+<!-- key:pageCacheSize(-WOApplication) meth:pageCacheSize descr:<TT>- (unsigned int)<B>pageCacheSize</B> </TT> -->
+
+<H3><a name="pageCacheSize(-WOApplication)">pageCacheSize</a></H3>
+
+   <TT>- (unsigned int)<B>pageCacheSize</B> </TT>
+
+<P>
+
+Returns the size of the internal cache for page instances. The default size
+
+is 30 instances.
+
+<P>
+
+<B>See Also: </b>- <b>setPageCacheSize:</B> 
+
+<hr>
+
+<!-- key:pageWithName:(-WOApplication) meth:pageWithName: descr:<TT>- (WOComponent *)<B>pageWithName:</B>(NSString *)<I>aName</I> </TT> -->
+
+<H3><a name="pageWithName:(-WOApplication)">pageWithName:</a></H3>
+
+   <TT>- (WOComponent *)<B>pageWithName:</B>(NSString *)<I>aName</I> </TT>
+
+<P>
+
+Returns a new page instance (a WOComponent object) identified by <I>aName</I>.
+
+
+If <I>aName</I> is <b>nil</b>, the "Main" component is assumed. If the method cannot
+
+create a valid page instance, it raises an exception.
+
+<P>
+
+<B>See Also: </B> - <B>restorePageForContextID:</B>, - <B>savePage:</B> 
+
+<hr>
+
+<!-- key:path(-WOApplication) meth:path descr:<TT>- (NSString *)<B>path</B> </TT> -->
+
+<H3><a name="path(-WOApplication)">path</a></H3>
+
+   <TT>- (NSString *)<B>path</B> </TT>
+
+<P>
+
+Returns the file-system path of the application, which is an absolute path
+
+and includes the ".woa" extension; for example
+
+"C:/NETSCAPE/ns-home/docs/WebObjects/Examples/HelloWorld.woa" is a typical
+
+application path.
+
+<P>
+
+<B>See Also: </b>- <b>baseURL</B>, - <B>name</B> 
+
+<hr>
+
+<!-- key:pathForResourceNamed:ofType:(-WOApplication) meth:pathForResourceNamed:ofType: descr:<TT>- (NSString *)<B>pathForResourceNamed:</B>(NSString *)<I>aName</I> <B>ofType:</B>(NSString *)<I>anExtension</I> </TT> -->
+
+<H3><a name="pathForResourceNamed:ofType:(-WOApplication)">pathForResourceNamed:ofType:</a></H3>
+
+   <TT>- (NSString *)<B>pathForResourceNamed:</B>(NSString *)<I>aName</I> <B>ofType:</B>(NSString *)<I>anExtension</I> </TT>
+
+<P>
+
+Returns the absolute path to the application resource having the name of
+
+<I>aName</I> and an extension of <I>aType</I>. The method searches all localized
+
+application ".lproj" directories before searching directly under the ".woa" wrapper.
+
+<P>
+
+See <A href="#Localization">Localization and Resource Access</A> in the class
+
+description for further details.
+
+<P>
+
+<B>See Also: </B> - <B>stringForKey:InTableNamed:withDefaultValue:</B>, - <B>urlForResourceNamed:ofType:</B> 
+
+<hr>
+
+<!-- key:printsHTMLParserDiagnostics(-WOApplication) meth:printsHTMLParserDiagnostics descr:<TT>- (BOOL)<B>printsHTMLParserDiagnostics</B> </TT> -->
+
+<H3><a name="printsHTMLParserDiagnostics(-WOApplication)">printsHTMLParserDiagnostics</a></H3>
+
+   <TT>- (BOOL)<B>printsHTMLParserDiagnostics</B> </TT>
+
+<P>
+
+Returns whether the HTML parser prints warning messages to the standard output
+
+device (stdout) if it encounters unbalanced container elements or other
+
+syntatically incorrect HTML.
+
+<P>
+
+<B>See Also:  </b>- <b>setPrintsHTMLParserDiagnostics:</B> 
+
+<hr>
+
+<!-- key:restorePageForContextID:(-WOApplication) meth:restorePageForContextID: descr:<TT>- (WOComponent *)<B>restorePageForContextID:</B>(NSString *)<I>contextID</I> </TT> -->
+
+<H3><a name="restorePageForContextID:(-WOApplication)">restorePageForContextID:</a></H3>
+
+   <TT>- (WOComponent *)<B>restorePageForContextID:</B>(NSString *)<I>contextID</I> </TT>
+
+<P>
+
+Returns a page instance stored the session page cache. The key to the stored
+
+instance is the context ID, which derives from the transaction's WOContext
+
+or WORequest objects. This method returns <B>nil</B> if restoration is impossible.
+
+<P>
+
+<B>See Also:  </b>- <b>savePage:</B> 
+
+<hr>
+
+<!-- key:restoreSession(-WOApplication) meth:restoreSession descr:<TT>- (WOSession *)<B>restoreSession</B> </TT> -->
+
+<H3><a name="restoreSession(-WOApplication)">restoreSession</a></H3>
+
+   <TT>- (WOSession *)<B>restoreSession</B> </TT>
+
+<P>
+
+Restores the WOSession object representing a session. In normal request
+
+handling, this method is invoked at the start of a cycle of the request-response
+
+loop. The default implementation simply invokes WOSessionStore's
+
+<B>restoreSession</B> method, but raises an exception if the WOSessionStore
+
+object is missing.
+
+<P>
+
+<B>See Also:  </b>- <b>createSession</B>, - <B>saveSession:</B>, 
+
+<hr>
+
+<!-- key:run(-WOApplication) meth:run descr:<TT>- (void)<B>run</B> </TT> -->
+
+<H3><a name="run(-WOApplication)">run</a></H3>
+
+   <TT>- (void)<B>run</B> </TT>
+
+<P>
+
+Runs the application in a near-indefinite run loop in the default run-loop
+
+mode. Before starting the run loop, the method sends <B>registerForEvents</B>
+
+to the application's adaptors so that they can begin receiving run-loop events.
+
+Normally, <b>run</b> is invoked in the <B>main</B> function.
+
+<P>
+
+<B>See Also:  </b>- <b>setTimeOut:</B> 
+
+<hr>
+
+<!-- key:runLoop(-WOApplication) meth:runLoop descr:<TT>- (NSRunLoop *)<B>runLoop</B> </TT> -->
+
+<H3><a name="runLoop(-WOApplication)">runLoop</a></H3>
+
+   <TT>- (NSRunLoop *)<B>runLoop</B> </TT>
+
+<P>
+
+Returns the run loop used in the <b>run</b> method.
+<P>
+
+<hr>
+
+<!-- key:savePage:(-WOApplication) meth:savePage: descr:<TT>- (void)<B>savePage:</B>(WOComponent *)<I>aPage</I> </TT> -->
+
+<H3><a name="savePage:(-WOApplication)">savePage:</a></H3>
+
+   <TT>- (void)<B>savePage:</B>(WOComponent *)<I>aPage</I> </TT>
+
+<P>
+
+Saves the page instance <I>aPage</I> in the session page cache. The
+
+context ID for the current transaction is made the key for obtaining this
+
+instance in the cache using <B>restorePageForContextID:</B>. 
+
+<hr>
+
+<!-- key:saveSession:(-WOApplication) meth:saveSession: descr:<TT>- (void)<B>saveSession:</B>(WOSession *)<I>aSession</I> </TT> -->
+
+<H3><a name="saveSession:(-WOApplication)">saveSession:</a></H3>
+
+   <TT>- (void)<B>saveSession:</B>(WOSession *)<I>aSession</I> </TT>
+
+<P>
+
+Saves a WOSession object that represents a session. In normal request handling,
+
+this method is invoked at the end of a cycle of the request-response loop.
+
+The default implementation simply invokes WOSessionStore's <B>saveSession:</B>
+
+method, but raises an exception if the WOSessionStore object is missing.
+
+<P>
+
+<B>See Also:  </b>- <b>restoreSession</B> 
+
+<hr>
+
+<!-- key:scriptedClassWithPath:(-WOApplication) meth:scriptedClassWithPath: descr:<TT>- (Class)<B>scriptedClassWithPath:</B>(NSString *)<I>aPath</I> </TT> -->
+
+<H3><a name="scriptedClassWithPath:(-WOApplication)">scriptedClassWithPath:</a></H3>
+
+   <TT>- (Class)<B>scriptedClassWithPath:</B>(NSString *)<I>aPath</I> </TT>
+
+<P>
+
+Loads a scripted class with the pathname <i>aPath</i> into the application. The specified script is parsed assuming the default string encoding, and the class and categories found in the script file are dynamically added to the runtime.
+<P>
+
+<hr>
+
+<!-- key:scriptedClassWithPath:encoding:(-WOApplication) meth:scriptedClassWithPath:encoding: descr:<TT>- (Class)<B>scriptedClassWithPath:</B>(NSString *)<I>aPath</I> <B>encoding:</B>(NSStringEncoding)<I>anEncoding</I> </TT> -->
+
+<H3><a name="scriptedClassWithPath:encoding:(-WOApplication)">scriptedClassWithPath:encoding:</a></H3>
+
+   <TT>- (Class)<B>scriptedClassWithPath:</B>(NSString *)<I>aPath</I> <B>encoding:</B>(NSStringEncoding)<I>anEncoding</I> </TT>
+
+<P>
+
+Loads a scripted class with the pathname <i>aPath</i> using the encoding <i>anEncoding</i>. The class and categories found in the script file are dynamically added to the runtime.
+<P>
+
+<hr>
+
+<!-- key:session(-WOApplication) meth:session descr:<TT>- (WOSession *)<B>session</B> </TT> -->
+
+<H3><a name="session(-WOApplication)">session</a></H3>
+
+   <TT>- (WOSession *)<B>session</B> </TT>
+
+<P>
+
+Returns the application's current WOSession object. May not be overridden.
+
+<P>
+
+<B>See Also:  </b>+ <b>application</B>, - <B>context</B> 
+
+<hr>
+
+<!-- key:sessionStore(-WOApplication) meth:sessionStore descr:<TT>- (WOSessionStore *)<B>sessionStore</B> </TT> -->
+
+<H3><a name="sessionStore(-WOApplication)">sessionStore</a></H3>
+
+   <TT>- (WOSessionStore *)<B>sessionStore</B> </TT>
+
+<P>
+
+Returns the application's current WOSessionStore object (which, by default,
+
+stores state in the server).
+
+<P>
+
+<B>See Also:  </b>- <b>setSessionStore:</B> 
+
+<hr>
+
+<!-- key:setCachingEnabled:(-WOApplication) meth:setCachingEnabled: descr:<TT>- (void)<B>setCachingEnabled:</B>(BOOL)<I>aFlag</I> </TT> -->
+
+<H3><a name="setCachingEnabled:(-WOApplication)">setCachingEnabled:</a></H3>
+
+   <TT>- (void)<B>setCachingEnabled:</B>(BOOL)<I>aFlag</I> </TT>
+
+<P>
+
+Enables or disables the caching of component definitions. Component definitions
+
+contain templates and other information about pages and subcomponents, and
+
+are used to generate instances of those components. When this flag is enabled,
+
+the application parses the script (or implementation) file, the HTML template,
+
+and the declaration (".wod") file of a component once and then stores the
+
+resulting component definition. By default, this kind of caching is disabled
+
+so that you can edit a scripted component without having to relaunch the
+
+application every time to check the results.
+You should always enable component-definition caching when you deploy an
+
+application since performance improves significantly. 
+
+
+<P>
+
+Do not confuse this type of caching with <I>page-instance caching</I> (see
+
+<B>setPageCacheSize:</B>). <A href="#Caching">Caching Strategies</A> in the class description provides further details.
+
+<P>
+
+<B>See Also:  </b>- <b>isCachingEnabled</B> 
+
+<hr>
+
+<!-- key:setPageCacheSize: (-WOApplication) meth:setPageCacheSize: descr:<TT>- (void)<B>setPageCacheSize:</B> (int) <I>anInt: </I> </TT> -->
+
+<H3><a name="setPageCacheSize:(-WOApplication)">setPageCacheSize: </a></H3>
+
+   <TT>- (void)<B>setPageCacheSize:</B> (int) <I>anInt: </I> </TT>
+
+<P>
+
+Sets whether caching of page instances will occur <I>and</I> the number of
+
+pages the cache will hold. When page-instance caching is enabled, the application
+
+stores the WOComponent instance corresponding to the response page in the session.
+
+When the page is backtracked to, it restores it from the session and makes
+
+it the request page. The state of the page is retained. By default, page-instance
+
+caching is enabled, with a cache limit of 30 pages.
+
+<P>
+
+You turn page-instance caching off by invoking this method with an argument
+
+of zero. In this case, when the user backtracks to a page, the page is not
+
+stored in the session and so must be re-created "from scratch." Do not confuse
+
+this type of caching with <I>component-definition caching</I> (see
+
+<B>setCachingEnabled:</B>).
+
+<P>
+
+See <A href="#Caching">Caching Strategies</A> in the class description for
+
+further details.
+
+<P>
+
+<B>See Also:  </b>- <b>pageCacheSize</B> 
+
+<hr>
+
+<!-- key:setPageRefreshOnBacktrackEnabled:(-WOApplication) meth:setPageRefreshOnBacktrackEnabled: descr:<TT>- (void)<B>setPageRefreshOnBacktrackEnabled:</B>(BOOL)<I>aFlag</I> </TT> -->
+
+<H3><a name="setPageRefreshOnBacktrackEnabled:(-WOApplication)">setPageRefreshOnBacktrackEnabled:</a></H3>
+
+   <TT>- (void)<B>setPageRefreshOnBacktrackEnabled:</B>(BOOL)<I>aFlag</I> </TT>
+
+<P>
+
+When <I>flag</I> is YES, disables caching of pages by the client
+
+by setting the page's expiration-time header to the current date and time.
+
+(By default, this attribute is set to NO.) Disabling of client
+
+caching affects what happens during backtracking. With client caching turned
+
+off, the browser resends the URL to the server for the page requested by
+
+backtracking. The application must return a new page to the browser
+
+(corresponding to a new WOComponent instance). This behavior is desirable when
+
+you do not want the user to backtrack to a page that might be obsolete because
+
+of changes that have occurred in the session.
+
+<P>
+
+When this flag is turned on and a request corresponding to a client backtrack
+
+occurs, the retrieved page will only be asked to regenerate its response.
+
+The first two phases of a normal request-response loop (value extraction
+
+from the request and action invocation) do not occur.
+
+<P>
+
+See <A href="#Caching">Caching Strategies</A> in the class description for
+
+further details.
+
+<P>
+
+<B>See Also:  </b>- <b>isPageRefreshOnBacktrackEnabled</B> 
+
+<hr>
+
+<!-- key:setPrintsHTMLParserDiagnostics:(-WOApplication) meth:setPrintsHTMLParserDiagnostics: descr:<TT>- (void)<B>setPrintsHTMLParserDiagnostics:</B>(BOOL)<I>aBool</I> </TT> -->
+
+<H3><a name="setPrintsHTMLParserDiagnostics:(-WOApplication)">setPrintsHTMLParserDiagnostics:</a></H3>
+
+   <TT>- (void)<B>setPrintsHTMLParserDiagnostics:</B>(BOOL)<I>aBool</I> </TT>
+
+<P>
+
+Sets whether the HTML parser prints warning messages to the standard output
+
+device (stdout) if it encounters unbalanced container elements or other
+
+syntatically incorrect HTML.
+
+<P>
+
+<B>See Also:  </b>- <b>printsHTMLParserDiagnostics</B> 
+
+<hr>
+
+<!-- key:setSessionStore:(-WOApplication) meth:setSessionStore: descr:<TT>- (void)<B>setSessionStore:</B>(WOSessionStore *)<I>aSessionStore</I> </TT> -->
+
+<H3><a name="setSessionStore:(-WOApplication)">setSessionStore:</a></H3>
+
+   <TT>- (void)<B>setSessionStore:</B>(WOSessionStore *)<I>aSessionStore</I> </TT>
+
+<P>
+
+Set the session-store object for the application. By default, an object that
+
+stores session state in process memory (that is, in the server) is used.
+
+The session-store object specifies the state storage strategy for the whole
+
+application. This object is responsible for making session objects persistent.
+
+WebObjects supports state storage in the server, in the page, and in cookies.
+
+You should set the session store object when the application starts up, before
+
+the first request is handled.
+
+<P>
+
+<B>See Also:  </b>- <b>sessionStore</B> 
+
+<hr>
+
+<!-- key:setTimeOut:(-WOApplication) meth:setTimeOut: descr:<TT>- (void)<B>setTimeOut:</B>(NSTimeInterval)<I>aTimeInterval</I> </TT> -->
+
+<H3><a name="setTimeOut:(-WOApplication)">setTimeOut:</a></H3>
+
+   <TT>- (void)<B>setTimeOut:</B>(NSTimeInterval)<I>aTimeInterval</I> </TT>
+
+<P>
+
+Sets the number of seconds the application can experience inactivity (no
+
+HTTP requests) before it terminates execution.
+
+<P>
+
+<B>See Also:  </b>- <b>timeOut</B> 
+
+<hr>
+
+<!-- key:sleep(-WOApplication) meth:sleep descr:<TT>- (void)<B>sleep</B> </TT> -->
+
+<H3><a name="sleep(-WOApplication)">sleep</a></H3>
+
+   <TT>- (void)<B>sleep</B> </TT>
+
+<P>
+
+Invoked at the conclusion of a request-handling cycle to give an application
+
+the opportunity for deallocating objects created and initialized in its
+
+<B>awake</B> method. The default implementation does nothing. 
+
+<hr>
+
+<!-- key:stringForKey:inTableNamed:withDefaultValue:(-WOApplication) meth:stringForKey:inTableNamed:withDefaultValue: descr:<TT>- (NSString *)<B>stringForKey:</B>(NSString *)<I>aKey</I> <B>inTableNamed:</B>(NSString *)<I>aTableName</I> <B>withDefaultValue:</B>(NSString *)<I>aDefaultValue</I> </TT> -->
+
+<H3><a name="stringForKey:inTableNamed:withDefaultValue:(-WOApplication)">stringForKey:inTableNamed:withDefaultValue:</a></H3>
+
+   <TT>- (NSString *)<B>stringForKey:</B>(NSString *)<I>aKey</I> <B>inTableNamed:</B>(NSString *)<I>aTableName</I> <B>withDefaultValue:</B>(NSString *)<I>aDefaultValue</I> </TT>
+
+<P>
+
+Returns a localized string from string table "<I>aTable</I>.strings" using
+
+<I>aKey</I> to look it up. If no string value for the key is found in the
+
+table, <I>defaultValue</I> (optional) is returned. The method first searches
+
+the "<I>aTable</I>.strings" file, if it exists, in each localized (".lproj")
+
+subdirectories of the application wrapper; searching proceeds in the order
+
+of the language list maintained by the WOSession object<!-- (for details, see
+
+the <B>setLanguages</B> method of the
+
+<A href="../WOSession/WOSession.html" target=_top> WOSession</A> class)-->.
+
+If no string value matching the key is found, the search then continues to
+
+the "<I>aTable</I>.strings" file (if it exists) directly under the application
+
+wrapper (the directory with the "woa" extension).
+
+<P>
+
+See <A href="#Localization">Localization and Resource Access</A> in the class
+
+description for further details.
+
+<P>
+
+<B>See Also:  </b>- <b>pathForResourceNamed:ofType:</B>, - <B>urlForResourceNamed:ofType:</B> 
+
+<hr>
+
+<!-- key:takeValuesFromRequest:inContext:(-WOApplication) meth:takeValuesFromRequest:inContext: descr:<TT>- (void)<B>takeValuesFromRequest:</B>(WORequest *)<I>aRequest</I> <B>inContext:</B>(WOContext *)<I>aContext</I> </TT> -->
+
+<H3><a name="takeValuesFromRequest:inContext:(-WOApplication)">takeValuesFromRequest:inContext:</a></H3>
+
+   <TT>- (void)<B>takeValuesFromRequest:</B>(WORequest *)<I>aRequest</I> <B>inContext:</B>(WOContext *)<I>aContext</I> </TT>
+
+<P>
+
+The WOApplication object sends this message to itself to start the first
+
+phase of request handling. In this phase, the message is propagated to the
+
+session and component objects involved in the request as well as the request
+
+page's dynamic elements. Each dynamic element acquires any entered data or
+
+changed state (such as a check in a check box) associated with an attribute
+
+and assigns the value to the variable bound to the attribute. The default
+
+WOApplication implementation of this method forwards the message to the
+
+session object.
+
+<P>
+
+<B>See Also:  </b>- <b>appendToResponse:inContext:</B>, - <B>invokeActionForRequest:inContext:</B> 
+
+<hr>
+
+<!-- key:terminate(-WOApplication) meth:terminate descr:<TT>- (void)<B>terminate</B> </TT> -->
+
+<H3><a name="terminate(-WOApplication)">terminate</a></H3>
+
+   <TT>- (void)<B>terminate</B> </TT>
+
+<P>
+
+Terminates the application process. Termination does not take place until
+
+the handling of the current request has completed.
+
+<P>
+
+<B>See Also:  </b>- <b>isTerminating</B>, - <B>setTimeOut:</B> 
+
+<hr>
+
+<!-- key:timeOut(-WOApplication) meth:timeOut descr:<TT>- (NSTimeInterval)<B>timeOut</B> </TT> -->
+
+<H3><a name="timeOut(-WOApplication)">timeOut</a></H3>
+
+   <TT>- (NSTimeInterval)<B>timeOut</B> </TT>
+
+<P>
+
+Returns the application's time-out interval: a period (in seconds) of inactivity
+
+before the application terminates execution. The default application time-out
+
+interval is a very large number.
+
+<P>
+
+<B>See Also:  </b>- <b>setTimeOut:</B> 
+
+<hr>
+
+<!-- key:trace:(-WOApplication) meth:trace: descr:<TT>- (void)<B>trace:</B>(BOOL)<I>aFlag</I> </TT> -->
+
+<H3><a name="trace:(-WOApplication)">trace:</a></H3>
+
+   <TT>- (void)<B>trace:</B>(BOOL)<I>aFlag</I> </TT>
+
+<P>
+
+If <i>aFlag</i> is YES, prints all trace messages (messages for scripted messages, compiled messages, and all statements in the application) to the standard error device. If <i>aFlag</i> is NO, stops printing all trace messages.
+
+<P>
+
+<B>See Also: </B>- <b>traceAssignments:</b>, - <b>traceObjectiveCMessages:</b>, - <b>traceScriptedMessages:</b>, - <b>traceStatements:</b>
+<hr>
+
+<!-- key:traceAssignments:(-WOApplication) meth:traceAssignments: descr:<TT>- (void)<B>traceAssignments:</B>(BOOL)<I>aFlag</I> </TT> -->
+
+<H3><a name="traceAssignments:(-WOApplication)">traceAssignments:</a></H3>
+
+   <TT>- (void)<B>traceAssignments:</B>(BOOL)<I>aFlag</I> </TT>
+
+<P>
+
+If <i>aFlag</i> is YES, prints a message to the standard error device every time an assignment statement is executed. If <i>aFlag</i> is NO, stops printing trace assignment messages.
+
+<P>
+
+<B>See Also: </B>- <b>trace:</b>, - <b>traceObjectiveCMessages:</b>, - <b>traceScriptedMessages:</b>, - <b>traceStatements:</b>
+<hr>
+
+<!-- key:traceObjectiveCMessages:(-WOApplication) meth:traceObjectiveCMessages: descr:<TT>- (void)<B>traceObjectiveCMessages:</B>(BOOL)<I>aFlag</I> </TT> -->
+
+<H3><a name="traceObjectiveCMessages:(-WOApplication)">traceObjectiveCMessages:</a></H3>
+
+   <TT>- (void)<B>traceObjectiveCMessages:</B>(BOOL)<I>aFlag</I> </TT>
+
+<P>
+
+If <i>aFlag</i> is YES, prints a message to the standard error device every time a message is sent to a compiled class. If <i>aFlag</i> is NO, stops printing trace Objective-C method messages.
+
+<P>
+
+<B>See Also: </B>- <b>trace:</b>, - <b>traceAssignments:</b>, - <b>traceScriptedMessages:</b>, - <b>traceStatements:</b>
+<hr>
+
+<!-- key:traceScriptedMessages:(-WOApplication) meth:traceScriptedMessages: descr:<TT>- (void)<B>traceScriptedMessages:</B>(BOOL)<I>aFlag</I> </TT> -->
+
+<H3><a name="traceScriptedMessages:(-WOApplication)">traceScriptedMessages:</a></H3>
+
+   <TT>- (void)<B>traceScriptedMessages:</B>(BOOL)<I>aFlag</I> </TT>
+
+<P>
+
+If <i>aFlag</i> is YES, prints a message to the standard error device every time a message is sent to a scripted class. If <i>aFlag</i> is NO, stops printing trace scripted method messages.
+
+<P>
+
+<B>See Also: </B>- <b>trace:</b>, - <b>traceAssignments:</b>, - <b>traceObjectiveCMessages:</b>, - <b>traceStatements:</b>
+<hr>
+
+<!-- key:traceStatements:(-WOApplication) meth:traceStatements: descr:<TT>- (void)<B>traceStatements:</B>(BOOL)<I>aFlag</I> </TT> -->
+
+<H3><a name="traceStatements:(-WOApplication)">traceStatements:</a></H3>
+
+   <TT>- (void)<B>traceStatements:</B>(BOOL)<I>aFlag</I> </TT>
+
+<P>
+
+If <i>aFlag</i> is YES, prints a message to the standard error device every time a statement in the application is executed. If <i>aFlag</i> is NO, stops printing trace statement messages.
+
+<P>
+
+<B>See Also: </B>- <b>trace:</b>, - <b>traceAssignments:</b>, - <b>traceObjectiveCMessages:</b>, - <b>traceScriptedMessages:</b>
+<hr>
+
+<!-- key:urlForResourceNamed:ofType:(-WOApplication) meth:urlForResourceNamed:ofType: descr:<TT>- (NSString *)<B>urlForResourceNamed:</B>(NSString *)<I>aName</I> <B>ofType:</B>(NSString *)<I>anExtension</I> </TT> -->
+
+<H3><a name="urlForResourceNamed:ofType:(-WOApplication)">urlForResourceNamed:ofType:</a></H3>
+
+   <TT>- (NSString *)<B>urlForResourceNamed:</B>(NSString *)<I>aName</I> <B>ofType:</B>(NSString *)<I>anExtension</I> </TT>
+
+<P>
+
+Returns the URL associated with an application resource having a name of
+
+<I>aName</I> and an extension of <I>aType</I>. The method searches all localized
+
+application ".lproj" directories before searching directly under the ".woa"
+
+wrapper for the resource.
+
+<P>
+
+See <A href="#Localization">Localization and Resource Access</A> in the class
+
+description for further details.
+
+<P>
+
+<B>See Also:  </b>- <b>pathForResourceNamed:ofType:</B>,  - <B>stringForKey:InTableNamed:withDefaultValue:</B> 
+
+<hr>
+
+</body>
+
+</html>
+

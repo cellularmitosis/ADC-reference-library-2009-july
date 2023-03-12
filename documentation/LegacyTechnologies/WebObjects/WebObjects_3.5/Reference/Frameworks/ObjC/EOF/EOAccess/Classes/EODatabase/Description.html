@@ -1,0 +1,492 @@
+<html><head><title></title></head>
+
+<body bgcolor="#ffffff">
+
+ 
+
+ 
+
+<h2><a name="//apple_ref/occ/cl/EODatabase">EODatabase</a>
+
+ <BR>
+
+</h2>
+
+<p><B>Inherits From:</B><BR>  
+
+NSObject
+
+
+
+<p><B>Conforms To:</B>
+
+NSObject (NSObject)
+
+
+
+<p><B>Declared in:</B>
+
+EOAccess/EODatabase.h
+
+
+
+<p><a name="384">
+
+<a name="description"></a>
+
+<h3>Class Description </h3>
+
+</a>An EODatabase represents a single database server. It contains an EOAdaptor which is capable of communicating with the server, a list of EOModels that describe the server's schema, a list of EODatabaseContexts that are connected to the server, and a set of snapshots representing the state of all objects stored in the server.<p>
+
+Each of an EODatabase's EODatabaseContexts forms a separate transaction scope, and is in effect a separate logical user to the server. An EODatabaseContext uses one or more pairs of EODatabaseChannel and EOAdaptorChannel objects to manage data operations (insert, update, delete, and fetch). Adaptors may support a limited number of contexts per database or channels per context, but an application is guaranteed at least one of each.<p>
+
+The EODatabase, EODatabaseContext, and EODatabaseChannel classes form the <strong>database level</strong> of the Enterprise Objects Framework. The database level is a client of the <em>adaptor level</em>, which is defined by the adaptor classes: EOAdaptor, EOAdaptorContext, and EOAdaptorChannel. Together, the database and adaptor levels make up the <em>access layer</em> of the Enterprise Objects Framework.<p>
+
+<img src="../EODatabase.gif"><p>
+
+<a name="386">
+
+<b>Figure 3 </b> The Access Layer
+
+
+
+</a>The database level acts as an intermediary between the adaptor level and the <em>control layer</em>, which includes an EOObjectStoreCoordinator and an EOEditingContext (<a href="#387">Figure 4</a>). The control layer operates in terms of enterprise objects, while the adaptor level operates in terms of database rows packaged as NSDictionaries. It's the job of the database level to perform the necessary object-to-relational translation between the two. <p>
+
+There's little need for your code to interact directly with an EODatabase. An EOEditingContext creates its own database level objects, which create their own corresponding adaptor level objects. Once the network of objects is in place, your code might interact with an EODatabase to access its corresponding EOAdaptor object, but additional programmatic interaction is usually unnecessary.<p>
+
+<img src="../EODatabase1.gif"><p>
+
+<a name="387">
+
+<b>Figure 4 </b> The Database Level as an Intermediary Between the Adaptor Level and the Control Layer
+
+
+
+</a><a name="388">
+
+<h3> Snapshots</h3>
+
+</a>EODatabase's most significant responsibility is to record <em>snapshots</em> for its EODatabaseContexts. A snapshot is a dictionary whose keys are attribute names and whose values are the corresponding, last-known database values. Enterprise Objects Framework records snapshots as it successfully fetches, inserts and updates enterprise objects. Snapshot information is used when changes to enterprise objects are saved back out to the database to ensure that row data has not been changed by someone else since it was last recorded by the application.<p>
+
+A snapshot contains entries for a row's primary key, class properties, foreign keys for class property relationships, and attributes used for locking. They are recorded under the globalIDs of their enterprise objects. (GlobalIDs are based on an object's primary key and its associated entity; see the class specification for EOGlobalID for more information.)<p>
+
+EODatabase also records snapshots for to-many relationships. These snapshots consist of an NSDictionary of NSDictionaries, in which the top-level dictionary has as its key the globaID of the enterprise object for which to-many relationships are being recorded. The key's value is a dictionary whose keys are the names of the enterprise object's to-many relationships. Each of these keys in turn has as its value an array of globalIDs that identify the objects at the destination of the relationship.<p>
+
+The snapshots made by an EODatabase form the global view of data for nearly every other part of the application, representing the current view of data in the server as far as the application is concerned (though other applications may have made changes). This global view is temporarily overridden locally by EODatabaseContexts, which form their own snapshots as they make changes during a transaction. When an EODatabaseContext commits its top-level transaction, it reconciles all changed snapshots with the global view of the database object, so that other database contexts (except those with open transactions) immediately use the new snapshots as well. EODatabaseContexts automatically use their EODatabase to record snapshots, so there's no need for your application to intervene in an EODatabase's snapshotting mechanism.<p>
+
+For more information on snapshots and how they relate to an application's update strategy, see the EODatabaseContext class specification.<p>
+
+Result Cache<p>
+
+An EODatabase also performs the function of caching enterprise objects for entities that cache their objects (see the EOEntity class specification). An EODatabase's result cache stores the globalIDs of enterprise objects for entities that cache their objects. The first time you perform a fetch against such an entity, all of its objects are fetched, regardess of the fetch specification used. The globalIDs of the resulting objects are stored in the EODatabase's result cache by entity name. Whenever possible, subsequent fetches are performed against the cache (in memory) rather than against the database. With a globalID, Enterprise Objects Framework can look up the values for the corresponding object in its snapshot using EODatabase's or EODatabaseContext's <a href="#475"><B>snapshotForGlobalID: </B></a> method.<p>
+
+As an example, suppose that you have an entity named Rating that contains all the valid ratings for Movies (G, PG, R, and so on). Rather than store a Movie's rating directly in the Movie as an attribute, Movie maintains a relationship to a Rating. To specify a rating for a movie, users select the rating from a pop-up list of the possible values. This Rating entity should cache its objects. The values that populate the rating pop-up list are only fetched once, and there's no need to fetch them again; the relationships between Movies and Ratings can be maintained without subsequent fetches.<p>
+
+The result cache is managed automatically; you shouldn't have to manipulate it explicitly. However, if you need to access or alter the cache, EODatabase provides several methods for interacting with it.<p>
+
+<dl><dt>Creating instances
+
+<dl><dt><a href="#//apple_ref/occ/instm/EODatabase/initWithModel:">- initWithModel:</a>
+
+<dt><a href="#//apple_ref/occ/instm/EODatabase/initWithAdaptor:">- initWithAdaptor:</a>
+
+<dt><a href="#//apple_ref/occ/instm/EODatabase/adaptor">- adaptor</a>
+
+</dl><dt>Adding and removing EOModels
+
+<dl><dt><a href="#//apple_ref/occ/instm/EODatabase/addModel:">- addModel:</a>
+
+<dt><a href="#//apple_ref/occ/instm/EODatabase/addModelIfCompatible:">- addModelIfCompatible:</a>
+
+<dt><a href="#//apple_ref/occ/instm/EODatabase/removeModel:">- removeModel:</a>
+
+<dt><a href="#//apple_ref/occ/instm/EODatabase/models">- models</a>
+
+</dl><dt>Getting EOEntities
+
+<dl><dt><a href="#//apple_ref/occ/instm/EODatabase/entityForObject:">- entityForObject:</a>
+
+<dt><a href="#//apple_ref/occ/instm/EODatabase/entityNamed:">- entityNamed:</a>
+
+</dl><dt>Recording snapshots
+
+<dl><dt><a href="#//apple_ref/occ/instm/EODatabase/recordSnapshot:forGlobalID:">- recordSnapshot:forGlobalID:</a>
+
+<dt><a href="#//apple_ref/occ/instm/EODatabase/recordSnapshots:">- recordSnapshots:</a>
+
+<dt><a href="#//apple_ref/occ/instm/EODatabase/forgetSnapshotForGlobalID:">- forgetSnapshotForGlobalID:</a>
+
+<dt><a href="#//apple_ref/occ/instm/EODatabase/forgetSnapshotsForGlobalIDs:">- forgetSnapshotsForGlobalIDs:</a>
+
+<dt><a href="#//apple_ref/occ/instm/EODatabase/forgetAllSnapshots">- forgetAllSnapshots</a>
+
+<dt><a href="#//apple_ref/occ/instm/EODatabase/snapshotForGlobalID:">- snapshotForGlobalID:</a>
+
+<dt><a href="#//apple_ref/occ/instm/EODatabase/snapshots">- snapshots</a>
+
+<dt><a href="#//apple_ref/occ/instm/EODatabase/recordSnapshot:forSourceGlobalID:relationshipName:">- recordSnapshot:forSourceGlobalID:relationshipName:</a>
+
+<dt><a href="#//apple_ref/occ/instm/EODatabase/recordToManySnapshots:">- recordToManySnapshots:</a>
+
+<dt><a href="#//apple_ref/occ/instm/EODatabase/snapshotForSourceGlobalID:relationshipName:">- snapshotForSourceGlobalID:relationshipName:</a>
+
+</dl><dt>Registering EODatabaseContexts
+
+<dl><dt><a href="#//apple_ref/occ/instm/EODatabase/registerContext:">- registerContext:</a>
+
+<dt><a href="#//apple_ref/occ/instm/EODatabase/unregisterContext:">- unregisterContext:</a>
+
+<dt><a href="#//apple_ref/occ/instm/EODatabase/registeredContexts">- registeredContexts</a>
+
+</dl><dt>Managing the result cache
+
+<dl><dt><a href="#//apple_ref/occ/instm/EODatabase/invalidateResultCache">- invalidateResultCache</a>
+
+<dt><a href="#//apple_ref/occ/instm/EODatabase/invalidateResultCacheForEntityNamed:">- invalidateResultCacheForEntityNamed:</a>
+
+<dt><a href="#//apple_ref/occ/instm/EODatabase/resultCacheForEntityNamed:">- resultCacheForEntityNamed:</a>
+
+<dt><a href="#//apple_ref/occ/instm/EODatabase/setResultCache:forEntityNamed:">- setResultCache:forEntityNamed:</a>
+
+</dl></dl><a name="412">
+
+<a name="instm"></a>
+
+<h3>Instance Methods </h3>
+
+</a><a name="413">
+
+<h4> <a name="//apple_ref/occ/instm/EODatabase/adaptor">adaptor</a></h4>
+
+</a>- (EOAdaptor *)<B>adaptor </B><p>
+
+Returns the EOAdaptor used by the EODatabase for communication with the database server. Your application can interact directly with the EOAdaptor, but should avoid altering its state (for example, by starting a transaction with one of its adaptor contexts).<p>
+
+<a name="416">
+
+<h4> <a name="//apple_ref/occ/instm/EODatabase/addModel:">addModel:</a></h4>
+
+</a>- (void)<B>addModel: </B>(EOModel *)<em>aModel</em><p>
+
+Adds <em>aModel</em> to the receiver's list of EOModels. This allows EODatabases to load entities and their properties only as they're needed, by dividing them among separate EOModels. <em>aModel</em> must use the same EOAdaptor as the receiver and use the same connection dictionary as the receiver's other EOModels.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EODatabase/addModelIfCompatible:">- addModelIfCompatible:</a> </B>, <a href="#//apple_ref/occ/instm/EODatabase/models"><B>- models</a> </B>, <a href="#//apple_ref/occ/instm/EODatabase/removeModel:"><B>- removeModel:</a>
+
+ </B><p><a name="420">
+
+<h4> <a name="//apple_ref/occ/instm/EODatabase/addModelIfCompatible:">addModelIfCompatible:</a></h4>
+
+</a>- (BOOL)<B>addModelIfCompatible: </B>(EOModel *)<em>aModel</em><p>
+
+Adds <em>aModel</em> to the receiver's list of EOModels, checking first to see whether it's compatible with those other EOModels. Returns YES if <em>aModel</em> is already in the list or if it's successfully added. Returns NO if <em>aModel</em>'s adaptor name differs from that of the receivers or if the receiver's adaptor returns NO to a <B>canServiceModel: </B> message.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EODatabase/addModel:">- addModel:</a> </B>, <a href="#//apple_ref/occ/instm/EODatabase/models"><B>- models</a> </B>, <a href="#//apple_ref/occ/instm/EODatabase/removeModel:"><B>- removeModel:</a>
+
+ </B><p><a name="424">
+
+<h4> <a name="//apple_ref/occ/instm/EODatabase/entityForObject:">entityForObject:</a></h4>
+
+</a>- (EOEntity *)<B>entityForObject: </B>(id)<em>anObject</em><p>
+
+Returns the EOEntity mapped to <em>anObject</em> in the receiver's EOModels, or <B>nil </B> if there is no such EOEntity. This method works by sending <B>entityForObject: </B> messages to each of the receiver's EOModels and returning the first one found.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EODatabase/entityNamed:">- entityNamed:</a>
+
+ </B><p><a name="428">
+
+<h4> <a name="//apple_ref/occ/instm/EODatabase/entityNamed:">entityNamed:</a></h4>
+
+</a>- (EOEntity *)<B>entityNamed: </B>(NSString *)<em>entityName</em><p>
+
+Returns the EOEntity named <em>entityName</em> in the receiver's EOModels, or <B>nil </B> if there is no such EOEntity. This method works by sending <B>entityNamed: </B> messages to each of the receiver's EOModels and returning the first one found.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EODatabase/entityForObject:">- entityForObject:</a>
+
+ </B><p><a name="432">
+
+<h4> <a name="//apple_ref/occ/instm/EODatabase/forgetAllSnapshots">forgetAllSnapshots</a></h4>
+
+</a>- (void)<B>forgetAllSnapshots </B><p>
+
+Clears all of the receiver's snapshots and posts an EOObjectsChangedInStoreNotification (defined in EOObjectStore) describing the invalidated object. For a description of snapshots and their role in an application, see the class description.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EODatabase/forgetSnapshotForGlobalID:">- forgetSnapshotForGlobalID:</a> </B>, <a href="#//apple_ref/occ/instm/EODatabase/forgetSnapshotsForGlobalIDs:"><B>- forgetSnapshotsForGlobalIDs:</a> </B>, 
+
+<B><a href="#//apple_ref/occ/instm/EODatabase/recordSnapshot:forGlobalID:">- recordSnapshot:forGlobalID:</a> </B>, <a href="#//apple_ref/occ/instm/EODatabase/recordSnapshots:"><B>- recordSnapshots:</a> </B>, 
+
+<B><a href="#//apple_ref/occ/instm/EODatabase/recordSnapshot:forSourceGlobalID:relationshipName:">- recordSnapshot:forSourceGlobalID:relationshipName:</a> </B>, <a href="#//apple_ref/occ/instm/EODatabase/recordToManySnapshots:"><B>- recordToManySnapshots:</a>
+
+ </B><p><a name="436">
+
+<h4> <a name="//apple_ref/occ/instm/EODatabase/forgetSnapshotForGlobalID:">forgetSnapshotForGlobalID:</a></h4>
+
+</a>- (void)<B>forgetSnapshotForGlobalID: </B>(EOGlobalID *)<em>globalID</em><p>
+
+Clears the snapshot made for the enterprise object identified by <em>globalID</em> and posts an EOObjectsChangedInStoreNotification (defined in EOObjectStore) describing the invalidated object. For a description of snapshots and their role in an application, see the class description.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EODatabase/forgetSnapshotsForGlobalIDs:">- forgetSnapshotsForGlobalIDs:</a> </B>, <a href="#//apple_ref/occ/instm/EODatabase/forgetAllSnapshots"><B>- forgetAllSnapshots</a> </B>, <a href="#//apple_ref/occ/instm/EODatabase/recordSnapshot:forGlobalID:"><B>- recordSnapshot:forGlobalID:</a>
+
+ </B><p><a name="440">
+
+<h4> <a name="//apple_ref/occ/instm/EODatabase/forgetSnapshotsForGlobalIDs:">forgetSnapshotsForGlobalIDs:</a></h4>
+
+</a>- (void)<B>forgetSnapshotsForGlobalIDs: </B>(NSArray *)<em>globalIDs</em><p>
+
+Clears the snapshots made for the enterprise objects identified by each of the EOGlobalIDs in <em>globalIDs</em> and posts an EOObjectsChangedInStoreNotification (defined in EOObjectStore) describing the invalidated objects. For a description of snapshots and their role in an application, see the class description.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EODatabase/forgetSnapshotForGlobalID:">- forgetSnapshotForGlobalID:</a> </B>, <a href="#//apple_ref/occ/instm/EODatabase/forgetAllSnapshots"><B>- forgetAllSnapshots</a> </B>, <a href="#//apple_ref/occ/instm/EODatabase/recordSnapshots:"><B>- recordSnapshots:</a>
+
+ </B><p><a name="444">
+
+<h4> <a name="//apple_ref/occ/instm/EODatabase/initWithAdaptor:">initWithAdaptor:</a></h4>
+
+</a>- <B>initWithAdaptor: </B>(EOAdaptor *)<em>anAdaptor</em><p>
+
+The designated initializer, this method initializes a newly allocated EODatabase with <em>anAdaptor</em> as its adaptor and returns <B>self </B>.<p>
+
+Typically, you don't need to programmatically create EODatabase objects. Rather, they are created automatically by the control layer. See the class description for more information. If you do need to create an EODatabase programmatically, you should never associate more than one EODatabase with a given EOAdaptor. In general, use <B><a href="#447">initWithModel:</a> </B>, which automatically selects the adaptor.<p>
+
+<a name="447">
+
+<h4> <a name="//apple_ref/occ/instm/EODatabase/initWithModel:">initWithModel:</a></h4>
+
+</a>- <B>initWithModel: </B>(EOModel *)<em>aModel</em><p>
+
+Initializes a newly allocated EODatabase by creating an instance of EOAdaptor named in <em>aModel</em> and invoking <B><a href="#444">initWithAdaptor:</a> </B>. Returns <B>self </B>. Typically, you don't need to programmatically create EODatabase objects. Rather, they are created automatically by the control layer. See the class description for more information.<p>
+
+<B>See also: </B>  
+
+<B><a href="../EOAdaptor.html#//apple_ref/occ/clm/EOAdaptor/adaptorWithModel:" target="_top">+ adaptorWithModel: </B> (EOAdaptor)</a>, <B><a href="../EOModel/EOModel.html#//apple_ref/occ/instm/EOModel/adaptorName" target="_top">- adaptorName </B> (EOModel)</a>
+
+<p><a name="376">
+
+<h4> <a name="//apple_ref/occ/instm/EODatabase/invalidateResultCache">invalidateResultCache</a></h4>
+
+</a>- (void)<code>invalidateResultCache</code><p>
+
+Invalidates the receiver's result cache. See the class description for more discussion of this topic.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EODatabase/invalidateResultCacheForEntityNamed:">- invalidateResultCacheForEntityNamed:</a> </B>, <a href="#//apple_ref/occ/instm/EODatabase/resultCacheForEntityNamed:"><B>- resultCacheForEntityNamed:</a>
+
+ </B><p><a name="496">
+
+<h4> <a name="//apple_ref/occ/instm/EODatabase/invalidateResultCacheForEntityNamed:">invalidateResultCacheForEntityNamed:</a></h4>
+
+</a>- (void)<code>invalidateResultCacheForEntityNamed:</code>(NSString *)<em>entityName</em><p>
+
+Invalidates the result cache containing an array of globalIDs for the objects associated with the entity <em>entityName</em>. See the class description for more discussion of this topic.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EODatabase/invalidateResultCache">- invalidateResultCache</a> </B>, <a href="#//apple_ref/occ/instm/EODatabase/resultCacheForEntityNamed:"><B>- resultCacheForEntityNamed:</a>
+
+ </B><p><a name="451">
+
+<h4> <a name="//apple_ref/occ/instm/EODatabase/models">models</a></h4>
+
+</a>- (NSArray *)<B>models </B><p>
+
+Returns the receiver's EOModels.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EODatabase/initWithModel:">- initWithModel:</a> </B>, <a href="#//apple_ref/occ/instm/EODatabase/addModel:"><B>- addModel:</a> </B>, <a href="#//apple_ref/occ/instm/EODatabase/addModelIfCompatible:"><B>- addModelIfCompatible:</a> </B>, <a href="#//apple_ref/occ/instm/EODatabase/removeModel:"><B>- removeModel:</a>
+
+ </B><p><a name="455">
+
+<h4> <a name="//apple_ref/occ/instm/EODatabase/recordSnapshot:forGlobalID:">recordSnapshot:forGlobalID:</a></h4>
+
+</a>- (void)<B>recordSnapshot: </B>(NSDictionary *)<em>aSnapshot</em><code> </code><B>forGlobalID: </B>(EOGlobalID *)<em>globalID</em><p>
+
+Records <em>aSnapshot</em> under <em>globalID</em>. For a description of snapshots and their role in an application, see the class description.<p>
+
+<B>See also: </B>  
+
+<B><a href="../EOEntity/EOEntity.html#//apple_ref/occ/instm/EOEntity/globalIDForRow:" target="_top">- globalIDForRow: </B> (EOEntity)</a>, <a href="#//apple_ref/occ/instm/EODatabase/recordSnapshots:"><B>- recordSnapshots:</a> </B>, <a href="#//apple_ref/occ/instm/EODatabase/forgetSnapshotForGlobalID:"><B>- forgetSnapshotForGlobalID:</a>
+
+ </B><p><a name="528">
+
+<h4> <a name="//apple_ref/occ/instm/EODatabase/recordSnapshot:forSourceGlobalID:relationshipName:">recordSnapshot:forSourceGlobalID:relationshipName:</a></h4>
+
+</a>- (void)<code>recordSnapshot:</code>(NSArray *)<em>globalIDs</em> <code>forSourceGlobalID:</code>(EOGlobalID *)<em>globalID</em> <code>relationshipName:</code>(NSString *)<em>name</em><p>
+
+For the object identified by <em>globalID</em>, records an NSArray of <em>globalIDs</em> for the to-many relationship named <em>name</em>. These <em>globalIDs</em> identify the objects at the destination of the relationship. For a description of snapshots and their role in an application, see the class description.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EODatabase/recordSnapshot:forGlobalID:">- recordSnapshot:forGlobalID:</a> </B>, <a href="#//apple_ref/occ/instm/EODatabase/recordSnapshots:"><B>- recordSnapshots:</a> </B>, <a href="#//apple_ref/occ/instm/EODatabase/recordSnapshot:forGlobalID:"><B>- recordSnapshot:forGlobalID:</a> </B>, 
+
+<B><a href="#//apple_ref/occ/instm/EODatabase/snapshotForSourceGlobalID:relationshipName:">- snapshotForSourceGlobalID:relationshipName:</a>
+
+ </B><p><a name="459">
+
+<h4> <a name="//apple_ref/occ/instm/EODatabase/recordSnapshots:">recordSnapshots:</a></h4>
+
+</a>- (void)<B>recordSnapshots: </B>(NSDictionary *)<em>snapshots</em><p>
+
+Records the snapshots in <em>snapshots</em>. <em>snapshots</em> is a dictionary whose keys are EOGlobalIDs and whose values are the snapshots for those global IDs.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EODatabase/recordSnapshot:forGlobalID:">- recordSnapshot:forGlobalID:</a> </B>, <a href="#//apple_ref/occ/instm/EODatabase/forgetSnapshotsForGlobalIDs:"><B>- forgetSnapshotsForGlobalIDs:</a>
+
+ </B><p><a name="537">
+
+<h4> <a name="//apple_ref/occ/instm/EODatabase/recordToManySnapshots:">recordToManySnapshots:</a></h4>
+
+</a>- (void)<code>recordToManySnapshots:</code>(NSDictionary *)<em>snapshots</em><p>
+
+Records the objects in <em>snapshots</em>. <em>snapshots</em> should be an NSDictionary of NSDictionaries, in which the top-level dictionary has as its key the globaID of the enterprise object for which to-many relationships are being recorded. The key's value is a dictionary whose keys are the names of the enterprise object's to-many relationships. Each of these keys in turn has as its value an array of globalIDs that identify the objects at the destination of the relationship. For a description of snapshots and their role in an application, see the class description.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EODatabase/recordSnapshot:forSourceGlobalID:relationshipName:">- recordSnapshot:forSourceGlobalID:relationshipName:</a> </B>, <a href="#//apple_ref/occ/instm/EODatabase/recordSnapshot:forGlobalID:"><B>- recordSnapshot:forGlobalID:</a> </B>, 
+
+<B><a href="#//apple_ref/occ/instm/EODatabase/snapshotForSourceGlobalID:relationshipName:">- snapshotForSourceGlobalID:relationshipName:</a>
+
+ </B><p><a name="463">
+
+<h4> <a name="//apple_ref/occ/instm/EODatabase/registerContext:">registerContext:</a></h4>
+
+</a>- (void)<B>registerContext: </B>(EODatabaseContext *)<em>aContext</em><p>
+
+Records <em>aContext</em> as one of the receiver's EODatabaseContexts, without retaining it. <em>aContext</em> must have been created with the receiver using EODatabaseContext's <B>initWithDatabase: </B> method, which invokes this method automatically. You should never need to invoke this method directly.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EODatabase/unregisterContext:">- unregisterContext:</a> </B>, <a href="#//apple_ref/occ/instm/EODatabase/registeredContexts"><B>- registeredContexts</a>
+
+ </B><p><a name="467">
+
+<h4> <a name="//apple_ref/occ/instm/EODatabase/registeredContexts">registeredContexts</a></h4>
+
+</a>- (NSArray *)<B>registeredContexts </B><p>
+
+Returns all EODatabaseContexts that have been registered with the receiver, generally all the database contexts that were created with the receiver using EODatabaseContext's <code>initWithDatabase:</code> method.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EODatabase/registerContext:">- registerContext:</a> </B>, <a href="#//apple_ref/occ/instm/EODatabase/unregisterContext:"><B>- unregisterContext:</a>
+
+ </B><p><a name="471">
+
+<h4> <a name="//apple_ref/occ/instm/EODatabase/removeModel:">removeModel:</a></h4>
+
+</a>- (void)<B>removeModel: </B>(EOModel *)<em>aModel</em><p>
+
+Removes <em>aModel</em> from the receiver's list of EOModels. Raises an exception if <em>aModel</em> isn't one of the receiver's models.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EODatabase/addModel:">- addModel:</a> </B>, <a href="#//apple_ref/occ/instm/EODatabase/addModelIfCompatible:"><B>- addModelIfCompatible:</a> </B>, <a href="#//apple_ref/occ/instm/EODatabase/models"><B>- models</a>
+
+ </B><p><a name="500">
+
+<h4> <a name="//apple_ref/occ/instm/EODatabase/resultCacheForEntityNamed:">resultCacheForEntityNamed:</a></h4>
+
+</a>- (NSArray *)<code>resultCacheForEntityNamed:</code>(NSString *)<em>entityName</em><p>
+
+Returns an array containing the globalIDs of the objects associated with <em>entityName</em>. See the class description for more discussion of this topic.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EODatabase/invalidateResultCache">- invalidateResultCache</a> </B>, <a href="#//apple_ref/occ/instm/EODatabase/invalidateResultCacheForEntityNamed:"><B>- invalidateResultCacheForEntityNamed:</a>
+
+ </B><p><a name="519">
+
+<h4> <a name="//apple_ref/occ/instm/EODatabase/setResultCache:forEntityNamed:">setResultCache:forEntityNamed:</a></h4>
+
+</a>- (void)<code>setResultCache:</code>(NSArray *)<em>cache</em> <code>forEntityNamed:</code>(NSString *)<em>entityName</em><p>
+
+Updates the receiver's cache for <em>entityName</em> with <em>cache</em>, an array of globalIDs for all the enterprise objects associated with the EOEntity named<em> entityName</em>. This method is invoked automatically, and you should never need to invoke it directly. For more information on this topic, see the class description.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EODatabase/invalidateResultCache">- invalidateResultCache</a> </B>, <a href="#//apple_ref/occ/instm/EODatabase/invalidateResultCacheForEntityNamed:"><B>- invalidateResultCacheForEntityNamed:</a> </B>, 
+
+<B><a href="#//apple_ref/occ/instm/EODatabase/resultCacheForEntityNamed:">- resultCacheForEntityNamed:</a>
+
+ </B><p><a name="475">
+
+<h4> <a name="//apple_ref/occ/instm/EODatabase/snapshotForGlobalID:">snapshotForGlobalID:</a></h4>
+
+</a>- (NSDictionary *)<B>snapshotForGlobalID: </B>(EOGlobalID *)<em>globalID</em><p>
+
+Returns the snapshot associated with <em>globalID</em> if there is one; otherwise returns <B>nil </B>. For a description of snapshots and their role in an application, see the class description.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EODatabase/recordSnapshot:forGlobalID:">- recordSnapshot:forGlobalID:</a> </B>, <a href="#//apple_ref/occ/instm/EODatabase/forgetSnapshotForGlobalID:"><B>- forgetSnapshotForGlobalID:</a>
+
+ </B><p><a name="539">
+
+<h4> <a name="//apple_ref/occ/instm/EODatabase/snapshotForSourceGlobalID:relationshipName:">snapshotForSourceGlobalID:relationshipName:</a></h4>
+
+</a>- (NSArray *)<code>snapshotForSourceGlobalID:</code>(EOGlobalID *)<em>globalID</em> <br><code>relationshipName:</code>(NSString *)<em>name</em><p>
+
+Returns a snapshot that consists of an array of globalIDs. These globalIDs identify the objects at the destination of the to-many relationship named <em>name</em>, which is a property of the object identified by <em>globalID</em>. If there is no snapshot, returns <code>nil</code>. For a description of snapshots and their role in an application, see the class description.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EODatabase/recordSnapshot:forSourceGlobalID:relationshipName:">- recordSnapshot:forSourceGlobalID:relationshipName:</a> </B>, <a href="#//apple_ref/occ/instm/EODatabase/recordToManySnapshots:"><B>- recordToManySnapshots:</a>
+
+ </B><p><a name="479">
+
+<h4> <a name="//apple_ref/occ/instm/EODatabase/snapshots">snapshots</a></h4>
+
+</a>- (NSDictionary *)<B>snapshots </B><p>
+
+Returns all of the receiver's snapshots, stored in an NSDictionary under their EOGlobalIDs.<p>
+
+<a name="482">
+
+<h4> <a name="//apple_ref/occ/instm/EODatabase/unregisterContext:">unregisterContext:</a></h4>
+
+</a>- (void)<B>unregisterContext: </B>(EODatabaseContext *)<em>aContext</em><p>
+
+Removes <em>aContext</em> as one of the receiver's EODatabaseContexts, without releasing it. EODatabaseContext automatically invokes this method when deallocated; you should never need to invoke it directly.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EODatabase/registerContext:">- registerContext:</a> </B>, <a href="#//apple_ref/occ/instm/EODatabase/registeredContexts"><B>- registeredContexts</a>
+
+ </B><p>
+
+ 
+
+ 
+
+
+
+
+
+<i>Copyright &#169; 1997, Apple Computer, Inc.   All rights
+
+reserved.</i>
+
+
+
+<!-- Last updated: 10/16/97 11:21:21 -->
+
+
+
+</body>
+
+</html>
+

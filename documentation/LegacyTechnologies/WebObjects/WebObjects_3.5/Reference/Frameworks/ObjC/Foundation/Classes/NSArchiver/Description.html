@@ -1,0 +1,368 @@
+<html><head><title></title></head>
+
+<body bgcolor="#ffffff">
+
+ 
+
+ 
+
+<h1>
+
+<FONT COLOR="#000066">
+
+<a name="128">
+
+ <a name="//apple_ref/occ/cl/NSArchiver">NSArchiver</a>
+
+</a>
+
+</FONT>
+
+</h1>
+
+<p><B>Inherits From:</B><BR>  
+
+ NSCoder : NSObject
+
+
+
+<p><B>Conforms To:</B><BR>
+
+NSObject (NSObject) 
+
+
+
+<p><B>Declared In:	</B><BR>
+
+Foundation/NSArchiver.h
+
+
+
+<p><p>
+
+<a name="159"></a>
+
+<HR WIDTH=75% SIZE=4 ALIGN=LEFT>
+
+<H3>
+
+<FONT COLOR="#201040">
+
+Class At A Glance
+
+</FONT>
+
+</H3>
+
+<dl><a name="160"></a>
+
+<dt><h4>Purpose</h4>
+
+<dd><dl>
+
+<dt>An NSArchiver encodes objects into a format that can be written to a file. The archiving process traverses a set of interconnected objects, making sure to encode each one only once.
+
+</dl></dd>
+
+<a name="162"></a>
+
+<dt><h4>Principal Attributes</h4>
+
+</dl><ul><li>An NSMutableData object containing the encoded data<br>
+
+</ul><dl><a name="164"></a>
+
+<dt><h4>Creation</h4>
+
+<dd><dl>
+
+<dt>- initForWritingWithMutableData:
+
+</dl></dd>
+
+<a name="166"></a>
+
+<dt><h4>Commonly Used Methods<p>
+
+<Table Border="3">
+
+<caption></caption>
+
+<tr><td scope="row">+ archiveRootObject:ToFile:
+
+</td><td>Archives a graph of objects to a file.
+
+</td></tr>
+
+<tr><td scope="row">+ archivedDataWithRootObject:
+
+</td><td>Archives a graph of objects into an NSMutableData object.
+
+</td></tr>
+
+
+
+</Table>
+
+
+
+<Table>
+
+<tr><td>
+
+</Table>
+
+</h4>
+
+</dl><HR WIDTH=75% SIZE=4 ALIGN=LEFT>
+
+<p><a name="168"></a>
+
+<a name="description"></a>
+
+<H2>Class Description 
+
+</H2>
+
+NSArchiver, a concrete subclass of NSCoder, provides a way to encode Objective-C objects into an architecture-independent format that can be stored in a file. When you archive a set of objects, their class information and the values of their instance variables are written to the archive. NSArchiver's companion class, NSUnarchiver, decodes an archive into a set of objects equivalent to the original set.<p>
+
+NSArchiver implements encoding by placing the archived data in an NSMutableData object. After encoding the objects, you can have the NSArchiver write this NSMutableData immediately to a file, or you can retrieve the encoded data for some other use.<p>
+
+<h3>
+
+<a name="171">
+
+ Archiving a Graph of Objects
+
+</a>
+
+</h3>
+
+The easiest way to archive an object is to invoke a single class method-either <code>archiveRootObject:toFile:</code><code> </code>or <code>archivedDataWithRootObject:</code>, depending on whether you want the encoded data to be stored in a file immediately. These convenience methods create a temporary NSArchiver and send it an <code>encodeRootObject:</code><code> </code>message-you need do no more. However, if you want to customize the archiving process (for example, by substituting certain classes for others), you must instead create an NSArchiver instance yourself, configure it as desired, and send it an <code>encodeRootObject:</code><code> </code>message explicitly.<p>
+
+<em></em>The "root object" that you specify as the argument to any of these three methods indicates the starting point for archiving. The NSArchiver commences archiving by invoking the root object's <code>encodeWithCoder:</code><code> </code>method. That method typically encodes the root object's instance variables, which isn't necessarily a straightforward process-the instance variables can themselves be other objects that respond to <code>encodeWithCoder:</code>, and so on, yielding a possibly complex graph of objects that need to be archived.<p>
+
+The fact that many objects contain references to other objects poses two problems for archiving. The first is redundancy. An object graph isn't necessarily a simple tree structure. Two objects can contain references to each other, for example, creating a cycle. To address this problem, NSArchiver overrides NSCoder's <code>encodeRootObject:</code> method to keep track of all the objects encountered while traversing the graph. If any object is encountered more than once, the multiple references to it are stored, but the object itself is encoded only once.<p>
+
+<em></em>The second problem is that it's not always appropriate to archive the entire graph. To use an example from the Application Kit, when you archive an NSView as the root object, its subviews should be archived, but not its superview. In this case, the superview is considered an extraneous part of the graph. On the other hand, if you archive the superview as the root object, the NSView should now include a reference to the superview. To solve this dilemma, NSArchiver implements conditional archiving, overriding the minimal <code>encodeConditionalObject:</code> method that's inherited from NSCoder.<code> </code>A class's<code> encodeWithCoder: </code>method can invoke<code> encodeConditionalObject:</code> to archive inessential object instance variables. The NSArchiver doesn't actually archive a conditionally encoded object unless some other object in the graph encodes it unconditionally (using one of the other <code>encode...Object:</code> methods declared by NSCoder). When everything is unarchived, all original references to the conditionally encoded object are properly restored as references to the single unarchived object. For example, an NSView encodes its superview with <code>encodeConditionalObject:</code>, because it doesn't own the superview but does need to preserve its connection to it if some other object archives the superview. <p>
+
+In contrast, <code>encodeObject:</code> unconditionally instructs an object to encode itself. This method is most often used in a class's <code>encodeWithCoder:</code> method for instance variables that are intrinsic to the receiver and essential for proper functioning. An NSView encodes its subviews with <code>encodeObject:</code>, because it owns them.<p>
+
+All the objects to be placed in a single archive must be interconnected members of a single graph. In other words, there can only be one root object per archive. The only recommended way to archive objects is to send an NSArchiver a single <code>encodeRootObject:</code><code> </code>message, whether directly, or indirectly by invoking <code>archiveRootObject:toFile:</code><code> </code>or <code>archivedDataWithRootObject:</code>.<em> </em>Don't try to add data to the archive by invoking any of NSCoder's other <code>encode...</code><code> </code>methods, except from within the <code>encodeWithCoder:</code><code> </code>method of each object that's part of the graph.  (These <code>encodeWithCoder:</code><code> </code>methods are invoked automatically when you encode the root object.)<p>
+
+To extract an object graph from an archive, use the NSUnarchiver class method <code>unarchiveObjectWithFile:</code> or <code>unarchiveObjectWithData:</code>, assigning the return value to the desired root object.<p>
+
+<h3>
+
+<a name="179">
+
+ Archiving other Data Types
+
+</a>
+
+</h3>
+
+It's possible to create an archive that doesn't contain any objects. To archive other data types, invoke <code>encodeValueOfObjCType:</code> directly for each data item to be archived, instead of using <code>setRootObject:</code>.<code> </code>When you create an archive in this way, the corresponding unarchiving code must follow exactly the same sequence of data types.<p>
+
+This approach shouldn't be used to archive objects. <em> </em>Use <code>setRootObject:</code> instead, to avoid the problems mentioned in the previous section and to simplify unarchiving<em>.</em><p>
+
+An NSSerializer provides another means to store data in an architecture-independent format. See the NSSerializer class specification for more information.<p>
+
+<h3>
+
+<a name="183">
+
+ Superclass Methods to Avoid
+
+</a>
+
+</h3>
+
+NSArchiver's superclass, NSCoder, supplies methods for both encoding and decoding. However, only the encoding methods are applicable to NSArchiver-don't send an NSArchiver any <code>decode...</code> messages. (Similarly, don't send<code> encode...</code> messages to an NSUnarchiver.) <p>
+
+<a name="185">
+
+<HR WIDTH=50% ALIGN=LEFT>
+
+<h2>Method Types 
+
+</h2>
+
+</a><dl>
+
+<dt>Initializing an NSArchiver<dd><dl><dd><dl><dd><dl><dd><dl>
+
+<dt><a href="#//apple_ref/occ/instm/NSArchiver/initForWritingWithMutableData:">- initForWritingWithMutableData:</a></dl></dd>
+
+</dl></dd></dl></dd></dl></dd><dt>Archiving data<dd><dl><dd><dl><dd><dl><dd><dl>
+
+<dt><a href="#//apple_ref/occ/clm/NSArchiver/archivedDataWithRootObject:">+ archivedDataWithRootObject:</a><dt><a href="#//apple_ref/occ/clm/NSArchiver/archiveRootObject:toFile:">+ archiveRootObject:toFile:</a><dt><a href="#//apple_ref/occ/instm/NSArchiver/encodeRootObject:">- encodeRootObject:</a><dt><a href="#//apple_ref/occ/instm/NSArchiver/encodeConditionalObject:">- encodeConditionalObject:</a></dl></dd>
+
+</dl></dd></dl></dd></dl></dd><dt>Getting the archived data<dd><dl><dd><dl><dd><dl><dd><dl>
+
+<dt><a href="#//apple_ref/occ/instm/NSArchiver/archiverData">- archiverData</a></dl></dd>
+
+</dl></dd></dl></dd></dl></dd><dt>Substituting classes or objects<dd><dl><dd><dl><dd><dl><dd><dl>
+
+<dt><a href="#//apple_ref/occ/instm/NSArchiver/classNameEncodedForTrueClassName:">- classNameEncodedForTrueClassName:</a><dt><a href="#//apple_ref/occ/instm/NSArchiver/encodeClassName:intoClassName:">- encodeClassName:intoClassName:</a><dt><a href="#//apple_ref/occ/instm/NSArchiver/replaceObject:withObject:">- replaceObject:withObject:</a></dl></dd>
+
+</dl></dd></dl></dd></dl></dd></dl>
+
+<HR WIDTH=50% ALIGN=LEFT>
+
+<a name="199"></a>
+
+<a name="clm"></a>
+
+<h2>Class Methods</h2>  
+
+ 
+
+
+
+<a name="200"></a>
+
+<h3>
+
+ <a name="//apple_ref/occ/clm/NSArchiver/archiveRootObject:toFile:">archiveRootObject:toFile:</a>
+
+</h3>
+
++ (BOOL)<code>archiveRootObject:</code>(id)<em>rootObject </em><code>toFile:</code>(NSString *)<em>path</em> 
+
+<P>Archives<em> rootObject</em> by encoding it into a data object in a temporary NSArchiver and writing that data object to the file <em>path</em>. This convenience method invokes <code>archivedDataWithRootObject:</code> to get the encoded data, and then sends that data object the message <code>writeToFile:atomically:</code>, using <em>path</em> for the first argument and YES for the second. Returns YES upon success.<p>
+
+<hr WIDTH=25% ALIGN=LEFT>
+
+<a name="203"></a>
+
+<h3> <a name="//apple_ref/occ/clm/NSArchiver/archivedDataWithRootObject:">archivedDataWithRootObject:</a></h3>
+
++ (NSData *)<code>archivedDataWithRootObject:</code>(id)<em>rootObject</em> 
+
+<P>Returns a data object containing the encoded form of the object graph whose root object is <em>rootObject</em>. This method invokes <code>initForWritingWithMutableData:</code> and <code>encodeRootObject:</code> to create a temporary archiver that encodes the object graph.<p>
+
+<HR WIDTH=50% ALIGN=LEFT>
+
+<a name="instm"></a>
+
+<h2>Instance Methods</h2>  
+
+
+
+
+
+<a name="207"></a>
+
+<h3>
+
+ <a name="//apple_ref/occ/instm/NSArchiver/archiverData">archiverData</a>
+
+</h3>
+
+- (NSMutableData *)<code>archiverData</code> 
+
+<P>Returns the archived data. The returned data object is the same one that was specified as the argument to <code>initForWritingWithMutableData:</code>. It contains whatever data has been encoded thus far by invocations of the various encoding methods. It's safest not to invoke this method until after <code>encodeRootObject:</code> has returned. In other words, although it's possible for a class to invoke this method from within its <code>encodeWithCoder:</code> method, that method must not alter the data.<p>
+
+<hr WIDTH=25% ALIGN=LEFT>
+
+<a name="210"></a>
+
+<h3> <a name="//apple_ref/occ/instm/NSArchiver/classNameEncodedForTrueClassName:">classNameEncodedForTrueClassName:</a></h3>
+
+- (NSString *)<code>classNameEncodedForTrueClassName:</code>(NSString *)<em>trueName</em> 
+
+<P>Returns the class name used to archive instances of the class <em>trueName</em>.<p>
+
+<B>See also: </B>  
+
+<code> <a href="#//apple_ref/occ/instm/NSArchiver/encodeClassName:intoClassName:">- encodeClassName:intoClassName: </a>
+
+</code><p><hr WIDTH=25% ALIGN=LEFT>
+
+<a name="214"></a>
+
+<h3> <a name="//apple_ref/occ/instm/NSArchiver/encodeClassName:intoClassName:">encodeClassName:intoClassName:</a></h3>
+
+- (void)<code>encodeClassName:</code>(NSString *)<em>trueName </em><code>intoClassName:</code>(NSString *)<em>inArchiveName</em> 
+
+<P>Encodes in the archive a substitute name for the class name <em>trueName</em>. Any subsequently encountered objects of class <em>trueName</em> will be archived as instances of class <em>inArchiveName</em>. It's safest not to invoke this method during the archiving process (that is, within an <code>encodeWithCoder:</code> method). Instead, invoke it before <code>encodeRootObject:</code>.<p>
+
+<B>See also: </B>  
+
+<code><a href="#//apple_ref/occ/instm/NSArchiver/classNameEncodedForTrueClassName:">- classNameEncodedForTrueClassName:</a>
+
+</code><p><hr WIDTH=25% ALIGN=LEFT>
+
+<a name="218"></a>
+
+<h3> <a name="//apple_ref/occ/instm/NSArchiver/encodeConditionalObject:">encodeConditionalObject:</a></h3>
+
+- (void)<code>encodeConditionalObject:</code>(id)<em>object</em> 
+
+<P>Archives <em>object</em> conditionally. This method overrides the superclass implementation to allow <em>object</em> to be encoded only if it's also encoded unconditionally by another object in the object graph. Conditional encoding lets you encode one part of a graph detached from the rest. (See the class description for more information.)<p>
+
+This method should be invoked only from within an <code>encodeWithCoder:</code><code> </code>method. If <em>object</em> is <code>nil</code>, the NSArchiver encodes it unconditionally as <code>nil</code>. Raises an NSInvalidArgumentException if no root object has been encoded.<p>
+
+<hr WIDTH=25% ALIGN=LEFT>
+
+<a name="222"></a>
+
+<h3> <a name="//apple_ref/occ/instm/NSArchiver/encodeRootObject:">encodeRootObject:</a></h3>
+
+- (void)<code>encodeRootObject:</code>(id)<em>rootObject</em> 
+
+<P>Archives <em>rootObject</em> along with all the objects it's connected to. If any object is encountered more than once while traversing the graph, it's encoded only once, but the multiple references to it are stored. (See the discussion of object graphs in the class description.) <p>
+
+This message mustn't be sent more than once to a given NSArchiver; an NSInvalidArgumentException is raised if a root object has already been encoded. Therefore, don't attempt to reuse an NSArchiver; instead, create a new one. To encode multiple object graphs, use distinct NSArchivers.<p>
+
+<hr WIDTH=25% ALIGN=LEFT>
+
+<a name="226"></a>
+
+<h3> <a name="//apple_ref/occ/instm/NSArchiver/initForWritingWithMutableData:">initForWritingWithMutableData:</a></h3>
+
+- (id)<code>initForWritingWithMutableData:</code>(NSMutableData *)<em>data</em> 
+
+<P>Initializes an archiver, encoding stream and version information into <em>data</em>. Raises an NSInvalidArgumentException if <em>data</em> is <code>nil</code>.<p>
+
+<B>See also: </B>  
+
+<code><a href="#//apple_ref/occ/instm/NSArchiver/archiverData">- archiverData</a>
+
+</code><p><hr WIDTH=25% ALIGN=LEFT>
+
+<a name="230"></a>
+
+<h3><a name="//apple_ref/occ/instm/NSArchiver/replaceObject:withObject:">replaceObject:withObject:</a></h3>
+
+- (void)<code>replaceObject:</code>(id)<em>object</em> <code>withObject:</code>(id)<em>newObject</em>
+
+<P>Causes the NSArchiver to treat subsequent requests to encode <em>object</em> as though they were requests to encode <em>newObject</em>.<p>
+
+<p>
+
+
+
+ 
+
+
+
+
+
+
+
+<i>Copyright &#169; 1997, Apple Computer, Inc.   All rights
+
+reserved.</i>
+
+
+
+<!-- Last updated: 06/17/97 16:45:26 -->
+
+
+
+</body>
+
+</html>
+

@@ -1,0 +1,162 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+<head>
+	<title>Garbage Collection Programming Guide: Using Garbage Collection</title>
+	<meta id="Generator" name="Generator" content="Gutenberg"/>
+	<meta id="GeneratorVersion" name="GeneratorVersion" content="v132"/>
+	<meta http-equiv="content-type" content="text/html;charset=utf-8"/>
+	<meta id="Copyright" name="Copyright" content="Copyright 2009 Apple Inc. All Rights Reserved."/>
+	<meta id="IndexTitle" name="IndexTitle" content="Using Garbage Collection"/>
+	<meta id="xcode-display" name="xcode-display" content="render"/>
+	<meta id="toc-file" name="toc-file" content="../toc.html"/>
+	<meta id="RESOURCES" content="../../../../Resources" />
+	
+	<link rel="stylesheet" type="text/css" href="../../../../Resources/CSS/frameset_styles.css"/>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/lib/prototype.js"></script>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/lib/scriptaculous.js"></script>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/page.js"></script>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/pedia.js"></script>
+	<!--[if lte IE 6]>
+		<style type="text/css">
+			/*<![CDATA[*/ 
+			html {overflow-x:auto; overflow-y:hidden;  }
+			/*]]>*/
+		</style>
+	<![endif]-->
+</head>
+<body bgcolor="#ffffff" onload="initialize_page();"><a name="//apple_ref/doc/uid/TP40008006" title="Using Garbage Collection"></a>
+    <noscript>
+    <div id="tocMenu">
+        <iframe id="toc_content" name="toc_content" SRC="../toc.html" width="210" height="100%" align="left" frameborder="0">This document set is best viewed in a browser that supports iFrames.</iframe>
+    </div>
+    </noscript>
+    <div id="bodyText">
+        <a name="top"></a>
+        <div class="hideOnPrint hideInXcode">
+        <!-- start of header -->
+        <!--#include virtual="/includes/framesetheader" -->
+        <!-- end of header -->
+        </div>
+        
+        <!-- start of path -->
+<div class="breadcrumb hideOnPrint hideInXcode"><a href="http://developer.apple.com/" target="_top">ADC Home</a> &gt; <a href="../../../../../referencelibrary/index.html#//apple_ref/doc/uid/TP30000943" target="_top">Reference Library</a> &gt; <a href="../../../../index.html#//apple_ref/doc/uid/TP30000440" target="_top">Guides</a> &gt; <a href="../../../index.html#//apple_ref/doc/uid/TP30000440-TP30000416" target="_top">Cocoa</a> &gt; <a href="../../../ObjectiveCLanguage-date.html#//apple_ref/doc/uid/TP30000440-TP30000416-TP30000856" target="_top">Objective-C Language</a> &gt; <a href="../index.html" target="_top">Garbage Collection Programming Guide</a> &gt; </div><br class="hideInXcode"/><!-- end of path -->
+        
+        <div class="mini_nav_text" align="left">
+        <span class="navButtons">
+        <a href="gcArchitecture.html">&lt; Previous Page</a><span style="margin-left: 8px"><a href="gcFinalize.html">Next Page &gt;</a></span>
+        </span>
+        <span id="showHideTOCUpperSpan">
+        <a href="#" onclick="showHideTOC();"><img src="../../../../Resources/Images/show_toc_icon.gif" width="15" height="14" border="0" style="margin-bottom: -2px;" alt="" hideText="Hide TOC" showText="Show TOC" /></a> <a href="#" onclick="showHideTOC();">Hide TOC</a>
+        </span>
+        </div>
+        
+        
+        <a name="//apple_ref/doc/uid/TP40008006-SW1" title="Using Garbage Collection"></a><hr /><H1>Using Garbage Collection</H1><p>This article describes some of the design patterns and features you can take advantage of when you use garbage collection, and some of subtleties you need to be aware of.</p>
+<!-- This template is being used for both PDF and HTML. -->
+
+    
+    <!-- TopicBook.pm uses this template for its miniTOCs, but needs a different title. -->
+    <h4>Contents:</h4>
+    
+    
+    <p class="blockquote">
+    
+        
+			
+			
+				<a href="gcUsing.html#//apple_ref/doc/uid/TP40008006-SW2">Cycles</a>
+				
+			<br/>
+			
+        
+			
+			
+				<a href="gcUsing.html#//apple_ref/doc/uid/TP40008006-SW3">Weak and Zeroing Weak References</a>
+				
+			<br/>
+			
+        
+			
+			
+				<a href="gcUsing.html#//apple_ref/doc/uid/TP40008006-SW4">Managing Opaque Pointers</a>
+				
+			<br/>
+			
+        
+			
+			
+				<a href="gcUsing.html#//apple_ref/doc/uid/TP40008006-SW5">Global Object Pointers</a>
+				
+			<br/>
+			
+        
+			
+			
+				<a href="gcUsing.html#//apple_ref/doc/uid/TP40008006-SW7">Interior Pointers</a>
+				
+			<br/>
+			
+        
+			
+			
+				<a href="gcUsing.html#//apple_ref/doc/uid/TP40008006-SW9">C Structs</a>
+				
+			<br/>
+			
+        
+			
+			
+				<a href="gcUsing.html#//apple_ref/doc/uid/TP40008006-SW8">Compiler Flag</a>
+				
+			<br/>
+			
+        
+
+    </p><br/>
+
+<a name="//apple_ref/doc/uid/TP40008006-SW2" title="Cycles"></a><h2>Cycles</h2><p>A problem when using manually reference counting is that it is possible to create retain cycles. If two objects retain each other, and you do not have a reference to either, then they will remain valid for the lifetime of your application—constituting a memory leak (see, for example, <span class="content_text"><a href="../../MemoryMgmt/Articles/mmObjectOwnership.html#//apple_ref/doc/uid/20000043" target="_top">Object Ownership and Disposal</a></span>).</p><p>With garbage collection, retain cycles are not a problem. Since the collector traces strong reference from root objects, even if two objects have strong references to each other they can be collected if neither has a reference from a root object.</p><a name="//apple_ref/doc/uid/TP40008006-SW3" title="Weak and Zeroing Weak References"></a><h2>Weak and Zeroing Weak References</h2><p>Sometimes you need a reference to an object but do not want to form a strong relationship to that object to prevent its being collected if it has no other references. For example, a notification center should not form strong relationships to registered observers, otherwise it artificially prolongs the lifetime of those objects indefinitely. You can specify a weak reference—one that the collector does not follow—using the keyword <code>__weak</code>.</p><p><code><a href="../../../Reference/NSMapTable_class/Reference/NSMapTable.html#//apple_ref/occ/cl/NSMapTable" target="_top">NSMapTable</a></code>, <code><a href="../../../Reference/NSHashTable_class/Introduction/Introduction.html#//apple_ref/occ/cl/NSHashTable" target="_top">NSHashTable</a></code>, and <code><a href="../../../Reference/Foundation/Classes/NSPointerArray_Class/Introduction/Introduction.html#//apple_ref/occ/cl/NSPointerArray" target="_top">NSPointerArray</a></code> provide collection objects that have the option of maintaining zeroing weak references to their elements. If an element is collected, the reference from the collection object is simply removed.</p><a name="//apple_ref/doc/uid/TP40008006-SW4" title="Managing Opaque Pointers"></a><h2>Managing Opaque Pointers</h2><p>There are several Cocoa methods and Core Foundation functions that have as one parameter an opaque pointer (<code>void *</code>). In a garbage collected environment, the general policy is that the lifetime of any object passed as a <code>void *</code> should be either managed by the callbacks or known to be safe.</p><p>For example, in Cocoa, there are a several “asynchronous” methods that take a delegate object, a selector, and a context and send the selector to the delegate object at some later point passing the context as an argument. These APIs typically declare the context as a <code>void *</code> and represent it as such in their internal state. A common example of this kind of code flow is seen with sheets, especially sheets that are created by a temporary controller object as illustrated in the following code fragment: </p><div class="codesample"><table><tr><td scope="row"><pre>@implementation MySheetController<span></span></pre></td></tr><tr><td scope="row"><pre>- (IBAction)showDoSomethingSheetAction:(id)action<span></span></pre></td></tr><tr><td scope="row"><pre>{<span></span></pre></td></tr><tr><td scope="row"><pre>    id contextObject = /* ... */;<span></span></pre></td></tr><tr><td scope="row"><pre>    // code omitted<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>    // point A<span></span></pre></td></tr><tr><td scope="row"><pre>    [NSApp beginSheet:sheetWindow<span></span></pre></td></tr><tr><td scope="row"><pre>           modalForWindow:window<span></span></pre></td></tr><tr><td scope="row"><pre>           modalDelegate:delegate<span></span></pre></td></tr><tr><td scope="row"><pre>           didEndSelector:@selector(sheetDidEnd:returnCode:contextInfo:);<span></span></pre></td></tr><tr><td scope="row"><pre>           contextInfo:(void *)contextObject];<span></span></pre></td></tr><tr><td scope="row"><pre>}<span></span></pre></td></tr><tr><td scope="row"><pre>@end<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>@implementation MySheetControllerDelegate<span></span></pre></td></tr><tr><td scope="row"><pre>- (void)sheetDidEnd:(NSWindow *)sheet returnCode:(int)returnCode contextInfo:(void *)contextInfo<span></span></pre></td></tr><tr><td scope="row"><pre>{<span></span></pre></td></tr><tr><td scope="row"><pre>    // point B<span></span></pre></td></tr><tr><td scope="row"><pre>    id contextObject = (id)contextInfo;<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>    [contextObject doSomething];<span></span></pre></td></tr><tr><td scope="row"><pre>    // ...<span></span></pre></td></tr><tr><td scope="row"><pre>}<span></span></pre></td></tr><tr><td scope="row"><pre>@end<span></span></pre></td></tr></table></div><p>The problem is that in between points A and B, a garbage collection can occur and—if there are no strong references to it from a root object—the context object can be collected. (This example is somewhat simplified, but in a complex application it's a situation that can happen when the only strong reference to the object passed via the context parameter is on the stack—which for a sheet will be unwound all the way to the main run loop.)</p><p>The solution is to use a <code>CFRetain</code>/<code>CFRelease</code> pair as the value is put into/taken out of the <code>void *</code> parameter. This ensures that the object that will be used as context won't be collected until after it's no longer used (see <span class="content_text"><a href="gcCoreFoundation.html#//apple_ref/doc/uid/TP40006687-SW3">“Memory Management Semantics”</a></span>).</p><div class="codesample"><table><tr><td scope="row"><pre>@implementation MySheetController<span></span></pre></td></tr><tr><td scope="row"><pre>- (IBAction)showDoSomethingSheetAction:(id)action<span></span></pre></td></tr><tr><td scope="row"><pre>{<span></span></pre></td></tr><tr><td scope="row"><pre>    id contextObject = /* ... */;<span></span></pre></td></tr><tr><td scope="row"><pre>    // code omitted<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>    // point A<span></span></pre></td></tr><tr><td scope="row"><pre>    CFRetain(contextObject);<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>    [NSApp beginSheet:sheetWindow<span></span></pre></td></tr><tr><td scope="row"><pre>           modalForWindow:window<span></span></pre></td></tr><tr><td scope="row"><pre>           modalDelegate:delegate<span></span></pre></td></tr><tr><td scope="row"><pre>           didEndSelector:@selector(sheetDidEnd:returnCode:contextInfo:);<span></span></pre></td></tr><tr><td scope="row"><pre>           contextInfo:(void *)contextObject];<span></span></pre></td></tr><tr><td scope="row"><pre>}<span></span></pre></td></tr><tr><td scope="row"><pre>@end<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>@implementation MySheetControllerDelegate<span></span></pre></td></tr><tr><td scope="row"><pre>- (void)sheetDidEnd:(NSWindow *)sheet returnCode:(int)returnCode contextInfo:(void *)contextInfo<span></span></pre></td></tr><tr><td scope="row"><pre>{<span></span></pre></td></tr><tr><td scope="row"><pre>    // point B<span></span></pre></td></tr><tr><td scope="row"><pre>    id contextObject = (id)contextInfo;<span></span></pre></td></tr><tr><td scope="row"><pre>    // code omitted<span></span></pre></td></tr><tr><td scope="row"><pre>    [contextObject doSomething];<span></span></pre></td></tr><tr><td scope="row"><pre>    CFRelease(contextObject);<span></span></pre></td></tr><tr><td scope="row"><pre>}<span></span></pre></td></tr><tr><td scope="row"><pre>@end<span></span></pre></td></tr></table></div><a name="//apple_ref/doc/uid/TP40008006-SW5" title="Global Object Pointers"></a><h2>Global Object Pointers</h2><p>Typically, the garbage collector treats global object pointers as root objects and so does not consider them candidates for collection (see <span class="content_text"><a href="gcEssentials.html#//apple_ref/doc/uid/TP40002452-SW5">“Root Set and Reference Types”</a></span>). Globals of Objective-C objects or other <code>__strong</code> pointer variables, and function-level static variables, are written to with a write-barrier. Note that although this is true for Objective-C or Objective-C++, writing to globals from C or C++ is not supported. Weak globals have the same restriction; in addition, however, you cannot read from them in C or C++.</p><p>You can check whether a write-barrier is being used with the <code>-Wassign-intercept</code> compiler flag—see <span class="content_text"><a href="gcUsing.html#//apple_ref/doc/uid/TP40008006-SW8">“Compiler Flag.”</a></span></p><div class="notebox"><a name="//apple_ref/doc/uid/TP40008006-SW6" title="Limitations on Mac OS X v10.5"></a><p><strong>Limitations on Mac OS X v10.5:</strong>&nbsp;You may pass addresses of strong globals or statics into routines expecting pointers to object pointers (such as <code>id*</code> or <code>NSError**</code>) <em>only</em> if they have first been assigned to directly, rather than through a pointer dereference. You should never take the address of a weak global, static or instance variable, as assigning or reading through that pointer will bypass the weak barriers and expose your programs to race conditions.</p>Assigning a value to a global by reference does not work correctly, as illustrated in the following example. Given these global declarations:</p><div class="codesample"><table><tr><td scope="row"><pre>static id globalId1;<span></span></pre></td></tr><tr><td scope="row"><pre>static id globalId2;<span></span></pre></td></tr></table></div>if in a function you make an assignment to a global by reference:</p><div class="codesample"><table><tr><td scope="row"><pre>id localObject = ... ;<span></span></pre></td></tr><tr><td scope="row"><pre>id *localPointerToGlobal = (someTest() ? &amp;globalId1 : &amp;globalId2);<span></span></pre></td></tr><tr><td scope="row"><pre>*localPointerToGlobal = localObject;<span></span></pre></td></tr></table></div>then the wrong write barrier is used in the assignment of <code>localObject</code>. You can work around this by using <code>objc_assign_global</code>.</p></div><a name="//apple_ref/doc/uid/TP40008006-SW7" title="Interior Pointers"></a><h2>Interior Pointers</h2><p>The compiler can reuse stack slots it determines are no longer used (see <span class="content_text"><a href="gcEssentials.html#//apple_ref/doc/uid/TP40002452-SW5">“Root Set and Reference Types”</a></span>). This can mean that objects are collected more quickly than you might expect—when a local variable is removed from the stack and hence the corresponding object not considered rooted. This has implications for situations in which you access data held by a local variable after the last direct reference to that variable. To illustrate, consider the following example:</p><div class="codesample"><table><tr><td scope="row"><pre>NSData *myData = [someObject getMyData];<span></span></pre></td></tr><tr><td scope="row"><pre>const uint8_t *bytes = [myData bytes];<span></span></pre></td></tr><tr><td scope="row"><pre>NSUInteger offset = 0, length = [myData length];<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>while (offset &lt; length) {<span></span></pre></td></tr><tr><td scope="row"><pre>  // if you never reference myData again, bytes is a dangling pointer.<span></span></pre></td></tr><tr><td scope="row"><pre>}<span></span></pre></td></tr></table></div><p>Suppose that after you send <code>myData</code> the <code>length</code> message, you do not reference it again directly. The compiler may reuse the stack slot for <code>myData</code>. <code>myData</code> may then become eligible for collection (see <span class="content_text"><a href="gcEssentials.html#//apple_ref/doc/uid/TP40002452-SW5">“Root Set and Reference Types”</a></span>); if it is collected, then <code>bytes</code> becomes invalid.</p><p>You can ensure that the data object remains valid until you’ve finished using it by sending it a message, as shown in the following version: </p><div class="codesample"><table><tr><td scope="row"><pre>NSData *myData = [someObject getMyData];<span></span></pre></td></tr><tr><td scope="row"><pre>[myData retain];<span></span></pre></td></tr><tr><td scope="row"><pre>const uint8_t *bytes = [myData bytes];<span></span></pre></td></tr><tr><td scope="row"><pre>NSUInteger offset = 0, length = [myData length];<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>while (offset &lt; length) {<span></span></pre></td></tr><tr><td scope="row"><pre>  // bytes remains valid until next message sent to myData<span></span></pre></td></tr><tr><td scope="row"><pre>}<span></span></pre></td></tr><tr><td scope="row"><pre>[myData release];<span></span></pre></td></tr></table></div><p>Alternatively, in this particular case you can retrieve data from the object by sending it messages, as in this variant:</p><div class="codesample"><table><tr><td scope="row"><pre>NSData *myData = [someObject getMyData];<span></span></pre></td></tr><tr><td scope="row"><pre>const uint8_t *bytes = [myData bytes];<span></span></pre></td></tr><tr><td scope="row"><pre>NSUInteger currentAddress = 0, finalAddress = [myData length];<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>while (currentAddress &lt; finalAddress) {<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>    NSRange range = NSMakeRange (currentAddress, bytes[currentAddress]);<span></span></pre></td></tr><tr><td scope="row"><pre>    if (range.length > finalAddress || currentAddress > finalAddress - range.length) {<span></span></pre></td></tr><tr><td scope="row"><pre>        // This is an overflow<span></span></pre></td></tr><tr><td scope="row"><pre>        break;<span></span></pre></td></tr><tr><td scope="row"><pre>    }<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>    NSData *newData = [NSData dataWithBytesNoCopy:(void *)&amp;bytes[currentAddress]<span></span></pre></td></tr><tr><td scope="row"><pre>                                           length:length freeWhenDone:NO];<span></span></pre></td></tr><tr><td scope="row"><pre>    currentAddress += length;<span></span></pre></td></tr><tr><td scope="row"><pre>    // use the data from newData...<span></span></pre></td></tr><tr><td scope="row"><pre>}<span></span></pre></td></tr></table></div><p>This ensures that <code>myData</code> remains on the stack until after you have finished processing the data it contains.</p><a name="//apple_ref/doc/uid/TP40008006-SW9" title="C Structs"></a><h2>C Structs</h2><p>If you assign an Objective-C object into a raw C <code>struct</code>, the compiler will treat the reference as strong, even if you cast an <code>id</code> directly to a <code>void *</code>:</p><div class="codesample"><table><tr><td scope="row"><pre>MyStruct *myStruct;<span></span></pre></td></tr><tr><td scope="row"><pre>id object;<span></span></pre></td></tr><tr><td scope="row"><pre>// assign the variables appropriately...<span></span></pre></td></tr><tr><td scope="row"><pre>myStruct->anObject = object;<span></span></pre></td></tr><tr><td scope="row"><pre>myStruct->anObject = (void *)object;<span></span></pre></td></tr></table></div><p>Both the assignments to <code>aField</code> result in strong references.</p><a name="//apple_ref/doc/uid/TP40008006-SW8" title="Compiler Flag"></a><h2>Compiler Flag</h2><p>You can use the <code>-Wassign-intercept</code> compiler flag to find out when write-barriers are being used in your code. When you set the flag, the compiler logs a message when it offloads an assignment statement to a helper function.</p><p>Typically you use the flag to find situations where a write-barrier is <em>not</em> actually used. A missing write-barrier can cause various problems—primarily when memory is being collected before you expect it to be. This is of particular interest when you’re using pointers to garbage-collected memory—especially pointers to pointers—such as where a left-hand-side cast discards the strong knowledge, as illustrated in the following example:</p><div class="codesample"><table><tr><td scope="row"><pre>__strong CFDictionaryRef x;  // struct or ivar declaration<span></span></pre></td></tr><tr><td scope="row"><pre>*(CFMutableDictionaryRef)&amp;x = CFDictionaryCreateMutable(...);<span></span></pre></td></tr></table></div>
+
+        <br/><br/> 
+
+        <div class="mini_nav_text" align="left">
+        <span class="navButtons">
+        <a href="gcArchitecture.html">&lt; Previous Page</a><span style="margin-left: 8px"><a href="gcFinalize.html">Next Page &gt;</a></span>
+        </span>
+        <span id="showHideTOCLowerSpan">
+        <a href="#" onclick="showHideTOC();"><img src="../../../../Resources/Images/show_toc_icon.gif" width="15" height="14" border="0" style="margin-bottom: -2px;" alt="" /></a> <a href="#" onclick="showHideTOC();">Hide TOC</a>
+        </span>
+        </div>
+
+        <br/><hr /><div align="center"><p class="content_text" lang="en" dir="ltr"> <!--#if expr="0=1" -->&#x00a9; 2008 Apple Inc. All Rights Reserved. &#40;<!--#endif -->Last updated: 2008-11-19<!--#if expr="0=1" -->&#041;<!--#endif --></p></div>
+
+        
+        <div class="hideOnPrint hideInXcode">
+        <!-- start of footer -->
+        	<table width="100%" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/documentation/Cocoa/Conceptual/GarbageCollection/Articles/gcUsing.html%3Fid%3DTP40002431-1.6&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/documentation/Cocoa/Conceptual/GarbageCollection/Articles/gcUsing.html%3Fid%3DTP40002431-1.6&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/documentation/Cocoa/Conceptual/GarbageCollection/Articles/gcUsing.html%3Fid%3DTP40002431-1.6&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+
+        <!--#include virtual="/includes/framesetfooter" -->
+        <!-- end of footer -->
+        </div>
+    </div>
+</body>
+</html>

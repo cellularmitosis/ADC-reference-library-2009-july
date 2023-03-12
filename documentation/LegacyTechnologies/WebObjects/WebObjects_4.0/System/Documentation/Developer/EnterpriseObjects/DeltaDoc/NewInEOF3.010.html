@@ -1,0 +1,115 @@
+<html><head><title>What's New in Enterprise Objects Framework 3.0</title></head>
+<body bgcolor="#ffffff">
+
+
+<!--start of banner -->
+<!--#include virtual="/includes/framesetheader" -->
+<!-- end of banner -->
+
+<!--start of path -->
+<font face="Geneva,Helvetica,Arial" size="1">
+<b>PATH<spacer type="horizontal" size="5">&nbsp;</b>
+ <a href="../../../../../webobjects.html" target="_top">WebObjects 4.0 Documentation</a> <b>&gt;</b>
+ <a href="NewInEOFTOC.html" target="_top">What's New in EOF 3.0</a>
+</font>
+<br><br>
+<!--end of path -->
+ 
+<a href="NewInEOFTOC.html"><IMG SRC="ArrowUp.gif">Table of Contents</a> <a href="NewInEOF3.09.html"><IMG SRC="ArrowLeft.gif">Previous Section</a>
+ 
+<a name="9216">
+<h1> Raw Row Fetching</h1>
+</a><a name="17971">
+When you perform a fetch in an Enterprise Objects Framework application, the information from the database is fetched and stored in a graph of enterprise objects. This object graph provides many advantages, but it can be large and complex. If you're creating a simple application, you may not need all of the benefits of the object graph. For example, a WebObjects application that merely displays information from a database without ever performing database updates and without ever traversing relationships might be just as well served by fetching the information into a set of dictionaries rather than a set of enterprise objects.<p>
+</a><a name="17972">
+More specifically, suppose you want to display the first name, last name, and the department for a set of employees. Using objects, you would bind Employee's <strong>firstName</strong>, <strong>lastName</strong>, and <strong>department.name</strong> keys to your user interface. This configuration requires fetching of all of the attributes in an Employee entity-the ones you want to display (<strong>firstName</strong> and <strong>lastName</strong>) as well as the ones you don't (<strong>salary</strong>, <strong>birthDate</strong>, <strong>address</strong>, and so on, for example). In addition, this configuration requires faulting in (or perhaps prefetching) all of the related Department objects. Again you fetch all the Department attributes, those you want to display (<strong>departmentName</strong>) as well as those you don't (<strong>budget</strong>, <strong>location</strong>, and so on). In addition to fetching a large amount of data that your application doesn't use, this object-based fetch incurs the additional overhead of creating real enterprise objects from the returned data and of uniquing those objects in the EOEditingContext.<p>
+</a><a name="17936">
+In this kind of display-only scenario, it might be preferable to fetch only the attributes that you need, and to fetch them as lightweight, non-uniqued, rows. In this example, you could fetch only the <strong>firstName</strong>, <strong>lastName</strong>, and <strong>department.name</strong> for each employee. In addition to fetching less data, you'd also fetch with one trip to the database instead of two (one for Employee objects and one for the related Departments).<p>
+</a><a name="9225">
+Enterprise Objects Framework 3.0 supports this concept of a simplified fetch, called <em>raw row</em> fetching. In raw row fetching, each row from the database is fetched into an NSDictionary object. <p>
+</a><a name="15825">
+To set up an application to perform raw row fetching, create an EOFetchSpecification, and send it a <strong>setFetchesRawRows:YES</strong> (or <strong>setFetchesRawRows(true)</strong> in Java) message. By default, the keys in the raw row dictionaries are the attribute names as given by the EOEntity's <strong>attributesToFetch</strong> method.<p>
+</a><a name="16270">
+If you want more control over the attributes that are fetched for the raw row, use the <strong>setRawRowKeyPaths:</strong> method to specify the attribute paths you want. The key paths you provide can be simple attribute keys, such as <strong>title</strong>, as well as key paths, such as <strong>studio.name</strong>. After the fetch, each row is returned as a separate dictionary whose keys are the key paths you specified. If you use <strong>setRawRowKeyPaths:</strong>, you don't have to invoke <strong>setFetchesRawRows:</strong>; it's automatic. <p>
+</a><a name="9252">
+When you use raw row fetching, you lose some important features:<p>
+</a><ul><a name="9260">
+<p><li>The NSDictionary objects are not uniqued.
+</a><a name="9265">
+<p><li>The NSDictionary objects aren't tracked by an editing context.
+</a><a name="9271">
+<p><li>You can't access to-many relationship information. (To access to-one relationship information, you use key paths such as "<strong>movie.dateReleased</strong>".)
+</a></ul><a name="9275">
+Should you fetch a row into an NSDictionary and later want to fetch the corresponding enterprise object, send <strong>faultForRawRow:entityNamed:editingContext:</strong> (or <strong>faultForRawRow</strong> in Java) to the EOEditingContext. This creates a fault for the row (an EOFault object in Objective-C or an empty object of the correct enterprise object class in Java). The raw row dictionary must contain the primary key attributes for this method to work properly. When your code tries to access the object for that row, the fault forces another database fetch, and a true enterprise object is created.<p>
+</a><a name="10965">
+The following tables describe the API added to support raw row fetching. 
+<Table Border="3">
+<caption></caption>
+<tr><th colspan=2 rowspan=1><a name="10987">
+EOFetchSpecification 
+</a></th></tr>
+<tr><td scope="row"><a name="10991">
+rawRowKeyPaths
+</a></td><td><a name="10993">
+Returns an array of attribute keys that should be fetched as raw data. The default value is nil or null, indicating that full enterprise objects are to be returned from the fetch. If the array contains no objects, the entity specifies which attributes to fetch (EOEntity's attributesToFetch method). 
+</a></td></tr>
+<tr><td scope="row"><a name="10995">
+setRawRowKeyPaths:
+</a></td><td><a name="10997">
+Sets the array of attribute keys that should be fetched as raw data. You can disable the fetching of raw rows by sending nil or null to this method. If you want to perform raw row fetching, but you want the entity to specify which attributes to fetch, you can pass an empty array to this method or you can use the setFetchesRawRows: method to enable raw row fetching.
+</a></td></tr>
+<tr><td scope="row"><a name="10999">
+fetchesRawRows
+</a></td><td><a name="11001">
+Returns whether raw row fetching is performed. YES or true if rawRowKeyPaths is non-nil or non-null.
+</a></td></tr>
+<tr><td scope="row"><a name="11003">
+setFetchesRawRows:
+</a></td><td><a name="11005">
+Sets whether raw row fetching is performed. If the value passed to this method is YES or true, then the rawRowKeyPaths array is set to an empty array. If NO or false, then the rawRowKeyPaths array is set to nil or null.
+</a></td></tr>
+
+</Table>
+
+<Table>
+<tr><td scope="row">
+</Table>
+ 
+<Table Border="3">
+<caption></caption>
+<tr><th colspan=2 rowspan=1><a name="11012">
+EOObjectStore 
+</a></th></tr>
+<tr><td scope="row"><a name="11016">
+faultForRawRow:entityNamed:editingContext: (Objective-C)
+</a><a name="11960">
+faultForRawRow (Java)
+</a></td><td><a name="11018">
+Returns a fault for the given raw row dictionary. The raw row dictionary must include the primary key attributes for this method to work properly. If the dictionary does not include the primary key, this method raises or throws an exception.
+</a><a name="11951">
+Note that as EOObjectStore subclasses, EOEditingContext and EODatabaseContext also provide this method.
+</a></td></tr>
+
+</Table>
+
+<Table>
+<tr><td>
+</Table>
+<p>
+</a><a name="18420">
+In addition to these methods, EOUtilities also provides raw row fetching methods. For more information, see section "<a href="NewInEOF3.06.html#16295">New Convenience API</a>."<p>
+</a>
+<P>
+ 
+<a href="NewInEOFTOC.html"><IMG SRC="ArrowUp.gif">Table of Contents</a> <a href="NewInEOF3.011.html"><IMG SRC="ArrowRight.gif">Next Section</a>
+<P>
+
+
+
+
+<!--start of footer -->
+<!--#include virtual="/includes/framesetfooter" -->
+<!-- end of footer -->
+
+</body>
+</html>

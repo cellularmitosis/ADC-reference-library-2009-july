@@ -1,0 +1,239 @@
+<html><head><title>Advanced Enterprise Object Modeling</title></head>
+<body bgcolor="#ffffff">
+
+<!--start of banner -->
+<!--#include virtual="/includes/framesetheader" -->
+<!-- end of banner -->
+
+<!--start of path -->
+<font face="Geneva,Helvetica,Arial" size="1">
+<b>PATH<spacer type="horizontal" size="5">&nbsp;</b>
+ <a href="../../../../../webobjects.html" target="_top">WebObjects 4.0 Documentation</a> <b>&gt;</b>
+ <a href="GuideTOC.html" target="_top">EOF Developer's Guide</a>
+</font>
+<br><br>
+<!--end of path -->
+
+ 
+<a href="EOsII.html"><IMG SRC="ArrowUp.gif">Table of Contents</a> <a href="EOsII1.html"><IMG SRC="ArrowLeft.gif">Previous Section</a>
+ 
+<a name="278">
+<h1> Modeling Relationships	</h1>
+</a><a name="6339">
+How you model relationships is perhaps the most complex and interesting part of a database-to-objects mapping. This section describes some of the finer points of relationship modeling.<p>
+</a><a name="5997">
+<h2> Modeling Optional To-One Relationships	</h2>
+</a><a name="264">
+A to-one relationship is optional if the relationship's destination object can be <strong>null</strong> (<strong>nil</strong> in Objective-C). For example, a Member entity's <strong>creditCard</strong> relationship is optional if a Member object isn't required to &#32;have a CreditCard object.<p>
+</a><a name="282">
+<B>Note: </B> Occasionally, a mandatory to-one relationship doesn't resolve to a &#32;destination object. For example, suppose your application's Movie database contains legacy data for which relational integrity constraints weren't strictly enforced. As a result, some Movies don't have corresponding Studios even though the Movies-to-Studios relationship is mandatory. The techniques for handling these errant to-one relationships are the same as those for handling optional to-one relationships.<p>
+</a><a name="349">
+You can model an optional to-one relationship many different ways, depending on how you represent the relationship in the database-as a &#32;<em>foreign key to primary key join</em> or as a <em>primary key to primary key join</em>.<p>
+</a><a name="8816">
+<B>Note: </B> For to-one relationships, Enterprise Objects Framework doesn't support primary key to foreign key joins. The destination join attribute in a to-one relationship must be the destination entity's primary key.<p>
+</a><a name="6715">
+Using a foreign key to primary key join, you include the destination row's primary key in the source row. For example, in the relationship shown in <a href="EOsII2.html#8812">Figure &#32;24</a>, the <strong>creditCard</strong> relationship's source table (MEMBER) has a foreign key (CARD_NUMBER) to the destination table (CREDIT_CARD). Using this approach, you can model an optional <br>to-one relationship as a true to-one relationship just as you would model a mandatory to-one relationship.<p>
+</a><a name="8807">
+<p><img src="EOsII1.gif"><p>
+</a><a name="8812">
+<p>Figure 24.	  Storing a Foreign Key in the Source Table<p>
+</a><a name="6747">
+A foreign key to primary key join is the best way to model a to-one relationship for use with Enterprise Objects Framework. If you have control over the design of the database schema, use foreign key to primary key joins for to-one relationships whenever possible.<p>
+</a><a name="945">
+Alternatively, you can use a primary key to primary key join that includes the source's primary key in the destination table. For example, in the relationship shown in <a href="EOsII2.html#936">Figure &#32;25</a>, the <strong>talentPhoto</strong> relationship's destination table (TALENT_PHOTO) has a foreign key (TALENT_ID) to the source table (TALENT). For reasons described below, this arrangement requires special handling.<p>
+</a><a name="943">
+<p><img src="EOsII5.gif"><p>
+</a><a name="936">
+<p>Figure 25.	  Storing a Foreign Key in the Destination Table<p>
+</a><a name="523">
+When Enterprise Objects Framework fetches an enterprise object, it attempts to assign destination objects to any of the object's to-one relationships. If a destination object hasn't already been fetched, Enterprise Objects Framework creates a fault to stand in for the destination object until it is actually needed. (For more information on faulting, see the chapter<a href="BehindSc.html#8585"> "Behind the Scenes"</a>.)<p>
+</a><a name="273">
+The exception to this is when the relationship is based on a foreign key to primary key join and the relationship's source object doesn't have a corresponding destination. Instead of creating a fault, Enterprise Objects Framework assigns <strong>null</strong> (or <strong>nil</strong> in Objective-C) to the source object's relationship property. For example, if a Member doesn't have a corresponding CreditCard, the corresponding MEMBER record's CARD_NUMBER value is NULL. When Enterprise Objects Framework sees the null-valued CARD_NUMBER attribute, it sets the Member's <strong>creditCard</strong> property to <strong>null</strong>.<p>
+</a><a name="266">
+On the other hand, Enterprise Objects Framework can't detect that a primary key to primary key relationship doesn't have a destination. For example, Enterprise Objects Framework can't tell that a TALENT record doesn't have a corresponding TALENT_PHOTO record until it tries to fetch a TALENT_PHOTO with the same TALENT_ID value and fails. Consequently, in a primary key to primary key relationship, Enterprise Objects Framework always assigns a fault if a corresponding destination object hasn't been fetched. If no such destination exists, Enterprise Objects Framework throws an exception when it tries to resolve the fault.<p>
+</a><a name="916">
+An optional primary key to primary key relationship (such as <strong>talentPhoto</strong>) can be handled in a number of ways:<p>
+</a><ul><a name="308">
+<p><li><em>Model the relationship as a mandatory to-one, but allow the destination entity to have </em><strong>null</strong><em>-valued attributes.</em> For example, assume that a relationship between Customers and Addresses is optional. To model the relationship as a mandatory to-one, Customers who don't provide their Addresses have corresponding Address objects with <strong>null</strong>-valued <strong>streetAddress</strong>, <strong>city</strong>, <strong>state</strong>, and <strong>zip</strong> attributes. The Customers also have Address rows in the database, but the Address rows contain NULLs in all the columns except the primary key column (whose value matches that of the corresponding Customer).
+</a><a name="8821">
+<p>This approach is a good choice when the destination object contains what are conceptually attributes of the source object. For &#32;example, conceptually <strong>photo</strong> is an attribute of a Talent object. It's implemented using a to-one relationship for performance reasons. (Photo data is very large, and isn't fetched unless-and until-it's needed.)<p>
+</a><a name="320">
+<p><li><em>Model the relationship as a to-many.</em> This approach is useful when you think that a to-one relationship may evolve into a to-many relationship in the future. For example, current requirements for a &#32;Movie application specify that a Talent object may only have one photo. However, the requirements for the next version of the application mention a Talent's portfolio.
+</a><a name="927">
+<p><li><em>Handle the exception thrown by faults that don't correspond to a destination object.</em> This approach is probably the best for handling optional to-one relationships based on primary key to primary key joins.
+</a><a name="954">
+<p><li>I<em>mplement the delegate method</em> <strong>databaseContextFailedToFetchObject</strong> (<strong>databaseContext:failedToFetchObject:globalID:</strong> in Objective-C). This approach is best for handling mandatory to-one relationships with errant data (source rows that don't have corresponding destinations).
+</a></ul><a name="955">
+The following sections describe each approach.<p>
+</a><a name="302">
+<h3> Use a Mandatory To-One Relationship</h3>
+</a><a name="323">
+This approach is used for the Movies database to model Talent's <strong>talentPhoto</strong> relationship. Although a Talent object doesn't have to have a photo, it does have to have a corresponding TalentPhoto object. As shown in <a href="EOsII2.html#526">Figure &#32;26</a>, a Talent object that doesn't have a photo has a TalentPhoto object whose <strong>photo</strong> attribute is <strong>null</strong> (<strong>nil</strong> in Objective-C).<p>
+</a><a name="537">
+<p><img src="EOsII4.gif"><p>
+</a><a name="526">
+<p>Figure 26.	  A Destination Object with null-Valued Attributes<p>
+</a><a name="11264">
+This approach doesn't require any code. In the Advanced Relationship Inspector for the Talent entity's <strong>talentPhoto</strong> relationship, you simply set the relationship to <em>propagate primary key</em>. Propagate primary key tells Enterprise Objects Framework to propagate the primary key of the source entity into newly inserted objects in the destination entity (instead of generating a primary key value for the destination). With this configuration, Enterprise Objects Framework inserts a new Talent object, it inserts a corresponding TalentPhoto object if the Talent object doesn't already have one assigned to it.<p>
+</a><a name="953">
+<h3> Use a To-Many Relationship</h3>
+</a><a name="9887">
+To-many relationships use a different faulting mechanism than to-ones. A fault for a to-many relationship replaces itself with an NSArray of corresponding destination objects, and it doesn't throw an exception if it doesn't find any. If you use a to-many relationship to model an optional to-one and no destination object exists, the array is simply empty. If the relationship does have a destination object, it's the first and only object in the array.<p>
+</a><a name="296">
+You can design your enterprise object's API to hide the to-many implementation. For example, suppose that Talent's <strong>talentPhoto</strong> relationship was modeled as a to-many. To design a Talent enterprise object that acts as if its <strong>talentPhoto</strong> relationship is an optional to-one, you could name the to-many relationship (and the corresponding instance variable) "_talentPhotoArray" and implement the following two accessor methods:<p>
+</a><a name="10886">
+In Java:<p>
+</a><pre><a name="10889">public void setTalentPhoto(TalentPhoto talentPhoto)<br>
+{<br>
+	willChange();<br>
+	_talentPhotoArray.removeAllObjects();<br>
+	if (talentPhoto != null)<br>
+		_talentPhotoArray.addObject(talentPhoto);<br>
+}<br>
+<br>
+public TalentPhoto talentPhoto()<br>
+{<br>
+	willRead();<br>
+	if (_talentPhotoArray.count() &gt; 0)<br>
+		return _talentPhotoArray.objectAtIndex(0);<br>
+	return null;<br>
+}
+</a></pre><a name="10887">
+In Objective-C:<p>
+</a><pre><a name="5614">- (void)setTalentPhoto:(TalentPhoto *)talentPhoto<br>
+{<br>
+	[self willChange];<br>
+	[_talentPhotoArray removeAllObjects];<br>
+	if (_talentPhotoArray)<br>
+		[_talentPhotoArray addObject:talentPhoto];<br>
+}<br>
+<br>
+- (id)talentPhoto<br>
+{<br>
+	if ([_talentPhotoArray count])<br>
+		return [_talentPhotoArray objectAtIndex:0];<br>
+	return nil;<br>
+}
+</a></pre><a name="12325">
+<h3> Handle the Exception</h3>
+</a><a name="11269">
+You can use a to-one relationship if you handle any exceptions that are thrown when a fault doesn't resolve to a destination object. For example, in the Talent enterprise object, you would implement the <strong>talentPhoto</strong> relationship "get" method as follows:<p>
+</a><a name="12178">
+In Java:<p>
+</a><pre><a name="12179">public TalentPhoto talentPhoto()<br>
+{<br>
+	try {<br>
+		// If the receiver is a fault, sending it a willRead<br>
+		// message attempts to resolve it.  If the<br>
+		// corresponding row doesn't exist in the database,<br>
+		// an exception is thrown.<br>
+		talentPhoto.willRead();<br>
+	} catch (NSException e) {<br>
+		talentPhoto = null;<br>
+	}<br>
+<br>
+	return talentPhoto;<br>
+}
+</a></pre><a name="12157">
+In Objective-C:<p>
+</a><pre><a name="5641">- (TalentPhoto *)talentPhoto<br>
+{<br>
+	NS_DURING<br>
+		// If the receiver is a fault, sending it a self<br>
+		// message attempts to resolve it.  If the<br>
+		// corresponding row doesn't exist in the database,<br>
+		// an exception is raised.<br>
+		[talentPhoto self];<br>
+	NS_HANDLER<br>
+		[talentPhoto autorelease];<br>
+		talentPhoto = nil;<br>
+	NS_ENDHANDLER<br>
+<br>
+	return talentPhoto;<br>
+}
+</a></pre><a name="4213">
+Sending <strong>willRead</strong> (or <strong>self</strong> in Objective-C) to a fault triggers it to fetch its corresponding enterprise object. If a Talent instance doesn't have a corresponding TalentPhoto, sending <strong>willRead</strong> to the <strong>talentPhoto</strong> property throws an exception. In the <strong>talentPhoto</strong> method above, the exception handler simply sets the property to <strong>null</strong> (first autoreleasing the <strong>talentPhoto</strong> fault in Objective-C).<p>
+</a><a name="321">
+<h3> Implement databaseContextFailedToFetchObject</h3>
+</a><a name="348">
+With the EODatabaseContext delegate method <strong>databaseContextFailedToFetchObject</strong> (<strong>databaseContext:failedToFetchObject:globalID:</strong> in Objective-C), you &#32;can &#32;prevent an exception from being thrown when a fault doesn't resolve to a destination object. This method is invoked when a fault for &#32;a &#32;to-one relationship can't find its corresponding object in the database. By returning <strong>false</strong> (NO in Objective-C), you can prevent the &#32;EODatabaseContext from raising an exception.<p>
+</a><a name="5002">
+For example, to handle mandatory to-one relationships with errant data (source rows that don't have corresponding destinations), you could implement the delegate method to insert the empty object, thereby supplying the missing destination object:<p>
+</a><a name="11381">
+In Java:<p>
+</a><pre><a name="11368">public boolean databaseContextFailedToFetchObject(<br>
+	EODatabaseContext context, <br>
+	Object object,<br>
+	EOGlobalID gid)<br>
+{<br>
+	// Perform a check to determine whether to intervene<br>
+	if (...) {<br>
+		// Set values in your object (if necesssary).<br>
+		object.editingContext().insertObject(object);<br>
+		return false;<br>
+	}<br>
+	return true;<br>
+}
+</a></pre><a name="11383">
+In Objective-C:<p>
+</a><pre><a name="5663">- (BOOL)databaseContext:(EODatabaseContext *)context<br>
+	failedToFetchObject:(id)object<br>
+	globalID:(EOGlobalID *)gid<br>
+{<br>
+	// Perform a check to determine whether to intervene<br>
+	if (...) {<br>
+		// Set values in your object (if necesssary).<br>
+		[[object editingContext] insertObject:object];<br>
+		return NO;<br>
+	}<br>
+	return YES;<br>
+}
+</a></pre><a name="352">
+In the above implementations, the delegate method first checks to see if it should intervene. For example, the method might check to see if <strong>object</strong> is an instance of the TalentPhoto class. If the delegate determines that <strong>object</strong> represents a destination object that's missing from the database, the delegate queues <strong>object</strong> for insertion into the database by inserting it into its editing context. It returns <strong>false</strong> (NO in Objective-C) indicating that the delegate has handled the error and that the EODatabaseContext shouldn't throw an exception.<p>
+</a><a name="6001">
+<h2> Modeling Many-To-Many Relationships</h2>
+</a><a name="12340">
+To model a many-to-many relationship between objects is simple: each object manages a collection of the other kind. For example, consider the many-to-many relationship between employees and projects. To model this relationship in objects, an Employee has an NSArray, <strong>projects</strong>, of all the projects he or she works on; and a Project class has an NSArray, <strong>employees</strong>, of all its members.<p>
+</a><a name="6043">
+To model a many-to-many relationship in a database, you have to create &#32;an intermediate table (also known as a <em>correlation</em> or <em>join</em> table). For &#32;example, the database for employees and projects might have EMPLOYEE, PROJECT, and EMP_PROJ tables, where EMP_PROJ is &#32;the correlation table. The appendix "Entity-Relationship Modeling" provides more information on the tables behind a many-to-many relationship.<p>
+</a><a name="6047">
+Given the relational database representation of a many-to-many, how do you get the object model you want? You don't want to see evidence of the correlation table in your object model, and you don't want to write code to maintain database correlation rows. With Enterprise Objects Framework, you don't have to. Simply use flattened relationships as described in the chapter "Using EOModeler" to hide your correlation tables.<p>
+</a><a name="6122">
+A model with the following features has the effect of hiding the EMP_PROJ correlation table from its object model altogether:<p>
+</a><ul><a name="6211">
+<p><li>Employee and Project entities whose to-many relationships to the EmpProj entity (<strong>toEmpProj</strong>) are not class properties. 
+</a><a name="6231">
+<p><li>The flattened relationships <strong>projects</strong> and <strong>employees</strong> in Employee and Project, respectively, are class properties.
+</a></ul><a name="6281">
+Consequently, EmpProj enterprise objects are never created, Employees have an array of related Projects, and Projects have an array of related Employees. Furthermore, Enterprise Objects Framework automatically manages rows in the EMP_PROJ correlation table.<p>
+</a><a name="6013">
+However, what do you do when a correlation table contains extra attributes that are interesting? For example, the MOVIE_ROLE table in the sample Movies database is a correlation table between movies and the actors who star in them. In addition to foreign keys for MOVIE and TALENT, the MOVIE_ROLE table also contains the name of the role the actor plays in the film. In this case, MovieRole enterprise objects actually have a place in the object model even though they're fetched from a correlation table.<p>
+</a><a name="8901">
+If you want to programmatically access both a Movie's roles and its actors directly from the Movie object, you should do the following:<p>
+</a><ol>
+<a name="8935">
+<P><li>Create a <strong>movieRole</strong> relationship from Movie to MovieRole and set it to be a class property.
+</a><a name="8936">
+<P><li>Create a <strong>talent</strong> relationship from MovieRole to Talent.
+</a><a name="8937">
+<P><li>Define an <strong>actors</strong> method in the Movie class that returns the Talent objects by getting them from the corresponding MovieRoles.
+</a></ol>
+<a name="6015">
+Because MovieRole corresponds to a data-bearing correlation table, you shouldn't create a flattened relationship from Movie to Talent. If your application fetches correlation records as enterprise objects, consistency problems can arise if it also manages a flattened relationship. For example, suppose you did flatten the <strong>talent</strong> relationship into the Movie entity. Movie objects would then have an array of MovieRole objects and an array of Talent objects. If your application adds a new MovieRole to a Movie's <strong>roles</strong> array, the corresponding <strong>actors</strong> array doesn't reflect the addition until the new MovieRole is saved to the database and the Movie is refetched.<p>
+</a><a name="8965">
+Instead, if you create an<strong> actors</strong> method that traverses the object graph through the Movie's MovieRole objects, you avoid any consistency problems.<p>
+</a><a name="9010">
+For display purposes, you don't even need an accessor method to bypass a correlation object. Instead, you can use key paths. For example, you can use the key path <strong>roles.talent</strong> to access a Movie's Talent objects in a master-detail configuration between a Movie EODisplayGroup and a Talent EODisplayGroup.<p>
+</a>
+<P>
+ 
+<a href="EOsII.html"><IMG SRC="ArrowUp.gif">Table of Contents</a> <a href="EOsII3.html"><IMG SRC="ArrowRight.gif">Next Section</a>
+<P>
+
+
+<!--start of footer -->
+<!--#include virtual="/includes/framesetfooter" -->
+<!-- end of footer -->
+
+</body>
+</html>

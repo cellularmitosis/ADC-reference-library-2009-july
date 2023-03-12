@@ -1,0 +1,249 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML EXPERIMENTAL 970324//EN">
+<HTML>
+<HEAD>
+<META NAME="GENERATOR" CONTENT="Adobe FrameMaker 5.5/HTML Export Filter">
+<LINK REL="STYLESHEET" HREF="UnnormalizedTables.css">
+<TITLE> </TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+<!--start of banner -->
+<!--#include virtual="/includes/framesetheader" -->
+<!-- end of banner -->
+<!--start of path -->
+<font face="Geneva,Helvetica,Arial" size="1">
+<b>PATH<spacer type="horizontal" size="5">&nbsp;</b>
+ <a href="../../../../../webobjects.html" target="_top">WebObjects 4.0 Documentation</a> <b>&gt;</b>
+ <a href="TopicsTOC.html" target="_top">WebObjects Programming Topics</a>
+</font>
+<br><br>
+<!--end of path -->
+
+
+<H1 CLASS="TopictTitleTOC">
+Working with Unnormalized Tables
+</H1>
+<DIV>
+<H2 CLASS="Synopsis">
+<A NAME="pgfId=606101">
+ </A>
+Synopsis<DIV>
+<IMG SRC="UnnormalizedTables-1.gif">
+</DIV>
+</H2>
+<P CLASS="Body">
+<A NAME="pgfId=606102">
+ </A>
+Describes how to set up an EOModel to work with a database with unnormalized tables.</P>
+</DIV>
+<DIV>
+<H2 CLASS="Heading1">
+<A NAME="pgfId=606103">
+ </A>
+Discussion<DIV>
+<IMG SRC="UnnormalizedTables-1.gif">
+</DIV>
+</H2>
+<P CLASS="Body">
+<A NAME="pgfId=612501">
+ </A>
+A normalized table contains no columns with duplicate data.  Any column with duplicate data is replaced with foreign keys into a new table containing unique data.  For example, suppose you are creating a movie database. Every movie has a category such as &quot;action&quot;, &quot;drama&quot;, or &quot;comedy&quot;.  An unnormalized Movies table may be designed with a category column containing string data. All comedies would contain the string &quot;comedy&quot; duplicated in the category column.</P>
+<P CLASS="Body">
+<A NAME="pgfId=612606">
+ </A>
+This table can be normalized by creating a Category table having a unique set of category strings, the string &quot;comedy&quot; appearing exactly once in this table.  Each movie in the Movie table now has a key to the row in the Category table corresponding to the movie's category.  All comedies contain the key to the comedy row duplicated in the category column.</P>
+<P CLASS="Body">
+<A NAME="pgfId=612599">
+ </A>
+Fetches on unnormalized tables don't require the extra joins to the unique tables and are consequently faster than fetches on normalized tables.  However, they are harder to maintain.  For example, every action movie must have the string &quot;action&quot; in the category column.  If an action movie has the misspelled string &quot;actio&quot;, or the synonymous string &quot;adventure&quot; in the category column, an query for action movies will overlook this movie.</P>
+<P CLASS="Body">
+<A NAME="pgfId=612709">
+ </A>
+Suppose you are working with the unnormalized Movies table where the category column contains string data, and you want to present the user with a pick list of all the movie categories. You can't just read all of the categories from the Category table because the database doesn't contain one.  However, you can use EOF to pretend your database is normalized by creating extra entities to the same database tables. These extra entities have a subset of the database table's columns. EOF makes objects unique by entity and primary keys, so records fetched from these different entities are indeed different objects. The &quot;faked-out&quot; entities that are not complete records from the database table should be marked as read-only, because it makes no sense to insert a sparse Movie record with only the Category set when attempting to create a new Category.</P>
+<P CLASS="Body">
+<A NAME="pgfId=606105">
+ </A>
+The following steps in EOModeler simulate a Movies database with a Category table when the category data is actually embedded within the Movies table.</P>
+<OL>
+<P CLASS="Numbered1">
+<A NAME="pgfId=606106">
+ </A>
+1.		Create a new read-only entity in the EOModeler called Category. </P>
+<P CLASS="Numbered">
+<A NAME="pgfId=606107">
+ </A>
+2.		Set the new Category entity's table name to &quot;Movie.&quot;</P>
+<P CLASS="Numbered">
+<A NAME="pgfId=606108">
+ </A>
+3.		Add one attribute called &quot;category&quot; to the Category entity.</P>
+<P CLASS="Numbered">
+<A NAME="pgfId=606109">
+ </A>
+4.		Make the category attribute the primary key.</P>
+<P CLASS="Numbered">
+<A NAME="pgfId=606110">
+ </A>
+5.		Create a to-many relationship from the Category entity to the Movie entity joined by the category attribute in each table. This allows to you get all the movies for a given category.</P>
+</OL>
+<P CLASS="Body">
+<A NAME="pgfId=606111">
+ </A>
+When you fetch the Category entity, you must remember to <EM CLASS="Code">
+setUsesDistinct</EM>
+ to true/YES. Otherwise, you will get duplicates, since you are really just fetching one column from the Movie table (see the &quot;Fetching Distinct Results&quot; programming topic)</P>
+<DIV>
+<H5 CLASS="Code-Listing">
+<A NAME="pgfId=607928">
+ </A>
+Figure 1.  Java Code</H5>
+<DIV>
+<pre>public NSArray fetchCategories() {</pre></DIV>
+<A NAME="pgfId=607930">
+ </A>
+<DIV>
+<pre>    EOEditingContext ec=session().defaultEditingContext();</pre></DIV>
+<A NAME="pgfId=607932">
+ </A>
+<DIV>
+<pre>    EOFetchSpecification fs=new EOFetchSpecification("Category", null, null);</pre></DIV>
+<A NAME="pgfId=607934">
+ </A>
+<DIV>
+<pre>    fs.setUsesDistinct(true);</pre></DIV>
+<A NAME="pgfId=607936">
+ </A>
+<DIV>
+<pre>    return ec.objectsWithFetchSpecification(fs);</pre></DIV>
+<A NAME="pgfId=607938">
+ </A>
+<DIV>
+<pre>}</pre></DIV>
+<A NAME="pgfId=607940">
+ </A>
+</DIV>
+<DIV>
+<H5 CLASS="Code-Listing">
+<A NAME="pgfId=607945">
+ </A>
+Figure 2.  Objective-C Code</H5>
+<DIV>
+<pre>- (NSArray *) fetchCategories {</pre></DIV>
+<A NAME="pgfId=607947">
+ </A>
+<DIV>
+<pre>    EOEditingContext *ec=[[self session] defaultEditingContext];</pre></DIV>
+<A NAME="pgfId=607949">
+ </A>
+<DIV>
+<pre>    EOFetchSpecification *fs=[EOFetchSpecification</pre></DIV>
+<A NAME="pgfId=607951">
+ </A>
+<DIV>
+<pre>        fetchSpecificationWithEntityName: @"Category"</pre></DIV>
+<A NAME="pgfId=614165">
+ </A>
+<DIV>
+<pre>        qualifier: nil sortOrderings: nil];</pre></DIV>
+<A NAME="pgfId=614174">
+ </A>
+<DIV>
+<pre>    [fs setUsesDistinct: YES];</pre></DIV>
+<A NAME="pgfId=607953">
+ </A>
+<DIV>
+<pre>    return [ec objectsWithFetchSpecification: fs];</pre></DIV>
+<A NAME="pgfId=607955">
+ </A>
+<DIV>
+<pre>}</pre></DIV>
+<A NAME="pgfId=607957">
+ </A>
+<P CLASS="Body">
+<A NAME="pgfId=614140">
+ </A>
+.</P>
+</DIV>
+</DIV>
+<DIV>
+<H2 CLASS="Heading1">
+<A NAME="pgfId=614207">
+ </A>
+See Also<DIV>
+<IMG SRC="UnnormalizedTables-1.gif">
+</DIV>
+</H2>
+<UL>
+<P CLASS="Bulleted">
+<A NAME="pgfId=614208">
+ </A>
+&#183;	Fetching Distinct Results</P>
+<P CLASS="Bulleted">
+<A NAME="pgfId=614209">
+ </A>
+&#183;	EOFetchSpecification</P>
+</UL>
+</DIV>
+<DIV>
+<H2 CLASS="Heading1">
+<A NAME="pgfId=614210">
+ </A>
+Questions<DIV>
+<IMG SRC="UnnormalizedTables-1.gif">
+</DIV>
+</H2>
+<UL>
+<P CLASS="Bulleted">
+<A NAME="pgfId=606134">
+ </A>
+&#183;	How do I set up an EOModel to be more normalized than the actual database?</P>
+<P CLASS="Bulleted">
+<A NAME="pgfId=606135">
+ </A>
+&#183;	How do I fetch pick lists when the rows are not normalized into a separate table?</P>
+</UL>
+</DIV>
+<DIV>
+<H2 CLASS="Heading1">
+<A NAME="pgfId=607068">
+ </A>
+Keywords<DIV>
+<IMG SRC="UnnormalizedTables-1.gif">
+</DIV>
+</H2>
+<UL>
+<P CLASS="Bulleted">
+<A NAME="pgfId=607069">
+ </A>
+&#183;	Unnormalized tables</P>
+<P CLASS="Bulleted">
+<A NAME="pgfId=607070">
+ </A>
+&#183;	Distinct</P>
+<P CLASS="Bulleted">
+<A NAME="pgfId=606141">
+ </A>
+&#183;	Pick lists</P>
+</UL>
+</DIV>
+<DIV>
+<H2 CLASS="Heading1">
+<A NAME="pgfId=606143">
+ </A>
+Revision History<DIV>
+<IMG SRC="UnnormalizedTables-1.gif">
+</DIV>
+</H2>
+<P CLASS="Body">
+<A NAME="pgfId=606144">
+ </A>
+21 July, 1998. David Scheck. First Draft.<BR>
+19 November 1998. Clif Liu. Second Draft.</P>
+</DIV>
+
+
+<!--start of footer -->
+<!--#include virtual="/includes/framesetfooter" -->
+<!-- end of footer -->
+
+</body>
+</HTML>

@@ -1,0 +1,384 @@
+<html><head><title></title></head>
+
+<body bgcolor="#ffffff">
+
+ 
+
+ 
+
+<h1>
+
+<FONT COLOR="#000066">
+
+<a name="59">
+
+ <a name="//apple_ref/occ/cl/NSException">NSException</a>
+
+</a>
+
+</FONT>
+
+</h1>
+
+<p><B>Inherits From:</B><BR>  
+
+NSObject 
+
+
+
+<p><B>Conforms To:</B><BR>
+
+NSCoding<br>
+
+NSCopying<br>
+
+NSObject (NSObject)
+
+
+
+<p><B>Declared In:	</B><BR>
+
+Foundation/NSException.h
+
+
+
+<p><a name="90"></a>
+
+<a name="description"></a>
+
+<H2>Class Description 
+
+</H2>
+
+NSException is used to implement exception handling and contains information about an exception. An <em>exception</em> is a special condition that interrupts the normal flow of program execution. Each application can interrupt the program for different reasons. For example, one application might interpret saving a file in a directory that's write-protected as an exception. In this sense, the exception is equivalent to an error. Another application might interpret the user's keypress (i.e., Control-C) as an exception: an indication that a long-running process should be aborted.<p>
+
+<h3>
+
+<a name="92">
+
+ Raising an Exception
+
+</a>
+
+</h3>
+
+Once an exception is detected, it must be propagated to code that will handle it, called the <em>exception handler</em>. This entire process of handling an exception is referred to as "raising an exception." Exceptions are raised by instantiating an NSException object and sending it a <code>raise</code> message.<p>
+
+NSException objects provide:<p>
+
+<ul><li>a name - a short string that is used to uniquely identify the exception.<p>
+
+<li>a reason - a longer string that contains a "human-readable" reason for the exception.<p>
+
+<li>userInfo - a dictionary used to supply application-specific data to the exception handler. For example, if the return value of a method causes an exception to be raised, you could pass the return value to the exception handler through <code>userInfo</code>.<p>
+
+</ul><h3>
+
+<a name="98">
+
+ Handling an Exception
+
+</a>
+
+</h3>
+
+Where and how an exception is handled depends on the context where the exception was raised. In general, a <code>raise</code> message is sent to an NSException object within the domain of an exception handler. An exception handler is contained within a control structure created by the macros NS_DURING, NS_HANDLER, and NS_ENDHANDLER, as shown in the following illustration.<p>
+
+<p><img src="../NSException0.gif"><p><p>
+
+The section of code between NS_DURING and NS_HANDLER is the <em>exception handling domain</em>; the section between NS_HANDLER and NS_ENDHANDLER is the <em>local exception handler</em>. The normal flow of program execution is marked by the gray arrow; the code within the local exception handler is executed only if an exception is raised. Sending a <code>raise</code> message to an exception object causes program control to jump to the first executable line following NS_HANDLER.<p>
+
+Although you can raise an exception directly within the exception handling domain, <code>raise</code> is more often invoked indirectly from a method invoked from the domain. No matter how deep in a call sequence the exception is raised, execution jumps to the local exception handler (assuming there are no intervening exception handlers, as discussed in the next section). In this way, exceptions raised at a low level can be caught at a high level.<p>
+
+For example, in the following program excerpt, the local exception handler displays an attention panel after detecting an exception having the name MyAppException. The local exception handler has access to the raised exception object through a local variable <code>localException</code>.<p>
+
+<blockquote><pre>NS_DURING<br>    ...<br>    if (someError)<br>        [anException raise];<br>    ...<br>NS_HANDLER<br>    if ([[localException name] isEqualToString:MyAppException]) {<br>        NSRunAlertPanel(@"Error Panel", @"%@", @"OK", nil, nil, <br>                localException);<br>    }<br>    [localException raise]; /* Re-raise the exception. */<br>NS_ENDHANDLER
+
+</pre></blockquote><p>You may leave the exception handling domain (the section of code between NS_DURING and NS_HANDLER) by:<p>
+
+<ul><li>Raising an exception.<p>
+
+<li>Calling <code>NS_VALUERETURN()</code><p>
+
+<li>Calling <code>NS_VOIDRETURN</code><p>
+
+<li>"Falling off the end"<p>
+
+</ul>The above example raises an exception when <code>someError</code> is YES. Alternatively, you can return control to the caller from within the exception handling domain by calling either <code>NS_VALUERETURN()</code> or <code>NS_VOIDRETURN</code>. "Falling off the end" is simply the normal path of execution-after all statements in the exception handling domain are executed, execution continues on the line following NS_ENDHANDLER.<p>
+
+<B><dt>Note:	</B>
+
+You can't use <code>goto</code> or <code>return</code> to exit an exception handling domain-errors will result. Nor can you 
+
+use <code>setjmp()</code> and<code> longjmp()</code> if the jump entails crossing an NS_DURING statement. Since the 
+
+NEXTSTEP code that your program calls may have exception handling domains within it, avoid 
+
+using <code>setjmp()</code> and <code>longjmp()</code> in your application.
+
+Similarly, you can leave the local exception handler (the section of code between NS_HANDLER and NS_ENDHANDLER) by raising an exception or simply "falling off the end". <p>
+
+<h3>
+
+<a name="113">
+
+ Nested Exception Handlers
+
+</a>
+
+</h3>
+
+In the code example above, the same exception, <code>localException</code>, is raised again at the end of the local handler, allowing an encompassing exception handler to take some additional action. Exception handlers can be nested so that an exception raised in an inner domain can be treated by the local exception handler and any number of encompassing exception handlers. The following diagram illustrates the use of nested exception handlers, and is discussed in the text that follows.<p>
+
+<p><img src="../NSException1.gif"><p><p>
+
+An exception raised within Method3's domain causes execution to jump to its local exception handler. In a typical application, this exception handler checks the object <code>localException</code> to determine the nature of the exception. For exception types that it recognizes, the local handler responds and then may send <code>raise</code> to <code>localException</code> to pass notification of the exception to the handler above, the handler in Method2. (An exception that's re-raised appears to the next higher handler just as if the initial exception had been raised within its own exception handling domain.) Method2's exception handler does the same and then re-raises the exception to Method1's handler. Finally, Method1's handler re-raises the exception. Since there's no exception handling domain above Method1, the exception is transferred to the uncaught exception handler as described below.<p>
+
+<h3>
+
+<a name="117">
+
+ Uncaught Exceptions
+
+</a>
+
+</h3>
+
+If an exception is not caught by any handler, it's intercepted by the uncaught exception handler, a function set by <code>NSSetUncaughtExceptionHandler()</code> and returned by <code>NSGetUncaughtExceptionHandler()</code>. <p>
+
+The default uncaught exception handler logs a message in the console and exits the program. However, for Application Kit programs, the message is logged with the Workspace Manager's console window (if the application was launched by the Workspace Manager) or to a Terminal window (if the application was launched from the shell). <p>
+
+You can change the default behavior by changing the uncaught exception handler using <code>NSSetUncaughtExceptionHandler()</code>.<p>
+
+<h3>
+
+<a name="121">
+
+ Predefined Exceptions
+
+</a>
+
+</h3>
+
+NEXTSTEP predefines a number of exception names. These exception names are defined in <code>NSException.h</code>. For example:<p>
+
+<ul><li><code>NSGenericException</code><br>
+
+<li><code>NSRangeException</code><br>
+
+<li><code>NSInvalidArgumentException</code><br>
+
+<li><code>NSMallocException</code><br>
+
+</ul>You can catch any of these exceptions from within your exception handler by comparing the exception's name with these predefined names. Note that all predefined exceptions begin with the prefix "NS", so you should avoid using the same prefix when creating new exception names.<p>
+
+<HR WIDTH="50%" ALIGN="LEFT">
+
+<h2>Adopted Protocols</h2>  
+
+ 
+
+
+
+<dl>
+
+<dt>NSCoding<dd><dl><dd><dl><dd><dl><dd><dl>
+
+<dt><a href="../../Protocols/NSCoding.html#//apple_ref/occ/intfm/NSCoding/encodeWithCoder:" target="_top">- encodeWithCoder:</a><dt><a href="../../Protocols/NSCoding/NSCoding.html#//apple_ref/occ/intfm/NSCoding/initWithCoder:" target="_top">- initWithCoder:</a></dl></dd>
+
+</dl></dd></dl></dd></dl></dd><dt>NSCopying<dd><dl><dd><dl><dd><dl><dd><dl>
+
+<dt><a href="../../Protocols/NSCopying/NSCopying.html#//apple_ref/occ/intfm/NSCopying/copyWithZone:" target="_top">- copyWithZone:</a></dl></dd>
+
+</dl></dd></dl></dd></dl></dd></dl>
+
+<a name="134">
+
+<HR WIDTH="50%" ALIGN="LEFT">
+
+<h2>Method Types 
+
+</h2>
+
+</a><dl>
+
+<dt>Creating and raising an NSException<dd><dl><dd><dl><dd><dl><dd><dl>
+
+<dt><a href="#//apple_ref/occ/clm/NSException/exceptionWithName:reason:userInfo:">+ exceptionWithName:reason:userInfo:</a>
+
+<dt><a href="#//apple_ref/occ/clm/NSException/raise:format:">+ raise:format:</a>
+
+<dt><a href="#//apple_ref/occ/clm/NSException/raise:format:arguments:">+ raise:format:arguments:</a>
+
+<dt><a href="#//apple_ref/occ/instm/NSException/initWithName:reason:userInfo:">- initWithName:reason:userInfo:</a>
+
+<dt><a href="#//apple_ref/occ/instm/NSException/raise">- raise</a></dl></dd>
+
+</dl></dd></dl></dd></dl></dd><dt>Querying an NSException<dd><dl><dd><dl><dd><dl><dd><dl>
+
+<dt><a href="#//apple_ref/occ/instm/NSException/name">- name</a><dt><a href="#//apple_ref/occ/instm/NSException/reason">- reason</a><dt><a href="#//apple_ref/occ/instm/NSException/userInfo">- userInfo</a></dl></dd>
+
+</dl></dd></dl></dd></dl></dd></dl>
+
+<hr WIDTH="25%" ALIGN="LEFT">
+
+<a name="145"></a>
+
+<h3> <a name="//apple_ref/occ/clm/NSException/exceptionWithName:reason:userInfo:">exceptionWithName:reason:userInfo:</a></h3>
+
++ (NSException *)<code>exceptionWithName:</code>(NSString *)<em>name<br></em><code>reason:</code>(NSString *)<em>reason<br></em><code>userInfo:</code>(NSDictionary *)<em>userInfo</em> 
+
+<P>Creates and returns an exception object using a predefined <em>name,</em> a<em> </em>human-readable <em>reason</em>, and arbitrary <em>userInfo</em>.<p>
+
+<B>See also: </B>  
+
+<code><a href="#//apple_ref/occ/instm/NSException/initWithName:reason:userInfo:">- initWithName:reason:userInfo:</a></code>, <a href="#//apple_ref/occ/instm/NSException/name"><code>- name</a></code>, <a href="#//apple_ref/occ/instm/NSException/reason"><code>- reason</a></code>,  <a href="#//apple_ref/occ/instm/NSException/userInfo"><code>- userInfo</a>
+
+</code><p><hr WIDTH="25%" ALIGN="LEFT">
+
+<a name="149"></a>
+
+<h3> <a name="//apple_ref/occ/clm/NSException/raise:format:">raise:format:</a></h3>
+
++ (void)<code>raise:</code>(NSString *)<em>name </em><code>format:</code>(NSString *)<em>format,...</em> 
+
+<P>A convenience method that creates and raises an exception with name <em>name</em> and<em> </em>a reason constructed from <em>format</em> and the arguments that follow in the manner of <code>printf()</code>. The user-defined information is <code>nil</code>.<p>
+
+<B>See also: </B>  
+
+<code><a href="#//apple_ref/occ/clm/NSException/raise:format:arguments:">+ raise:format:arguments:</a></code>, <a href="#//apple_ref/occ/instm/NSException/raise"><code>- raise</a>
+
+</code><p><hr WIDTH="25%" ALIGN="LEFT">
+
+<a name="153"></a>
+
+<h3> <a name="//apple_ref/occ/clm/NSException/raise:format:arguments:">raise:format:arguments:</a></h3>
+
++ (void)<code>raise:</code>(NSString *)<em>name </em><code>format:</code>(NSString *)<em>format </em><code>arguments:</code>(va_list)<em>argList</em> 
+
+<P>Creates and raises an exception with name <em>name</em> and a reason constructed from <em>format</em> and the arguments in <em>argList</em>, in the manner of <code>vprintf()</code>. The user-defined information is <code>nil</code>.<p>
+
+<B>See also: </B>  
+
+<code><a href="#//apple_ref/occ/clm/NSException/raise:format:">+ raise:format:</a></code>, <a href="#//apple_ref/occ/instm/NSException/raise"><code>- raise</a>
+
+</code><p><HR WIDTH="50%" ALIGN="LEFT">
+
+<a name="instm"></a>
+
+<h2>Instance Methods</h2>  
+
+
+
+
+
+<a name="158"></a>
+
+<h3>
+
+ <a name="//apple_ref/occ/instm/NSException/description">description</a>
+
+</h3>
+
+- (NSString *)<code>description</code>
+
+<P>Overridden to return the receiver's reason, so that "%@" used in formatted strings produces a meaningful description of the exception.<p>
+
+<B>See also: </B>  
+
+<code><a href="#//apple_ref/occ/instm/NSException/reason">- reason</a>
+
+</code><p><hr WIDTH="25%" ALIGN="LEFT">
+
+<a name="162"></a>
+
+<h3> <a name="//apple_ref/occ/instm/NSException/initWithName:reason:userInfo:">initWithName:reason:userInfo:</a></h3>
+
+- (id)<code>initWithName:</code>(NSString *)<em>name<br></em><code>reason:</code>(NSString *)<em>reason<br></em><code>userInfo:</code>(NSDictionary *)<em>userInfo</em> 
+
+<P>Initializes a newly allocated exception object using the predefined <em>name,</em> human-readable <em>reason, </em>and user-defined <em>userInfo</em>. This is the designated initializer.<p>
+
+<B>See also: </B>  
+
+<code><a href="#//apple_ref/occ/clm/NSException/exceptionWithName:reason:userInfo:">+ exceptionWithName:reason:userInfo:</a></code>, <a href="#//apple_ref/occ/instm/NSException/name"><code>- name</a></code>, <a href="#//apple_ref/occ/instm/NSException/reason"><code>- reason</a></code>,  <a href="#//apple_ref/occ/instm/NSException/userInfo"><code>- userInfo</a>
+
+</code><p><hr WIDTH="25%" ALIGN="LEFT">
+
+<a name="166"></a>
+
+<h3> <a name="//apple_ref/occ/instm/NSException/name">name</a></h3>
+
+- (NSString *)<code>name</code> 
+
+<P>Returns an NSString used to uniquely identify the exception.<p>
+
+<B>See also: </B>  
+
+<code><a href="#//apple_ref/occ/clm/NSException/exceptionWithName:reason:userInfo:">+ exceptionWithName:reason:userInfo:</a></code>, <a href="#//apple_ref/occ/instm/NSException/initWithName:reason:userInfo:"><code>- initWithName:reason:userInfo:</a>
+
+</code><p><hr WIDTH="25%" ALIGN="LEFT">
+
+<a name="170"></a>
+
+<h3> <a name="//apple_ref/occ/instm/NSException/raise">raise</a></h3>
+
+- (void)<code>raise</code> 
+
+<P>Raises the exception, causing program flow to jump to the local exception handler. All other methods that raise an exception call this method, so set a breakpoint here if you are debugging exceptions.<p>
+
+<B>See also: </B>  
+
+<code><a href="#//apple_ref/occ/clm/NSException/raise:format:">+ raise:format:</a></code>, <a href="#//apple_ref/occ/clm/NSException/raise:format:arguments:"><code>+ raise:format:arguments:</a>
+
+</code><p><hr WIDTH="25%" ALIGN="LEFT">
+
+<a name="174"></a>
+
+<h3> <a name="//apple_ref/occ/instm/NSException/reason">reason</a></h3>
+
+- (NSString *)<code>reason</code> 
+
+<P>Returns an NSString containing a "human-readable" reason for the exception.<p>
+
+<B>See also: </B>  
+
+<code><a href="#//apple_ref/occ/instm/NSException/description">- description</a></code>, <a href="#//apple_ref/occ/clm/NSException/exceptionWithName:reason:userInfo:"><code>+ exceptionWithName:reason:userInfo:</a></code>, <a href="#//apple_ref/occ/instm/NSException/initWithName:reason:userInfo:"><code>- initWithName:reason:userInfo:</a>
+
+</code><p><hr WIDTH="25%" ALIGN="LEFT">
+
+<a name="178"></a>
+
+<h3> <a name="//apple_ref/occ/instm/NSException/userInfo">userInfo</a></h3>
+
+- (NSDictionary *)<code>userInfo</code> 
+
+<P>Returns an NSDictionary that contains application-specific data pertaining to the receiver. Returns <code>nil</code> if no application-specific data exists. As an example, if a method's return value caused the exception to be raised, the return value might be available to the exception handler through this method.<p>
+
+<B>See also: </B>  
+
+<code><a href="#//apple_ref/occ/clm/NSException/exceptionWithName:reason:userInfo:">+ exceptionWithName:reason:userInfo:</a></code>,<code> <a href="#//apple_ref/occ/instm/NSException/initWithName:reason:userInfo:"></code><code>- initWithName:reason:userInfo:</a>
+
+</code><p>
+
+ 
+
+ 
+
+
+
+
+
+<i>Copyright &#169; 1997, Apple Computer, Inc.   All rights
+
+reserved.</i>
+
+
+
+<!-- Last updated: 06/17/97 16:57:12 -->
+
+
+
+</body>
+
+</html>
+

@@ -1,0 +1,127 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+<head>
+	<title>Garbage Collection Programming Guide: Implementing a finalize Method</title>
+	<meta id="Generator" name="Generator" content="Gutenberg"/>
+	<meta id="GeneratorVersion" name="GeneratorVersion" content="v132"/>
+	<meta http-equiv="content-type" content="text/html;charset=utf-8"/>
+	<meta id="Copyright" name="Copyright" content="Copyright 2009 Apple Inc. All Rights Reserved."/>
+	<meta id="IndexTitle" name="IndexTitle" content="Implementing a finalize Method"/>
+	<meta id="xcode-display" name="xcode-display" content="render"/>
+	<meta id="toc-file" name="toc-file" content="../toc.html"/>
+	<meta id="RESOURCES" content="../../../../Resources" />
+	
+	<link rel="stylesheet" type="text/css" href="../../../../Resources/CSS/frameset_styles.css"/>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/lib/prototype.js"></script>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/lib/scriptaculous.js"></script>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/page.js"></script>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/pedia.js"></script>
+	<!--[if lte IE 6]>
+		<style type="text/css">
+			/*<![CDATA[*/ 
+			html {overflow-x:auto; overflow-y:hidden;  }
+			/*]]>*/
+		</style>
+	<![endif]-->
+</head>
+<body bgcolor="#ffffff" onload="initialize_page();"><a name="//apple_ref/doc/uid/TP40002453" title="Implementing a finalize Method"></a>
+    <noscript>
+    <div id="tocMenu">
+        <iframe id="toc_content" name="toc_content" SRC="../toc.html" width="210" height="100%" align="left" frameborder="0">This document set is best viewed in a browser that supports iFrames.</iframe>
+    </div>
+    </noscript>
+    <div id="bodyText">
+        <a name="top"></a>
+        <div class="hideOnPrint hideInXcode">
+        <!-- start of header -->
+        <!--#include virtual="/includes/framesetheader" -->
+        <!-- end of header -->
+        </div>
+        
+        <!-- start of path -->
+<div class="breadcrumb hideOnPrint hideInXcode"><a href="http://developer.apple.com/" target="_top">ADC Home</a> &gt; <a href="../../../../../referencelibrary/index.html#//apple_ref/doc/uid/TP30000943" target="_top">Reference Library</a> &gt; <a href="../../../../index.html#//apple_ref/doc/uid/TP30000440" target="_top">Guides</a> &gt; <a href="../../../index.html#//apple_ref/doc/uid/TP30000440-TP30000416" target="_top">Cocoa</a> &gt; <a href="../../../ObjectiveCLanguage-date.html#//apple_ref/doc/uid/TP30000440-TP30000416-TP30000856" target="_top">Objective-C Language</a> &gt; <a href="../index.html" target="_top">Garbage Collection Programming Guide</a> &gt; </div><br class="hideInXcode"/><!-- end of path -->
+        
+        <div class="mini_nav_text" align="left">
+        <span class="navButtons">
+        <a href="gcUsing.html">&lt; Previous Page</a><span style="margin-left: 8px"><a href="gcInapplicablePatterns.html">Next Page &gt;</a></span>
+        </span>
+        <span id="showHideTOCUpperSpan">
+        <a href="#" onclick="showHideTOC();"><img src="../../../../Resources/Images/show_toc_icon.gif" width="15" height="14" border="0" style="margin-bottom: -2px;" alt="" hideText="Hide TOC" showText="Show TOC" /></a> <a href="#" onclick="showHideTOC();">Hide TOC</a>
+        </span>
+        </div>
+        
+        
+        <a name="//apple_ref/doc/uid/TP40002453-SW1" title="Implementing a finalize Method"></a><hr /><H1>Implementing a finalize Method</H1><p>This article describes how to correctly and efficiently implement a <code>finalize</code> method.</p>
+<!-- This template is being used for both PDF and HTML. -->
+
+    
+    <!-- TopicBook.pm uses this template for its miniTOCs, but needs a different title. -->
+    <h4>Contents:</h4>
+    
+    
+    <p class="blockquote">
+    
+        
+			
+			
+				<a href="gcFinalize.html#//apple_ref/doc/uid/TP40002453-SW3">Design Patterns</a>
+				
+			<br/>
+			
+        
+			
+			
+				<a href="gcFinalize.html#//apple_ref/doc/uid/TP40002453-SW6">Managing an External Resource</a>
+				
+			<br/>
+			
+        
+
+    </p><br/>
+
+<a name="//apple_ref/doc/uid/TP40002453-SW3" title="Design Patterns"></a><h2>Design Patterns</h2><p>Object finalization occurs at most once during the lifetime of an object—when it is collected. When more than one object is finalized, the order in which they are sent a <code>finalize</code> message is indeterminate, even if there are references between them. If you send messages between objects when they are being finalized, you must take extreme care to avoid anomalous behavior. To ease correctness concerns alone, it is best not to attempt any work in a finalizer. Moreover, however, time spent in object finalization incurs application overhead. Your design goal should therefore be to not have a finalizer at all. If you must use a finalizer, you should keep it as short as possible, and reference as few other objects as possible in its implementation.</p><a name="//apple_ref/doc/uid/TP40002453-SW4" title="Efficiency"></a><h3>Efficiency</h3><p>Memory recovery time is typically <em>not</em> the best time to reclaim resources or do clean-up work (such as releasing instance variables and closing resources). Your <code>finalize</code> code is part of the garbage collector’s critical path, and so should be kept to a minimum if not eliminated entirely. You should implement invalidation code that is distinct from your deallocation or finalization code and invoke it when appropriate.</p><p>To make your <code>finalize</code> method as efficient as possible, you should typically <em>not</em> do any of the following:</p><ul class="spaceabove"><li class="li"><p>Disconnect object graphs</p></li><li class="li"><p>Set instance variables to <code>nil</code></p></li><li class="li"><p>For view classes, remove <code>self</code> from the existing view hierarchy</p></li><li class="li"><p>Remove <code>self</code> as an observer of a notification center (in a garbage collected environment, notification centers use zeroing weak references).</p></li></ul><p>You should typically use <code>NSMakeCollectable()</code> on Core Foundation objects rather than relying on <code>CFRelease()</code> in <code>finalize</code>—this way collectable Core Foundation objects are actually collected sooner. (Collectable objects are collected with the source object whereas released objects are simply marked as being eligible for collection—these must wait for the next collection cycle to be collected.)</p><a name="//apple_ref/doc/uid/TP40002453-SW5" title="Messaging Other Objects"></a><h3>Messaging Other Objects</h3><p>No objects are deallocated until all finalizers are complete (otherwise, no finalizer could use any other object anywhere, including objects like <code>NSString</code> that don’t have a finalizer) so you can access already-finalized objects—but only in other finalizers. Within a <code>finalize</code> method, therefore, you should reference as few other objects as possible. You can't necessarily know what other objects might have a reference to your instance, or whether they might message your instance from their finalizer, you must therefore code defensively to try to keep your instance as fully functional as is possible to support messages it might receive after finalization. Similarly, since you don't know in what order objects will be finalized, it may be that objects you message during a <code>finalize</code> method have themselves already been cleared.</p><p>For example, some objects use collection objects (arrays, dictionaries, or sets) to hold other related objects. Sometimes during finalization the collection is accessed and messages sent to each and every contained object. If the collection itself had been finalized and had discharged its objects, the algorithm would fail on that account alone. Similarly, if any of the objects in the collection can no longer respond correctly to the requested message after it is finalized, the algorithm again will fail.</p><a name="//apple_ref/doc/uid/TP40002453-SW2" title="Avoiding Resurrection"></a><h3>Avoiding Resurrection</h3><p>Some Cocoa objects make assumptions about how many references are kept about themselves and where, for example by implementing the <code>release</code> method to trap the transition to a known value (typically of <code>0</code>) and then distributing cleanup work among their holders. In a garbage-collected environment, this pattern can lead to “resurrection” of an object—that is, it becomes valid again after having been finalized.</p><p>Resurrection occurs when a <code>finalize</code> method stores <code>self</code> in a non-garbage object. The resurrected object becomes a zombie. It logs all messages that are sent to it, but it is otherwise useless. It is eventually deallocated when it becomes garbage again (when its container is collected). You should consider resurrection to be a programming error.</p><p>The following example illustrates a trivial, albeit unlikely, case:</p><div class="codesample"><table><tr><td scope="row"><pre>- (void)finalize<span></span></pre></td></tr><tr><td scope="row"><pre>{<span></span></pre></td></tr><tr><td scope="row"><pre>    [NSArray arrayWithObject:self];<span></span></pre></td></tr><tr><td scope="row"><pre>}<span></span></pre></td></tr></table></div><a name="//apple_ref/doc/uid/TP40002453-SW6" title="Managing an External Resource"></a><h2>Managing an External Resource</h2><p>The following example illustrates what happens if an object must manage an external resource—in this case, a Logger object is given a file descriptor to use for writing logging messages. File descriptors are not inexhaustible, and so the object provides a <code>close</code> method to relinquish the resource. In an ideal scenario, you should have closed the file descriptor before the <code>finalize</code> method is called. If, however—as is implied in this example—you have a shared or singleton object, it may not be possible to actively manage the object's resources, and you will have to rely on <code>finalize</code> to clean up. To ensure that the file descriptor is not kept beyond the object's lifetime, therefore, the <code>close</code> method is invoked in the <code>finalize</code> method.</p><div class="codesample"><table><tr><td scope="row"><pre>@interface Logger : NSObject<span></span></pre></td></tr><tr><td scope="row"><pre>{<span></span></pre></td></tr><tr><td scope="row"><pre>    int fileDescriptor;<span></span></pre></td></tr><tr><td scope="row"><pre>}<span></span></pre></td></tr><tr><td scope="row"><pre>- initWithFileDescriptor:(int)aFileDescriptor;<span></span></pre></td></tr><tr><td scope="row"><pre>- (void)close;<span></span></pre></td></tr><tr><td scope="row"><pre>- (void)log:(NSString *)message;<span></span></pre></td></tr><tr><td scope="row"><pre>@end<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>@implementation Logger<span></span></pre></td></tr><tr><td scope="row"><pre>- initWithFileDescriptor:(int)aFileDescriptor<span></span></pre></td></tr><tr><td scope="row"><pre>{<span></span></pre></td></tr><tr><td scope="row"><pre>    fileDescriptor = aFileDescriptor;<span></span></pre></td></tr><tr><td scope="row"><pre>    return self;<span></span></pre></td></tr><tr><td scope="row"><pre>}<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>- (void)close<span></span></pre></td></tr><tr><td scope="row"><pre>{<span></span></pre></td></tr><tr><td scope="row"><pre>    if (fileDescriptor != -1) close(fileDescriptor);<span></span></pre></td></tr><tr><td scope="row"><pre>    fileDescriptor = -1;<span></span></pre></td></tr><tr><td scope="row"><pre>}<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>- (void)finalize<span></span></pre></td></tr><tr><td scope="row"><pre>{<span></span></pre></td></tr><tr><td scope="row"><pre>    [self close];<span></span></pre></td></tr><tr><td scope="row"><pre>    [super finalize];<span></span></pre></td></tr><tr><td scope="row"><pre>}<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>- (void)log:(NSString *)message<span></span></pre></td></tr><tr><td scope="row"><pre>{<span></span></pre></td></tr><tr><td scope="row"><pre>    // Implementation continues ...<span></span></pre></td></tr><tr><td scope="row"><pre>}<span></span></pre></td></tr><tr><td scope="row"><pre>@end<span></span></pre></td></tr></table></div><p>The runtime invokes the <code>finalize</code> method after it determines that a logger object can no longer be reached. The message is sent once and it is an error for a finalizing object to have a new reference created to it in a reachable object. In other words, the object may not be revived (resurrected) once found to be unreachable.</p><p>A problem emerges even in this simple example. What would happen if a Logger object were created to track some other “larger” object, for example a window or a drawer or a network connection? This larger object might offer a logging API that enabled notations to be delivered to the file descriptor to mark progress. It might be natural to then have in this larger object one last message in its finalizer: </p><div class="codesample"><table><tr><td scope="row"><pre>- (void)finalize<span></span></pre></td></tr><tr><td scope="row"><pre>{<span></span></pre></td></tr><tr><td scope="row"><pre>    [logger log:@"saying goodbye!"];<span></span></pre></td></tr><tr><td scope="row"><pre>    [logger close];<span></span></pre></td></tr><tr><td scope="row"><pre>    [super finalize];<span></span></pre></td></tr><tr><td scope="row"><pre>}<span></span></pre></td></tr></table></div><p>Unfortunately the results would not always match your expectation, because the final message would sometimes appear and sometimes not. This is because the larger object and the logger object would both be found to be garbage in the same collection cycle and both would be put on the finalizer list in some order, and that order would require that the logger be after the larger object in order for the file descriptor resource to still be open.</p>
+
+        <br/><br/> 
+
+        <div class="mini_nav_text" align="left">
+        <span class="navButtons">
+        <a href="gcUsing.html">&lt; Previous Page</a><span style="margin-left: 8px"><a href="gcInapplicablePatterns.html">Next Page &gt;</a></span>
+        </span>
+        <span id="showHideTOCLowerSpan">
+        <a href="#" onclick="showHideTOC();"><img src="../../../../Resources/Images/show_toc_icon.gif" width="15" height="14" border="0" style="margin-bottom: -2px;" alt="" /></a> <a href="#" onclick="showHideTOC();">Hide TOC</a>
+        </span>
+        </div>
+
+        <br/><hr /><div align="center"><p class="content_text" lang="en" dir="ltr"> <!--#if expr="0=1" -->&#x00a9; 2008 Apple Inc. All Rights Reserved. &#40;<!--#endif -->Last updated: 2008-11-19<!--#if expr="0=1" -->&#041;<!--#endif --></p></div>
+
+        
+        <div class="hideOnPrint hideInXcode">
+        <!-- start of footer -->
+        	<table width="100%" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/documentation/Cocoa/Conceptual/GarbageCollection/Articles/gcFinalize.html%3Fid%3DTP40002431-1.6&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/documentation/Cocoa/Conceptual/GarbageCollection/Articles/gcFinalize.html%3Fid%3DTP40002431-1.6&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/documentation/Cocoa/Conceptual/GarbageCollection/Articles/gcFinalize.html%3Fid%3DTP40002431-1.6&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+
+        <!--#include virtual="/includes/framesetfooter" -->
+        <!-- end of footer -->
+        </div>
+    </div>
+</body>
+</html>

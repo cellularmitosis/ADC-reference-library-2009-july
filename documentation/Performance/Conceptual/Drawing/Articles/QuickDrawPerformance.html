@@ -1,0 +1,127 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+<head>
+	<title>Drawing Performance Guidelines: Improving QuickDraw Performance</title>
+	<meta id="Generator" name="Generator" content="Gutenberg"/>
+	<meta id="GeneratorVersion" name="GeneratorVersion" content="v132"/>
+	<meta http-equiv="content-type" content="text/html;charset=utf-8"/>
+	<meta id="Copyright" name="Copyright" content="Copyright 2009 Apple Inc. All Rights Reserved."/>
+	<meta id="IndexTitle" name="IndexTitle" content="Improving QuickDraw Performance"/>
+	<meta id="xcode-display" name="xcode-display" content="render"/>
+	<meta id="toc-file" name="toc-file" content="../toc.html"/>
+	<meta id="RESOURCES" content="../../../../Resources" />
+	
+	<link rel="stylesheet" type="text/css" href="../../../../Resources/CSS/frameset_styles.css"/>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/lib/prototype.js"></script>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/lib/scriptaculous.js"></script>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/page.js"></script>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/pedia.js"></script>
+	<!--[if lte IE 6]>
+		<style type="text/css">
+			/*<![CDATA[*/ 
+			html {overflow-x:auto; overflow-y:hidden;  }
+			/*]]>*/
+		</style>
+	<![endif]-->
+</head>
+<body bgcolor="#ffffff" onload="initialize_page();"><a name="//apple_ref/doc/uid/20001878" title="Improving QuickDraw Performance"></a>
+    <noscript>
+    <div id="tocMenu">
+        <iframe id="toc_content" name="toc_content" SRC="../toc.html" width="210" height="100%" align="left" frameborder="0">This document set is best viewed in a browser that supports iFrames.</iframe>
+    </div>
+    </noscript>
+    <div id="bodyText">
+        <a name="top"></a>
+        <div class="hideOnPrint hideInXcode">
+        <!-- start of header -->
+        <!--#include virtual="/includes/framesetheader" -->
+        <!-- end of header -->
+        </div>
+        
+        <!-- start of path -->
+<div class="breadcrumb hideOnPrint hideInXcode"><a href="http://developer.apple.com/" target="_top">ADC Home</a> &gt; <a href="../../../../../referencelibrary/index.html#//apple_ref/doc/uid/TP30000943" target="_top">Reference Library</a> &gt; <a href="../../../../index.html#//apple_ref/doc/uid/TP30000440" target="_top">Guides</a> &gt; <a href="../../../index.html#//apple_ref/doc/uid/TP30000440-TP30000430" target="_top">Performance</a> &gt; <a href="../../../GraphicsImaging-date.html#//apple_ref/doc/uid/TP30000440-TP30000430-TP30000450" target="_top">Graphics &amp; Imaging</a> &gt; <a href="../index.html" target="_top">Drawing Performance Guidelines</a> &gt; </div><br class="hideInXcode"/><!-- end of path -->
+        
+        <div class="mini_nav_text" align="left">
+        <span class="navButtons">
+        <a href="../NSBezierPathTips.html">&lt; Previous Page</a><span style="margin-left: 8px"><a href="../RevisionHistory.html">Next Page &gt;</a></span>
+        </span>
+        <span id="showHideTOCUpperSpan">
+        <a href="#" onclick="showHideTOC();"><img src="../../../../Resources/Images/show_toc_icon.gif" width="15" height="14" border="0" style="margin-bottom: -2px;" alt="" hideText="Hide TOC" showText="Show TOC" /></a> <a href="#" onclick="showHideTOC();">Hide TOC</a>
+        </span>
+        </div>
+        
+        
+        <a name="//apple_ref/doc/uid/20001878-CJBJFIDD" title="Improving QuickDraw Performance"></a><hr /><H1>Improving QuickDraw Performance</H1><p><a name="//apple_ref/doc/uid/20001878-DontLinkElementID_90"></a>If your application still uses QuickDraw to render content to the screen, the best way to improve the performance of that code its to port it to Quartz. QuickDraw is a deprecated technology in Mac OS X v10.4 and later, which means no new active development for it is taking place. On the other hand, Quartz performance continues to improve as more and more calls are accelerated, both due to hardware and software changes. </p><p>If for some reason you must still support legacy QuickDraw calls, there are some performance penalties you should avoid.</p>
+<!-- This template is being used for both PDF and HTML. -->
+
+    
+    <!-- TopicBook.pm uses this template for its miniTOCs, but needs a different title. -->
+    <h4>Contents:</h4>
+    
+    
+    <p class="blockquote">
+    
+        
+			
+			
+				<a href="QuickDrawPerformance.html#//apple_ref/doc/uid/20001878-100426">Locking the Port Bits</a>
+				
+			<br/>
+			
+        
+			
+			
+				<a href="QuickDrawPerformance.html#//apple_ref/doc/uid/20001878-100586">Accelerating Update Region Marking</a>
+				
+			<br/>
+			
+        
+
+    </p><br/>
+
+<a name="//apple_ref/doc/uid/20001878-100426" title="Locking the Port Bits"></a><h2>Locking the Port Bits</h2><p>In Mac OS X, the window buffer is stored in shared memory and is accessible to both your application and the window server. As a result, before it can safely draw into the window buffer, your application must explicitly lock the window buffer to prevent the window server from making any changes to it. After performing its drawing operations, your application must then unlock the buffer to allow other processes to access the buffer.</p><p>Some QuickDraw drawing functions, such as <code>LineTo</code> and <code>FrameRect</code> do not require any sort of begin/end calls to acquire and release locks. Instead, these routines lock the window buffer before drawing to it and unlock the window buffer afterwards. If your code calls these routines infrequently, you may not notice an impact on performance. However, if your code calls several of these functions in short succession, you may notice a significant performance drop because of the number of locks being acquired.</p><p>Acquiring a lock is an expensive operation that requires an inter-process call from QuickDraw to the window server process. Reducing the number of these calls can improve your application performance significantly. You can reduce the number of acquired locks by eliminating these QuickDraw calls from your code or you can acquire a lock explicitly prior to calling them.</p><p>The QuickDraw functions <code>LockPortBits</code> and <code>UnlockPortBits</code> are responsible for acquiring and releasing locks on the window buffer. Calls to these functions are nestable, but only the first call to <code>LockPortBits</code> and the last call to <code>UnlockPortBits</code> cause an inter-process communication to the window server. Thus, if the port bits have already been locked, they don’t need to be locked again. By bracketing your QuickDraw drawing routines with calls to <code>LockPortBits</code> and <code>UnlockPortBits</code>, you can eliminate the overhead of repeated calls to the window server. The following example demonstrates this concept:</p><div class="codesample"><table><tr><td scope="row"><pre>LockPortBits(GetWindowPort(window))<span></span></pre></td></tr><tr><td scope="row"><pre>// your QD drawing sequence . . .<span></span></pre></td></tr><tr><td scope="row"><pre>UnlockPortBits();<span></span></pre></td></tr></table></div><div class="notebox"><a name="//apple_ref/doc/uid/20001878-DontLinkElementID_8" title="Note"></a><p><strong>Note:</strong>&nbsp;You should not keep the port bits locked for longer than is absolutely necessary. If your drawing sequence takes more than one or two seconds, you should break up the sequence into separate segments, surrounding each segment of drawing calls with calls to <code>LockPortBits</code> and <code>UnlockPortBits</code>. </p></div><a name="//apple_ref/doc/uid/20001878-100586" title="Accelerating Update Region Marking"></a><h2>Accelerating Update Region Marking</h2><p>Every call to a QuickDraw drawing routines updates the dirty region with the new area that was modified. If a drawing sequence consists of several short drawing calls to a particular region of the screen, it is sometimes worthwhile to mark the entire region as dirty prior to doing any drawing. Doing this eliminates the need for QuickDraw to update the dirty region with each function call and might save some time. To mark an explicit region as dirty, use the <code>QDSetDirtyRegion</code> function. </p><p>You should use this technique only when you have a large region being drawn into by many calls to QuickDraw routines. You should also measure the performance of your drawing code prior to implementing this technique and verify that the improvement is warranted. If your code already performs acceptably, it might not be worthwhile to go back and calculate this update region in advance.<a name="//apple_ref/doc/uid/20001878-DontLinkElementID_91"></a></p>
+
+        <br/><br/> 
+
+        <div class="mini_nav_text" align="left">
+        <span class="navButtons">
+        <a href="../NSBezierPathTips.html">&lt; Previous Page</a><span style="margin-left: 8px"><a href="../RevisionHistory.html">Next Page &gt;</a></span>
+        </span>
+        <span id="showHideTOCLowerSpan">
+        <a href="#" onclick="showHideTOC();"><img src="../../../../Resources/Images/show_toc_icon.gif" width="15" height="14" border="0" style="margin-bottom: -2px;" alt="" /></a> <a href="#" onclick="showHideTOC();">Hide TOC</a>
+        </span>
+        </div>
+
+        <br/><hr /><div align="center"><p class="content_text" lang="en" dir="ltr"> <!--#if expr="0=1" -->&#x00a9; 2003, 2006 Apple Computer, Inc. All Rights Reserved. &#40;<!--#endif -->Last updated: 2006-04-04<!--#if expr="0=1" -->&#041;<!--#endif --></p></div>
+
+        
+        <div class="hideOnPrint hideInXcode">
+        <!-- start of footer -->
+        	<table width="100%" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/documentation/Performance/Conceptual/Drawing/Articles/QuickDrawPerformance.html%3Fid%3D10000151i-3.2&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/documentation/Performance/Conceptual/Drawing/Articles/QuickDrawPerformance.html%3Fid%3D10000151i-3.2&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/documentation/Performance/Conceptual/Drawing/Articles/QuickDrawPerformance.html%3Fid%3D10000151i-3.2&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+
+        <!--#include virtual="/includes/framesetfooter" -->
+        <!-- end of footer -->
+        </div>
+    </div>
+</body>
+</html>

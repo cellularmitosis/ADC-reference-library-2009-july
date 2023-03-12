@@ -1,0 +1,1003 @@
+<html><head><title></title></head>
+<body bgcolor="#ffffff">
+ 
+ 
+<h1>
+<FONT COLOR="#000066">
+<a name="816">
+ <a name="//apple_ref/java/cl/EditingContext">EditingContext</a>
+</a>
+</FONT>
+</h1>
+<p><B>Extends:</B><BR>  
+next.eo.ObjectStore
+
+<p><p>
+<a name="4053"></a>
+<HR WIDTH=75% SIZE=4 ALIGN=LEFT>
+<H3>
+<FONT COLOR="#201040">
+Class At A Glance
+</FONT>
+</H3>
+<dl><a name="4054"></a>
+<dt><h4>Purpose</h4>
+</dl>EditingContext manages a graph of enterprise objects in an application; this object graph represents an internally consistent view of one or more external stores (most often a database).<p>
+<dl><a name="4056"></a>
+<dt><h4>Principal Attributes</h4>
+</dl><ul><li>The set of enterprise objects managed by the EditingContext<br>
+<li>The EditingContext's parent ObjectStore<br>
+<li>The set of Editor objects managed by the EditingContext<br>
+<li>The EditingContext's MessageHandler <br>
+</ul><dl><a name="4066"></a>
+<dt><h4>Commonly Used Methods<p>
+<Table Border="3">
+<caption></caption>
+<tr><td scope="row"><a href="#3882">objectsWithFetchSpecification</a>
+</td><td>Fetches objects from an external store.
+</td></tr>
+<tr><td scope="row"><a href="#3263">insertObject</a>
+</td><td>Registers a new object to be inserted into the parent ObjectStore.
+</td></tr>
+<tr><td scope="row"><a href="#3160">deleteObject</a>
+</td><td>Registers that an object should be removed from the parent ObjectStore 
+when changes are saved.
+</td></tr>
+<tr><td scope="row"><a href="#3295">lockObject</a>
+</td><td>Attempts to lock an object in the external store.
+</td></tr>
+<tr><td scope="row"><a href="#3226">hasChanges</a>
+</td><td>Returns <code>true</code> if any of the receiver's enterprise objects have been modified.
+</td></tr>
+<tr><td scope="row"><a href="#987">saveChanges</a>
+</td><td>Commits changes made in the receiver to the parent ObjectStore.
+</td></tr>
+<tr><td scope="row"><a href="#3481">revert</a>
+</td><td>Removes everything from the undo stack, discards all insertions and 
+deletions, and restores updated objects to their original values.
+</td></tr>
+<tr><td scope="row"><a href="#3344">objectForGlobalID</a>
+</td><td>Given a globalID, returns its associated object.
+</td></tr>
+<tr><td scope="row"><a href="#3221">globalIDForObject</a>
+</td><td>Given an object, returns its globalID.
+</td></tr>
+<tr><td scope="row"><a href="#1083">setDelegate</a>
+</td><td>Sets the receiver's delegate.
+</td></tr>
+<tr><td scope="row"><a href="#3371">parentObjectStore</a>
+</td><td>Returns the receiver's parent ObjectStore.
+</td></tr>
+<tr><td scope="row"><a href="#3492">rootObjectStore</a>
+</td><td>Returns the receiver's root ObjectStore.
+</td></tr>
+
+</Table>
+
+<Table>
+<tr><td scope="row">
+</Table>
+</h4>
+</dl><HR WIDTH=75% SIZE=4 ALIGN=LEFT>
+<p><a name="4120"></a>
+<a name="description"></a>
+<H2>Class Description 
+</H2>
+EditingContext represents a single "object space" or document in an application. Its primary responsibility is managing a graph of enterprise objects. This <em>object graph</em> is a group of related business objects that represent an internally consistent view of one or more external stores (usually a database).<p>
+All objects fetched from an external store are registered in an EditingContext along with a global identifier (GlobalID) that's used to uniquely identify each object to the external store. The EditingContext is responsible for watching for changes in its objects (using the Observing interface) and recording snapshots for object-based undo. A single enterprise object instance exists in one and only one EditingContext, but multiple copies of an object can exist in different EditingContexts. Thus object uniquing is scoped to a particular EditingContext.<p>
+<h3>
+<a name="4126">
+ Other Classes that Participate in Object Graph Management
+</a>
+</h3>
+EditingContext works in conjunction with other classes to manage the object graph. Two other classes that play a significant role in object graph management are UndoManager and ObserverCenter. UndoManager is a general-purpose undo stack. As a client of UndoManager, EditingContext registers undo events for all changes made the enterprise objects that it watches.<p>
+The other class that plays a significant role in object graph management is ObserverCenter. ObserverCenter provides a notification mechanism for an observing object to find out when another object is about to change its state. "Observable" objects (typically all enterprise objects) are responsible for invoking <code>willChange</code> prior to altering their state (in a "set" method, for instance). Objects (such as instances of EditingContext) can add themselves as observers to the objects they care about in the ObserverCenter. They then receive a notification (as an <a href="../../Interfaces/Observing/Frameset.html#" target="_top"><code>objectWillChange</code></a> message) whenever an observed object invokes <a href="../../Interfaces/EnterpriseObject/Frameset.html#" target="_top"><code>willChange</code></a>. <p>
+The <code>objectWillChange</code> method is defined in the Observing interface. Through EditingContext's superclass, ObjectStore, EditingContext implements the Observing interface. For more information about the object change notification mechanism, see the Observing interface specification.<p>
+<h3>
+<a name="4129">
+ Programmatically Creating an EditingContext
+</a>
+</h3>
+Typically, an EditingContext is created automatically for your application as a by product of some other operation. For example, the following operations result in the creation of network of objects that include an EditingContext:<p>
+<ul><li>Running the EOF Wizard in Project Builder to create an OpenStep application with a graphical user interface<p>
+<li>Dragging an entity from EOModeler into a nib file in Interface Builder<p>
+<li>Accessing the default editing context of a next.wo.Session in a WebObjects application<p>
+</ul>Under certain circumstances, however, you may need to create an EditingContext programmatically-for example, if you're writing an application that doesn't include a graphical interface. To create an EditingContext, do this:<p>
+<blockquote><pre>EditingContext editingContext = new EditingContext();
+</pre></blockquote><p>This creates an editing context that's connected to the default ObjectStoreCoordinator. You can change this default setting by initializing an EditingContext with a particular parent ObjectStore. This is useful if you want your EditingContext to use a different ObjectStoreCoordinator than the default, or if your EditingContext is nested. For example, the following code excerpt initializes <code>childEditingContext</code> with a parent object store <code>parentEditingContext</code>:<p>
+<blockquote><pre>EditingContext parentEditingContext;     // Assume this exists.<br>EditingContext childEditingContext = new EditingContext(parentEditingContext);
+</pre></blockquote><p>For more discussion of working programmatically with EditingContexts, see the chapter "Application Configurations" in the <em>Enterprise Objects Framework Developer's Guide</em>.<p>
+<h4>
+<a name="4142">
+ Accessing An Editing Context's Adaptor Level Objects
+</a>
+</h4>
+You can use an EditingContext with any ObjectStore. However, in a typical configuration, you use an EditingContext with the objects in the access layer. To access an EditingContext's adaptor level objects, you get the editing context's ObjectStoreCoordinator from the editing context, you get a DatabaseContext from the object store coordinator, and you get the adaptor level objects from there. The following code demonstrates the process.<p>
+<blockquote><pre>EditingContext editingContext;    // Assume this exists.<br>String entityName;                // Assume this exists. <br>FetchSpecification fspec;<br>ObjectStoreCoordinator rootStore;<br>DatabaseContext dbContext;<br>Adaptor adaptor;<br>AdaptorContext adContext;<br><br>fspec = new FetchSpecification(entityName, null, null);<br>rootStore = (ObjectStoreCoordinator)editingContext.rootObjectStore();<br>dbContext = (DatabaseContext)rootStore.objectStoreForFetchSpecification(fspec);<br>adaptor = dbContext.database().adaptor();<br>adContext = dbContext.adaptorContext();
+</pre></blockquote><p>This example first creates a fetch specification, providing just the entity name as an argument. Of course, you can use a fetch specification that has non-<code>null</code> values for all of its arguments, but only the entity name is used by the ObjectStore <a href="../ObjectStoreCoordinator/Frameset.html#1528" target="_top"><code>objectStoreForFetchSpecification</code></a> method. Next, the example gets the editing context's ObjectStoreCoordinator using the EditingContext method <a href="#3492"><code>rootObjectStore</code></a>. <code>rootObjectStore</code> returns an ObjectStore and not an ObjectStoreCoordinator, because it's possible to substitute a custom object store in place of an object store coordinator. Similarly, the ObjectStoreCoordinator method <code>objectStoreForFetchSpecification</code> returns a CooperatingObjectStore instead of a DatabaseContext because it's possible to substitute a custom cooperating object store in place of a database context. If your code performs any such substitutions, you should alter the above code example to match your custom object store's API. See the class specifications for ObjectStore, ObjectStoreCoordinator, and CooperatingObjectStore for more information.<p>
+An EditingContext's ObjectStoreCoordinator can have more than one set of database and adaptor level objects. Consequently, to get a database context from the object store coordinator, you have to provide information that the coordinator can use to choose the correct database context. The code example above provides a FetchSpecification using the method <a href="../ObjectStoreCoordinator/Frameset.html#1528" target="_top"><code>objectStoreForFetchSpecification</code></a>, but you could specify different criteria by using one of the following ObjectStoreCoordinator methods instead:<p>
+<Table Border="3">
+<caption></caption>
+<tr><th><b>Method</b>
+</th><th><b>Description</b>
+</th></tr>
+<tr><td scope="row"><a href="../ObjectStoreCoordinator/Frameset.html#887" target="_top"><code>cooperatingObjectStores</code></a>
+</td><td>Returns an array of the ObjectStoreCoordinator's cooperating object stores.
+</td></tr>
+<tr><td scope="row"><a href="../ObjectStoreCoordinator/Frameset.html#966" target="_top"><code>objectStoreForGlobalID</code></a>
+</td><td>Returns the cooperating object store for the enterprise object identified by the 
+provided GlobalID<em>.
+</em></td></tr>
+<tr><td scope="row"><a href="../ObjectStoreCoordinator/Frameset.html#991" target="_top"><code>objectStoreForObject</code></a>
+</td><td>Returns the cooperating object store for the provided enterprise object.
+</td></tr>
+
+</Table>
+
+<Table>
+<tr><td scope="row">
+</Table>
+<p>
+After you have the database context, you can get the corresponding Adaptor and AdaptorContext as shown in the example above.<p>
+<h3>
+<a name="4167">
+ Using EditingContexts in Different Configurations
+</a>
+</h3>
+The fundamental relationship an EditingContext has is to its parent ObjectStore, which creates the object graph the EditingContext monitors. ObjectStore  defines a source and sink of objects for an EditingContext. The ObjectStore is responsible for constructing and registering objects, servicing object faults, and committing changes made in an EditingContext.<p>
+You can augment the basic configuration of an EditingContext and its parent ObjectStore in several different ways. For example, multiple EditingContexts can share the same ObjectStore, one EditingContext can act as an ObjectStore for another, and so on. The most commonly used scenarios are described in the following sections.<p>
+<h4>
+<a name="4170">
+ Peer EditingContexts
+</a>
+</h4>
+One or more "peer" EditingContexts can share a single ObjectStore (<a href="#4180">Figure 1</a>). Each EditingContext has its own object graph-so, for example, a given Employee row in a database can have separate object instances in each EditingContext. Changes to an object in one EditingContext don't affect the corresponding object in another EditingContext until all changes are successfully committed to the shared object store. At that time the objects in all EditingContexts are synchronized with the committed changes. This arrangement is useful when an application allows the user to edit multiple independent "documents."<p>
+<p><img src="../EditingContext.anc.gif"><p><p>
+<a name="4180">
+<b>Figure 1 </b>
+Peer EditingContexts
+</a>
+<p><h4>
+<a name="4181">
+ Nested EditingContexts
+</a>
+</h4>
+EditingContext is a subclass of ObjectStore, which gives its instances the ability to act as ObjectStores for other EditingContexts. In other words, EditingContexts can be nested (<a href="#4191">Figure 2</a>), thereby allowing a user to make edits to an object graph in one EditingContext and then discard or commit those changes to another object graph (which, in turn, may commit them to an external store). This is useful in a "drill down" style of user interface where changes in a nested dialog can be okayed (committed) or canceled (rolled back) to the previous panel.<p>
+<p><img src="../EditingContext.anc1.gif"><p><p>
+<a name="4191">
+<b>Figure 2 </b>
+Nested EditingContexts
+</a>
+<p>When an object is fetched into a nested EditingContext, it incorporates any uncommitted changes that were made to it in its parent EditingContext. For example, suppose that in one panel you have a list of employees that allows you to edit salaries, and that the panel includes a button to display a nested panel where you can edit detail information. If you edit the salary in the parent panel, you see the modified salary in the nested panel, not the old (committed) salary from the database. Thus, conceptually, nested EditingContexts fetch through their parents.<p>
+EditingContext overrides several of ObjectStore's methods:<p>
+<ul><li><a href="#3759">arrayFaultWithSourceGlobalID</a><br>
+<li><a href="#3767">faultForGlobalID</a><br>
+<li><a href="#3798">invalidateAllObjects</a><br>
+<li><a href="#3816">invalidateObjectsWithGlobalIDs</a><br>
+<li><a href="#3877">objectsForSourceGlobalID</a><br>
+<li><a href="#3882">objectsWithFetchSpecification</a><br>
+<li><a href="#3913">refaultObject</a><br>
+<li><a href="#3921">saveChangesInEditingContext</a><br>
+</ul>These methods are generally used when an EditingContext acts as an ObjectStore for another EditingContext. For more information, see the individual method descriptions. For information on setting up this configuration for interfaces loaded from nib files, see the method description for <a href="#4007"><code>setDefaultParentObjectStore</code></a>.<p>
+For a description of how to implement nested EditingContexts, see the chapter "Application Configurations" in the <em>Enterprise Objects Framework Developer's Guide</em>.<p>
+<h4>
+<a name="4229">
+ Getting Data from Multiple Sources
+</a>
+</h4>
+An EditingContext's object graph can contain objects from more than one external store (<a href="#4239">Figure 3</a>). In this scenario, the object store is an ObjectStoreCoordinator, which provides the abstraction of a single object store by redirecting operations to one or more CooperatingObjectStores.<p>
+<p><img src="../EditingContext.anc2.gif"><p><p>
+<a name="4239">
+<b>Figure 3 </b>
+An EditingContext Containing Objects from Multiple Sources
+</a>
+<p>In writing an application, it's likely that you'll use combinations of the different scenarios described in the above sections. <p>
+<h3>
+<a name="4241">
+ Fetching Objects
+</a>
+</h3>
+The most common way to explicitly fetch objects from an external store in an Enterprise Objects Framework application is to use EditingContext's <a href="#3882"><code>objectsWithFetchSpecification</code></a> method. This method takes a fetch specification and returns an array of objects. A fetch specification includes the name of the entity for which you want to fetch objects, the qualifier (query) you want to use in the fetch, and the sort order in which you want the objects returned (if any). <p>
+<h3>
+<a name="4252">
+ Managing Changes in Your Application
+</a>
+</h3>
+EditingContext provides several methods for managing the changes made to objects in your application. You can use these methods to get information about objects that have changed, to selectively undo and redo changes, and to discard all changes made to objects before these changes are committed to the database. These methods are described in the following sections.<p>
+<h4>
+<a name="4254">
+ Getting Information About Changed Objects
+</a>
+</h4>
+An EditingContext maintains information about three different kinds of changes to objects in its object graph: insertions, deletions, and updates. After these changes have been made and before they're committed to the database, you can find out which objects have changes in each of these categories by using the <a href="#3253"><code>insertedObjects</code></a>, <a href="#3138"><code>deletedObjects</code></a>, and <a href="#1300"><code>updatedObjects</code></a> methods. Each method returns an array containing the objects that have been inserted, deleted, and updated, respectively. The <a href="#3226"><code>hasChanges</code></a> method returns <code>true</code> or <code>false</code> to indicate whether any of the objects in the object graph have been inserted, deleted, or updated.<p>
+<h4>
+<a name="4256">
+ Undo and Redo
+</a>
+</h4>
+EditingContext includes the <code><a href="#3626"></code><code>undo</code><code></a></code>, <code><a href="#3425"></code><code>redo</code><code></a></code>, and <code><a href="#3481"></code><code>revert</code><code></a></code> methods for managing changes to objects in the object graph. <code>undo</code> asks the EditingContext's UndoManager to reverse the latest changes to objects in the object graph. <code>redo</code> asks the UndoManager to reverse the latest undo operation. <code>revert</code> clears the undo stack, discards all insertions and deletions, and restores updated objects to their last committed (saved) values. The <code>undo</code> and <code>revert</code> methods are also discussed in the context of managing the object graph, below.<p>
+<h4>
+<a name="4282">
+ Saving Changes
+</a>
+</h4>
+The <a href="#987"><code>saveChanges</code></a> method commits changes made to objects in the object graph to an external store. When you save changes, EditingContext's lists of inserted, updated, and deleted objects are flushed.<p>
+Upon a successful save operation, the EditingContext's parent ObjectStore broadcasts an ObjectsChangedInStoreNotification. Peers of the saved EditingContext receive this notification and respond by synchronizing their objects with the committed versions.<p>
+<h3>
+<a name="4286">
+ Methods for Managing the Object Graph
+</a>
+</h3>
+EditingContext provides methods for managing the enterprise objects in the context's object graph. This section describes these methods, as well as other techniques you can use to manage the object graph.<p>
+At different points in your application, you might want to do the following:<p>
+<ul><li>Break reference cycles between enterprise objects<p>
+<li>Discard changes that have been made to enterprise objects <p>
+<li>Make sure that when you refetch objects from the database, any changed database values are used instead of the original values<p>
+<li>Discard the view of objects cached in memory<p>
+<li>Work with objects across multiple editing contexts<p>
+</ul>These scenarios are discussed in the following sections.<p>
+<h4>
+<a name="4295">
+ Breaking Reference Cycles
+</a>
+</h4>
+When you are using Java APIs to access Objective-C Enterprise Objects Framework classes, you have to take into consideration the way objects are deallocated on the Objective-C side of the Java Bridge. This means that you might still need to break reference cycles to help keep your application's memory usage in check.<p>
+You use the EditingContext methods <a href="#3445"><code>refaultObjects</code></a> and <a href="#3913"><code>refaultObject</code></a> to break reference cycles between your enterprise objects. For example, suppose you have an Employee object that has a to-one relationship to its Department, and the Department object in turn has an array of Employee objects. This circular reference constitutes a reference cycle, which you can break using the <code>refault...</code> methods. <p>
+<DT><B>Note:</B></DT>
+<DD>Reference cycles are automatically broken if the EditingContext is finalized. 
+</DD>You should use the <code>refault...</code> methods with caution, since refaulting an object doesn't remove the object snapshot from the undo stack. Objects that have been newly inserted or deleted should not be refaulted. In general, it's safer to use <code>refaultObjects</code> than it is to use <code>refaultObject</code> since <code>refaultObjects</code> only refaults objects that haven't been inserted, deleted or updated. <code>refaultObject</code> doesn't make this distinction, so you should only use it when you're sure you know what you're doing.<p>
+If you want to reset your EditingContext and free all of its objects, do the following:<p>
+<blockquote><pre>EditingContext editingContext;     // Assume this exists.<br>editingContext.revert();           // Discard uncommitted changes.<br>editingContext.refaultObjects();
+</pre></blockquote><p>Note that you must remove any other references to enterprise objects in the EditingContext for them to actually be freed. For example, to clear a display group that references a list of enterprise objects, you'd do something like the following:<p>
+<blockquote><pre>displayGroup.setObjectArray(null);
+</pre></blockquote><p>Using the <code>invalidate...</code> methods (described below) also has the effect of breaking reference cycles, but these methods have a more far-reaching effect. It's not recommended that you use them simply to break reference cycles.<p>
+<h4>
+<a name="4320">
+ Discarding Changes to Enterprise Objects
+</a>
+</h4>
+EditingContext provides different techniques for discarding changes to enterprise objects. These techniques are as follows:<p>
+<ul><li>Perform a simple <code><a href="#3626"></code><code>undo</code><code></a></code>, which reverses the latest uncommitted changes applied to objects in the object graph.<p>
+<li>Invoke the EditingContext method <a href="#3481"><code>revert</code></a>, which removes everything from the undo stack, discards all insertions and deletions, and restores updated objects to their last committed values. If you just want to discard uncommitted changes but you don't want to sacrifice the original values from the database cached in memory, use the <code>revert</code> method.<p>
+</ul>A different approach is to use the <code>invalidate...</code> methods, described in "<a href="#4336">"Discarding the View of Objects Cached in Memory"</a>."<p>
+<h4>
+<a name="4331">
+ Refreshing Objects 
+</a>
+</h4>
+One characteristic of an object graph is that it represents an internally consistent view of your application's data. By default, when you refetch data, Enterprise Objects Framework maintains the integrity of your object graph by not overwriting your object values with database values that have been changed by someone else. But what if you want your application to see those changes? You can accomplish this by using the FetchSpecification method <a href="../FetchSpecification/Frameset.html#1999" target="_top"><code>setRefreshesRefetchedObjects</code></a>. Invoking <code>setRefreshesRefetchedObjects</code> with the argument <code>true</code> causes existing objects to be overwritten with fetched values that have been changed. Alternatively, you can use the DatabaseContext delegate method <code>databaseContextShouldUpdateCurrentSnapshot</code><code>.</code><p>
+Normally, when you set a FetchSpecification to refresh using <code>setRefreshesRefetchedObjects</code>, it only refreshes the objects you're fetching. For example, if you refetch employees, you don't also refetch the employees' departments. However, if you use the PrefetchingRelationshipHintKey with a FetchSpecification in the DatabaseContext method <code>objectsWithFetchSpecification</code>, the refetch is propagated for all of the fetched objects' relationships that are specified for the hint. For more discussion of this topic, see the DatabaseContext class specification.<p>
+Refreshing refetched objects only affects the objects you specify. If you want to refetch your entire object graph, you can use the EditingContext<code> invalidate...</code> methods, described below.<p>
+<h4>
+<a name="4336">
+ Discarding the View of Objects Cached in Memory
+</a>
+</h4>
+As described in the section "<a href="#4320">Discarding Changes to Enterprise Objects</a>," you can use <a href="#3626"><code>undo</code></a> or <a href="#3481"><code>revert</code></a> to selectively discard the changes you've made to enterprise objects. Using these methods preserves the original cache of values fetched from the database. But what if you want to flush your in-memory object view all together-in the most likely scenario, to see changes someone else has made to the database? You can invalidate your enterprise objects using the <a href="#3798"><code>invalidateAllObjects</code></a> or the <a href="#3816"><code>invalidateObjectsWithGlobalIDs</code></a> method. (You can also use the method <a href="#3435"><code>refetch</code></a>, which simply invokes <code>invalidateAllObjects</code>). Unlike fetching with the FetchSpecification method <a href="../FetchSpecification/Frameset.html#1999" target="_top"><code>setRefreshesRefetchedObjects</code></a> set to <code>true</code> (described above), the <code>invalidate...</code> methods result in the refetch of your entire object graph. <p>
+The effect of the<code> </code><code>invalidateAllObjects</code> method depends on how you use it. For example, if you send<code> </code><code>invalidateAllObjects</code> to an EditingContext, it sends<code> </code><a href="#3816"><code>invalidateObjectsWithGlobalIDs</code></a> to its parent object store with all the globalIDs for the objects registered in it. If the EditingContext is nested, its parent object store is another EditingContext; otherwise its parent object store is typically an ObjectStoreCoordinator. Regardless, the message is propagated down the object store hierarchy. Once it reaches the ObjectStoreCoordinator, it's propagated to the DatabaseContext(s). The DatabaseContext discards the row snapshots for these globalIDs and sends an ObjectsChangedInStoreNotification, thereby refaulting all the enterprise objects in the object graph. The next time you access one of these objects, it's refetched from the database.<p>
+Sending <code>invalidateAllObjects</code> to an EditingContext affects not only that context's objects, but objects with the same globalIDs in other EditingContexts. For example, suppose <em>editingContext1</em> has <em>objectA</em> and <em>objectB</em>, and <em>editingContext2</em> has <em>objectA</em>, <em>objectB</em>, and <em>objectC</em>. When you send <code>invalidateAllObjects</code> to <em>editingContext1</em>, <em>objectA</em> and <em>objectB</em> are refaulted in both <em>editingContext1</em> and <em>editingContext2</em>. However, <em>objectC</em> in <em>editingContext2</em> is left intact since <em>editingContext1</em> doesn't have an <em>objectC</em>. <p>
+If you send<code> </code><code>invalidateAllObjects</code> directly to the ObjectStoreCoordinator, it sends<code> </code><code>invalidateAllObjects</code> to all of its DatabaseContexts, which then discard all of the snapshots in your application and refault every single enterprise object in all of your EditingContexts.<p>
+The <code>invalidate...</code> methods are the only way to get rid of a database lock without saving your changes.<p>
+<h4>
+<a name="4361">
+ Working with Objects Across Multiple EditingContexts
+</a>
+</h4>
+Any time your application is using more than one EditingContext (as described in the section <a href="#4167">"Using EditingContexts in Different Configurations"</a>), it's likely that one editing context will need to access objects in another.<p>
+On the face of it, it may seem like the most reasonable solution would be for the first editing context to just get the desired object in the second editing context and modify the object directly. But this would violate the cardinal rule of keeping each editing context's object graph internally consistent. Instead of modifying the second editing context's object, the first editing context needs to get its own copy of the object. It can then modify its copy without affecting the original. When it saves changes, they're propagated to the original object, down the object store hierarchy. The method that you use to give one editing context its own copy of an object that's in another editing context is <a href="#3767"><code>faultForGlobalID</code></a>.<p>
+For example, suppose you have a nested editing context configuration in which a user interface displays a list of objects-this maps to the parent editing context. From the list, the user can select an object to inspect and modify in a "detail view"-this maps to the child editing context. To give the child its own copy of the object to modify in the detail view, you would do something like the following:<p>
+<blockquote><pre>EditingContext childEC, parentEC; // Assume these exist.<br>Object origObject;                // Assume this exists.<br>Object newObject;<br><br>newObject = childEC.faultForGlobalID(parentEC.globalIDForObject(origObject, childEC));
+</pre></blockquote><p>where <code>origObject</code> is the object the user selected for inspection from the list.<p>
+The child can make changes to <code>newObject</code> without affecting <code>origObject</code> in the parent. Then when the child saves changes, <code>origObject</code> is updated accordingly. <p>
+<h3>
+<a name="4375">
+ General Guidelines for Managing the Object Graph
+</a>
+</h3>
+When you fetch objects into your application, you create a graph of objects instantiated from database data. From that point on, your focus should be on working with the object graph-not on interacting with your database. This distinction is an important key to working with Enterprise Objects Framework.<p>
+<h4>
+<a name="4377">
+ You don't have to worry about the database...
+</a>
+</h4>
+One of the primary benefits of Enterprise Objects Framework is that it insulates you from having to worry about database details. Once you've defined the mapping between your database and your enterprise objects in a model file, you don't need to think about issues such as foreign key propagation, how object deletions are handled, how operations in the object graph are reflected in your database tables, and so on. <p>
+This can be illustrated by considering the common scenario in which one object has a relationship to another. For example, suppose an Employee has a relationship to a Department. In the object graph, this relationship is simply expressed as an Employee object having an instance variable for its Department object. The Department object might in turn have an instance variable that's an array of Employee objects. When you manipulate relationships in the object graph (for example, by moving an Employee to a different Department), Enterprise Objects Framework changes the appropriate relationship references. For example, moving an Employee to a different Department changes the Employee's department instance variable and adds the Employee to the new Department's employee array. When you save your changes to the database, Enterprise Objects Framework knows how to translate these object graph manipulations into database operations. <p>
+<h4>
+<a name="4380">
+ ...but you do have to worry about the object graph
+</a>
+</h4>
+As described above, you generally don't need to concern yourself with how changes to the object graph are saved to the database. However, you do need to concern yourself with managing the object graph itself. Since the object graph is intended to represent an internally consistent view of your application's data, one of your primary considerations should be maintaining its consistency. For example, suppose you have a relationship from Employee to Project, and from Employee to Manager. When you create a new Employee object, you must make sure that it has relationships to the appropriate Projects and to a Manager. <p>
+Just as you need to maintain the internal consistency of an EditingContext's object graph, you should never directly modify the objects in one EditingContext from another EditingContext. If you do so, you risk creating major synchronization problems in your application. If you need to access the objects in one EditingContext from another, use the method <a href="#3767"><code>faultForGlobalID</code></a>, as described in "<a href="#4361">Working with Objects Across Multiple EditingContexts</a>." This gives the receiving EditingContext its own copy of the object, which it can modify without affecting the original. Then when it saves its changes, the original is updated accordingly.<p>
+One of the implications of needing to maintain the consistency of your object graph is that you should never copy an enterprise object (though you can snapshot its properties), since this would be in conflict with uniquing. Uniquing dictates that an EditingContext can have one and only one copy of a particular object. For more discussion of uniquing, see the chapter "Behind the Scenes" in the <em>Enterprise Objects Framework Developer's Guide</em>. Similarly, your enterprise objects shouldn't override the <code>equals</code> method (inherited from CustomObject, which inherits the method from next.util.NextObject). Enterprise Objects Framework relies on the inherited next.util.NextObject implementation to check instance equality rather than value equality.<p>
+<h3>
+<a name="4391">
+ Using EditingContext to Archive Custom Objects in Web Objects Framework 
+</a>
+</h3>
+In WebObjects, applications that use the Enterprise Objects Framework must enlist the help of the EditingContext to archive enterprise objects. The primary reason is so that the EditingContext can keep track, from one transaction to the next, of the objects it manages. But using an EditingContext for archiving also benefits your application in these other ways:<p>
+<ul><li>During archiving, an EditingContext stores only as much information about its enterprise objects as is needed to reconstitute the object graph at a later time. For example, unmodified objects are stored as simple references (by globalID) that will allow the EditingContext to recreate the object from the database. Thus, your application can store state very efficiently by letting an EditingContext archive your enterprise objects.<p>
+<li>During unarchiving, an EditingContext can recreate individual objects in the graph only as they are needed by the application. This approach can significantly improve application performance.<p>
+</ul>An enterprise object (like any other object that uses the OpenStep archiving scheme) makes itself available for archiving by declaring that it implements the next.util.Coding interface, by implementing the interface's method <code>encodeWithCoder</code>, and by providing a constructor that takes a next.util.Coder object. <p>
+The enterprise object simply passes on responsibility for archiving and unarchiving itself to the EditingContext class, by invoking the <a href="#3986"><code>encodeObjectWithCoder</code></a> and <a href="#3995"><code>initObjectWithCoder</code></a> static methods. The EditingContext takes care of the rest. For more discussion of <code>encodeWithCoder</code> and the corresponding constructor, see the Coding interface specification in the <em>Foundation Framework Reference</em>.<p>
+EditingContext includes two additional methods that affect the archiving and unarchiving of objects: <a href="#4025"><code>setUsesContextRelativeEncoding</code></a> and <a href="#4043"><code>usesContextRelativeEncoding</code></a>. When you use context relative encoding, it means that enterprise objects that archive themselves using the EditingContext <code>encodeObjectWithCoder</code> method archive their current state (that is, all of their class properties) only if they (the objects) are marked as inserted or updated in the EditingContext. Otherwise, they archive just their globalID's since their state matches what's stored in the database and can be retrieved from there. If <code>usesContextRelativeEncoding</code> returns <code>false</code>, it means the current state will always be archived, even if the enterprise object is unmodified. The default is <code>false</code> for OpenStep applications, and <code>true</code> for WebObjects applications.<p>
+<a name="830">
+<HR WIDTH=50% ALIGN=LEFT>
+<h2>Method Types
+</h2>
+</a><dl>
+<dt>Constructors<dl><dl><dl><dl>
+<dt><a href="#2576">EditingContext</a></dl>
+</dl></dl></dl></dl>
+<a name="4463">
+<HR WIDTH=50% ALIGN=LEFT>
+<h2>Method Types
+</h2>
+</a><dl>
+<dt>Fetching objects<dl><dl><dl><dl>
+<dt><a href="#3882">objectsWithFetchSpecification</a></dl>
+</dl></dl></dl><dt>Nested EditingContext support<dl><dl><dl><dl>
+<dt><a href="#3882">objectsWithFetchSpecification</a><dt><a href="#3877">objectsForSourceGlobalID</a><dt><a href="#3759">arrayFaultWithSourceGlobalID</a><dt><a href="#3767">faultForGlobalID</a><dt><a href="#3921">saveChangesInEditingContext</a><dt><a href="#3913">refaultObject</a><dt><a href="#3816">invalidateObjectsWithGlobalIDs</a><dt><a href="#3775">initializeObject</a></dl>
+</dl></dl></dl><dt>Committing or discarding changes<dl><dl><dl><dl>
+<dt><a href="#987">saveChanges</a><dt><a href="#3445">refaultObjects</a><dt><a href="#3430">refault</a><dt><a href="#3435">refetch</a><dt><a href="#3481">revert</a><dt><a href="#3798">invalidateAllObjects</a></dl>
+</dl></dl></dl><dt>Object registration and snapshotting<dl><dl><dl><dl>
+<dt><a href="#3192">forgetObject</a><dt><a href="#3420">recordObject</a><dt><a href="#3083">committedSnapshotForObject</a><dt><a href="#3088">currentEventSnapshotForObject</a><dt><a href="#3344">objectForGlobalID</a><dt><a href="#3466">registeredObjects</a><dt><a href="#3221">globalIDForObject</a></dl>
+</dl></dl></dl><dt>Locking objects<dl><dl><dl><dl>
+<dt><a href="#3295">lockObject</a><dt><a href="#3869">lockObjectWithGlobalID</a><dt><a href="#5943">isObjectLockedWithGlobalID</a><dt><a href="#3541">setLocksObjectsBeforeFirstModification</a><dt><a href="#3317">locksObjectsBeforeFirstModification</a></dl>
+</dl></dl></dl><dt>Registering changes<dl><dl><dl><dl>
+<dt><a href="#3160">deleteObject</a><dt><a href="#3263">insertObject</a><dt><a href="#3268">insertObjectWithGlobalID</a><dt><a href="#3376">processRecentChanges</a></dl>
+</dl></dl></dl><dt>Checking changes<dl><dl><dl><dl>
+<dt><a href="#3138">deletedObjects</a><dt><a href="#3253">insertedObjects</a><dt><a href="#1300">updatedObjects</a><dt><a href="#3226">hasChanges</a></dl>
+</dl></dl></dl><dt>Undo<dl><dl><dl><dl>
+<dt><a href="#3425">redo</a><dt><a href="#3626">undo</a><dt><a href="#3591">setUndoManager</a><dt><a href="#1200">undoManager</a></dl>
+</dl></dl></dl><dt>Deletion and Validation Behavior<dl><dl><dl><dl>
+<dt><a href="#3566">setPropagatesDeletesAtEndOfEvent</a><dt><a href="#3381">propagatesDeletesAtEndOfEvent</a><dt><a href="#3571">setStopsValidationAfterFirstError</a><dt><a href="#3611">stopsValidationAfterFirstError</a></dl>
+</dl></dl></dl><dt>Unarchiving from nib<dl><dl><dl><dl>
+<dt><a href="#3973">defaultParentObjectStore</a><dt><a href="#4007">setDefaultParentObjectStore</a><dt><a href="#4016">setSubstitutionEditingContext</a><dt><a href="#4034">substitutionEditingContext</a></dl>
+</dl></dl></dl><dt>Returning related object stores<dl><dl><dl><dl>
+<dt><a href="#3371">parentObjectStore</a><dt><a href="#3492">rootObjectStore</a></dl>
+</dl></dl></dl><dt>Managing editors<dl><dl><dl><dl>
+<dt><a href="#3165">editors</a><dt><a href="#3831">addEditor</a><dt><a href="#3471">removeEditor</a></dl>
+</dl></dl></dl><dt>Setting the delegate<dl><dl><dl><dl>
+<dt><a href="#1083">setDelegate</a><dt><a href="#3133">delegate</a></dl>
+</dl></dl></dl><dt>Setting the message handler<dl><dl><dl><dl>
+<dt><a href="#3546">setMessageHandler</a><dt><a href="#3322">messageHandler</a></dl>
+</dl></dl></dl><dt>Invalidating objects<dl><dl><dl><dl>
+<dt><a href="#3536">setInvalidatesObjectsWhenFreed</a><dt><a href="#5947">invalidatesObjectsWhenFreed</a></dl>
+</dl></dl></dl><dt>Archiving and unarchiving objects<dl><dl><dl><dl>
+<dt><a href="#3986">encodeObjectWithCoder</a><dt><a href="#3995">initObjectWithCoder</a><dt><a href="#4025">setUsesContextRelativeEncoding</a><dt><a href="#4043">usesContextRelativeEncoding</a></dl>
+</dl></dl></dl></dl>
+<HR WIDTH=50% ALIGN=LEFT>
+<a name="2569"></a>
+<a name="cons"></a>
+<h2>Constructors</h2>  
+
+
+<a name="2576"></a>
+<h3>
+ EditingContext
+</h3>
+public <code>next.eo.EditingContext</code>()
+
+<P>public <code>next.eo.EditingContext</code>(next.eo.ObjectStore <em>anObjectStore</em>)
+
+<P>Creates a new EditingContext object. If <em>anObjectStore</em> is provided, initializes the receiver with <em>anObjectStore</em> as its parent ObjectStore. If no argument is provided, the new EditingContext has as its parent ObjectStore the default parent ObjectStore. For more discussion of parent ObjectStores, see <a href="#4126">"Other Classes that Participate in Object Graph Management"</a> in the class description.<p>
+<B>See also: </B>  
+<a href="#3371"><code>parentObjectStore</code></a>, <a href="#3973"><code>defaultParentObjectStore</code></a>
+<p><HR WIDTH=50% ALIGN=LEFT>
+<a name="3962"></a>
+<a name="clm"></a>
+<h2>Static Methods</h2>  
+
+
+<a name="3973"></a>
+<h3>
+ <a name="//apple_ref/java/clm/EditingContext/defaultParentObjectStore">defaultParentObjectStore</a>
+</h3>
+public static next.eo.ObjectStore <code>defaultParentObjectStore</code>()
+
+<P>Returns the default parent ObjectStore. Normally this is the ObjectStoreCoordinator returned from the invocation <code>ObjectStoreCoordinator.defaultCoordinator()</code>. <p>
+<B>See also: </B>  
+<a href="#4007"><code>setDefaultParentObjectStore</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="3986"></a>
+<h3> <a name="//apple_ref/java/clm/EditingContext/encodeObjectWithCoder">encodeObjectWithCoder</a></h3>
+public static void <code>encodeObjectWithCoder</code>(java.lang.Object <em>object</em>, next.util.Coder <em>encoder</em>)
+
+<P>Invoked by an enterprise object <em>object</em> to ask the EditingContext to encode <em>object</em> using <em>encoder</em>. For more discussion of this subject, see <a href="#4391">"Using EditingContext to Archive Custom Objects in Web Objects Framework"</a> in the class description.<p>
+<B>See also: </B>  
+<a href="#3995"><code>initObjectWithCoder</code></a>, <a href="#4043"><code>usesContextRelativeEncoding</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="3995"></a>
+<h3> <a name="//apple_ref/java/clm/EditingContext/initObjectWithCoder">initObjectWithCoder</a></h3>
+public static java.lang.Object <code>initObjectWithCoder</code>(java.lang.Object <em>object</em>, next.util.Coder <em>decoder</em>)
+
+<P>Invoked by an enterprise object <em>object</em> to ask the EditingContext to initialize <em>object</em> from data in <em>decoder</em>. For more discussion of this subject, see <a href="#4391">"Using EditingContext to Archive Custom Objects in Web Objects Framework"</a> in the class description.<p>
+<B>See also: </B>  
+<a href="#3986"><code>encodeObjectWithCoder</code></a>, <a href="#4043"><code>usesContextRelativeEncoding</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="4007"></a>
+<h3> <a name="//apple_ref/java/clm/EditingContext/setDefaultParentObjectStore">setDefaultParentObjectStore</a></h3>
+public static void <code>setDefaultParentObjectStore</code>(next.eo.ObjectStore <em>store</em>)
+
+<P>Sets the<em> </em>default parent ObjectStore to <em>store</em>. You use this method before loading a nib file to change the default parent ObjectStores of the EditingContexts in the nib file. The object you supply for <em>store</em> can be a different ObjectStoreCoordinator or another EditingContext (if you're using a nested EditingContext). After loading a nib with an EditingContext substituted as the default parent ObjectStore, you should restore the default behavior by setting the default parent ObjectStore to <code>null</code>.<p>
+This substitution is global until it is changed again. For more discussion of this topic, see the chapter "Application Configurations" in the <em>Enterprise Objects Framework Developer's Guide</em>.<p>
+<B>See also: </B>  
+<em> </em><code><a href="#3973"></code><code>defaultParentObjectStore</code><code></a> 
+</code><p><hr WIDTH=25% ALIGN=LEFT>
+<a name="4016"></a>
+<h3> <a name="//apple_ref/java/clm/EditingContext/setSubstitutionEditingContext">setSubstitutionEditingContext</a></h3>
+public static void <code>setSubstitutionEditingContext</code>(next.eo.EditingContext <em>anEditingContext</em>)
+
+<P>Assigns <em>anEditingContext</em> as the EditingContext to substitute for the one specified in a nib file you're about to load. Using this method causes all of the connections in your nib file to be redirected to <em>anEditingContext</em>. This can be useful when you want an interface loaded from a second nib file to use an existing EditingContext. After loading a nib with a substitution EditingContext, you should restore the default behavior by setting the substitution EditingContext to <code>null</code>. <p>
+This substitution is global until it is changed again. For more discussion of this topic, see the chapter "Application Configurations" in the <em>Enterprise Objects Framework Developer's Guide</em>.<p>
+<B>See also: </B>  
+<em> </em><code><a href="#4034"></code><code>substitutionEditingContext</code><code></a>
+</code><p><hr WIDTH=25% ALIGN=LEFT>
+<a name="4025"></a>
+<h3> <a name="//apple_ref/java/clm/EditingContext/setUsesContextRelativeEncoding">setUsesContextRelativeEncoding</a></h3>
+public static void <code>setUsesContextRelativeEncoding</code>(boolean <em>flag</em>)
+
+<P>Sets according to <em>flag</em> whether an EditingContext uses context-relative encoding. For more discussion of this subject, see <a href="#4391">"Using EditingContext to Archive Custom Objects in Web Objects Framework"</a> in the class description.<p>
+<B>See also: </B>  
+<a href="#4043"><code>usesContextRelativeEncoding</code></a>, <a href="#3986"><code>encodeObjectWithCoder</code></a>, <a href="#3995"><code>initObjectWithCoder</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="4034"></a>
+<h3> <a name="//apple_ref/java/clm/EditingContext/substitutionEditingContext">substitutionEditingContext</a></h3>
+public static next.eo.EditingContext <code>substitutionEditingContext</code>()
+
+<P>Returns the substitution EditingContext if one has been specified. Otherwise returns <code>null</code>.<p>
+<B>See also: </B>  
+<a href="#4016"><code>setSubstitutionEditingContext</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="4043"></a>
+<h3> <a name="//apple_ref/java/clm/EditingContext/usesContextRelativeEncoding">usesContextRelativeEncoding</a></h3>
+public static boolean <code>usesContextRelativeEncoding</code>()
+
+<P>Returns <code>true</code> to indicate that the EditingContext uses context relative encoding, <code>false</code> otherwise. For more discussion of this subject, see <a href="#4391">"Using EditingContext to Archive Custom Objects in Web Objects Framework"</a> in the class description.<p>
+<B>See also: </B>  
+<a href="#4025"><code>setUsesContextRelativeEncoding</code></a>, <a href="#3986"><code>encodeObjectWithCoder</code></a>, <a href="#3995"><code>initObjectWithCoder</code></a>
+<p><HR WIDTH=50% ALIGN=LEFT>
+<a name="instm"></a>
+<h2>Instance Methods</h2>  
+
+
+<a name="3831"></a>
+<h3>
+ <a name="//apple_ref/java/instm/EditingContext/addEditor">addEditor</a>
+</h3>
+public void <code>addEditor</code>(java.lang.Object <em>anObject</em>)
+
+<P>Adds <em>editor</em> to the receiver's set of Editors. For more explanation, see the method description for <a href="#3165"><code>editors</code></a> and the Editors interface specification.<p>
+<B>See also: </B>  
+<a href="#3471"><code>removeEditor</code></a> 
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="3759"></a>
+<h3> <a name="//apple_ref/java/instm/EditingContext/arrayFaultWithSourceGlobalID">arrayFaultWithSourceGlobalID</a></h3>
+public next.util.ImmutableVector <code>arrayFaultWithSourceGlobalID</code>(next.eo.GlobalID <em>globalID</em>, 
+java.lang.String <em>aString</em>, next.eo.EditingContext <em>anEditingContext</em>)
+
+<P>Overrides the implementation inherited from ObjectStore. If the objects associated with the GlobalID <em>globalID</em> are already registered in the receiver, returns those objects. Otherwise, propagates the message down the object store hierarchy, through the parent object store, ultimately to the associated DatabaseContext. The DatabaseContext creates and returns a to-many fault.<p>
+When a parent EditingContext receives this on behalf of a child EditingContext and the GlobalID <em>globalID</em> identifies a newly inserted object in the parent, the parent returns a copy of its object's relationship array with the member objects translated into objects in the child EditingContext. <p>
+For more information on faults, see the ObjectStore, next.eo.DatabaseContext, Fault, and FaultHandler class specifications.<p>
+<B>See also: </B>  
+<a href="#3767"><code>faultForGlobalID</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="3083"></a>
+<h3> <a name="//apple_ref/java/instm/EditingContext/committedSnapshotForObject">committedSnapshotForObject</a></h3>
+public next.util.ImmutableHashtable <code>committedSnapshotForObject</code>(java.lang.Object <em>object</em>)
+
+<P>Returns a dictionary containing a snapshot of <em>object</em> that reflects its committed values (that is, its values as they were last committed to the database).<em> </em>In other words, this snapshot represents the state of the object before any modifications were made to it. The snapshot is updated to the newest object state after a save.<p>
+<B>See also: </B>  
+<a href="#3088"><code>currentEventSnapshotForObject</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="3088"></a>
+<h3> <a name="//apple_ref/java/instm/EditingContext/currentEventSnapshotForObject">currentEventSnapshotForObject</a></h3>
+public next.util.ImmutableHashtable <code>currentEventSnapshotForObject</code>(java.lang.Object <em>object</em>)
+
+<P>Returns a dictionary containing a snapshot of <em>object</em> that reflects its state as it was at the beginning of the current event loop. After the end of the current event, this snapshot is updated to hold the modified state of the object.<p>
+<B>See also: </B>  
+<a href="#3083"><code>committedSnapshotForObject</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="3133"></a>
+<h3> <a name="//apple_ref/java/instm/EditingContext/delegate">delegate</a></h3>
+public java.lang.Object <code>delegate</code>()
+
+<P>Returns the receiver's delegate. <p>
+<B>See also: </B>  
+<a href="#1083"><code>setDelegate</code></a> 
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="3138"></a>
+<h3> <a name="//apple_ref/java/instm/EditingContext/deletedObjects">deletedObjects</a></h3>
+public next.util.ImmutableVector <code>deletedObjects</code>()
+
+<P>Returns the objects that have been deleted from the receiver's object graph.<p>
+<B>See also: </B>  
+<code><a href="#1300"></code><code>updatedObjects</code><code></a></code>, <code><a href="#3253"></code><code>insertedObjects</code><code></a>
+</code><p><hr WIDTH=25% ALIGN=LEFT>
+<a name="3160"></a>
+<h3> <a name="//apple_ref/java/instm/EditingContext/deleteObject">deleteObject</a></h3>
+public void <code>deleteObject</code>(java.lang.Object <em>object</em>)
+
+<P>Specifies that <em>object</em> should be removed from the receiver's parent ObjectStore when changes are committed. At that time, the object will be removed from the uniquing tables.<p>
+<B>See also: </B>  
+<a href="#3138"><code>deletedObjects</code></a> 
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="3165"></a>
+<h3> <a name="//apple_ref/java/instm/EditingContext/editors">editors</a></h3>
+public next.util.ImmutableVector <code>editors</code>()
+
+<P>Returns the receiver's editors. Editors are special-purpose delegate objects that may contain uncommitted changes that need to be validated and applied to enterprise objects before the EditingContext saves changes. For example, interface layer display groups (not next.wo.DisplayGroups) register themselves as editors with the EditingContext of their data sources so that they can save any changes in the key text field. For more information, see the Editors interface specification and the EODisplayGroup class specification in the Objective-C version of the <em>Enterprise Objects Framework Reference</em>.<p>
+<B>See also: </B>  
+<code><a href="#3831"></code><code>addEditor</code><code></a></code>, <code><a href="#3471"></code><code>removeEditor</code><code></a> 
+</code><p><hr WIDTH=25% ALIGN=LEFT>
+<a name="3767"></a>
+<h3> <a name="//apple_ref/java/instm/EditingContext/faultForGlobalID">faultForGlobalID</a></h3>
+public java.lang.Object <code>faultForGlobalID</code>(next.eo.GlobalID <em>globalID</em>, 
+next.eo.EditingContext <em>anEditingContext</em>)
+
+<P>Overrides the implementation inherited from ObjectStore. If the object associated with the GlobalID <em>globalID</em> is already registered in the receiver, returns that object. Otherwise, propagates the message down the object store hierarchy, through the parent object store, ultimately to the associated DatabaseContext. The DatabaseContext creates and returns a to-one fault.<p>
+For example, suppose you want the department object whose <code>deptID</code> has a particular value. The most efficient way to get it is to look it up by its globalID using <code>faultForGlobalID</code>. If the department object is already registered in the EditingContext, <code>faultForGlobalID</code> returns the object (without going to the database). If not, a fault for this object is created, and the object is fetched only when you trigger the fault to fire.<p>
+<code></code>When a parent EditingContext is sent <code>faultForGlobalID</code> on behalf of a child EditingContext and <em>globalID</em> identifies a newly inserted object in the parent, the parent registers a copy of the object in the child. <p>
+For more discussion of this method, see the section <a href="#4361">"Working with Objects Across Multiple EditingContexts"</a> in the class description. For more information on faults, see the ObjectStore, next.eo.DatabaseContext, Fault, and FaultHandler class specifications.<p>
+<B>See also: </B>  
+<a href="#3759"><code>arrayFaultWithSourceGlobalID</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="3192"></a>
+<h3> <a name="//apple_ref/java/instm/EditingContext/forgetObject">forgetObject</a></h3>
+public void <code>forgetObject</code>(java.lang.Object <em>object</em>)
+
+<P>Removes <em>object</em> from the uniquing tables and causes the receiver to remove itself as the object's observer. This method is invoked whenever an object being observed by an EditingContext is finalized. You should not ever invoke this method directly. The correct way to remove an object from its editing context is to remove every reference to the object by refaulting any object references it (by using <a href="#3445"><code>refaultObjects</code></a> or <a href="#3798"><code>invalidateAllObjects</code></a>). Also note that this method does<em> not</em> have the effect of deleting an object-to delete an object you should either use the <a href="#3160"><code>deleteObject</code></a> method or remove the object from an owning relationship.<p>
+<hr WIDTH=25% ALIGN=LEFT>
+<a name="3221"></a>
+<h3> <a name="//apple_ref/java/instm/EditingContext/globalIDForObject">globalIDForObject</a></h3>
+public next.eo.GlobalID <code>globalIDForObject</code>(java.lang.Object <em>object</em>)
+
+<P>Returns the GlobalID for <em>object</em>. All objects fetched from an external store are registered in an EditingContext along with a global identifier (GlobalID) that's used to uniquely identify each object to the external store. If <em>object</em> hasn't been registered in the EditingContext (that is, if no match is found), this method returns <code>null</code>. Objects are registered in an EditingContext using the <a href="#3263"><code>insertObject</code></a> method, or, when fetching, with <a href="#3420"><code>recordObject</code></a>.<p>
+<B>See also: </B>  
+<a href="#3344"><code>objectForGlobalID</code></a><code> 
+</code><p><hr WIDTH=25% ALIGN=LEFT>
+<a name="3226"></a>
+<h3> <a name="//apple_ref/java/instm/EditingContext/hasChanges">hasChanges</a></h3>
+public boolean <code>hasChanges</code>()
+
+<P>Returns <code>true</code> if any of the objects in the receiver's object graph have been modified-that is, if any objects have been inserted, deleted, or updated. <p>
+<hr WIDTH=25% ALIGN=LEFT>
+<a name="3775"></a>
+<h3> <a name="//apple_ref/java/instm/EditingContext/initializeObject">initializeObject</a></h3>
+public void <code>initializeObject</code>(java.lang.Object <em>object</em>, next.eo.GlobalID <em>globalID</em>, 
+next.eo.EditingContext <em>anEditingContext</em>)
+
+<P>Overrides the implementation inherited from ObjectStore to build the properties for the <em>object</em> identified by <em>globalID</em>. When a parent EditingContext receives this on behalf of a child EditingContext (as represented by <em>anEditingContext</em>), and the <em>globalID</em> identifies an object instantiated in the parent, the parent returns properties extracted from its object and translated into the child's context. This ensures that a nested context "inherits" modified values from its parent EditingContext. If the receiver doesn't have <em>object</em>, the request is forwarded the receiver's parent ObjectStore.<p>
+<hr WIDTH=25% ALIGN=LEFT>
+<a name="3253"></a>
+<h3> <a name="//apple_ref/java/instm/EditingContext/insertedObjects">insertedObjects</a></h3>
+public next.util.ImmutableVector <code>insertedObjects</code>()
+
+<P>Returns the objects that have been inserted into the receiver's object graph. <p>
+<B>See also: </B>  
+<a href="#3138"><code>deletedObjects</code></a>, <code><a href="#1300"></code><code>updatedObjects</code><code></a>
+</code><p><hr WIDTH=25% ALIGN=LEFT>
+<a name="3263"></a>
+<h3> <a name="//apple_ref/java/instm/EditingContext/insertObject">insertObject</a></h3>
+public void <code>insertObject</code>(java.lang.Object <em>anObject</em>)
+
+<P>Registers (by invoking <a href="#3268"><code>insertObjectWithGlobalID</code></a>) <em>object</em> to be inserted in the receiver's parent ObjectStore the next time changes are saved. In the meantime, <em>object</em> is registered in the receiver with a temporary globalID.<p>
+<B>See also: </B>  
+<code><a href="#3253"></code><code>insertedObjects</code><code></a></code>, <a href="#3138"><code>deletedObjects</code></a>, <a href="#3268"><code>insertObjectWithGlobalID</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="3268"></a>
+<h3> <a name="//apple_ref/java/instm/EditingContext/insertObjectWithGlobalID">insertObjectWithGlobalID</a></h3>
+public void <code>insertObjectWithGlobalID</code>(java.lang.Object <em>object</em>, next.eo.GlobalID <em>globalID</em>)
+
+<P>Registers a new <em>object</em> identified by <em>globalID</em> that should be inserted in the parent ObjectStore when changes are saved. Works by invoking <a href="#3420"><code>recordObject</code></a>, unless the receiver already contains the object. Sends <em>object</em> the message <a href="../../Interfaces/EnterpriseObject/Frameset.html#" target="_top"><code>awakeFromFetchInEditingContext</code></a>. <em>globalID</em> must respond <code>true</code> to <a href="../GlobalID/Frameset.html#1466" target="_top"><code>isTemporary</code></a>. When the external store commits <em>object</em>, it re-records it with the appropriate permanent globalID.<p>
+It is an error to insert an object that's already registered in an editing context unless you are effectively undeleting the object by reinserting it.<p>
+<B>See also: </B>  
+<a href="#3263"><code>insertObject</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="3798"></a>
+<h3> <a name="//apple_ref/java/instm/EditingContext/invalidateAllObjects">invalidateAllObjects</a></h3>
+public void <code>invalidateAllObjects</code>()
+
+<P>Overrides the implementation inherited from ObjectStore to discard the values of objects cached in memory and refault them, which causes them to be refetched from the external store the next time they're accessed. This method sends the message <code>invalidateObjectsWithGlobalIDs</code> to the parent object store with the globalIDs of all of the objects cached in the receiver. When an EditingContext receives this message, it propagates the message down the object store hierarchy. DatabaseContexts discard their snapshots for invalidated objects and broadcast an ObjectsChangedInStoreNotification. <p>
+The final effect of this method is to refault all objects currently in memory. The next time you access one of these objects, it's refetched from the database.<p>
+To flush the entire application's cache of all values fetched from an external store, use a statement such as the following:<p>
+<blockquote><pre>editingContext.rootObjectStore().invalidateAllObjects();
+</pre></blockquote><p>If you just want to discard uncommitted changes but you don't want to sacrifice the values cached in memory, use the EditingContext <a href="#3481"><code>revert</code></a> method, which reverses all changes and clears the undo stack. For more discussion of this topic, see the section <a href="#4286">"Methods for Managing the Object Graph"</a> in the class description.<p>
+<B>See also: </B>  
+<a href="#3435"><code>refetch</code></a>, <a href="#3816"><code>invalidateObjectsWithGlobalIDs</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="3816"></a>
+<h3> <a name="//apple_ref/java/instm/EditingContext/invalidateObjectsWithGlobalIDs">invalidateObjectsWithGlobalIDs</a></h3>
+public void <code>invalidateObjectsWithGlobalIDs</code>(next.util.ImmutableVector <em>globalID</em>s)
+
+<P>Overrides the implementation inherited from ObjectStore to signal to the parent ObjectStore that the cached values for the objects identified by <em>globalID</em>s should no longer be considered valid and that they should be refaulted. Invokes <a href="#3376"><code>processRecentChanges</code></a> before refaulting the objects. This message is propagated to any underlying ObjectStore, resulting in a refetch the next time the objects are accessed. Any related (child or peer) ObjectStores are notified that the objects are no longer valid. For more discussion of this topic, see the section <a href="#4286">"Methods for Managing the Object Graph"</a> in the class description.<p>
+<B>See also: </B>  
+<a href="#3798"><code>invalidateAllObjects</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="5947"></a>
+<h3> <a name="//apple_ref/java/instm/EditingContext/invalidatesObjectsWhenFreed">invalidatesObjectsWhenFreed</a></h3>
+public boolean <code>invalidatesObjectsWhenFreed</code>()
+
+<P>Returns <code>true</code> to indicate that the receiver clears and "booby-traps" all of the objects registered with it when the receiver is finalized, <code>false</code> otherwise. The default is <code>true</code>. In this method, "invalidate" has a different meaning than it does in the other <code>invalidate...</code> methods. For more discussion of this topic, see the method description for <a href="#3536"><code>setInvalidatesObjectsWhenFreed</code></a>.<p>
+<hr WIDTH=25% ALIGN=LEFT>
+<a name="5943"></a>
+<h3> <a name="//apple_ref/java/instm/EditingContext/isObjectLockedWithGlobalID">isObjectLockedWithGlobalID</a></h3>
+public boolean <code>isObjectLockedWithGlobalID</code>(next.eo.GlobalID <em>globalID</em>, 
+next.eo.EditingContext <em>anEditingContext</em>)
+
+<P>Returns <code>true</code> if the object identified by <em>globalID</em> in <em>anEditingContext</em> is locked, <code>false</code> otherwise. This method works by forwarding the message <code>isObjectLockedWithGlobalID</code> to its parent ObjectStore.<p>
+<B>See also: </B>  
+<a href="#3295"><code>lockObject</code></a>, <a href="#3869"><code>lockObjectWithGlobalID</code></a>, <a href="#3317"><code>locksObjectsBeforeFirstModification</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="3295"></a>
+<h3> <a name="//apple_ref/java/instm/EditingContext/lockObject">lockObject</a></h3>
+public void <code>lockObject</code>(java.lang.Object <em>anObject</em>)
+
+<P>Attempts to lock <em>anObject</em> in the external store. This method works by invoking <a href="#3869"><code>lockObjectWithGlobalID</code></a>. Raises an exception if it can't find the globalID for <em>anObject</em> to pass to <code>lockObjectWithGlobalID</code>.<p>
+<B>See also: </B>  
+<a href="#5943"><code>isObjectLockedWithGlobalID</code></a>, <a href="#3541"><code>setLocksObjectsBeforeFirstModification</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="3869"></a>
+<h3> <a name="//apple_ref/java/instm/EditingContext/lockObjectWithGlobalID">lockObjectWithGlobalID</a></h3>
+public void <code>lockObjectWithGlobalID</code>(next.eo.GlobalID <em>globalID</em>, 
+next.eo.EditingContext <em>anEditingContext</em>)
+
+<P>Overrides the implementation inherited from ObjectStore<code> </code>to attempt to lock the object identified by <em>globalID</em> in <em>anEditingContext</em> in the external store. Raises an exception if unable to obtain the lock. This method works by forwarding the message <code>lockObjectWithGlobalID</code> to its parent ObjectStore.<p>
+<B>See also: </B>  
+<a href="#3295"><code>lockObject</code></a>, <a href="#5943"><code>isObjectLockedWithGlobalID</code></a>, <a href="#3541"><code>setLocksObjectsBeforeFirstModification</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="3317"></a>
+<h3> <a name="//apple_ref/java/instm/EditingContext/locksObjectsBeforeFirstModification">locksObjectsBeforeFirstModification</a></h3>
+public boolean <code>locksObjectsBeforeFirstModification</code>()
+
+<P>Returns <code>true</code> if the receiver invokes <code>lockObject(object)</code> to lock <em>object</em> in the external store the first time <em>object</em> is modified.<p>
+<B>See also: </B>  
+<a href="#3541"><code>setLocksObjectsBeforeFirstModification</code></a>, <a href="#5943"><code>isObjectLockedWithGlobalID</code></a>, <a href="#3295"><code>lockObject</code></a>, 
+<a href="#3869"><code>lockObjectWithGlobalID</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="3322"></a>
+<h3> <a name="//apple_ref/java/instm/EditingContext/messageHandler">messageHandler</a></h3>
+public java.lang.Object <code>messageHandler</code>()
+
+<P>Returns the EditingContext's message handler. A message handler is a special-purpose delegate responsible for presenting errors to the user. Typically, an interface layer display group (an Objective-C EODisplayGroup, not a next.wo.DisplayGroup) registers itself as the message handler for its EditingContext. For more information, see the MessageHandlers interface specification.<p>
+<B>See also: </B>  
+<a href="#3546"><code>setMessageHandler</code></a><code> 
+</code><p><hr WIDTH=25% ALIGN=LEFT>
+<a name="3344"></a>
+<h3> <a name="//apple_ref/java/instm/EditingContext/objectForGlobalID">objectForGlobalID</a></h3>
+public java.lang.Object <code>objectForGlobalID</code>(next.eo.GlobalID <em>globalID</em>)
+
+<P>Returns the object identified by <em>globalID</em>, or <code>null</code> if no object has been registered in the EditingContext with <em>globalID</em>.<p>
+<B>See also: </B>  
+<a href="#3221"><code>globalIDForObject</code></a> 
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="3877"></a>
+<h3> <a name="//apple_ref/java/instm/EditingContext/objectsForSourceGlobalID">objectsForSourceGlobalID</a></h3>
+public next.util.ImmutableVector <code>objectsForSourceGlobalID</code>(next.eo.GlobalID <em>globalID</em>, 
+java.lang.String <em>name</em>, next.eo.EditingContext <em>anEditingContext</em>)
+
+<P>Overrides the implementation inherited from ObjectStore to service a to-many fault for a relationship named <em>name</em>. When a parent EditingContext receives this on behalf of a child EditingContext and <em>globalID</em> matches an object instantiated in the parent, the parent returns a copy of its relationship array and translates its objects into the child's EditingContext. This ensures that a nested EditingContext "inherits" modified values from its parent EditingContext. If the receiving EditingContext does not have the specified object or if the parent's relationship property is still a Fault, the request is fowarded to its parent ObjectStore.<code> </code><p>
+<hr WIDTH=25% ALIGN=LEFT>
+<a name="3882"></a>
+<h3> <a name="//apple_ref/java/instm/EditingContext/objectsWithFetchSpecification">objectsWithFetchSpecification</a></h3>
+public next.util.ImmutableVector 
+<code>objectsWithFetchSpecification</code>(next.eo.FetchSpecification <em>aFetchSpecification</em>, 
+next.eo.EditingContext <em>anEditingContext</em>)
+
+<P>public next.util.ImmutableVector 
+<code>objectsWithFetchSpecification</code>(next.eo.FetchSpecification <em>aFetchSpecification</em>)
+
+<P>Overrides the implementation inherited from ObjectStore to fetch objects from an external store according to the criteria specified by <em>fetchSpecification</em> and return them in an array. If one of these objects is already present in memory, this method doesn't overwrite its values with the new values from the database. This method throws an exception if an error occurs; the error message indicates the nature of the problem.<p>
+When an EditingContext receives this message, it forwards the message to its ObjectStore (typically an ObjectStoreCoordinator). Based on the entity name in <em>fetchSpecification</em>, the ObjectStoreCoordinator in turn forwards the request to the appropriate DatabaseContext. The DatabaseContext then obtains a DatabaseChannel and performs the fetch, registering all fetched objects in <em>anEditingContext</em>.<p>
+Invoking this method without providing <em>anEditingContext</em> is the same as invoking <code>objectsWithFetchSpecification</code> with <code>this</code> as the EditingContext.<p>
+<hr WIDTH=25% ALIGN=LEFT>
+<a name="3371"></a>
+<h3> <a name="//apple_ref/java/instm/EditingContext/parentObjectStore">parentObjectStore</a></h3>
+public next.eo.ObjectStore <code>parentObjectStore</code>()
+
+<P>Returns the ObjectStore from which the receiver fetches and to which it saves objects. <p>
+<hr WIDTH=25% ALIGN=LEFT>
+<a name="3376"></a>
+<h3> <a name="//apple_ref/java/instm/EditingContext/processRecentChanges">processRecentChanges</a></h3>
+public void <code>processRecentChanges</code>()
+
+<P>Forces the receiver to process pending insertions, deletions, and updates.<em> </em>Normally, when objects are changed, the processing of the changes is deferred until the end of the current event. At that point, an EditingContext moves objects to the inserted, updated, and deleted lists, delete propagation is performed, undos are registered, and ObjectsChangedInStoreNotification and ObjectsChangedInEditingContextNotification are posted (In an OpenStep application, this usually causes the user interface to update). You can use this method to explicitly force changes to be processed. An EditingContext automatically invokes this method on itself before performing certain operations such as <a href="#987"><code>saveChanges</code></a>. <p>
+<hr WIDTH=25% ALIGN=LEFT>
+<a name="3381"></a>
+<h3> <a name="//apple_ref/java/instm/EditingContext/propagatesDeletesAtEndOfEvent">propagatesDeletesAtEndOfEvent</a></h3>
+public boolean <code>propagatesDeletesAtEndOfEvent</code>()
+
+<P>Returns <code>true</code> if the receiver propagates deletes at the end of the event in which a change was made, <code>false</code> if it propagates deletes only right before saving changes. The default is <code>true</code>.<p>
+<B>See also: </B>  
+<a href="#3566"><code>setPropagatesDeletesAtEndOfEvent</code></a><code> 
+</code><p><hr WIDTH=25% ALIGN=LEFT>
+<a name="3420"></a>
+<h3> <a name="//apple_ref/java/instm/EditingContext/recordObject">recordObject</a></h3>
+public void <code>recordObject</code>(java.lang.Object <em>anObject</em>, next.eo.GlobalID <em>globalID</em>)
+
+<P>Makes the receiver aware of an object identified by <em>globalID</em> existing in its parent ObjectStore. ObjectStores (such as DatabaseContext) usually invoke this method for each object fetched. When it receives this message, the receiver enters the object in its uniquing table and registers itself as an observer of the object. <em> </em> <p>
+<hr WIDTH=25% ALIGN=LEFT>
+<a name="3425"></a>
+<h3> <a name="//apple_ref/java/instm/EditingContext/redo">redo</a></h3>
+public void <code>redo</code>()
+
+<P>This method forwards a <a href="../UndoManager/Frameset.html#1038" target="_top"><code>redo</code></a> message to the receiver's UndoManager, asking it to reverse the latest undo operation applied to objects in the object graph. <p>
+<B>See also: </B>  
+<a href="#3626"><code>undo</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="3430"></a>
+<h3> <a name="//apple_ref/java/instm/EditingContext/refault">refault</a></h3>
+public void <code>refault</code>()
+
+<P>This method simply invokes <a href="#3445"><code>refaultObjects</code></a>. <p>
+<hr WIDTH=25% ALIGN=LEFT>
+<a name="3913"></a>
+<h3> <a name="//apple_ref/java/instm/EditingContext/refaultObject">refaultObject</a></h3>
+public void <code>refaultObject</code>(java.lang.Object <em>object</em>, next.eo.GlobalID <em>globalID</em>, 
+next.eo.EditingContext <em>anEditingContext</em>)
+
+<P>Overrides the implementation inherited from ObjectStore to refault the enterprise object <em>object</em> identified by <em>globalID</em> in <em>anEditingContext</em>. This method should be used with caution since refaulting an object does not remove the object snapshot from the undo stack. Objects that have been newly inserted or deleted should not be refaulted. <p>
+The main purpose of this method is to break reference cycles between enterprise objects. When you are using Java APIs to access Objective-C Enterprise Objects Framework classes, you have to take into consideration the way objects are deallocated on the Objective-C side of the Java Bridge. This means that you might still need to break reference cycles to help keep your application's memory usage in check. For example, suppose you have an Employee object that has a to-one relationship to its Department, and the Department object in turn has an array of Employee objects. You can use this method to break the reference cycle. Note that reference cycles are automatically broken if the EditingContext is finalized. For more discussion of this topic, see the section <a href="#4286">"Methods for Managing the Object Graph"</a> in the class description.<p>
+<B>See also: </B>  
+<a href="#3430"><code>refault</code></a>, <a href="#3445"><code>refaultObjects</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="3445"></a>
+<h3> <a name="//apple_ref/java/instm/EditingContext/refaultObjects">refaultObjects</a></h3>
+public void <code>refaultObjects</code>()
+
+<P>Refaults all objects cached in the receiver that haven't been inserted, deleted, or updated. Invokes <a href="#3376"><code>processRecentChanges</code></a>, then invokes <a href="#3913"><code>refaultObject</code></a> for all objects that haven't been inserted, deleted, or updated. For more discussion of this topic, see the section <a href="#4286">"Methods for Managing the Object Graph"</a> in the class description.<p>
+<hr WIDTH=25% ALIGN=LEFT>
+<a name="3435"></a>
+<h3> <a name="//apple_ref/java/instm/EditingContext/refetch">refetch</a></h3>
+public void <code>refetch</code>()
+
+<P>This action method simply invokes the <a href="#3798"><code>invalidateAllObjects</code></a><em> </em>method. <p>
+<hr WIDTH=25% ALIGN=LEFT>
+<a name="3466"></a>
+<h3> <a name="//apple_ref/java/instm/EditingContext/registeredObjects">registeredObjects</a></h3>
+public next.util.ImmutableVector <code>registeredObjects</code>()
+
+<P>Returns the enterprise objects managed by the receiver. <p>
+<hr WIDTH=25% ALIGN=LEFT>
+<a name="3471"></a>
+<h3> <a name="//apple_ref/java/instm/EditingContext/removeEditor">removeEditor</a></h3>
+public void <code>removeEditor</code>(java.lang.Object <em>anObject</em>)
+
+<P>Unregisters <em>editor</em> from the receiver. For more discussion of Editors, see the <a href="#3165"><code>editors</code></a> method description and the Editors interface specification.<p>
+<B>See also: </B>  
+<a href="#3831"><code>addEditor</code></a> 
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="3481"></a>
+<h3> <a name="//apple_ref/java/instm/EditingContext/revert">revert</a></h3>
+public void <code>revert</code>()
+
+<P>Removes everything from the undo stack, discards all insertions and deletions, and restores updated objects to their last committed values. Does not refetch from the database. Note that <code>revert</code> doesn't automatically cause display groups to refetch. Display groups that allow insertion and deletion of objects need to be explicitly synchronized whenever this method is invoked on their EditingContext. <p>
+<B>See also: </B>  
+<a href="#3798"><code>invalidateAllObjects</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="3492"></a>
+<h3> <a name="//apple_ref/java/instm/EditingContext/rootObjectStore">rootObjectStore</a></h3>
+public next.eo.ObjectStore <code>rootObjectStore</code>()
+
+<P>Returns the non-EditingContext ObjectStore at the base of the ObjectStore hierarchy (usually an ObjectStoreCoordinator). <p>
+<hr WIDTH=25% ALIGN=LEFT>
+<a name="987"></a>
+<h3> <a name="//apple_ref/java/instm/EditingContext/saveChanges">saveChanges</a></h3>
+public void <code>saveChanges</code>()
+
+<P>Commits changes made in the receiver to its parent ObjectStore by sending it the message <a href="#3921"><code>saveChangesInEditingContext</code></a>. If the parent is an ObjectStore Coordinator, it guides its DatabaseContexts through a multi-pass save operation (see the ObjectStoreCoordinator class specification for more information). If no message handler or delegate is available and a database error occurs, an exception is thrown; the error message indicates the nature of the problem.<p>
+<hr WIDTH=25% ALIGN=LEFT>
+<a name="3921"></a>
+<h3> <a name="//apple_ref/java/instm/EditingContext/saveChangesInEditingContext">saveChangesInEditingContext</a></h3>
+public void <code>saveChangesInEditingContext</code>(next.eo.EditingContext <em>anEditingContext</em>)
+
+<P>Overrides the implementation inherited from ObjectStore to tell the receiver's ObjectStore to accept changes from a child EditingContext. This method shouldn't be invoked directly. It's invoked by a nested EditingContext when it's committing changes to a parent EditingContext. The receiving parent EditingContext incorporates all changes from the nested EditingContext into its own copies of the objects, but it doesn't immediately save those changes to the database. If the parent itself is later sent <code>saveChanges</code>, it propagates any changes received from the child along with any other changes to its parent ObjectStore. Raises an exception if an error occurs; the error message indicates the nature of the problem.<p>
+<hr WIDTH=25% ALIGN=LEFT>
+<a name="1083"></a>
+<h3> <a name="//apple_ref/java/instm/EditingContext/setDelegate">setDelegate</a></h3>
+public void <code>setDelegate</code>(java.lang.Object <em>anObject</em>)
+
+<P>Set the receiver's delegate to be <em>anObject</em>.<p>
+<B>See also: </B>  
+<a href="#3133"><code>delegate</code></a><code> 
+</code><p><hr WIDTH=25% ALIGN=LEFT>
+<a name="3536"></a>
+<h3> <a name="//apple_ref/java/instm/EditingContext/setInvalidatesObjectsWhenFreed">setInvalidatesObjectsWhenFreed</a></h3>
+public void <code>setInvalidatesObjectsWhenFreed</code>(boolean <em>flag</em>)
+
+<P>Sets according to <em>flag</em> whether the receiver clears and "booby-traps" all of the objects registered with it when the receiver is finalized. If an editing context invalidates objects when it's finalized, it sends a <a href="../../Interfaces/EnterpriseObject/Frameset.html#" target="_top"><code>clearProperties</code></a> message to all of its objects, thereby breaking any cycles between objects that would prevent them from being freed. (When you are using Java APIs to access Objective-C Enterprise Objects Framework classes, you have to take into consideration the way objects are deallocated on the Objective-C side of the Java Bridge. This means that you might still need to break reference cycles to help keep your application's memory usage in check.) This method leaves the objects in a state in which sending them any message  throws an exception.<p>
+The default is <code>true</code>, and as a general rule, this setting must be <code>true</code> for enterprise objects with cyclic references to be finalized when their EditingContext is finalized. Note that "invalidate" in this method has a different meaning than it does in the other <code>invalidate...</code> methods, which discard object values and refault them.<p>
+<B>See also: </B>  
+<a href="#5947"><code>invalidatesObjectsWhenFreed</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="3541"></a>
+<h3> <a name="//apple_ref/java/instm/EditingContext/setLocksObjectsBeforeFirstModification">setLocksObjectsBeforeFirstModification</a></h3>
+public void <code>setLocksObjectsBeforeFirstModification</code>(boolean <em>flag</em>)
+
+<P>Sets according to <em>flag</em> whether the receiver invokes <code>lockObject(object)</code> to lock <em>object</em> in the external store the first time <em>object</em> is modified. The default is <code>false</code>. If <em>flag</em> is <code>true</code>, an exception will be thrown if a lock can't be obtained when <em>object</em> invokes <a href="../../Interfaces/EnterpriseObject/Frameset.html#" target="_top"><code>willChange</code></a>. There are two reasons a lock might fail: because the row is already locked in the server, or because your snapshot is out of date. If your snapshot is out of date, you can explicitly refetch the object using a FetchSpecification with <a href="../FetchSpecification/Frameset.html#1999" target="_top"><code>setRefreshesRefetchedObjects</code></a> set to <code>true</code>. To handle the exception, you can implement the DatabaseContext delegate method <code>databaseContextShouldRaiseExceptionForLockFailure</code>.<p>
+You should avoid using this method or pessimistic locking in an interactive end-user application (OpenStep or WebObjects). A user might make a change and neglect to save it, thereby leaving the data locked in the server indefinitely. Consider using optimistic locking or application level explicit check-in/check-out instead. <p>
+<B>See also: </B>  
+<a href="#3317"><code>locksObjectsBeforeFirstModification</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="3546"></a>
+<h3> <a name="//apple_ref/java/instm/EditingContext/setMessageHandler">setMessageHandler</a></h3>
+public void <code>setMessageHandler</code>(java.lang.Object <em>handler</em>)
+
+<P>Set the receiver's message handler to be <em>handler</em>. <p>
+<B>See also: </B>  
+<a href="#3322"><code>messageHandler</code></a><code> 
+</code><p><hr WIDTH=25% ALIGN=LEFT>
+<a name="3566"></a>
+<h3> <a name="//apple_ref/java/instm/EditingContext/setPropagatesDeletesAtEndOfEvent">setPropagatesDeletesAtEndOfEvent</a></h3>
+public void <code>setPropagatesDeletesAtEndOfEvent</code>(boolean <em>flag</em>)
+
+<P>Sets according to <em>flag</em> whether the receiver propagates deletes at the end of the event in which a change was made, or only just before saving changes.<p>
+If <em>flag</em> is <code>true</code>, deleting an enterprise object triggers delete propagation at the end of the event in which the deletion occurred (this is the default behavior). If <em>flag</em> is <code>false</code>, delete propagation isn't performed until <a href="#987"><code>saveChanges</code></a> is invoked.<p>
+You can delete enterprise objects explicitly by using the <a href="#3160"><code>deleteObject</code></a> method or implicitly by removing the enterprise object from an owning relationship. Delete propagation uses the delete rules in the ClassDescription to determine whether objects related to the deleted object should also be deleted (for more information, see the ClassDescription class specification and the EnterpriseObject interface specification). If delete propagation fails (that is, if an enterprise object refuses to be deleted-possibly due to a deny rule), all changes made during the event are rolled back. <p>
+<B>See also: </B>  
+<a href="#3381"><code>propagatesDeletesAtEndOfEvent</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="3571"></a>
+<h3> <a name="//apple_ref/java/instm/EditingContext/setStopsValidationAfterFirstError">setStopsValidationAfterFirstError</a></h3>
+public void <code>setStopsValidationAfterFirstError</code>(boolean <em>flag</em>)
+
+<P>Sets according to <em>flag</em> whether the receiver stops validating after the first error is encountered, or continues for all objects (validation typically occurs during a save operation). The default is <code>true</code>. Setting it to <code>false</code> is useful if the delegate implements <a href="../../Interfaces/EditingContextDelegates/Frameset.html#" target="_top"><code>editingContextShouldPresentException</code></a> to handle the presentation of aggregate exceptions. <p>
+<B>See also: </B>  
+<a href="#3611"><code>stopsValidationAfterFirstError</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="3591"></a>
+<h3> <a name="//apple_ref/java/instm/EditingContext/setUndoManager">setUndoManager</a></h3>
+public void <code>setUndoManager</code>(next.eo.UndoManager <em>undoManager</em>)
+
+<P>Sets the receiver's UndoManager to <em>undoManager</em>. <p>
+<B>See also: </B>  
+<a href="#1200"><code>undoManager</code></a> 
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="3611"></a>
+<h3> <a name="//apple_ref/java/instm/EditingContext/stopsValidationAfterFirstError">stopsValidationAfterFirstError</a></h3>
+public boolean <code>stopsValidationAfterFirstError</code>()
+
+<P>Returns <code>true</code> to indicate that the receiver should stop validating after it encounters the first error, or <code>false</code> to indicate that it should continue for all objects.<p>
+<B>See also: </B>  
+<a href="#3571"><code>setStopsValidationAfterFirstError</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="3626"></a>
+<h3> <a name="//apple_ref/java/instm/EditingContext/undo">undo</a></h3>
+public void <code>undo</code>()
+
+<P>This action method forwards an <a href="../UndoManager/Frameset.html#1804" target="_top"><code>undo</code></a> message to the receiver's UndoManager, asking it to reverse the latest uncommitted changes applied to objects in the object graph. <p>
+<B>See also: </B>  
+<a href="#3425"><code>redo</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="1200"></a>
+<h3> <a name="//apple_ref/java/instm/EditingContext/undoManager">undoManager</a></h3>
+public next.eo.UndoManager <code>undoManager</code>()
+
+<P>Returns the receiver's UndoManager. <p>
+<B>See also: </B>  
+<a href="#3591"><code>setUndoManager</code></a> 
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="1300"></a>
+<h3> <a name="//apple_ref/java/instm/EditingContext/updatedObjects">updatedObjects</a></h3>
+public next.util.ImmutableVector <code>updatedObjects</code>()
+
+<P>Returns the objects in the receiver's object graph that have been updated. <p>
+<B>See also: </B>  
+<code><a href="#3138"></code><code>deletedObjects</code><code></a></code>, <code><a href="#3253"></code><code>insertedObjects</code><code></a></code><em> 
+</em><p><a name="8166">
+<HR WIDTH=50% ALIGN=LEFT>
+<h2>Notifications
+</h2>
+</a>The following notifications are declared (except where otherwise noted) and posted by EditingContext. <p>
+<a name="8168"></a>
+<h3> <a name="//apple_ref/c/data/ObjectsChangedInStoreNotification">ObjectsChangedInStoreNotification</a></h3>
+<dl>
+<dt><code>Notification Object</code>	The EditingContext<dt><code>userInfo Dictionary</code><p>
+<Table Border="3">
+<caption></caption>
+<tr><th><b>Key</b>
+</th><th><b>Value</b>
+</th></tr>
+<tr><td scope="row">updated
+</td><td>A next.util.ImmutableVector of GlobalIDs for objects whose properties have changed. A 
+receiving EditingContext typically responds by refaulting the objects.
+</td></tr>
+<tr><td scope="row">inserted
+</td><td>A next.util.ImmutableVector of GlobalIDs for objects that have been inserted into the 
+ObjectStore.
+</td></tr>
+<tr><td scope="row">deleted
+</td><td>A next.util.ImmutableVector of GlobalIDs for objects that have been deleted from the 
+ObjectStore.
+</td></tr>
+<tr><td scope="row">invalidated
+</td><td>A next.util.ImmutableVector of GlobalIDs for objects that have been turned into Faults. 
+Invalidated objects are those for which the cached view can should no longer be trusted. 
+Invalidated objects should be refaulted so that they are refetched when they're next 
+examined.
+</td></tr>
+
+</Table>
+
+<Table>
+<tr><td scope="row">
+</Table>
+</dl>
+This notification is broadcast whenever <a href="../../Interfaces/Observing/Frameset.html#" target="_top"><code>objectWillChange</code></a> observer notifications are processed, which is usually as the end of the event in which the changes occurred. See the ObjectStore class specification for more information on ObjectsChangedInStoreNotification.<p>
+<hr WIDTH=25% ALIGN=LEFT>
+<a name="8177"></a>
+<h3><a name="//apple_ref/c/data/ObjectsChangedInEditingContextNotification">ObjectsChangedInEditingContextNotification</a></h3>
+<dl>
+<dt><code>Notification Object</code>	The EditingContext<dt><code>userInfo </code>Dictionary<p>
+<Table Border="3">
+<caption></caption>
+<tr><th><b>Key</b>
+</th><th><b>Value</b>
+</th></tr>
+<tr><td scope="row">updated
+</td><td>A next.util.ImmutableVector containing the changed objects
+</td></tr>
+<tr><td scope="row">deleted
+</td><td>A next.util.ImmutableVector containing the deleted objects
+</td></tr>
+<tr><td scope="row">inserted
+</td><td>A next.util.ImmutableVector containing the inserted objects
+</td></tr>
+<tr><td scope="row">invalidated
+</td><td>A next.util.ImmutableVector containing invalidated objects. 
+</td></tr>
+
+</Table>
+
+<Table>
+<tr><td scope="row">
+</Table>
+</dl>
+This notification is broadcast whenever changes are made in an EditingContext. ObjectsChangedInEditingContextNotification is similar to ObjectsChangedInStoreNotification, except that it contains objects rather than globalIDs. Interface layer display groups (Objective-C EODisplayGroups, not WebObjects next.wo.DisplayGroups) listen for this notification to redisplay their contents.<p>
+<hr WIDTH=25% ALIGN=LEFT>
+<a name="8186"></a>
+<h3><a name="//apple_ref/c/data/EditingContextDidSaveChangesNotification">EditingContextDidSaveChangesNotification</a></h3>
+<dl>
+<dt><code>Notification Object</code>	The EditingContext<dt><code>userInfo Dictionary<p>
+<Table Border="3">
+<caption></caption>
+<tr><th><b>Key</b>
+</th><th><b>Value</b>
+</th></tr>
+<tr><td scope="row">updated
+</td><td>A next.util.ImmutableVector containing the changed objects
+</td></tr>
+<tr><td scope="row">deleted
+</td><td>A next.util.ImmutableVector containing the deleted objects
+</td></tr>
+<tr><td scope="row">inserted
+</td><td>A next.util.ImmutableVector containing the inserted objects
+</td></tr>
+
+</Table>
+
+<Table>
+<tr><td>
+</Table>
+</code></dl>
+This notification is broadcast after changes are saved to the EditingContext's parent ObjectStore.<p>
+<hr WIDTH=25% ALIGN=LEFT>
+<a name="8194"></a>
+<h3><a name="//apple_ref/c/data/InvalidatedAllObjectsInStoreNotification">InvalidatedAllObjectsInStoreNotification</a></h3>
+<dl>
+<dt><code>Notification Object</code>	The EditingContext<dt><code>userInfo Dictionary</code>	None.</dl>
+This notification is broadcast whenever an EditingContext is invalidating all its objects. When an EditingContext receives this notification from its parent ObjectStore, it clears its lists of inserted, updated, and deleted objects, and resets its undo stack. Interface layer display groups (Objective-C EODisplayGroups, not WebObjects next.wo.DisplayGroups) listen for this notification to refetch their contents. See the ObjectStore class specification for more information on this notification. <p>
+<p>
+
+ 
+ 
+
+
+<i>Copyright &#169; 1998, Apple Computer, Inc.   All rights
+reserved.</i>
+
+<!-- Last updated: 01/21/98 12:28:23 -->
+
+</body>
+</html>

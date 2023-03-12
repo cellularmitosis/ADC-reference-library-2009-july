@@ -1,0 +1,222 @@
+<HTML>
+	<HEAD>
+		<meta http-equiv="content-type" content="text/html;charset=iso-8859-1">
+		<meta name="generator" content="XML_Publisher">
+		<meta name="Copyright" content="Copyright 2001 Apple Computer, Inc. All Rights Reserved.">
+        <title>Add
+Custom Code</title>
+		</HEAD>
+	<BODY bgcolor="#ffffff">
+<!-- start of header -->
+<!--#include virtual="/includes/framesetheader" -->
+<!-- end of header --> <!-- insert Show/Hide frames -->
+<script type="text/javascript" language="JavaScript"><!--
+function loadFrames(){
+if (top == self || (parent.frames[1].name != content))
+    top.location.href = 'index.html?' + location.href;
+}
+
+if (self != top) {
+  // loaded in frames
+  document.write('<a href="'+self.location+'" target="_top"><img src="../images/hideframes.gif" border="0" alt="Hide Frames"></a>');
+  }
+else {
+  // not loaded frames
+	document.write('<a href="JavaScript:loadFrames()"><img src="../images/showframes.gif" border="0" alt="Show Frames"></a>');
+}
+//--></script>
+<!-- end Show/Hide frames -->
+<a href="Prepare_App_iness_Logic.html" target="content"><img src="../images/previous.gif" border="0"></a>&nbsp;<a href="Controller_Hierarchy.html" target="content"><img src="../images/next.gif" border="0"></a>&nbsp;<!-- apple_doc:infillMarkerTop -->  
+<!-- apple_doc: pageHeadingStart --><a name = "TPXREF110"></a><a name="-636807"></a><h3><font face="Lucida Grande,Helvetica,Arial">Add
+Custom Code</font></h3><!-- apple_doc: pageHeadingEnd -->
+
+<p>You now need to add a method for the new property you added
+in Assistant. The new <code>rating</code> attribute
+in the Student entity is designed to aggregate ACT and SAT scores
+and GPAs into a numeric rating based on how each of those attributes
+is weighted. You need to add a method to perform the calculation,
+a method to invoke the calculation, and class constants to define
+the weighting.</p>
+<p>The algorithm used to calculate the rating is "sensitive"
+business logic, so it should exist only on the server side. The
+client business logic class simply invokes the concrete implementations
+of the rating methods on the server side.</p>
+<p>Add these class constants to the server-side <code>Student.java</code> file:</p>
+<pre>private static final double ACT_WEIGHT = 0.30;
+private static final double SAT_WEIGHT = 0.30;
+private static final double GPA_WEIGHT = 0.40; </pre>
+<p>Add this method to the server-side <code>Student.java</code> file:</p>
+<pre>public Number rating() {
+    float aggregate = 0;
+    float satTemp;
+    float actTemp;
+    float gpaTemp;
+        
+    if (sat() != null &amp;&amp; act() != null &amp;&amp; gpa() !=null) {
+        satTemp = sat().floatValue() / 1600;
+        actTemp = act().floatValue() / 36;
+        gpaTemp = gpa().floatValue() / 4;
+            
+        aggregate = (float)(((gpaTemp * GPA_WEIGHT) + (actTemp + ACT_WEIGHT)
+        + (satTemp + SAT_WEIGHT)) * 10);
+    }
+        
+    return (new Float(aggregate));
+ }  </pre>
+<p>Add a method called <code>clientSideRequestRating</code> in
+the server-side <code>Student.java</code> file
+that invokes the <code>rating</code> method, as shown:</p>
+<pre>public Number clientSideRequestRating() {
+        return rating();
+}</pre>
+<p>Add this code to client-side <code>Student.java</code> file
+to invoke the remote method:</p>
+<pre> public Number rating() {
+        return (Number)(invokeRemoteMethod(&quot;clientSideRequestRating&quot;, null,
+        null));
+ }</pre>
+<p>In the last section, you bound the association aspect of the
+EOTextFieldController (rating) to a method called <code>rating</code> in
+the client-side business logic class. You've just defined this method,
+so now whenever the rating property needs a value, the <code>rating</code> method
+is invoked. It's that easy&#151;Java Client handles all the communication
+between the business logic and the user interface for you.</p>
+<p>There is more going on behind the scenes, though. The <code>rating</code> in
+the client-side business logic class invokes a remote method called <code>clientSideRequestRating</code> in
+the server-side business logic class. This method in turn invokes
+a method called <code>rating</code>, which actually performs
+the calculation. </p>
+<p>Rebuild and run the application. Make a new student record
+and see how the rating field is populated upon saving as shown in  <a href="#TPXREF128">Figure 5-16</a>.</p>
+<br><table border = "0" BGCOLOR="#E6E6E6">
+
+<tr>
+<td scope="row"><b>Note: </b>Whenever <code>rating</code> is
+requested, a round trip to the server is made to perform the remote
+method invocation. To lessen network traffic, you should consider caching
+the value in the client-side enterprise object.</td>
+</tr>
+
+</table><br>
+<br><a name = "TPXREF128"></a><a name="-649684"></a><p><b><font face="Geneva,Helvetica,Arial" size="2">Figure
+5-16 The rating field in action</font></b></p>
+ <img src = "../Art/ratinginaction.gif" alt = "[image: ../Art/ratinginaction.gif]">
+
+<br><a name = "TPXREF122"></a><a name="-649695"></a><h4><font face="Lucida Grande,Helvetica,Arial">Validation</font></h4>
+<p>WebObjects provides some useful classes and methods to validate
+user input. You should validate the entered data for each of the
+three score fields. To do this, add the following code in the server-side <code>Student.java</code> class:</p>
+<pre>public Number validateSat(Number score) throws NSValidation.ValidationException {
+    if ((score.intValue() &gt; 1600) || (score.intValue() &lt; 0)) {
+        throw new NSValidation.ValidationException(&quot;Invalid SAT score.&quot;);
+    }
+    else
+        return score;
+}
+    
+public Number validateAct(Number score) throws NSValidation.ValidationException {
+    if ((score.intValue() &gt; 36) || (score.intValue() &lt; 0)) {
+        throw new NSValidation.ValidationException(&quot;Invalid ACT score.&quot;);
+    }
+    else
+        return score;        
+}
+    
+public Number validateGpa(Number score) throws NSValidation.ValidationException {
+    if ((score.floatValue() &gt; 4.0) || (score.floatValue() &lt; 0.0)) {
+        throw new NSValidation.ValidationException(&quot;Invalid GPA.&quot;);
+    }
+    else
+        return score;        
+}</pre>
+<p>The code you added is rather trivial, but it demonstrates
+a particularly powerful feature of WebObjects&#151;validation. The
+NSValidation class in the Foundation framework provides this functionality.
+By throwing an <code>NSValidation.ValidationException</code>,
+a method tells Enterprise Objects that the current object graph
+is not cleared to be saved to the database. </p>
+<p>In this case, if one of the attributes fails to validate,
+the object graph is not cleared by NSValidation and the current
+record won't be committed to the data store until a valid value
+is entered.</p>
+<p>You were instructed to put all the validation methods in the
+server-side business logic class, but this is not necessary. In
+fact, it often makes more sense to validate some values on the client.
+This reduces network traffic (there is no round-trip to the server
+to perform the validation) and increases overall application performance.
+Experiment with this by moving one of the validation methods to
+the client-side business logic class.</p>
+<p>Validation methods are of the form <code>validate</code><em>Attribute</em>.
+In this example, be sure that <code>validateGpa</code> is
+capitalized correctly&#151;<code>validateGPA</code> will
+not invoke validation on the <code>gpa</code> attribute.</p>
+<p>If you write validation methods, they are invoked in the framework
+by various classes and interfaces such as EOValidation, EODisplayGroup,
+and EOEditingContext. Validation is performed for these activities:</p>
+<ul><li>updating
+the client-side database context (<code>validateForUpdate</code>)</font></li>
+<li>saving to the database (<code>validateForSave</code>)</font></li>
+<li>deleting from the database (<code>validateForDelete</code>)</font></li>
+<li>inserting a new record (<code>validateForInsert</code>)</font></li>
+<li>updating the server-side database context (<code>validateForUpdate</code>)</font></li></ul>
+<br><a name = "TPXREF123"></a><a name="-651143"></a><h4><font face="Lucida Grande,Helvetica,Arial">Initial
+Values</font></h4>
+<p>When you create a new record, it would be nice to supply some
+default values for the fields in that record. Although none of the
+fields in the Student record really need a default value, you'll
+override <code>awakeFromInsertion</code> in order to
+learn how to give a field a default value.</p>
+<p>Add this code in the server-side <code>Student.java</code> file:</p>
+<pre>public void awakeFromInsertion(EOEditingContext context) {
+        super.awakeFromInsertion(context);
+        if (gpa() == null) {
+            setGpa(new BigDecimal(&quot;0&quot;));
+        }
+        if (sat() == null) {
+            setSat(new BigDecimal(&quot;0&quot;));
+        }
+        if (act() == null) {
+            setAct(new BigDecimal(&quot;0&quot;));
+        }
+        if (name() == null) {
+            setName(&quot;&quot;);
+        }
+ }</pre>
+<p>Build and run the application and create a new student record.
+You'll notice that some of the fields are populated in the new
+record as shown in  <a href="#TPXREF124">Figure 5-17</a>.</p>
+<br><a name = "TPXREF124"></a><a name="-646249"></a><p><b><font face="Geneva,Helvetica,Arial" size="2">Figure
+5-17 Initial values</font></b></p> <img src = "../Art/initialvalues.gif" alt = "[image: ../Art/initialvalues.gif]">
+
+<p>Also try entering some invalid data to see how the validation
+you implemented works. If you enter an invalid score, you should
+get a validation exception message when saving, as shown in  <a href="#TPXREF125">Figure 5-18</a>.</p>
+<br><a name = "TPXREF125"></a><a name="-646268"></a><p><b><font face="Geneva,Helvetica,Arial" size="2">Figure
+5-18 Validation exception message</font></b></p>
+ <img src = "../Art/validationexception.gif" alt = "[image: ../Art/validationexception.gif]">
+
+
+
+<br><br><br>
+    <!-- insert Show/Hide frames -->
+<script type="text/javascript" language="JavaScript"><!--
+function loadFrames(){
+if (top == self || (parent.frames[1].name != content))
+    top.location.href = 'index.html?' + location.href;
+}
+
+if (self != top) {
+  // loaded in frames
+  document.write('<a href="'+self.location+'" target="_top"><img src="../images/hideframes.gif" border="0" alt="Hide Frames"></a>');
+  }
+else {
+  // not loaded frames
+	document.write('<a href="JavaScript:loadFrames()"><img src="../images/showframes.gif" border="0" alt="Show Frames"></a>');
+}
+//--></script>
+<!-- end Show/Hide frames -->
+<a href="Prepare_App_iness_Logic.html" target="content"><img src="../images/previous.gif" border="0"></a>&nbsp;<a href="Controller_Hierarchy.html" target="content"><img src="../images/next.gif" border="0"></a>&nbsp;<!-- apple_doc:infillMarkerBottom --> <br><br><p><hr><font face="Geneva,Helvetica,Arial" size="2">&#169; 2002 Apple Computer, Inc. (Last Updated May 1, 2002)</font></p><!-- start of footer -->
+<!--#include virtual="/includes/framesetfooter" -->
+<!-- end of footer -->
+</body>
+</html>

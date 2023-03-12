@@ -1,0 +1,198 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+<head>
+	<title>Application Architecture Overview: Graceful Application Termination</title>
+	<meta id="Generator" name="Generator" content="Gutenberg"/>
+	<meta id="GeneratorVersion" name="GeneratorVersion" content="v132"/>
+	<meta http-equiv="content-type" content="text/html;charset=utf-8"/>
+	<meta id="Copyright" name="Copyright" content="Copyright 2009 Apple Inc. All Rights Reserved."/>
+	<meta id="IndexTitle" name="IndexTitle" content="Graceful Application Termination"/>
+	<meta id="xcode-display" name="xcode-display" content="render"/>
+	<meta id="toc-file" name="toc-file" content="../toc.html"/>
+	<meta id="RESOURCES" content="../../../../Resources" />
+	
+	<link rel="stylesheet" type="text/css" href="../../../../Resources/CSS/frameset_styles.css"/>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/lib/prototype.js"></script>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/lib/scriptaculous.js"></script>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/page.js"></script>
+	<script language="JavaScript" type="text/javascript" src="../../../../Resources/JavaScript/pedia.js"></script>
+	<!--[if lte IE 6]>
+		<style type="text/css">
+			/*<![CDATA[*/ 
+			html {overflow-x:auto; overflow-y:hidden;  }
+			/*]]>*/
+		</style>
+	<![endif]-->
+</head>
+<body bgcolor="#ffffff" onload="initialize_page();"><a name="//apple_ref/doc/uid/20001280" title="Graceful Application Termination"></a>
+    <noscript>
+    <div id="tocMenu">
+        <iframe id="toc_content" name="toc_content" SRC="../toc.html" width="210" height="100%" align="left" frameborder="0">This document set is best viewed in a browser that supports iFrames.</iframe>
+    </div>
+    </noscript>
+    <div id="bodyText">
+        <a name="top"></a>
+        <div class="hideOnPrint hideInXcode">
+        <!-- start of header -->
+        <!--#include virtual="/includes/framesetheader" -->
+        <!-- end of header -->
+        </div>
+        
+        <!-- start of path -->
+<div class="breadcrumb hideOnPrint hideInXcode"><a href="http://developer.apple.com/" target="_top">ADC Home</a> &gt; <a href="../../../../../referencelibrary/index.html#//apple_ref/doc/uid/TP30000943" target="_top">Reference Library</a> &gt; <a href="../../../../index.html#//apple_ref/doc/uid/TP30000440" target="_top">Guides</a> &gt; <a href="../../../index.html#//apple_ref/doc/uid/TP30000440-TP30000416" target="_top">Cocoa</a> &gt; <a href="../../../DesignGuidelines-date.html#//apple_ref/doc/uid/TP30000440-TP30000416-TP30000556" target="_top">Design Guidelines</a> &gt; <a href="../index.html" target="_top">Application Architecture Overview</a> &gt; </div><br class="hideInXcode"/><!-- end of path -->
+        
+        <div class="mini_nav_text" align="left">
+        <span class="navButtons">
+        <a href="../Concepts/Undo.html">&lt; Previous Page</a><span style="margin-left: 8px"><a href="../RevisionHistory.html">Next Page &gt;</a></span>
+        </span>
+        <span id="showHideTOCUpperSpan">
+        <a href="#" onclick="showHideTOC();"><img src="../../../../Resources/Images/show_toc_icon.gif" width="15" height="14" border="0" style="margin-bottom: -2px;" alt="" hideText="Hide TOC" showText="Show TOC" /></a> <a href="#" onclick="showHideTOC();">Hide TOC</a>
+        </span>
+        </div>
+        
+        
+        <a name="//apple_ref/doc/uid/20001280-SW1" title="Graceful Application Termination"></a><hr /><H1>Graceful Application Termination</H1>
+
+<p>When a user quits an application (by choosing the Quit command or pressing Command–Q) or when a user logs out, restarts, or shuts down the system, an application should do whatever is necessary to terminate itself gracefully. It should ensure that all data associated with the application and its documents is properly saved, all state (such as user preferences) is stored, and that all necessary clean-up takes place. What graceful termination entails depends on the type of application. For example, an application with multiple documents to save must do a lot more than a simple document-less application that needs only to free allocated resources.</p>
+<p>In Cocoa, all raw events requiring application termination result in the invocation of the <code>NSApplication</code> delegation method <code>applicationShouldTerminate:</code>. If the delegate does not implement this method, the application is terminated regardless of any unsaved documents. Moreover, quitting, logging out, restarting, or shutting down does <em>not</em> automatically lead to the invocation of the <code>NSWindow</code> delegation method <code>windowShouldClose:</code> in any of the application’s windows. This method is immediately invoked when users click the close box or choose the Close command. It is typically the place the window’s (NSWindow) delegate displays a sheet asking users if they want to save any data associated with the window. To gracefully terminate your application (assuming it has data to save) you must ensure that <code>windowShouldClose:</code> is invoked for each of your windows, or that the behavior commonly implemented in this method occurs elsewhere in your application.</p>
+<p>An application that gracefully terminates can be one of several kinds:</p>
+<ul class="ul"><li class="li"><p>multi-document applications based on Cocoa’s document architecture</p></li>
+<li class="li"><p>multi-document applications not based on the document architecture</p></li>
+<li class="li"><p>single-document applications</p></li>
+<li class="li"><p>applications that need to save state and do any clean-up tasks not handled by the application itself</p></li></ul>
+<p>The procedure differs for each of these kinds of application. The following discussion focuses primarily on the second type of application— multi-document applications that are not based on the document architecture—because the procedure is most comprehensive. The code examples used to illustrate the procedure come from the Text Edit example application located at <code>/Developer/Examples/AppKit/TextEdit/</code>.</p>
+
+<!-- This template is being used for both PDF and HTML. -->
+
+    
+    <!-- TopicBook.pm uses this template for its miniTOCs, but needs a different title. -->
+    <h4>Contents:</h4>
+    
+    
+    <p class="blockquote">
+    
+        
+			
+			
+				<a href="GracefulAppTermination.html#//apple_ref/doc/uid/20001280-1001842-BBCIAJFA">Applications Based on the Document Architecture</a>
+				
+			<br/>
+			
+        
+			
+			
+				<a href="GracefulAppTermination.html#//apple_ref/doc/uid/20001280-1001887">Summary of Document-Saving Procedure</a>
+				
+			<br/>
+			
+        
+			
+			
+				<a href="GracefulAppTermination.html#//apple_ref/doc/uid/20001280-1001961-BBCEFGFG">An Example: Text Edit</a>
+				
+			<br/>
+			
+        
+			
+			
+				<a href="GracefulAppTermination.html#//apple_ref/doc/uid/20001280-1002469">Cleaning Up</a>
+				
+			<br/>
+			
+        
+
+    </p><br/>
+
+<a name="//apple_ref/doc/uid/20001280-1001842" title="Applications Based on the Document Architecture"></a><a name="//apple_ref/doc/uid/20001280-1001842-BBCIAJFA" title="Applications Based on the Document Architecture"></a><h2>Applications Based on the Document Architecture</h2>
+<p>If your multi-document application uses Cocoa’s document architecture—that is, the constellation of <code>NSDocument</code>, <code>NSWindowController</code>, and <code>NSDocumentController</code> objects, along with their delegates—the good news is that you have to do absolutely nothing to effect a graceful termination of the application. This “free” behavior is implemented largely in <code>NSDocumentController</code>.</p>
+<p>In case you don’t use the default <code>NSDocumentController</code> object, or want to create a subclass of it, you may need to know more about how the <code>NSDocumentController</code> class gracefully terminates execution; here is a summary:</p>
+<ol class="ol"><li class="li"><p>In <code>applicationShouldTerminate:</code>, if there are multiple unsaved documents, <code>NSDocumentController</code> calls a method with an impossibly long name: <code>reviewUnsavedDocumentsWithAlertTitle:cancellable:delegate:didReviewAllSelector:contextInfo:</code>. This method displays an alert dialog containing buttons for reviewing unsaved documents, quitting despite unsaved documents, and canceling the impending save operation.</p></li>
+<li class="li"><p>If the user chooses to cancel, <code>NSDocumentController</code> simply returns <code><a href="../../../Reference/ApplicationKit/Classes/NSApplication_Class/Reference/Reference.html#//apple_ref/doc/c_ref/NSTerminateCancel" target="_top">NSTerminateCancel</a></code>.</p></li>
+<li class="li"><p>If the user chooses to quit without saving or if there are no documents to save, the method identified by the <code>didReviewAllSelector</code> selector is invoked with a parameter of <code>YES</code>, allowing the specified delegate to do whatever is necessary before terminating.</p></li>
+<li class="li"><p>If the user chooses to review unsaved documents, <code>NSDocumentController</code> calls <code>closeAllDocumentsWithDelegate:didCloseAllSelector:contextInfo:</code>. This method simply displays a sheet, in order, for each of the windows with unsaved document data.</p></li></ol>
+<p>For more information on Cocoa’s document architecture, see the programming topic <em><a href="../../Documents/index.html#//apple_ref/doc/uid/10000006i" target="_top">Document-Based Applications Overview</a></em>.</p>
+<a name="//apple_ref/doc/uid/20001280-1001887" title="Summary of Document-Saving Procedure"></a><h2>Summary of Document-Saving Procedure</h2>
+<p>A multi-document application that is not based on Cocoa’s document architecture has to do much more of the termination work itself. This work is similar to what <code>NSDocumentController</code> does, as described in <span class="content_text"><a href="GracefulAppTermination.html#//apple_ref/doc/uid/20001280-1001842">“Applications Based on the Document Architecture.”</a></span> In summary, the steps are the following:</p>
+<ol class="ol"><li class="li"><p>The application delegate should implement <code>applicationShouldTerminate:</code> to handle any request to quit the application or log out, restart, or shut down the system.</p></li>
+<li class="li"><p>In <code>applicationShouldTerminate:</code> the delegate should get an array of the application’s windows and determine if any associated documents have unsaved data.</p></li>
+<li class="li"><p>If there are unsaved documents, the delegate displays an alert dialog asking the user if he or she wants to save the documents before quitting, discard any changes (and quit), or cancel the operation.</p><p>Of course, if there are no unsaved documents, the delegate should return <code>NSTerminateNow</code>, which tells the application object to proceed with termination (closing all windows, and so on).</p></li>
+<li class="li"><p>If users want to review changes and save document data, the application delegate should, in <code>applicationShouldTerminate:</code>, initiate the window-save procedure and return <code>NSTerminateLater</code>. Otherwise, it should return <code>NSTerminateNow</code> or <code>NSTerminateCancel</code>, as appropriate.</p></li>
+<li class="li"><p>In a window-save routine, each window with unsaved data should display a sheet asking users if they wish to save the document, close the window without saving, or cancel the operation. Each window should display its sheet in an orderly sequence, not all at once, and should respond appropriately to the user’s choice.</p><p>Because the goals are the same (saving document data), the code used for this purpose can be the same code that is executed when the user closes the window (typically invoked by the window’s delegate in <code>windowShouldClose:</code>).</p></li>
+<li class="li"><p>After all document data has been saved (or when users choose “close without saving”), send <code>replyToApplicationShouldTerminate:</code> to the application object (<code><a href="../../../Reference/ApplicationKit/Classes/NSApplication_Class/Reference/Reference.html#//apple_ref/doc/c_ref/NSApp" target="_top">NSApp</a></code>) with an argument of <code>YES</code>. </p><p>If the user is logging out, or is restarting or shutting down the system, You need to send <code>replyToApplicationShouldTerminate:</code> within two minutes after returning <code>NSTerminateLater</code> in <code>applicationShouldTerminate:</code> or the procedure will time out.</p></li>
+<li class="li"><p>When the application object gets the go-ahead for termination, it closes any open window (among other things). This results in the invocation of the <code>NSWindow</code> delegation method <code>windowWillClose:</code> in which the delegate can perform any necessary tasks (clean-up, for example) related to the window.</p></li>
+<li class="li"><p>Just before the application ceases execution, the application delegate method <code>applicationWillTerminate:</code> is invoked; here the delegate can perform any tasks related to the application itself, such as writing out application preferences.</p></li></ol>
+<p>The following section, <span class="content_text">“An Example: Text Edit,”</span> illustrates the procedure outlined above and points out details of implementation.</p>
+<a name="//apple_ref/doc/uid/20001280-1001961" title="An Example: Text Edit"></a><a name="//apple_ref/doc/uid/20001280-1001961-BBCEFGFG" title="An Example: Text Edit"></a><h2>An Example: Text Edit</h2>
+<p>When you install the Developer package for Mac OS X, the Text Edit application, which is included in a standard user installation of Mac OS X, is also included as an example Cocoa Application project (<code>/Developer/Examples/AppKit/TextEdit/</code>). Even though Text Edit is a multi-document application it does not (currently, at least) make use of the document architecture. Given this, how it handles graceful application termination is instructive.</p>
+<p><span class="content_text">Listing 1</span> shows how Text Edit’s application delegate—which is its application controller object (<code>Controller.m</code>)—implements <code>applicationShouldTerminate:</code>. </p>
+<a name="//apple_ref/doc/uid/20001280-1004541-BCIFJGDF" title="Listing 1Implementing applicationShouldTerminate:"></a><p class="codesample"><a name="//apple_ref/doc/uid/20001280-1004541" title="Listing 1Implementing applicationShouldTerminate:"></a><strong>Listing 1&nbsp;&nbsp;</strong>Implementing applicationShouldTerminate:</p>
+<div class="codesample"><table><tr><td scope="row"><pre>- (NSApplicationTerminateReply)applicationShouldTerminate:(NSApplication *)app {<span></span></pre></td></tr><tr><td scope="row"><pre>    NSArray *windows = [app windows];<span></span></pre></td></tr><tr><td scope="row"><pre>    unsigned count = [windows count];<span></span></pre></td></tr><tr><td scope="row"><pre>    unsigned needsSaving = 0;<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>    // Determine if there are any unsaved documents...<span></span></pre></td></tr><tr><td scope="row"><pre>    while (count--) {<span></span></pre></td></tr><tr><td scope="row"><pre>        NSWindow *window = [windows objectAtIndex:count];<span></span></pre></td></tr><tr><td scope="row"><pre>        Document *document = [Document documentForWindow:window];<span></span></pre></td></tr><tr><td scope="row"><pre>        if (document &amp;&amp; [document isDocumentEdited]) needsSaving++;<span></span></pre></td></tr><tr><td scope="row"><pre>    }<span></span></pre></td></tr><tr><td scope="row"><pre>    if (needsSaving > 0) {<span></span></pre></td></tr><tr><td scope="row"><pre>        int choice = NSAlertDefaultReturn;  // Meaning, review changes<span></span></pre></td></tr><tr><td scope="row"><pre>    if (needsSaving > 1) { // If we only have 1 unsaved document,<span></span></pre></td></tr><tr><td scope="row"><pre>                          // we skip the "review changes?" panel<span></span></pre></td></tr><tr><td scope="row"><pre>            NSString *title = [NSString stringWithFormat:<span></span></pre></td></tr><tr><td scope="row"><pre>                NSLocalizedString(@"You have %d documents with unsaved<span></span></pre></td></tr><tr><td scope="row"><pre>                changes. Do you want to review these changes before<span></span></pre></td></tr><tr><td scope="row"><pre>                quitting?", @"Title of alert panel which comes up when user<span></span></pre></td></tr><tr><td scope="row"><pre>                chooses Quit and there are multiple unsaved documents."),<span></span></pre></td></tr><tr><td scope="row"><pre>                needsSaving];<span></span></pre></td></tr><tr><td scope="row"><pre>        choice = NSRunAlertPanel(title,<span></span></pre></td></tr><tr><td scope="row"><pre>            NSLocalizedString(@"If you don't review your documents, all<span></span></pre></td></tr><tr><td scope="row"><pre>                changes will be lost.", @"Warning in the alert panel which<span></span></pre></td></tr><tr><td scope="row"><pre>                comes up when user chooses Quit and there are unsaved<span></span></pre></td></tr><tr><td scope="row"><pre>                documents."),<span></span></pre></td></tr><tr><td scope="row"><pre>            NSLocalizedString(@"Review Changes...", @"Choice (on a button)<span></span></pre></td></tr><tr><td scope="row"><pre>                given to user which allows him/her to review all unsaved<span></span></pre></td></tr><tr><td scope="row"><pre>                documents if he/she quits the application without saving<span></span></pre></td></tr><tr><td scope="row"><pre>                them all first."),<span></span></pre></td></tr><tr><td scope="row"><pre>            NSLocalizedString(@"Discard Changes", @"Choice (on a button)<span></span></pre></td></tr><tr><td scope="row"><pre>                given to user which allows him/her to quit the application<span></span></pre></td></tr><tr><td scope="row"><pre>                even though there are unsaved documents."),<span></span></pre></td></tr><tr><td scope="row"><pre>            NSLocalizedString(@"Cancel", @"Button choice allowing user to<span></span></pre></td></tr><tr><td scope="row"><pre>                cancel."));<span></span></pre></td></tr><tr><td scope="row"><pre>            if (choice == NSAlertOtherReturn) return NSTerminateCancel; /* Cancel */<span></span></pre></td></tr><tr><td scope="row"><pre>        }<span></span></pre></td></tr><tr><td scope="row"><pre>        if (choice == NSAlertDefaultReturn) { /* Review unsaved; Quit Anyway falls through */<span></span></pre></td></tr><tr><td scope="row"><pre>            [Document reviewChangesAndQuitEnumeration:YES];<span></span></pre></td></tr><tr><td scope="row"><pre>            return NSTerminateLater;<span></span></pre></td></tr><tr><td scope="row"><pre>        }<span></span></pre></td></tr><tr><td scope="row"><pre>    }<span></span></pre></td></tr><tr><td scope="row"><pre>    return NSTerminateNow;<span></span></pre></td></tr><tr><td scope="row"><pre>}<span></span></pre></td></tr></table></div>
+<p>In this method, the delegate obtains the application object’s array of windows and queries the document associated with each for its edited (or “dirty”) status. If there are no dirty documents, it returns <code>NSTerminateNow</code>. If there are multiple dirty documents, it displays a dialog asking the user if he or she wants to review changes, discard changes, or cancel the operation. Based on the user’s response, the delegate returns an appropriate constant: <code>NSTerminateLater</code>, <code>NSTerminateNow</code>, or <code>NSTerminateCancel</code>. If the user wants to review the windows and their documents, or if there is only one window with a dirty document, the delegate sends the <code>reviewChangesAndQuitEnumeration:</code> message to the Document class before returning the <code>NSTerminateLater</code> constant. </p>
+<p>The <code>reviewChangesAndQuitEnumeration:</code> cycles through the applications windows and, for each window with unsaved document data, it calls <code>askToSave:</code> to have the window’s “do you want to save?” sheet displayed. What’s important is that it does this in a controlled sequence (instead of having all windows with their alert sheets displayed at the same time). <span class="content_text">Listing 2</span> illustrates how Text Edit (in its Document class) implements this class method.</p>
+<a name="//apple_ref/doc/uid/20001280-1004796-BCIDCFJA" title="Listing 2Recursively reviewing document changes"></a><p class="codesample"><a name="//apple_ref/doc/uid/20001280-1004796" title="Listing 2Recursively reviewing document changes"></a><strong>Listing 2&nbsp;&nbsp;</strong>Recursively reviewing document changes</p>
+<div class="codesample"><table><tr><td scope="row"><pre>+ (void)reviewChangesAndQuitEnumeration:(BOOL)cont {<span></span></pre></td></tr><tr><td scope="row"><pre>    if (cont) {<span></span></pre></td></tr><tr><td scope="row"><pre>        NSArray *windows = [NSApp windows];<span></span></pre></td></tr><tr><td scope="row"><pre>        unsigned count = [windows count];<span></span></pre></td></tr><tr><td scope="row"><pre>        while (count--) {<span></span></pre></td></tr><tr><td scope="row"><pre>            NSWindow *window = [windows objectAtIndex:count];<span></span></pre></td></tr><tr><td scope="row"><pre>            Document *document = [Document documentForWindow:window];<span></span></pre></td></tr><tr><td scope="row"><pre>            if (document) {<span></span></pre></td></tr><tr><td scope="row"><pre>                if ([document isDocumentEdited]) {<span></span></pre></td></tr><tr><td scope="row"><pre>                    [document askToSave:@selector(reviewChangesAndQuitEnumeration:)];<span></span></pre></td></tr><tr><td scope="row"><pre>                    return;<span></span></pre></td></tr><tr><td scope="row"><pre>                }<span></span></pre></td></tr><tr><td scope="row"><pre>            }<span></span></pre></td></tr><tr><td scope="row"><pre>        }<span></span></pre></td></tr><tr><td scope="row"><pre>    }<span></span></pre></td></tr><tr><td scope="row"><pre>    [NSApp replyToApplicationShouldTerminate:cont];<span></span></pre></td></tr><tr><td scope="row"><pre>}<span></span></pre></td></tr></table></div>
+<p>Text Edit accomplishes the orderly sequencing of window alert sheets by having <code>reviewChangesAndQuitEnumeration:</code> invoked recursively (as will be shown). The flag passed into the method (<em>cont</em>), if <code>NO</code>, signals that the user has canceled the termination; if <code>YES</code>, the method processes the next unsaved document. When there are no more documents to review, or if <em>cont</em> is <code>NO</code>, <code>replyToApplicationShouldTerminate:</code> is sent to the application object with the appropriate flag.</p>
+<p>The value passed into <code>askToSave:</code> is a selector, in this case identifying the <code>reviewChangesAndQuitEnumeration:</code> method. As shown in <span class="content_text">Listing 3</span>, Text Edit simply implements <code>askToSave:</code> to make the current document window visible and key and call the <code>NSBeginAlertSheet</code> function, which displays the alert sheet asking if the user wants to save the document before closing the window. Note that it passes the selector into this function as the context-information parameter. </p>
+<a name="//apple_ref/doc/uid/20001280-1004801-BCIJEIGF" title="Listing 3Displaying and handling a sheet for saving a document"></a><p class="codesample"><a name="//apple_ref/doc/uid/20001280-1004801" title="Listing 3Displaying and handling a sheet for saving a document"></a><strong>Listing 3&nbsp;&nbsp;</strong>Displaying and handling a sheet for saving a document</p>
+<div class="codesample"><table><tr><td scope="row"><pre>- (void)askToSave:(SEL)callback {<span></span></pre></td></tr><tr><td scope="row"><pre>    [[self window] makeKeyAndOrderFront:nil];<span></span></pre></td></tr><tr><td scope="row"><pre>    NSBeginAlertSheet(NSLocalizedString(@"Do you want to save changes<span></span></pre></td></tr><tr><td scope="row"><pre>        to this document before closing?", @"Title in the alert panel when<span></span></pre></td></tr><tr><td scope="row"><pre>        the user tries to close a window containing an unsaved document."),<span></span></pre></td></tr><tr><td scope="row"><pre>        NSLocalizedString(@"Save",<span></span></pre></td></tr><tr><td scope="row"><pre>        @"Button choice which allows the user to save the document."),<span></span></pre></td></tr><tr><td scope="row"><pre>        NSLocalizedString(@"Don't Save",<span></span></pre></td></tr><tr><td scope="row"><pre>        @"Button choice which allows the user to abort the save of a<span></span></pre></td></tr><tr><td scope="row"><pre>        document which is being closed."),<span></span></pre></td></tr><tr><td scope="row"><pre>        NSLocalizedString(@"Cancel",<span></span></pre></td></tr><tr><td scope="row"><pre>        @"Button choice allowing user to cancel."),<span></span></pre></td></tr><tr><td scope="row"><pre>         [self window], self,<span></span></pre></td></tr><tr><td scope="row"><pre>        @selector(willEndCloseSheet:returnCode:contextInfo:),<span></span></pre></td></tr><tr><td scope="row"><pre>        @selector(didEndCloseSheet:returnCode:contextInfo:),<span></span></pre></td></tr><tr><td scope="row"><pre>        (void *)callback,<span></span></pre></td></tr><tr><td scope="row"><pre>        NSLocalizedString(@"If you don't save, your changes will be lost.",<span></span></pre></td></tr><tr><td scope="row"><pre>        @"Subtitle in the alert panel when the user tries to close a<span></span></pre></td></tr><tr><td scope="row"><pre>        window containing an unsaved document."));<span></span></pre></td></tr><tr><td scope="row"><pre>}<span></span></pre></td></tr></table></div>
+<p>The Cocoa API for sheets specifies two callback methods that are potentially invoked in the modal delegate as a result of the <code>NSBeginAlertSheet</code> call. The first, called the did-end method, is invoked after the user clicks a button in the alert sheet but before the sheet is dismissed; the second, called the did-dismiss method, is invoked after the sheet is dismissed. The function parameters identifying them are selectors. The methods must conform to a certain signature. (See the programming topic <em><a href="../../Sheets/index.html#//apple_ref/doc/uid/10000002i" target="_top">Sheet Programming Topics for Cocoa</a></em> for further information.)</p>
+<p>The <code>askToSave:</code> implementation makes use of both callback methods. For the <em>contextInfo</em> parameter of <code>NSBeginAlertSheet</code> it passes the selector passed it, which in this case identifies the class method <code>reviewChangesAndQuitEnumeration:</code>. Then, for the modal delegate (<code>self</code>), it implements (as shown in <span class="content_text">Listing 4</span>) the did-end callback method <code>willEndCloseSheet:returnCode:contextInfo:</code> and the did-dismiss method <code>didEndCloseSheet:returnCode:contextInfo:</code>.</p>
+<a name="//apple_ref/doc/uid/20001280-1004806-BCIDHEDG" title="Listing 4Callback methods for NSBeginAlertSheet"></a><p class="codesample"><a name="//apple_ref/doc/uid/20001280-1004806" title="Listing 4Callback methods for NSBeginAlertSheet"></a><strong>Listing 4&nbsp;&nbsp;</strong>Callback methods for NSBeginAlertSheet</p>
+<div class="codesample"><table><tr><td scope="row"><pre>- (void)willEndCloseSheet:(NSWindow *)sheet returnCode:(int)returnCode contextInfo:(void *)contextInfo {<span></span></pre></td></tr><tr><td scope="row"><pre>    if (returnCode == NSAlertAlternateReturn) {     /* "Don't Save" */<span></span></pre></td></tr><tr><td scope="row"><pre>        [[self window] close];<span></span></pre></td></tr><tr><td scope="row"><pre>        if (contextInfo) ((void (*)(id, SEL, BOOL))objc_msgSend)([self class], (SEL)contextInfo, YES);         // Send callback (YES means continue save<span></span></pre></td></tr><tr><td scope="row"><pre>    }<span></span></pre></td></tr><tr><td scope="row"><pre>}<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>- (void)didEndCloseSheet:(NSWindow *)sheet returnCode:(int)returnCode contextInfo:(void *)contextInfo {<span></span></pre></td></tr><tr><td scope="row"><pre>    if (returnCode == NSAlertDefaultReturn) {       /* "Save" */<span></span></pre></td></tr><tr><td scope="row"><pre>        [self saveDocument:NO rememberName:YES shouldClose:YES whenDone:(SEL)contextInfo];<span></span></pre></td></tr><tr><td scope="row"><pre>    } else if (returnCode == NSAlertOtherReturn) {  /* "Cancel" */<span></span></pre></td></tr><tr><td scope="row"><pre>        if (contextInfo) ((void (*)(id, SEL, BOOL))objc_msgSend)([self class], (SEL)contextInfo, NO);          // Send callback indicating save cancel<span></span></pre></td></tr><tr><td scope="row"><pre>    }<span></span></pre></td></tr><tr><td scope="row"><pre>}<span></span></pre></td></tr></table></div>
+<p>Text Edit implements the <code>willEndCloseSheet:returnCode:contextInfo:</code> method for the case where the user want to close the window regardless of unsaved data. In this case, it wants the preferred user experience of the window closing before the sheet slides back up “under” the title bar. Note what this callback method does after it closes the window. Using the Objective-C runtime function <code>objc_msgSend</code>, <code>willEndCloseSheet:returnCode:contextInfo:</code> sends the message identified by the passed-in selector, <code>reviewChangesAndQuitEnumeration:</code>, to the Document class with a parameter of <code>YES</code>, thus causing the display of the next window’s alert sheet.</p>
+<p>The <code>didEndCloseSheet:returnCode:contextInfo:</code> handles the remaining button-identifying constants potentially sent by the <code>NSBeginAlertSheet</code> function. If the user clicks the button to save the window’s document, it invokes a method that not only saves the document (displaying the save browser, if necessary), but afterwards closes the window and calls <code>reviewChangesAndQuitEnumeration:</code> with a parameter of <code>YES</code>. (This detail is not shown.) If the user wants to cancel the termination operation, <code>didEndCloseSheet:returnCode:contextInfo:</code> uses the <code>objc_msgSend</code> function to send <code>reviewChangesAndQuitEnumeration:</code> to the Document class, this time with a parameter of <code>NO</code>.</p>
+<p>Text Edit ties in the relevant portions of its application-termination code with the code that is invoked when users explicitly close a window. The delegate for a document window implements <code>windowShouldClose:</code> in a way that results in the invocation of <code>askToSave:</code> if the document has unsaved data. This time <code>NULL</code> is passed instead of a selector, so <code>reviewChangesAndQuitEnumeration:</code> is invoked only once. <span class="content_text">Listing 5</span> illustrates how Text Edit does this.</p>
+<a name="//apple_ref/doc/uid/20001280-1004811-BCIFBHJJ" title="Listing 5Handling the explicit closing of a window"></a><p class="codesample"><a name="//apple_ref/doc/uid/20001280-1004811" title="Listing 5Handling the explicit closing of a window"></a><strong>Listing 5&nbsp;&nbsp;</strong>Handling the explicit closing of a window</p>
+<div class="codesample"><table><tr><td scope="row"><pre>- (BOOL)windowShouldClose:(id)sender {<span></span></pre></td></tr><tr><td scope="row"><pre>    return [self canCloseDocument];<span></span></pre></td></tr><tr><td scope="row"><pre>}<span></span></pre></td></tr><tr><td scope="row"><pre> <span></span></pre></td></tr><tr><td scope="row"><pre>- (BOOL)canCloseDocument {<span></span></pre></td></tr><tr><td scope="row"><pre>    if (isDocumentEdited) {<span></span></pre></td></tr><tr><td scope="row"><pre>        [self askToSave:NULL];<span></span></pre></td></tr><tr><td scope="row"><pre>        return NO;<span></span></pre></td></tr><tr><td scope="row"><pre>    }<span></span></pre></td></tr><tr><td scope="row"><pre>    return YES;<span></span></pre></td></tr><tr><td scope="row"><pre>}<span></span></pre></td></tr></table></div>
+<a name="//apple_ref/doc/uid/20001280-1002469" title="Cleaning Up"></a><h2>Cleaning Up</h2>
+<p>In terminating your application gracefully, there is really not much you typically need to do after saving document data. The objects that comprise an application generally take care of freeing used objects and allocated resources. There are a couple exceptions to this. One is to make sure that objects such as windows with external references have those references removed. One such case is a delegate. In Text Edit’s <code>windowWillClose:</code> method (which is invoked right after <code>windowShouldClose:</code>), the delegate of the window removes itself as a reference on the window (<span class="content_text">Listing 6</span>). </p>
+<a name="//apple_ref/doc/uid/20001280-1007103-BAJGBHCB" title="Listing 6Removing a reference in windowWillClose:"></a><p class="codesample"><a name="//apple_ref/doc/uid/20001280-1007103" title="Listing 6Removing a reference in windowWillClose:"></a><strong>Listing 6&nbsp;&nbsp;</strong>Removing a reference in windowWillClose:</p>
+<div class="codesample"><table><tr><td scope="row"><pre>- (void)windowWillClose:(NSNotification *)notification {<span></span></pre></td></tr><tr><td scope="row"><pre>    NSWindow *window = [self window];<span></span></pre></td></tr><tr><td scope="row"><pre>    [window setDelegate:nil];<span></span></pre></td></tr><tr><td scope="row"><pre>    [self release];<span></span></pre></td></tr><tr><td scope="row"><pre>}<span></span></pre></td></tr></table></div>
+<p>Another case where final tidying up might be necessary is when you need to save persistent data. User preferences are one such case, and <code>applicationWillTerminate:</code> is an ideal place to save them. <span class="content_text">Listing 7</span> illustrates how Text Edit makes use of <code>applicationWillTerminate:</code>.</p>
+<a name="//apple_ref/doc/uid/20001280-1007098-BAJJIIJI" title="Listing 7Saving user preferences in applicationWillTerminate:"></a><p class="codesample"><a name="//apple_ref/doc/uid/20001280-1007098" title="Listing 7Saving user preferences in applicationWillTerminate:"></a><strong>Listing 7&nbsp;&nbsp;</strong>Saving user preferences in applicationWillTerminate:</p>
+<div class="codesample"><table><tr><td scope="row"><pre>- (void)applicationWillTerminate:(NSNotification *)notification {<span></span></pre></td></tr><tr><td scope="row"><pre>    [Preferences saveDefaults];<span></span></pre></td></tr><tr><td scope="row"><pre>}<span></span></pre></td></tr></table></div>
+
+        <br/><br/> 
+
+        <div class="mini_nav_text" align="left">
+        <span class="navButtons">
+        <a href="../Concepts/Undo.html">&lt; Previous Page</a><span style="margin-left: 8px"><a href="../RevisionHistory.html">Next Page &gt;</a></span>
+        </span>
+        <span id="showHideTOCLowerSpan">
+        <a href="#" onclick="showHideTOC();"><img src="../../../../Resources/Images/show_toc_icon.gif" width="15" height="14" border="0" style="margin-bottom: -2px;" alt="" /></a> <a href="#" onclick="showHideTOC();">Hide TOC</a>
+        </span>
+        </div>
+
+        <br/><hr /><div align="center"><p class="content_text" lang="en" dir="ltr"> <!--#if expr="0=1" -->&#x00a9; 2001, 2006 Apple Computer, Inc. All Rights Reserved. &#40;<!--#endif -->Last updated: 2006-08-07<!--#if expr="0=1" -->&#041;<!--#endif --></p></div>
+
+        
+        <div class="hideOnPrint hideInXcode">
+        <!-- start of footer -->
+        	<table width="100%" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/documentation/Cocoa/Conceptual/AppArchitecture/Tasks/GracefulAppTermination.html%3Fid%3D10000005i-2.4&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/documentation/Cocoa/Conceptual/AppArchitecture/Tasks/GracefulAppTermination.html%3Fid%3D10000005i-2.4&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/documentation/Cocoa/Conceptual/AppArchitecture/Tasks/GracefulAppTermination.html%3Fid%3D10000005i-2.4&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+
+        <!--#include virtual="/includes/framesetfooter" -->
+        <!-- end of footer -->
+        </div>
+    </div>
+</body>
+</html>

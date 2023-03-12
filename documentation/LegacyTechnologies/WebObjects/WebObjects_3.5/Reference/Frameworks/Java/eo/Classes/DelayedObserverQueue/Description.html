@@ -1,0 +1,150 @@
+<html><head><title></title></head>
+<body bgcolor="#ffffff">
+ 
+ 
+<h1>
+<FONT COLOR="#000066">
+<a name="816">
+ <a name="//apple_ref/java/cl/DelayedObserverQueue">DelayedObserverQueue</a>
+</a>
+</FONT>
+</h1>
+<p><B>Extends:</B><BR>  
+next.util.NextObject
+
+<p><a name="826"></a>
+<a name="description"></a>
+<H2>Class Description
+</H2>
+DelayedObserverQueue collects change notifications for observers of multiple objects and notifies them of the changes <em>en masse</em> during the application's run loop, according to their individual priorities. This style of notification is particularly useful for coalescing and prioritizing multiple changes; the interface layer's association classes use it extensively to update OpenStep user interfaces, for example. Instead of being told that an object will change, a DelayedObserver is told that it did change, with a <a href="../DelayedObserver/Frameset.html#882" target="_top"><code>subjectChanged</code></a> message, as described in the DelayedObserver class specification. Delayed observation is thus not useful for comparing old and new states, but only for examining the new state. Delayed observation also isn't ordinarily be used outside the scope of an OpenStep application (in a command line tool or WebObjects application, for example).<p>
+The motivation for a delayed change notification mechanism arises mainly from issues in observing multiple objects. Any single change to an observed object typically requires the observer to update some state or perform an action. When many such objects change, it makes no sense to recalculate the new state and perform the action for each object. DelayedObserverQueue allows these changes to be collected into a single notification. It further orders change notifications according to priorities, allowing observers to be updated in sequence according to dependencies among them. For example, a MasterDetailAssociation, which must update its detail DisplayGroup according to the selection in the master <em>before</em> any redisplay occurs, has an earlier priority than the default for Associations. This prevents regular Associations from redisplaying old values and then displaying the new values after the MasterDetailAssociation updates.<p>
+<h3>
+<a name="1320">
+ Enqueuing a Delayed Observer
+</a>
+</h3>
+The <a href="#860"><code>enqueueObserver</code></a> method records a DelayedObserver for later change notification. However, enqueuing is usually performed automatically by a DelayedObserver in its <a href="../DelayedObserver/Frameset.html#1243" target="_top"><code>objectWillChange</code></a> method. Hence, it's typically enough that an object being observed invokes <a href="../../Interfaces/EnterpriseObject/Frameset.html#" target="_top"><code>willChange</code></a> as needed.<p>
+Although you can create individual DelayedObserverQueues, you typically use the single instance provided by the static method <a href="#1303"><code>defaultObserverQueue</code></a>. Using separate queues bypasses the prioritization mechanism (described below), which may cause problems between the objects using the separate queues. If you do use separate queues, your DelayedObserver subclasses should record a designated DelayedObserverQueue that they always use, and implement <a href="../DelayedObserver/Frameset.html#861" target="_top"><code>observerQueue</code></a> to return that object.<p>
+If you need to remove an enqueued observer, you can do so using the <a href="#1235"><code>dequeueObserver</code></a> method. DelayedObserver also defines the <a href="../DelayedObserver/Frameset.html#1233" target="_top"><code>discardPendingNotification</code></a> method, which removes the receiver from its designated queue.<p>
+<h3>
+<a name="1333">
+ Change Notification
+</a>
+</h3>
+The actual process of change notification is initiated by the <a href="#860"><code>enqueueObserver</code></a> messages that line observers up to receive notifications. Regardless of how many times <code>enqueueObserver</code> is invoked for a particular observer, that observer is only put in the queue once. The first observer enqueued during the run loop also sets up the DelayedObserverQueue to receive a message at the end of the run loop. DelayedObserver sets up this delayed invocation in NSDefaultRunLoopMode, but you can change the mode or add additional modes in which delayed invocation occurs using <a href="#935"><code>setRunLoopModes</code></a>.<p>
+<code>notifyObserversUpToPriority</code> cycles through the queue of DelayedObservers in priority order, from ObserverPriorityFirst to the priority given, sending each observer a <a href="../DelayedObserver/Frameset.html#882" target="_top"><code>subjectChanged</code></a> message. Each time, it returns to the earliest priority (rather than continuing through the queue) in case the message resulted in another DelayedObserver with a earlier priority being enqueued. This guarantees an optimal delivery of change notifications.<p>
+<h3>
+<a name="1351">
+ Observer Proxies
+</a>
+</h3>
+It may not always be possible for a custom observer class to inherit from DelayedObserver. To aid such objects in participating in delayed change notifications, the Framework defines the ObserverProxy class, which implements its <a href="../DelayedObserver/Frameset.html#882" target="_top"><code>subjectChanged</code></a> method to invoke an action method of your custom object. You create an ObserverProxy, providing the "real" observer, the action method to invoke, and the priority at which the ObserverProxy should be enqueued. Then, instead of registering the custom object as an observer of objects, you register the proxy (using ObserverCenter's <a href="../ObserverCenter/Frameset.html#1469" target="_top"><code>addObserver</code></a>). When the proxy receives an <code>objectWillChange</code> message, it enqueues itself for delayed change notification, receives the <code>subjectChanged</code> message from the DelayedObserverQueue, and then sends the action message to the "real" observer.<p>
+<a name="830">
+<HR WIDTH=50% ALIGN=LEFT>
+<h2>Method Types
+</h2>
+</a><dl>
+<dt>Constructors<dl><dl><dl><dl>
+<dt><a href="#1256">DelayedObserverQueue</a></dl>
+</dl></dl></dl><dt>Getting the default queue<dl><dl><dl><dl>
+<dt><a href="#1303">defaultObserverQueue</a></dl>
+</dl></dl></dl><dt>Enqueuing and dequeuing observers<dl><dl><dl><dl>
+<dt><a href="#860">enqueueObserver</a><dt><a href="#1235">dequeueObserver</a></dl>
+</dl></dl></dl><dt>Sending change notifications<dl><dl><dl><dl>
+<dt><a href="#910">notifyObserversUpToPriority</a></dl>
+</dl></dl></dl><dt>Configuring notification behavior<dl><dl><dl><dl>
+<dt><a href="#1245">runLoopModes</a><dt><a href="#935">setRunLoopModes</a></dl>
+</dl></dl></dl></dl>
+<HR WIDTH=50% ALIGN=LEFT>
+<a name="1268"></a>
+<a name="cons"></a>
+<h2>Constructors</h2>  
+
+
+<a name="1256"></a>
+<h3>
+ DelayedObserverQueue
+</h3>
+public <code>next.eo.DelayedObserverQueue</code>()
+
+<P>Creates and returns a new DelayedObserverQueue with NSDefaultRunLoopMode as its only run loop mode.<p>
+<B>See also: </B>  
+<a href="#1245"><code>runLoopModes</code></a>
+<p><HR WIDTH=50% ALIGN=LEFT>
+<a name="1295"></a>
+<a name="clm"></a>
+<h2>Static Methods</h2>  
+
+
+<a name="1303"></a>
+<h3>
+ <a name="//apple_ref/java/clm/DelayedObserverQueue/defaultObserverQueue">defaultObserverQueue</a>
+</h3>
+public static next.eo.DelayedObserverQueue <code>defaultObserverQueue</code>()
+
+<P>Returns the DelayedObserverQueue that DelayedObservers use by default.<p>
+<HR WIDTH=50% ALIGN=LEFT>
+<a name="instm"></a>
+<h2>Instance Methods</h2>  
+
+
+<a name="1235"></a>
+<h3>
+ <a name="//apple_ref/java/instm/DelayedObserverQueue/dequeueObserver">dequeueObserver</a>
+</h3>
+public void <code>dequeueObserver</code>(next.eo.DelayedObserver <em>anObserver</em>)
+
+<P>Removes <em>anObserver</em> from the receiver.<p>
+<B>See also: </B>  
+<a href="#860"><code>enqueueObserver</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="860"></a>
+<h3> <a name="//apple_ref/java/instm/DelayedObserverQueue/enqueueObserver">enqueueObserver</a></h3>
+public void <code>enqueueObserver</code>(next.eo.DelayedObserver <em>anObserver</em>)
+
+<P>Records <em>anObserver</em> to be sent a <a href="../DelayedObserver/Frameset.html#882" target="_top"><code>subjectChanged</code></a> message. If <em>anObserver</em>'s priority is ObserverPriorityImmediate it's immediately sent the message and not enqueued. Otherwise it's sent the message the next time <a href="#910"><code>notifyObserversUpToPriority</code></a> is invoked with a priority later than or equal to <em>anObserver</em>'s. Does nothing if <em>anObserver</em> is already recorded.<p>
+The first time this method is invoked during the run loop with an observer whose priority isn't ObserverPriorityImmediate, it registers the receiver to be sent a <a href="#910"><code>notifyObserversUpToPriority</code></a> message at the end of the run loop, using FlushDelayedObserversRunLoopOrdering and the receiver's run loop modes. This causes enqueued observers up to a priority of ObserverPrioritySixth to be notified automatically during each pass of the run loop.<p>
+When <em>anObserver</em> is done observing changes, it should invoke <code><a href="../DelayedObserver/Frameset.html#1233" target="_top">discardPendingNotification</a></code> to remove itself from the queue.<p>
+<B>See also: </B>  
+<a href="#1235"><code>dequeueObserver</code></a>, <a href="../DelayedObserver/Frameset.html#1253" target="_top"><code>priority</code></a> (DelayedObserver), 
+<a href="../DelayedObserver/Frameset.html#1233" target="_top"><code>discardPendingNotification</code></a> (DelayedObserver), <a href="#1245"><code>runLoopModes</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="910"></a>
+<h3> <a name="//apple_ref/java/instm/DelayedObserverQueue/notifyObserversUpToPriority">notifyObserversUpToPriority</a></h3>
+public void <code>notifyObserversUpToPriority</code>(int <em>priority</em>)
+
+<P>Sends <a href="../DelayedObserver/Frameset.html#882" target="_top"><code>subjectChanged</code></a> messages to all of the receiver's enqueued observers whose priority is <em>priority</em> or earlier. This method cycles through the receiver's enqueued observers in priority order, sending each a <code>subjectChanged</code> message and then returning to the very beginning of the queue, in case another observer with an earlier priority was enqueued as a result of the message.<p>
+DelayedObserverQueue invokes this method automatically as needed during the run loop, with a <em>priority</em> of ObserverPrioritySixth.<p>
+<B>See also: </B>  
+<a href="#860"><code>enqueueObserver</code></a>, <a href="../DelayedObserver/Frameset.html#1253" target="_top"><code>priority</code></a> (DelayedObserver)
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="1245"></a>
+<h3> <a name="//apple_ref/java/instm/DelayedObserverQueue/runLoopModes">runLoopModes</a></h3>
+public next.util.ImmutableVector <code>runLoopModes</code>()
+
+<P>Returns the receiver's run loop modes.<p>
+<B>See also: </B>  
+<a href="#935"><code>setRunLoopModes</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="935"></a>
+<h3> <a name="//apple_ref/java/instm/DelayedObserverQueue/setRunLoopModes">setRunLoopModes</a></h3>
+public void <code>setRunLoopModes</code>(next.util.ImmutableVector <em>modes</em>)
+
+<P>Sets the receiver's run loop modes to <em>modes</em>.<p>
+<B>See also: </B>  
+<a href="#1245"><code>runLoopModes</code></a>
+<p><hr WIDTH=25% ALIGN=LEFT>
+<a name="1251"></a>
+<h3> <a name="//apple_ref/java/instm/DelayedObserverQueue/"></a></h3>
+
+ 
+ 
+
+
+<i>Copyright &#169; 1998, Apple Computer, Inc.   All rights
+reserved.</i>
+
+<!-- Last updated: 01/21/98 12:26:35 -->
+
+</body>
+</html>

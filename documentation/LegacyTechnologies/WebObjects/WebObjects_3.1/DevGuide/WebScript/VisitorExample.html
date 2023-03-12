@@ -1,0 +1,111 @@
+<BODY bgcolor=#FFFFFF>
+<P><A HREF="WebScript.mif.book.html"><IMG SRC="ArrowUp.gif" border=0>Table of Contents</A>
+<A HREF="RoleOfScripts.html"><IMG SRC="ArrowLeft.gif" border=0>Previous Section</A>
+<!-- This file was created with the fm2html filter.
+The filter is copyright Norwegian Telecom Research and
+was programmed by Jon Stephenson von Tetzchner. -->
+
+
+<H1><A NAME="REF27311">Visitors Example</A></H1>
+<P>To explain how a WebScript operates within the larger context of a WebObjects application, this section uses the Visitors application as an example. The Visitors application takes the name of the current visitor, and displays the most recent visitor, the total number of visitors to the page, and the time remaining in the session:
+<CENTER><P><IMG SRC="Visitors.gif"></CENTER>
+<BR>
+<CENTER><B> <paranum><B>Figure 1. </B> The Visitors Example</B></CENTER>
+<P>The Visitors application includes the following directories and files:
+<PRE>/Visitors.woa
+  Application.wos
+  Session.wos
+  /Main.wo
+    Main.html
+    Main.wod
+      Main.wos
+</PRE>
+<P>To view the contents of <B>Main.wod</B> and <B>Main.html</B>, see the on-line Visitors example. The contents of <B>Application.wos</B>, <B>Session.wos</B>, and <B>Main.wos</B> are listed in the following sections.
+<BR>
+<BR>
+<H2><A NAME="HDR0">Application.wos</A></H2>
+
+<P><B>Application.wos</B> is the application script for the Visitors application. It declares two application variables: <B>visitorNum</B> and <B>lastVisitor</B>. Application variables can be accessed throughout the application, and they live for the duration of the application. For more information on application variables, see the section "<A HREF="VariablesAndScope.html#REF96027">Variables and Scope</A>".
+<PRE>id lastVisitor;    
+  // the most recent visitor
+id visitorNum;    
+  // the total number of visitors the page
+
+- init
+{
+    [super init];
+    lastVisitor = @"";
+    [self setTimeOut:7200];
+    return self;
+}
+</PRE>
+<BR>
+<BR>
+<H3><A NAME="HDR1">Implementing the init Method</A></H3>
+<P>The <B>Application.wos</B> script includes a method called <B>init</B>. The <B>init</B> method is where you can initialize the variables associated with the object. Thus, in an application script, it's common to implement an <B>init</B> method to initialize application variables. In a component script, on the other hand, you use <B>init</B> to prepare the associated page and its variables for use during the processing of the page. 
+<P>As illustrated in the above example, an implementation of <B>init</B> should always begin by invoking the <B>init</B> method of <B>super</B> (the superclass object). It should always end by returning <B>self</B>.
+<BR>
+<BR>
+<H2><A NAME="HDR2">Session.wos</A></H2>
+<P>In <B>Session.wos</B> of the Visitors application, an <B>init</B> method also initializes declared variables. These variables have session-wide visibility and persistence. But this <B>init</B> does much more than initialze variables. 
+
+<UL>
+<P><LI>It sets a time-out period for the session.
+<BR>
+<P><LI>It creates a timer scheduled to fire every second.
+<BR>
+<P><LI>It implements a method that is invoked when the timer is fired. This method increments a "seconds-counter" variable, which is bound to a WOString on the page.
+<BR>
+</UL>
+<PRE>	id timeSinceSessionBegan;
+	id timer;
+	- init
+	{
+	    [super init];
+
+   	    timeSinceSessionBegan = 0;
+     	    timer = [NSTimer scheduledTimerWithTimeInterval:1.0 target:self       
+    	        selector:"timeOfSession" userInfo:nil repeats:YES];
+  	    [self setTimeOut:120];
+    	    return self;
+	}
+	
+	- timeOfSession
+	{
+	    timeSinceSessionBegan++;
+	}
+</PRE>
+<P>As this example shows, you can do many things in the <B>init</B> method to set up the associated object besides initializing variables. This code example also illustrates a couple specific aspects of WebScript. The "hidden" variable <B>self</B> in this script refers to a WOSession object, and so the method invoked (<B>setTimeOut:</B>) must be declared by the WOSession class. Second, you can invoke any method of the Foundation framework, such as NSTimer's <B>scheduledTimerWithTimeInterval:target:selector:userInfo:repeats:</B>.
+<P> <paranum><B>Note: </B> The example above illustrates a syntax difference between WebScript and Objective-C: the way you refer to selectors and similar entities. In Objective, you use the <B>@selector()</B> directive; in WebScript, because "@" has special significance, you simply quote the selector.
+<BR>
+<BR>
+<H2><A NAME="HDR3">Main.wos</A></H2>
+<P>The script associated with the first (and in this example, only) page of the Visitors application is <B>Main.wos</B>. This script increments the number of visitors to the page (<B>visitorNum</B>), and assigns the name (<B>aName</B>) entered in the application's text field to the last visitor (<B>lastVisitor</B>). It then clears the text field by assigning an empty string to <B>aName</B>.
+<PRE>id number, aName;
+- awake {
+   if (!number) {
+    number = [[self application] visitorNum];
+    number++;
+    [[self application] setVisitorNum:number];
+  }
+}
+
+- recordMe
+{  
+  if ([aName length]) {
+    [[self application] setLastVisitor:aName];  
+
+    [self setAName:@""]; // clear the text field
+  }
+  return self; // use request page as response page
+}
+</PRE>
+<BR>
+<H3><A NAME="HDR4">Implementing the awake Method  </A></H3>
+<P>For a given page, the <B>awake</B> method is invoked exactly once per transaction, at the beginning of that transaction. The <B>init</B> method is invoked only once, at the start of an object's lifetime (see "<A HREF="DurationOfComponent.html#REF39669">The Duration of a Component</A> " for the reasons why). Because of this, it is more appropriate in the Visitor application to implement <B>awake</B> rather than <B>init</B>. We want to track each "visit" to this page. Because <B>awake</B> is invoked once per transaction, if the same page handles the request as well as generates the response (for example, the first page of an application), the <B>awake</B> method is only invoked during the request phase.
+<P>The <B>awake</B> method is the best place to initialize variables whose values are known or can be resolved at the start of the request-response cycle, such as a list of hyperlinks. The advantage of using <B>awake</B> to perform this type of initialization is that the variables are guaranteed to be initialized every time the page is displayed. 
+<P>The <B>awake</B> method has a complementary method, <B>sleep</B>, in which you can explictly deallocate objects assigned to variables by assigning <B>nil</B> to the variables. As a technique for improving application scalability, you can turn off page caching, initialize variables in <B>awake</B> (rather than in <B>init</B>), and deallocate them in <B>sleep</B>.
+
+<P><A HREF="WebScript.mif.book.html"><IMG SRC="ArrowUp.gif" border=0>Table of Contents</A>
+<A HREF="DurationOfComponent.html"><IMG SRC="ArrowRight.gif" border=0>Next Section</A>
+</BODY >

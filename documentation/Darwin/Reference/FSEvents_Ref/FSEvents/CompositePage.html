@@ -1,0 +1,766 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN"
+    "http://www.w3.org/TR/1998/REC-html40-19980424/loose.dtd">
+<html><head>
+    <title>FSEvents.h</title>
+	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+ <meta name="generator" content="HeaderDoc" />
+<link rel="stylesheet" type="text/css" href="../../../../Resources/CSS/frameset_styles.css">
+<style type="text/css"><!--.keyword {background:#ffffff; color:#761550;}.template {background:#ffffff; color:#761550;}.number {background: #ffffff; color:#0000ff;}.function {background:#ffffff; color:#000000;}.string {background: #ffffff; color:#891315;}.preprocessor {background:#ffffff; color:#236e25}.comment {background:#ffffff; color:#236e25}.char {background: #ffffff; color:#0000ff;}.var {background:#ffffff; color:#000000;}.type {background:#ffffff; color:#761550;}.param {background:#ffffff; color:#000000;}.graybox {         border-top: 1px solid #919699;         border-left: 1px solid #919699;         margin-bottom: 10px;         }  .graybox th {         padding: 4px 8px 4px 8px;         background: #E2E2E2;         font-size: 12px;         font-weight: bold;         border-bottom: 1px solid #919699;         border-right: 1px solid #919699;         }  .graybox td {         padding: 8px;         font-size: 12px;         text-align: left;         vertical-align: top;         border-bottom: 1px solid #919699;         border-right: 1px solid #919699;         }  --></style></head><body bgcolor="#ffffff">
+<!-- start of header -->
+
+<!-- start of header -->
+<!--#include virtual="/includes/framesetheader"-->
+<!-- end of header -->
+
+<table width=600><tr><td scope="row">
+<!-- begin breadcrumb insert request --><font face="Geneva,Helvetica,Arial" size="1">
+ <a target="_top" href="http://developer.apple.com">ADC Home</a> <b>&gt;</b> <a href="../../../../../referencelibrary/index.html#//apple_ref/doc/uid/TP30000943" target="_top">Reference Library</a> <b>&gt;</b> <a href="../../../../../reference/index.html#//apple_ref/doc/uid/TP30001281" target="_top">Reference</a> <b>&gt;</b> <a href="../../../../../reference/Darwin/index.html#//apple_ref/doc/uid/TP30001281-TP30000422" target="_top">Darwin</a> <b>&gt;</b> <a href="../../../../../reference/Darwin/idxFileManagement-date.html#//apple_ref/doc/uid/TP30001281-TP30000422-TP30000448" target="_top">File Management</a> <b>&gt;</b> <a href="../index.html#//apple_ref/doc/framework/FSEventsAPI" target="_top">FSEvents Reference</a></font>
+<!-- end breadcrumb insert request -->
+<p>&nbsp;</p>
+</td></tr></table>
+
+
+<!-- end of header -->
+<a name="top"></a>
+<a name="//apple_ref/doc/header/FSEvents.h" title="FSEvents.h"></a>
+<hr><table border="0"  cellpadding="2" cellspacing="2" width="300"><tr><td valign="top" height="12" colspan="5" scope="row"><h1><a name="FSEvents.h">FSEvents.h</a></h1>
+</td></tr></table><div class="spec_sheet_info_box"><table cellspacing="0" class="specbox">
+<tr><td scope="row"><b>Includes:</b></td><td><div style="margin-bottom:1px"><div class="content_text"><!-- a -->&lt;mach/mach.h&gt;<!-- /a --><br>
+<a href="../../usr_APIs/types/index.html#//apple_ref/doc/header/types.h" target="_top">&lt;sys/types.h&gt;</a><br>
+<!-- a -->&lt;CoreFoundation/CFRunLoop.h&gt;<!-- /a --><br>
+<!-- a -->&lt;CoreFoundation/CFUUID.h&gt;<!-- /a --><br>
+<!-- a -->&lt;AvailabilityMacros.h&gt;<!-- /a --></div></div></td></tr>
+</table></div>
+<h2>Overview</h2>
+</h5><p><!-- begin discussion --><br><br>
+This header describes the FSEvents API.  This API provides a mechanism to notify
+clients about directories they ought to re-scan in order to keep their internal
+data structures up-to-date with respect to the true state of the file system.
+(For example, when files or directories are created, modified, or removed.)
+It sends these notifications "in bulk", possibly notifying the client of changes
+to several directories in a single callback.
+By using the API, clients can notice such changes quickly, without needing
+to resort to recursive polling/scanning of the file system.
+<br><br>
+Much like kqueues, the FSEvents API allows an application to find near-immediately
+when the contents of a particular directory has changed.  However, unlike kqueues,
+the FSEvents API allows the application to monitor the whole file system hierarchy
+rooted at a specified directory (and still get precise per-directory notifications) --
+to do this with the kqueues API would require the client to monitor each directory
+individually.
+<br><br>
+Clients can register interest in a chunk of the filesystem hierarchy and will
+receive callbacks from their runloop whenever an event occurs that modifies the
+filesystem therein.  The callback will indicate the exact directory in which the event
+occurred, so the client only has to scan that directory for updated info, not all its
+children.  Clients can supply a "latency" parameter that tells how long to wait after an
+event occurs before forwarding it; this reduces the volume of events and reduces the chance
+that the client will see an "intermediate" state, like those that arise when doing a
+"safe save" of a file, creating a package, or downloading a file via Safari.
+<br><br>
+<br><br>
+The lifecycle of an FSEventStream consists of these stages:
+<br><br>
+<ol start="1"><li> FSEventStreamCreate() / FSEventStreamCreateRelativeToDevice() -> Creates an FSEventStream.
+<br><br>
+</li><li> FSEventStreamScheduleWithRunLoop() -> Schedules an FSEventStream on a runloop, like
+CFRunLoopAddSource() does for a CFRunLoopSourceRef.
+<br><br>
+</li><li> FSEventStreamStart() -> Starts receiving events and servicing them from the client's
+runloop(s) using the callback supplied by the client when the stream was created.        
+<br><br>
+</li><li> FSEventStreamStop()  -> Stops the stream, ensuring the client's callback will not
+be called again for this stream.    After stopping the stream, it can be
+restarted via FSEventStreamStart().
+<br><br>
+</li><li> FSEventStreamInvalidate() -> Invalidates the stream, like CFRunLoopSourceInvalidate() does
+for a CFRunLoopSourcRef.
+<br><br>
+</li><li> FSEventStreamRelease() -> Decrements the refcount on the stream (initially one and
+incremented via FSEventStreamRetain()).  If the refcount reaches zero, the
+stream is deallocated.
+</li></ol>
+Once the event stream has been started, the following calls can be used:
+<br><br>
+FSEventStreamGetLatestEventId() -> Initially, this returns the sinceWhen value supplied when
+the stream was created; thereafter, it is updated with the highest-numbered event ID
+mentioned in the current batch of events just before invoking the client's callback.
+Clients can store this value persistently as long as they also store the UUID for the device
+(obtained via FSEventsCopyUUIDForDevice()).  Clients can then later supply this event ID as
+the sinceWhen parameter to FSEventStreamCreateRelativeToDevice(), as long as its UUID matches
+what you stored.  This works because the FSEvents service stores events in a persistent, per-volume
+database.  In this regard,the stream of event IDs acts like a global, system-wide clock, but bears
+no relation to any particular timebase.
+<br><br>
+FSEventStreamFlushAsync() -> Requests that the fseventsd daemon send any events it has
+already buffered (via the latency parameter to one of the FSEventStreamCreate...() functions).
+This occurs asynchronously; clients will not have received all the callbacks by the time this
+call returns to them.
+<br><br>
+FSEventStreamFlushSync() -> Requests that the fseventsd daemon send any events it has
+already buffered (via the latency parameter to one of the FSEventStreamCreate...() functions).
+Then runs the runloop in its private mode till all events that have occurred have been reported
+(via the clients callback).  This occurs synchronously; clients will have received all the
+callbacks by the time this call returns to them.
+<br><br>
+FSEventStreamGetDeviceBeingWatched() -> Gets the dev_t value supplied when the stream was created with
+FSEventStreamCreateRelativeToDevice(), otherwise 0.
+<br><br>
+FSEventStreamCopyPathsBeingWatched() -> Gets the paths supplied when the stream was created with
+one of the FSEventStreamCreate...() functions.
+<br><br>
+Calls that can be made without a stream:
+<br><br>
+FSEventsCopyUUIDForDevice() -> Gets a UUID that uniquely identifies the FSEvents database for that volume.
+If the database gets discarded then its replacement will have a different UUID so that clients
+will be able to detect this situation and avoid trying to use event IDs that they stored as
+the sinceWhen parameter to the FSEventStreamCreate...() functions.
+<br><br>
+FSEventsGetLastEventIdForDeviceBeforeTime() -> Gets the last event ID for the given device that was returned
+before the given time.  This is conservative in the sense that if you then use the returned event ID
+as the sinceWhen parameter of FSEventStreamCreateRelativeToDevice() that you will not miss any events that
+happened since that time.  On the other hand, you might receive some (harmless) extra events.
+<br><br>
+FSEventsPurgeEventsForDeviceUpToEventId() -> Purges old events from the persistent per-volume database
+maintained by the service.  You can combine this with FSEventsGetLastEventIdForDeviceBeforeTime().
+Can only be called by the root user.
+<br><br>
+ <!-- end discussion --></p>
+<hr><br><h2>Functions</h2>
+<a name="HeaderDoc_functions"></a>
+<dl>
+<dt><tt><a href="CompositePage.html#//apple_ref/c/func/FSEventsCopyUUIDForDevice" target="doc">FSEventsCopyUUIDForDevice</a></tt></dt>
+<dd></dd>
+<dt><tt><a href="CompositePage.html#//apple_ref/c/func/FSEventsGetCurrentEventId" target="doc">FSEventsGetCurrentEventId</a></tt></dt>
+<dd></dd>
+<dt><tt><a href="CompositePage.html#//apple_ref/c/func/FSEventsGetLastEventIdForDeviceBeforeTime" target="doc">FSEventsGetLastEventIdForDeviceBeforeTime</a></tt></dt>
+<dd></dd>
+<dt><tt><a href="CompositePage.html#//apple_ref/c/func/FSEventsPurgeEventsForDeviceUpToEventId" target="doc">FSEventsPurgeEventsForDeviceUpToEventId</a></tt></dt>
+<dd></dd>
+<dt><tt><a href="CompositePage.html#//apple_ref/c/func/FSEventStreamCopyDescription" target="doc">FSEventStreamCopyDescription</a></tt></dt>
+<dd></dd>
+<dt><tt><a href="CompositePage.html#//apple_ref/c/func/FSEventStreamCopyPathsBeingWatched" target="doc">FSEventStreamCopyPathsBeingWatched</a></tt></dt>
+<dd></dd>
+<dt><tt><a href="CompositePage.html#//apple_ref/c/func/FSEventStreamCreate" target="doc">FSEventStreamCreate</a></tt></dt>
+<dd></dd>
+<dt><tt><a href="CompositePage.html#//apple_ref/c/func/FSEventStreamCreateRelativeToDevice" target="doc">FSEventStreamCreateRelativeToDevice</a></tt></dt>
+<dd></dd>
+<dt><tt><a href="CompositePage.html#//apple_ref/c/func/FSEventStreamFlushAsync" target="doc">FSEventStreamFlushAsync</a></tt></dt>
+<dd></dd>
+<dt><tt><a href="CompositePage.html#//apple_ref/c/func/FSEventStreamFlushSync" target="doc">FSEventStreamFlushSync</a></tt></dt>
+<dd></dd>
+<dt><tt><a href="CompositePage.html#//apple_ref/c/func/FSEventStreamGetDeviceBeingWatched" target="doc">FSEventStreamGetDeviceBeingWatched</a></tt></dt>
+<dd></dd>
+<dt><tt><a href="CompositePage.html#//apple_ref/c/func/FSEventStreamGetLatestEventId" target="doc">FSEventStreamGetLatestEventId</a></tt></dt>
+<dd></dd>
+<dt><tt><a href="CompositePage.html#//apple_ref/c/func/FSEventStreamInvalidate" target="doc">FSEventStreamInvalidate</a></tt></dt>
+<dd></dd>
+<dt><tt><a href="CompositePage.html#//apple_ref/c/func/FSEventStreamRelease" target="doc">FSEventStreamRelease</a></tt></dt>
+<dd></dd>
+<dt><tt><a href="CompositePage.html#//apple_ref/c/func/FSEventStreamRetain" target="doc">FSEventStreamRetain</a></tt></dt>
+<dd></dd>
+<dt><tt><a href="CompositePage.html#//apple_ref/c/func/FSEventStreamScheduleWithRunLoop" target="doc">FSEventStreamScheduleWithRunLoop</a></tt></dt>
+<dd></dd>
+<dt><tt><a href="CompositePage.html#//apple_ref/c/func/FSEventStreamShow" target="doc">FSEventStreamShow</a></tt></dt>
+<dd></dd>
+<dt><tt><a href="CompositePage.html#//apple_ref/c/func/FSEventStreamStart" target="doc">FSEventStreamStart</a></tt></dt>
+<dd></dd>
+<dt><tt><a href="CompositePage.html#//apple_ref/c/func/FSEventStreamStop" target="doc">FSEventStreamStop</a></tt></dt>
+<dd></dd>
+<dt><tt><a href="CompositePage.html#//apple_ref/c/func/FSEventStreamUnscheduleFromRunLoop" target="doc">FSEventStreamUnscheduleFromRunLoop</a></tt></dt>
+<dd></dd>
+</dl>
+<hr><!-- headerDoc=func;  uid=//apple_ref/c/func/FSEventsCopyUUIDForDevice;  name=FSEventsCopyUUIDForDevice -->
+<a name="//apple_ref/c/func/FSEventsCopyUUIDForDevice"></a>
+<table border="0"  cellpadding="2" cellspacing="2" width="300"><tr><td valign="top" height="12" colspan="5" scope="row"><h3><a name="FSEventsCopyUUIDForDevice">FSEventsCopyUUIDForDevice</a></h3>
+</td></tr></table><hr><p></p><pre><a href="../../../../CoreFoundation/Reference/CFUUIDRef/Reference/reference.html#//apple_ref/c/tdef/CFUUIDRef" target="_top" class="type"><span class="type">CFUUIDRef</span></a> <a href="CompositePage.html#//apple_ref/c/func/FSEventsCopyUUIDForDevice" class="function"><span class="function">FSEventsCopyUUIDForDevice</span></a>(
+    <a href="../../../../Carbon/Reference/Open_Transport/Reference/reference.html#//apple_ref/c/tdef/dev_t" target="_top" class="type"><span class="type">dev_t</span></a> <span class="param">dev</span>);  </pre>
+<h5 class="tight"><font face="Lucida Grande,Helvetica,Arial">Parameters</font></h5>
+<dl>
+<dt><code>dev</code></dt><dd>The dev_t of the device that you want to get the UUID for.</dd>
+</dl>
+<h5 class="tight"><font face="Lucida Grande,Helvetica,Arial">Return Value</font></h5><p><!-- begin return value -->The UUID associated with the stream of events on this machine.
+Ownership follows the Copy Rule.
+
+ 
+<!-- end return value --></p><h5 class="tight"><font face="Lucida Grande,Helvetica,Arial">Discussion</font>
+</h5><p><!-- begin discussion -->Gets the UUID associated with a device.  This uniquely identifies
+a given stream of FSEvents.  If this UUID is different than one that
+you stored from a previous run then the event stream is different
+because it wrapped around back to zero or was purged (and thus any
+stored event IDs you may have are not valid).<br>
+<!-- end discussion --></p>
+<p></p><dl><dt><i>Availability</i></dt><dd>Introduced in Mac OS X v10.5.
+</dd>
+</dl>
+<hr><!-- headerDoc=func;  uid=//apple_ref/c/func/FSEventsGetCurrentEventId;  name=FSEventsGetCurrentEventId -->
+<a name="//apple_ref/c/func/FSEventsGetCurrentEventId"></a>
+<table border="0"  cellpadding="2" cellspacing="2" width="300"><tr><td valign="top" height="12" colspan="5" scope="row"><h3><a name="FSEventsGetCurrentEventId">FSEventsGetCurrentEventId</a></h3>
+</td></tr></table><hr><p></p><pre><a href="CompositePage.html#//apple_ref/c/tdef/FSEventStreamEventId" class="type"><span class="type">FSEventStreamEventId</span></a> <a href="CompositePage.html#//apple_ref/c/func/FSEventsGetCurrentEventId" class="function"><span class="function">FSEventsGetCurrentEventId</span></a>(
+    <span class="param">void</span>);  </pre>
+<h5 class="tight"><font face="Lucida Grande,Helvetica,Arial">Return Value</font></h5><p><!-- begin return value -->The event ID of the most recent event generated by the
+system.
+
+ 
+<!-- end return value --></p><h5 class="tight"><font face="Lucida Grande,Helvetica,Arial">Discussion</font>
+</h5><p><!-- begin discussion -->Fetches the most current event ID on the system.  The ID
+returned is for the most recently generated event and is
+therefore obsolete as soon as it is returned.<br>
+<!-- end discussion --></p>
+<p></p><dl><dt><i>Availability</i></dt><dd>Introduced in Mac OS X v10.5.
+</dd>
+</dl>
+<hr><!-- headerDoc=func;  uid=//apple_ref/c/func/FSEventsGetLastEventIdForDeviceBeforeTime;  name=FSEventsGetLastEventIdForDeviceBeforeTime -->
+<a name="//apple_ref/c/func/FSEventsGetLastEventIdForDeviceBeforeTime"></a>
+<table border="0"  cellpadding="2" cellspacing="2" width="300"><tr><td valign="top" height="12" colspan="5" scope="row"><h3><a name="FSEventsGetLastEventIdForDeviceBeforeTime">FSEventsGetLastEventIdForDeviceBeforeTime</a></h3>
+</td></tr></table><hr><p></p><pre><a href="CompositePage.html#//apple_ref/c/tdef/FSEventStreamEventId" class="type"><span class="type">FSEventStreamEventId</span></a> <a href="CompositePage.html#//apple_ref/c/func/FSEventsGetLastEventIdForDeviceBeforeTime" class="function"><span class="function">FSEventsGetLastEventIdForDeviceBeforeTime</span></a>(
+    <a href="../../../../Carbon/Reference/Open_Transport/Reference/reference.html#//apple_ref/c/tdef/dev_t" target="_top" class="type"><span class="type">dev_t</span></a> <span class="param">dev</span>,
+    <a href="../../../../CoreFoundation/Reference/CFTimeUtils/Reference/reference.html#//apple_ref/c/tdef/CFAbsoluteTime" target="_top" class="type"><span class="type">CFAbsoluteTime</span></a> <span class="param">time</span>);  </pre>
+<h5 class="tight"><font face="Lucida Grande,Helvetica,Arial">Parameters</font></h5>
+<dl>
+<dt><code>dev</code></dt><dd>The dev_t of the device.</dd>
+<dt><code>time</code></dt><dd>The time as a CFAbsoluteTime.</dd>
+</dl>
+<h5 class="tight"><font face="Lucida Grande,Helvetica,Arial">Return Value</font></h5><p><!-- begin return value -->The last event ID for the given device that was returned before the given time.
+
+ 
+<!-- end return value --></p><h5 class="tight"><font face="Lucida Grande,Helvetica,Arial">Discussion</font>
+</h5><p><!-- begin discussion -->Gets the last event ID for the given device that was returned
+before the given time.  This is conservative in the sense that if
+you then use the returned event ID as the sinceWhen parameter of
+FSEventStreamCreateRelativeToDevice() that you will not miss any 
+events that happened since that time.  On the other hand, you might 
+receive some (harmless) extra events.<br>
+Beware: there are things that can cause this to fail to be accurate.
+For example, someone might change the system's clock (either backwards
+or forwards).  Or an external drive might be used on different systems
+without perfectly synchronized clocks.<br>
+<!-- end discussion --></p>
+<p></p><dl><dt><i>Availability</i></dt><dd>Introduced in Mac OS X v10.5.
+</dd>
+</dl>
+<hr><!-- headerDoc=func;  uid=//apple_ref/c/func/FSEventsPurgeEventsForDeviceUpToEventId;  name=FSEventsPurgeEventsForDeviceUpToEventId -->
+<a name="//apple_ref/c/func/FSEventsPurgeEventsForDeviceUpToEventId"></a>
+<table border="0"  cellpadding="2" cellspacing="2" width="300"><tr><td valign="top" height="12" colspan="5" scope="row"><h3><a name="FSEventsPurgeEventsForDeviceUpToEventId">FSEventsPurgeEventsForDeviceUpToEventId</a></h3>
+</td></tr></table><hr><p></p><pre><!-- a --><span class="type">Boolean</span><!-- /a --> <a href="CompositePage.html#//apple_ref/c/func/FSEventsPurgeEventsForDeviceUpToEventId" class="function"><span class="function">FSEventsPurgeEventsForDeviceUpToEventId</span></a>(
+    <a href="../../../../Carbon/Reference/Open_Transport/Reference/reference.html#//apple_ref/c/tdef/dev_t" target="_top" class="type"><span class="type">dev_t</span></a> <span class="param">dev</span>,
+    <a href="CompositePage.html#//apple_ref/c/tdef/FSEventStreamEventId" class="type"><span class="type">FSEventStreamEventId</span></a> <span class="param">eventId</span>);  </pre>
+<h5 class="tight"><font face="Lucida Grande,Helvetica,Arial">Parameters</font></h5>
+<dl>
+<dt><code>dev</code></dt><dd>The dev_t of the device.</dd>
+<dt><code>eventId</code></dt><dd>The event ID.</dd>
+</dl>
+<h5 class="tight"><font face="Lucida Grande,Helvetica,Arial">Return Value</font></h5><p><!-- begin return value -->True if it succeeds, otherwise False if it fails.
+
+ 
+<!-- end return value --></p><h5 class="tight"><font face="Lucida Grande,Helvetica,Arial">Discussion</font>
+</h5><p><!-- begin discussion -->Purges old events from the persistent per-volume database maintained by the service.
+Can only be called by the root user.<br>
+<!-- end discussion --></p>
+<p></p><dl><dt><i>Availability</i></dt><dd>Introduced in Mac OS X v10.5.
+</dd>
+</dl>
+<hr><!-- headerDoc=func;  uid=//apple_ref/c/func/FSEventStreamCopyDescription;  name=FSEventStreamCopyDescription -->
+<a name="//apple_ref/c/func/FSEventStreamCopyDescription"></a>
+<table border="0"  cellpadding="2" cellspacing="2" width="300"><tr><td valign="top" height="12" colspan="5" scope="row"><h3><a name="FSEventStreamCopyDescription">FSEventStreamCopyDescription</a></h3>
+</td></tr></table><hr><p></p><pre><a href="../../../../CoreFoundation/Reference/CFStringRef/Reference/reference.html#//apple_ref/c/tdef/CFStringRef" target="_top" class="type"><span class="type">CFStringRef</span></a> <a href="CompositePage.html#//apple_ref/c/func/FSEventStreamCopyDescription" class="function"><span class="function">FSEventStreamCopyDescription</span></a>( 
+    <a href="CompositePage.html#//apple_ref/c/tdef/ConstFSEventStreamRef" class="type"><span class="type">ConstFSEventStreamRef</span></a> <span class="param">streamRef</span>);  </pre>
+<h5 class="tight"><font face="Lucida Grande,Helvetica,Arial">Return Value</font></h5><p><!-- begin return value -->A CFStringRef containing the description of the supplied stream.
+Ownership follows the Copy rule.
+
+ 
+<!-- end return value --></p><h5 class="tight"><font face="Lucida Grande,Helvetica,Arial">Discussion</font>
+</h5><p><!-- begin discussion -->Returns a CFStringRef containing the description of the supplied stream.
+For debugging only.<br>
+<!-- end discussion --></p>
+<p></p><dl><dt><i>Availability</i></dt><dd>Introduced in Mac OS X v10.5.
+</dd>
+</dl>
+<hr><!-- headerDoc=func;  uid=//apple_ref/c/func/FSEventStreamCopyPathsBeingWatched;  name=FSEventStreamCopyPathsBeingWatched -->
+<a name="//apple_ref/c/func/FSEventStreamCopyPathsBeingWatched"></a>
+<table border="0"  cellpadding="2" cellspacing="2" width="300"><tr><td valign="top" height="12" colspan="5" scope="row"><h3><a name="FSEventStreamCopyPathsBeingWatched">FSEventStreamCopyPathsBeingWatched</a></h3>
+</td></tr></table><hr><p></p><pre><a href="../../../../CoreFoundation/Reference/CFArrayRef/Reference/reference.html#//apple_ref/c/tdef/CFArrayRef" target="_top" class="type"><span class="type">CFArrayRef</span></a> <a href="CompositePage.html#//apple_ref/c/func/FSEventStreamCopyPathsBeingWatched" class="function"><span class="function">FSEventStreamCopyPathsBeingWatched</span></a>( 
+    <a href="CompositePage.html#//apple_ref/c/tdef/ConstFSEventStreamRef" class="type"><span class="type">ConstFSEventStreamRef</span></a> <span class="param">streamRef</span>);  </pre>
+<h5 class="tight"><font face="Lucida Grande,Helvetica,Arial">Parameters</font></h5>
+<dl>
+<dt><code>streamRef</code></dt><dd>A valid stream.</dd>
+</dl>
+<h5 class="tight"><font face="Lucida Grande,Helvetica,Arial">Return Value</font></h5><p><!-- begin return value -->A CFArray of CFStringRefs corresponding to those supplied when the stream was created.
+Ownership follows the Copy rule.
+
+ 
+<!-- end return value --></p><h5 class="tight"><font face="Lucida Grande,Helvetica,Arial">Discussion</font>
+</h5><p><!-- begin discussion -->Fetches the paths supplied when the stream was created via
+one of the FSEventStreamCreate...() functions.<br>
+<!-- end discussion --></p>
+<p></p><dl><dt><i>Availability</i></dt><dd>Introduced in Mac OS X v10.5.
+</dd>
+</dl>
+<hr><!-- headerDoc=func;  uid=//apple_ref/c/func/FSEventStreamCreate;  name=FSEventStreamCreate -->
+<a name="//apple_ref/c/func/FSEventStreamCreate"></a>
+<table border="0"  cellpadding="2" cellspacing="2" width="300"><tr><td valign="top" height="12" colspan="5" scope="row"><h3><a name="FSEventStreamCreate">FSEventStreamCreate</a></h3>
+</td></tr></table><hr><p></p><pre><a href="CompositePage.html#//apple_ref/c/tdef/FSEventStreamRef" class="type"><span class="type">FSEventStreamRef</span></a> <a href="CompositePage.html#//apple_ref/c/func/FSEventStreamCreate" class="function"><span class="function">FSEventStreamCreate</span></a>( 
+    <a href="../../../../CoreFoundation/Reference/CFAllocatorRef/Reference/reference.html#//apple_ref/c/tdef/CFAllocatorRef" target="_top" class="type"><span class="type">CFAllocatorRef</span></a> <span class="param">allocator</span>, 
+    <a href="CompositePage.html#//apple_ref/c/tdef/FSEventStreamCallback" class="type"><span class="type">FSEventStreamCallback</span></a> <span class="param">callback</span>, 
+    <a href="CompositePage.html#//apple_ref/c/tdef/FSEventStreamContext" class="type"><span class="type">FSEventStreamContext</span></a> *<span class="param">context</span>, 
+    <a href="../../../../CoreFoundation/Reference/CFArrayRef/Reference/reference.html#//apple_ref/c/tdef/CFArrayRef" target="_top" class="type"><span class="type">CFArrayRef</span></a> <span class="param">pathsToWatch</span>, 
+    <a href="CompositePage.html#//apple_ref/c/tdef/FSEventStreamEventId" class="type"><span class="type">FSEventStreamEventId</span></a> <span class="param">sinceWhen</span>, 
+    <a href="../../../../CoreFoundation/Reference/CFTimeUtils/Reference/reference.html#//apple_ref/c/tdef/CFTimeInterval" target="_top" class="type"><span class="type">CFTimeInterval</span></a> <span class="param">latency</span>, 
+    <a href="CompositePage.html#//apple_ref/c/tdef/FSEventStreamCreateFlags" class="type"><span class="type">FSEventStreamCreateFlags</span></a> <span class="param">flags</span>);  </pre>
+<h5 class="tight"><font face="Lucida Grande,Helvetica,Arial">Parameters</font></h5>
+<dl>
+<dt><code>allocator</code></dt><dd>The CFAllocator to be used to allocate memory for the stream.  Pass NULL
+or kCFAllocatorDefault to use the current default allocator.</dd>
+<dt><code>callback</code></dt><dd>An FSEventStreamCallback which will be called when FS events occur.</dd>
+<dt><code>context</code></dt><dd>A pointer to the FSEventStreamContext structure the client wants to
+associate with this stream.  Its fields are copied out into the stream
+itself so its memory can be released after the stream is created.  Passing
+NULL is allowed and has the same effect as passing a structure whose
+fields are all set to zero.</dd>
+<dt><code>pathsToWatch</code></dt><dd>A CFArray of CFStringRefs, each specifying a path to a directory, signifying
+the root of a filesystem hierarchy to be watched for modifications.</dd>
+<dt><code>sinceWhen</code></dt><dd>The service will supply events that have happened after the given event ID.
+To ask for events "since now" pass the constant FSEventStreamEventIdSinceNow.
+Often, clients will supply the highest-numbered FSEventStreamEventId
+they have received in a callback, which they can obtain via the
+FSEventStreamGetLatestEventId() accessor.
+Do not pass zero for sinceWhen, unless you want to receive events for
+every directory modified since "the beginning of time" -- an unlikely scenario.</dd>
+<dt><code>latency</code></dt><dd>The number of seconds the service should wait after hearing about an event
+from the kernel before passing it along to the client via its callback.
+Specifying a larger value may result in more effective temporal coalescing,
+resulting in fewer callbacks and greater overall efficiency.</dd>
+<dt><code>flags</code></dt><dd>Specify kFSEventStreamCreateFlagNone to watch for events in the directory
+at the given path (and all its subdirectories, recursively).<br>
+Specify kFSEventStreamCreateFlagUseCFTypes to control what gets passed
+to the eventPaths argument of your callback.  See the documentation for the
+callback function for more information.<br>
+The kFSEventStreamCreateFlagNoDefer flag controls the behavior
+of the latency parameter.  If you specify the flag and more
+than latency seconds have elapsed since the last event, your app
+will receive the event immediately.  The delivery of the event
+resets the latency timer and any further events will be delivered
+after latency seconds have elapsed.  This flag is useful for apps
+that are interactive and want to react immediately to changes but
+avoid getting swamped by notifications when changes are occurring
+in rapid succession.<br>
+If you do not specify this flag, when an event occurs after a
+period of no events, the latency timer is started.  Any events
+that occur during the next latency seconds will be delivered as
+one group (along with the first event).  The delivery of the
+group of events resets the latency timer and any further events
+will be delivered after latency seconds.  This is the default
+behavior and is appropriate for background, daemon or batch
+processing apps.</dd>
+</dl>
+<h5 class="tight"><font face="Lucida Grande,Helvetica,Arial">Return Value</font></h5><p><!-- begin return value -->A valid FSEventStreamRef.
+
+ 
+<!-- end return value --></p><h5 class="tight"><font face="Lucida Grande,Helvetica,Arial">Discussion</font>
+</h5><p><!-- begin discussion -->Creates a new FS event stream object with the given parameters.
+In order to start receiving callbacks you must also call
+FSEventStreamScheduleWithRunLoop() and FSEventStreamStart().<br>
+<!-- end discussion --></p>
+<p></p><dl><dt><i>Availability</i></dt><dd>Introduced in Mac OS X v10.5.
+</dd>
+</dl>
+<hr><!-- headerDoc=func;  uid=//apple_ref/c/func/FSEventStreamCreateRelativeToDevice;  name=FSEventStreamCreateRelativeToDevice -->
+<a name="//apple_ref/c/func/FSEventStreamCreateRelativeToDevice"></a>
+<table border="0"  cellpadding="2" cellspacing="2" width="300"><tr><td valign="top" height="12" colspan="5" scope="row"><h3><a name="FSEventStreamCreateRelativeToDevice">FSEventStreamCreateRelativeToDevice</a></h3>
+</td></tr></table><hr><p></p><pre><a href="CompositePage.html#//apple_ref/c/tdef/FSEventStreamRef" class="type"><span class="type">FSEventStreamRef</span></a> <a href="CompositePage.html#//apple_ref/c/func/FSEventStreamCreateRelativeToDevice" class="function"><span class="function">FSEventStreamCreateRelativeToDevice</span></a>( 
+    <a href="../../../../CoreFoundation/Reference/CFAllocatorRef/Reference/reference.html#//apple_ref/c/tdef/CFAllocatorRef" target="_top" class="type"><span class="type">CFAllocatorRef</span></a> <span class="param">allocator</span>, 
+    <a href="CompositePage.html#//apple_ref/c/tdef/FSEventStreamCallback" class="type"><span class="type">FSEventStreamCallback</span></a> <span class="param">callback</span>, 
+    <a href="CompositePage.html#//apple_ref/c/tdef/FSEventStreamContext" class="type"><span class="type">FSEventStreamContext</span></a> *<span class="param">context</span>, 
+    <a href="../../../../Carbon/Reference/Open_Transport/Reference/reference.html#//apple_ref/c/tdef/dev_t" target="_top" class="type"><span class="type">dev_t</span></a> <span class="param">deviceToWatch</span>, 
+    <a href="../../../../CoreFoundation/Reference/CFArrayRef/Reference/reference.html#//apple_ref/c/tdef/CFArrayRef" target="_top" class="type"><span class="type">CFArrayRef</span></a> <span class="param">pathsToWatchRelativeToDevice</span>, 
+    <a href="CompositePage.html#//apple_ref/c/tdef/FSEventStreamEventId" class="type"><span class="type">FSEventStreamEventId</span></a> <span class="param">sinceWhen</span>, 
+    <a href="../../../../CoreFoundation/Reference/CFTimeUtils/Reference/reference.html#//apple_ref/c/tdef/CFTimeInterval" target="_top" class="type"><span class="type">CFTimeInterval</span></a> <span class="param">latency</span>, 
+    <a href="CompositePage.html#//apple_ref/c/tdef/FSEventStreamCreateFlags" class="type"><span class="type">FSEventStreamCreateFlags</span></a> <span class="param">flags</span>);  </pre>
+<h5 class="tight"><font face="Lucida Grande,Helvetica,Arial">Parameters</font></h5>
+<dl>
+<dt><code>allocator</code></dt><dd>The CFAllocator to be used to allocate memory for the stream.  Pass NULL
+or kCFAllocatorDefault to use the current default allocator.</dd>
+<dt><code>callback</code></dt><dd>An FSEventStreamCallback which will be called when FS events occur.</dd>
+<dt><code>context</code></dt><dd>A pointer to the FSEventStreamContext structure the client wants to
+associate with this stream.  Its fields are copied out into the stream
+itself so its memory can be released after the stream is created.</dd>
+<dt><code>deviceToWatch</code></dt><dd>A dev_t corresponding to the device which you want to receive notifications
+from.  The dev_t is the same as the st_dev field from a stat structure of
+a file on that device or the f_fsid[0] field of a statfs structure.  If the
+value of dev is zero, it is ignored.</dd>
+<dt><code>pathsToWatchRelativeToDevice</code></dt><dd>A CFArray of CFStringRefs, each specifying a relative path to a directory 
+on the device identified by the dev parameter.  The paths should be relative
+to the root of the device.  For example, if a volume "MyData" is mounted at
+"/Volumes/MyData" and you want to watch "/Volumes/MyData/Pictures/July", 
+specify a path string of "Pictures/July".  To watch the root of a volume
+pass a path of "" (the empty string).</dd>
+<dt><code>sinceWhen</code></dt><dd>The service will supply events that have happened after the given event ID.
+To ask for events "since now" pass the constant FSEventStreamEventIdSinceNow.
+Often, clients will supply the highest-numbered FSEventStreamEventId
+they have received in a callback, which they can obtain via the
+FSEventStreamGetLatestEventId() accessor.
+Do not pass zero for sinceWhen, unless you want to receive events for
+every directory modified since "the beginning of time" -- an unlikely scenario.</dd>
+<dt><code>latency</code></dt><dd>The number of seconds the service should wait after hearing about an event
+from the kernel before passing it along to the client via its callback.
+Specifying a larger value may result in more effective temporal coalescing,
+resulting in fewer callbacks.</dd>
+<dt><code>flags</code></dt><dd>Specify kFSEventStreamCreateFlagNone to watch for events in the directory
+at the given path (and all its subdirectories, recursively).</dd>
+</dl>
+<h5 class="tight"><font face="Lucida Grande,Helvetica,Arial">Return Value</font></h5><p><!-- begin return value -->A valid FSEventStreamRef.
+
+ 
+<!-- end return value --></p><h5 class="tight"><font face="Lucida Grande,Helvetica,Arial">Discussion</font>
+</h5><p><!-- begin discussion -->Creates a new FS event stream object for a particular device
+with the given parameters.
+In order to start receiving callbacks you must also call
+FSEventStreamScheduleWithRunLoop() and FSEventStreamStart().<br>
+<!-- end discussion --></p>
+<p></p><dl><dt><i>Availability</i></dt><dd>Introduced in Mac OS X v10.5.
+</dd>
+</dl>
+<hr><!-- headerDoc=func;  uid=//apple_ref/c/func/FSEventStreamFlushAsync;  name=FSEventStreamFlushAsync -->
+<a name="//apple_ref/c/func/FSEventStreamFlushAsync"></a>
+<table border="0"  cellpadding="2" cellspacing="2" width="300"><tr><td valign="top" height="12" colspan="5" scope="row"><h3><a name="FSEventStreamFlushAsync">FSEventStreamFlushAsync</a></h3>
+</td></tr></table><hr><p></p><pre><a href="../../../../GraphicsImaging/Reference/ImageCaptureDeviceModulesReference/ICADevice/CompositePage.html#//apple_ref/c/tdef/void" target="_top" class="type"><span class="type">void</span></a> <a href="CompositePage.html#//apple_ref/c/func/FSEventStreamFlushAsync" class="function"><span class="function">FSEventStreamFlushAsync</span></a>( 
+    <a href="CompositePage.html#//apple_ref/c/tdef/FSEventStreamRef" class="type"><span class="type">FSEventStreamRef</span></a> <span class="param">streamRef</span>);  </pre>
+<h5 class="tight"><font face="Lucida Grande,Helvetica,Arial">Parameters</font></h5>
+<dl>
+<dt><code>streamRef</code></dt><dd>A valid stream.</dd>
+</dl>
+<h5 class="tight"><font face="Lucida Grande,Helvetica,Arial">Discussion</font>
+</h5><p><!-- begin discussion -->Asks the FS Events service to flush out any events that have occurred but
+have not yet been delivered, due to the latency parameter that was supplied
+when the stream was created.  This flushing occurs asynchronously -- do not
+expect the events to have already been delivered by the time this call returns.<br>
+FSEventStreamFlushAsync() can only be called after the stream has been
+started, via FSEventStreamStart().<br>
+<!-- end discussion --></p>
+<p></p><dl><dt><i>Availability</i></dt><dd>Introduced in Mac OS X v10.5.
+</dd>
+</dl>
+<hr><!-- headerDoc=func;  uid=//apple_ref/c/func/FSEventStreamFlushSync;  name=FSEventStreamFlushSync -->
+<a name="//apple_ref/c/func/FSEventStreamFlushSync"></a>
+<table border="0"  cellpadding="2" cellspacing="2" width="300"><tr><td valign="top" height="12" colspan="5" scope="row"><h3><a name="FSEventStreamFlushSync">FSEventStreamFlushSync</a></h3>
+</td></tr></table><hr><p></p><pre><a href="../../../../GraphicsImaging/Reference/ImageCaptureDeviceModulesReference/ICADevice/CompositePage.html#//apple_ref/c/tdef/void" target="_top" class="type"><span class="type">void</span></a> <a href="CompositePage.html#//apple_ref/c/func/FSEventStreamFlushSync" class="function"><span class="function">FSEventStreamFlushSync</span></a>( 
+    <a href="CompositePage.html#//apple_ref/c/tdef/FSEventStreamRef" class="type"><span class="type">FSEventStreamRef</span></a> <span class="param">streamRef</span>);  </pre>
+<h5 class="tight"><font face="Lucida Grande,Helvetica,Arial">Parameters</font></h5>
+<dl>
+<dt><code>streamRef</code></dt><dd>A valid stream.</dd>
+</dl>
+<h5 class="tight"><font face="Lucida Grande,Helvetica,Arial">Discussion</font>
+</h5><p><!-- begin discussion -->Asks the FS Events service to flush out any events that have occurred but
+have not yet been delivered, due to the latency parameter that was supplied
+when the stream was created.  This flushing occurs synchronously -- by the
+time this call returns, your callback will have been invoked for every
+event that had already occurred at the time you made this call.<br>
+FSEventStreamFlushSync() can only be called after the stream has been
+started, via FSEventStreamStart().<br>
+<!-- end discussion --></p>
+<p></p><dl><dt><i>Availability</i></dt><dd>Introduced in Mac OS X v10.5.
+</dd>
+</dl>
+<hr><!-- headerDoc=func;  uid=//apple_ref/c/func/FSEventStreamGetDeviceBeingWatched;  name=FSEventStreamGetDeviceBeingWatched -->
+<a name="//apple_ref/c/func/FSEventStreamGetDeviceBeingWatched"></a>
+<table border="0"  cellpadding="2" cellspacing="2" width="300"><tr><td valign="top" height="12" colspan="5" scope="row"><h3><a name="FSEventStreamGetDeviceBeingWatched">FSEventStreamGetDeviceBeingWatched</a></h3>
+</td></tr></table><hr><p></p><pre><a href="../../../../Carbon/Reference/Open_Transport/Reference/reference.html#//apple_ref/c/tdef/dev_t" target="_top" class="type"><span class="type">dev_t</span></a> <a href="CompositePage.html#//apple_ref/c/func/FSEventStreamGetDeviceBeingWatched" class="function"><span class="function">FSEventStreamGetDeviceBeingWatched</span></a>( 
+    <a href="CompositePage.html#//apple_ref/c/tdef/ConstFSEventStreamRef" class="type"><span class="type">ConstFSEventStreamRef</span></a> <span class="param">streamRef</span>);  </pre>
+<h5 class="tight"><font face="Lucida Grande,Helvetica,Arial">Parameters</font></h5>
+<dl>
+<dt><code>streamRef</code></dt><dd>A valid stream.</dd>
+</dl>
+<h5 class="tight"><font face="Lucida Grande,Helvetica,Arial">Return Value</font></h5><p><!-- begin return value -->The dev_t for a device-relative stream, otherwise 0.
+
+ 
+<!-- end return value --></p><h5 class="tight"><font face="Lucida Grande,Helvetica,Arial">Discussion</font>
+</h5><p><!-- begin discussion -->Fetches the dev_t supplied when the stream was created via
+FSEventStreamCreateRelativeToDevice(), otherwise 0.<br>
+<!-- end discussion --></p>
+<p></p><dl><dt><i>Availability</i></dt><dd>Introduced in Mac OS X v10.5.
+</dd>
+</dl>
+<hr><!-- headerDoc=func;  uid=//apple_ref/c/func/FSEventStreamGetLatestEventId;  name=FSEventStreamGetLatestEventId -->
+<a name="//apple_ref/c/func/FSEventStreamGetLatestEventId"></a>
+<table border="0"  cellpadding="2" cellspacing="2" width="300"><tr><td valign="top" height="12" colspan="5" scope="row"><h3><a name="FSEventStreamGetLatestEventId">FSEventStreamGetLatestEventId</a></h3>
+</td></tr></table><hr><p></p><pre><a href="CompositePage.html#//apple_ref/c/tdef/FSEventStreamEventId" class="type"><span class="type">FSEventStreamEventId</span></a> <a href="CompositePage.html#//apple_ref/c/func/FSEventStreamGetLatestEventId" class="function"><span class="function">FSEventStreamGetLatestEventId</span></a>( 
+    <a href="CompositePage.html#//apple_ref/c/tdef/ConstFSEventStreamRef" class="type"><span class="type">ConstFSEventStreamRef</span></a> <span class="param">streamRef</span>);  </pre>
+<h5 class="tight"><font face="Lucida Grande,Helvetica,Arial">Parameters</font></h5>
+<dl>
+<dt><code>streamRef</code></dt><dd>A valid stream.</dd>
+</dl>
+<h5 class="tight"><font face="Lucida Grande,Helvetica,Arial">Return Value</font></h5><p><!-- begin return value -->The sinceWhen attribute of the stream.
+
+ 
+<!-- end return value --></p><h5 class="tight"><font face="Lucida Grande,Helvetica,Arial">Discussion</font>
+</h5><p><!-- begin discussion -->Fetches the sinceWhen property of the stream.  Upon receiving an event
+(and just before invoking the client's callback) this attribute is updated
+to the highest-numbered event ID mentioned in the event.<br>
+<!-- end discussion --></p>
+<p></p><dl><dt><i>Availability</i></dt><dd>Introduced in Mac OS X v10.5.
+</dd>
+</dl>
+<hr><!-- headerDoc=func;  uid=//apple_ref/c/func/FSEventStreamInvalidate;  name=FSEventStreamInvalidate -->
+<a name="//apple_ref/c/func/FSEventStreamInvalidate"></a>
+<table border="0"  cellpadding="2" cellspacing="2" width="300"><tr><td valign="top" height="12" colspan="5" scope="row"><h3><a name="FSEventStreamInvalidate">FSEventStreamInvalidate</a></h3>
+</td></tr></table><hr><p></p><pre><a href="../../../../GraphicsImaging/Reference/ImageCaptureDeviceModulesReference/ICADevice/CompositePage.html#//apple_ref/c/tdef/void" target="_top" class="type"><span class="type">void</span></a> <a href="CompositePage.html#//apple_ref/c/func/FSEventStreamInvalidate" class="function"><span class="function">FSEventStreamInvalidate</span></a>( 
+    <a href="CompositePage.html#//apple_ref/c/tdef/FSEventStreamRef" class="type"><span class="type">FSEventStreamRef</span></a> <span class="param">streamRef</span>);  </pre>
+<h5 class="tight"><font face="Lucida Grande,Helvetica,Arial">Parameters</font></h5>
+<dl>
+<dt><code>streamRef</code></dt><dd>A valid stream.</dd>
+</dl>
+<h5 class="tight"><font face="Lucida Grande,Helvetica,Arial">Discussion</font>
+</h5><p><!-- begin discussion -->Invalidates the stream, like CFRunLoopSourceInvalidate() does for
+a CFRunLoopSourceRef.  It will be unscheduled from any runloops upon which
+it had been scheduled.<br>
+FSEventStreamInvalidate() can only be called after the stream has been
+scheduled on at least one runloop, via FSEventStreamSchedueWithRunLoop().<br>
+<!-- end discussion --></p>
+<p></p><dl><dt><i>Availability</i></dt><dd>Introduced in Mac OS X v10.5.
+</dd>
+</dl>
+<hr><!-- headerDoc=func;  uid=//apple_ref/c/func/FSEventStreamRelease;  name=FSEventStreamRelease -->
+<a name="//apple_ref/c/func/FSEventStreamRelease"></a>
+<table border="0"  cellpadding="2" cellspacing="2" width="300"><tr><td valign="top" height="12" colspan="5" scope="row"><h3><a name="FSEventStreamRelease">FSEventStreamRelease</a></h3>
+</td></tr></table><hr><p></p><pre><a href="../../../../GraphicsImaging/Reference/ImageCaptureDeviceModulesReference/ICADevice/CompositePage.html#//apple_ref/c/tdef/void" target="_top" class="type"><span class="type">void</span></a> <a href="CompositePage.html#//apple_ref/c/func/FSEventStreamRelease" class="function"><span class="function">FSEventStreamRelease</span></a>( 
+    <a href="CompositePage.html#//apple_ref/c/tdef/FSEventStreamRef" class="type"><span class="type">FSEventStreamRef</span></a> <span class="param">streamRef</span>);  </pre>
+<h5 class="tight"><font face="Lucida Grande,Helvetica,Arial">Parameters</font></h5>
+<dl>
+<dt><code>streamRef</code></dt><dd>A valid stream.</dd>
+</dl>
+<h5 class="tight"><font face="Lucida Grande,Helvetica,Arial">Discussion</font>
+</h5><p><!-- begin discussion -->Decrements the stream's refcount.  The refcount is initially one and is
+incremented via FSEventStreamRetain().  If the refcount reaches zero then
+the stream is deallocated.<br>
+<!-- end discussion --></p>
+<p></p><dl><dt><i>Availability</i></dt><dd>Introduced in Mac OS X v10.5.
+</dd>
+</dl>
+<hr><!-- headerDoc=func;  uid=//apple_ref/c/func/FSEventStreamRetain;  name=FSEventStreamRetain -->
+<a name="//apple_ref/c/func/FSEventStreamRetain"></a>
+<table border="0"  cellpadding="2" cellspacing="2" width="300"><tr><td valign="top" height="12" colspan="5" scope="row"><h3><a name="FSEventStreamRetain">FSEventStreamRetain</a></h3>
+</td></tr></table><hr><p></p><pre><a href="../../../../GraphicsImaging/Reference/ImageCaptureDeviceModulesReference/ICADevice/CompositePage.html#//apple_ref/c/tdef/void" target="_top" class="type"><span class="type">void</span></a> <a href="CompositePage.html#//apple_ref/c/func/FSEventStreamRetain" class="function"><span class="function">FSEventStreamRetain</span></a>( 
+    <a href="CompositePage.html#//apple_ref/c/tdef/FSEventStreamRef" class="type"><span class="type">FSEventStreamRef</span></a> <span class="param">streamRef</span>);  </pre>
+<h5 class="tight"><font face="Lucida Grande,Helvetica,Arial">Parameters</font></h5>
+<dl>
+<dt><code>streamRef</code></dt><dd>A valid stream.</dd>
+</dl>
+<h5 class="tight"><font face="Lucida Grande,Helvetica,Arial">Discussion</font>
+</h5><p><!-- begin discussion -->Increments the stream's refcount.  The refcount is initially one and is
+decremented via FSEventStreamRelease().<br>
+<!-- end discussion --></p>
+<p></p><dl><dt><i>Availability</i></dt><dd>Introduced in Mac OS X v10.5.
+</dd>
+</dl>
+<hr><!-- headerDoc=func;  uid=//apple_ref/c/func/FSEventStreamScheduleWithRunLoop;  name=FSEventStreamScheduleWithRunLoop -->
+<a name="//apple_ref/c/func/FSEventStreamScheduleWithRunLoop"></a>
+<table border="0"  cellpadding="2" cellspacing="2" width="300"><tr><td valign="top" height="12" colspan="5" scope="row"><h3><a name="FSEventStreamScheduleWithRunLoop">FSEventStreamScheduleWithRunLoop</a></h3>
+</td></tr></table><hr><p></p><pre><a href="../../../../GraphicsImaging/Reference/ImageCaptureDeviceModulesReference/ICADevice/CompositePage.html#//apple_ref/c/tdef/void" target="_top" class="type"><span class="type">void</span></a> <a href="CompositePage.html#//apple_ref/c/func/FSEventStreamScheduleWithRunLoop" class="function"><span class="function">FSEventStreamScheduleWithRunLoop</span></a>( 
+    <a href="CompositePage.html#//apple_ref/c/tdef/FSEventStreamRef" class="type"><span class="type">FSEventStreamRef</span></a> <span class="param">streamRef</span>, 
+    <a href="../../../../CoreFoundation/Reference/CFRunLoopRef/Reference/reference.html#//apple_ref/c/tdef/CFRunLoopRef" target="_top" class="type"><span class="type">CFRunLoopRef</span></a> <span class="param">runLoop</span>, 
+    <a href="../../../../CoreFoundation/Reference/CFStringRef/Reference/reference.html#//apple_ref/c/tdef/CFStringRef" target="_top" class="type"><span class="type">CFStringRef</span></a> <span class="param">runLoopMode</span>);  </pre>
+<h5 class="tight"><font face="Lucida Grande,Helvetica,Arial">Parameters</font></h5>
+<dl>
+<dt><code>streamRef</code></dt><dd>A valid stream.</dd>
+<dt><code>runLoop</code></dt><dd>The run loop on which to schedule the stream.</dd>
+<dt><code>runLoopMode</code></dt><dd>A run loop mode on which to schedule the stream.</dd>
+</dl>
+<h5 class="tight"><font face="Lucida Grande,Helvetica,Arial">Discussion</font>
+</h5><p><!-- begin discussion -->This function schedules the stream on the specified run loop,
+like CFRunLoopAddSource() does for a CFRunLoopSourceRef.  The caller is
+responsible for ensuring that the stream is scheduled on at least one run
+loop and that at least one of the run loops on which the stream is
+scheduled is being run.<br>
+To start receiving events on the stream, call FSEventStreamStart().<br>
+To remove the stream from the run loops upon which it has been scheduled,
+call FSEventStreamUnscheduleFromRunLoop() or FSEventStreamInvalidate().<br>
+<!-- end discussion --></p>
+<p></p><dl><dt><i>Availability</i></dt><dd>Introduced in Mac OS X v10.5.
+</dd>
+</dl>
+<hr><!-- headerDoc=func;  uid=//apple_ref/c/func/FSEventStreamShow;  name=FSEventStreamShow -->
+<a name="//apple_ref/c/func/FSEventStreamShow"></a>
+<table border="0"  cellpadding="2" cellspacing="2" width="300"><tr><td valign="top" height="12" colspan="5" scope="row"><h3><a name="FSEventStreamShow">FSEventStreamShow</a></h3>
+</td></tr></table><hr><p></p><pre><a href="../../../../GraphicsImaging/Reference/ImageCaptureDeviceModulesReference/ICADevice/CompositePage.html#//apple_ref/c/tdef/void" target="_top" class="type"><span class="type">void</span></a> <a href="CompositePage.html#//apple_ref/c/func/FSEventStreamShow" class="function"><span class="function">FSEventStreamShow</span></a>( 
+    <a href="CompositePage.html#//apple_ref/c/tdef/ConstFSEventStreamRef" class="type"><span class="type">ConstFSEventStreamRef</span></a> <span class="param">streamRef</span>);  </pre>
+<h5 class="tight"><font face="Lucida Grande,Helvetica,Arial">Parameters</font></h5>
+<dl>
+<dt><code>streamRef</code></dt><dd>A valid stream.</dd>
+</dl>
+<h5 class="tight"><font face="Lucida Grande,Helvetica,Arial">Discussion</font>
+</h5><p><!-- begin discussion -->Prints a description of the supplied stream to stderr.
+For debugging only.<br>
+<!-- end discussion --></p>
+<p></p><dl><dt><i>Availability</i></dt><dd>Introduced in Mac OS X v10.5.
+</dd>
+</dl>
+<hr><!-- headerDoc=func;  uid=//apple_ref/c/func/FSEventStreamStart;  name=FSEventStreamStart -->
+<a name="//apple_ref/c/func/FSEventStreamStart"></a>
+<table border="0"  cellpadding="2" cellspacing="2" width="300"><tr><td valign="top" height="12" colspan="5" scope="row"><h3><a name="FSEventStreamStart">FSEventStreamStart</a></h3>
+</td></tr></table><hr><p></p><pre><!-- a --><span class="type">Boolean</span><!-- /a --> <a href="CompositePage.html#//apple_ref/c/func/FSEventStreamStart" class="function"><span class="function">FSEventStreamStart</span></a>( 
+    <a href="CompositePage.html#//apple_ref/c/tdef/FSEventStreamRef" class="type"><span class="type">FSEventStreamRef</span></a> <span class="param">streamRef</span>);  </pre>
+<h5 class="tight"><font face="Lucida Grande,Helvetica,Arial">Parameters</font></h5>
+<dl>
+<dt><code>streamRef</code></dt><dd>A valid stream.</dd>
+</dl>
+<h5 class="tight"><font face="Lucida Grande,Helvetica,Arial">Return Value</font></h5><p><!-- begin return value -->True if it succeeds, otherwise False if it fails.  It ought to always
+succeed, but in the event it does not then your code should fall back to
+performing recursive scans of the directories of interest as appropriate.
+
+ 
+<!-- end return value --></p><h5 class="tight"><font face="Lucida Grande,Helvetica,Arial">Discussion</font>
+</h5><p><!-- begin discussion -->Attempts to register with the FS Events service to receive events per
+the parameters in the stream.  <br>
+FSEventStreamStart() can only be called once the stream has been scheduled
+on at least one runloop, via FSEventStreamScheduleWithRunLoop().<br>
+Once started, the stream can be stopped via FSEventStreamStop().<br>
+<!-- end discussion --></p>
+<p></p><dl><dt><i>Availability</i></dt><dd>Introduced in Mac OS X v10.5.
+</dd>
+</dl>
+<hr><!-- headerDoc=func;  uid=//apple_ref/c/func/FSEventStreamStop;  name=FSEventStreamStop -->
+<a name="//apple_ref/c/func/FSEventStreamStop"></a>
+<table border="0"  cellpadding="2" cellspacing="2" width="300"><tr><td valign="top" height="12" colspan="5" scope="row"><h3><a name="FSEventStreamStop">FSEventStreamStop</a></h3>
+</td></tr></table><hr><p></p><pre><a href="../../../../GraphicsImaging/Reference/ImageCaptureDeviceModulesReference/ICADevice/CompositePage.html#//apple_ref/c/tdef/void" target="_top" class="type"><span class="type">void</span></a> <a href="CompositePage.html#//apple_ref/c/func/FSEventStreamStop" class="function"><span class="function">FSEventStreamStop</span></a>( 
+    <a href="CompositePage.html#//apple_ref/c/tdef/FSEventStreamRef" class="type"><span class="type">FSEventStreamRef</span></a> <span class="param">streamRef</span>);  </pre>
+<h5 class="tight"><font face="Lucida Grande,Helvetica,Arial">Parameters</font></h5>
+<dl>
+<dt><code>streamRef</code></dt><dd>A valid stream.</dd>
+</dl>
+<h5 class="tight"><font face="Lucida Grande,Helvetica,Arial">Discussion</font>
+</h5><p><!-- begin discussion -->Unregisters with the FS Events service.  The client callback will
+not be called for this stream while it is stopped.<br>
+FSEventStreamStop() can only be called if the stream has been started, 
+via FSEventStreamStart().<br>
+Once stopped, the stream can be restarted via FSEventStreamStart(),
+at which point it will resume receiving events from where it left off ("sinceWhen").<br>
+<!-- end discussion --></p>
+<p></p><dl><dt><i>Availability</i></dt><dd>Introduced in Mac OS X v10.5.
+</dd>
+</dl>
+<hr><!-- headerDoc=func;  uid=//apple_ref/c/func/FSEventStreamUnscheduleFromRunLoop;  name=FSEventStreamUnscheduleFromRunLoop -->
+<a name="//apple_ref/c/func/FSEventStreamUnscheduleFromRunLoop"></a>
+<table border="0"  cellpadding="2" cellspacing="2" width="300"><tr><td valign="top" height="12" colspan="5" scope="row"><h3><a name="FSEventStreamUnscheduleFromRunLoop">FSEventStreamUnscheduleFromRunLoop</a></h3>
+</td></tr></table><hr><p></p><pre><a href="../../../../GraphicsImaging/Reference/ImageCaptureDeviceModulesReference/ICADevice/CompositePage.html#//apple_ref/c/tdef/void" target="_top" class="type"><span class="type">void</span></a> <a href="CompositePage.html#//apple_ref/c/func/FSEventStreamUnscheduleFromRunLoop" class="function"><span class="function">FSEventStreamUnscheduleFromRunLoop</span></a>( 
+    <a href="CompositePage.html#//apple_ref/c/tdef/FSEventStreamRef" class="type"><span class="type">FSEventStreamRef</span></a> <span class="param">streamRef</span>, 
+    <a href="../../../../CoreFoundation/Reference/CFRunLoopRef/Reference/reference.html#//apple_ref/c/tdef/CFRunLoopRef" target="_top" class="type"><span class="type">CFRunLoopRef</span></a> <span class="param">runLoop</span>, 
+    <a href="../../../../CoreFoundation/Reference/CFStringRef/Reference/reference.html#//apple_ref/c/tdef/CFStringRef" target="_top" class="type"><span class="type">CFStringRef</span></a> <span class="param">runLoopMode</span>);  </pre>
+<h5 class="tight"><font face="Lucida Grande,Helvetica,Arial">Parameters</font></h5>
+<dl>
+<dt><code>streamRef</code></dt><dd>A valid stream.</dd>
+<dt><code>runLoop</code></dt><dd>The run loop from which to unschedule the stream.</dd>
+<dt><code>runLoopMode</code></dt><dd>The run loop mode from which to unschedule the stream.</dd>
+</dl>
+<h5 class="tight"><font face="Lucida Grande,Helvetica,Arial">Discussion</font>
+</h5><p><!-- begin discussion -->This function removes the stream from the specified run loop,
+like CFRunLoopRemoveSource() does for a CFRunLoopSourceRef.<br>
+<!-- end discussion --></p>
+<p></p><dl><dt><i>Availability</i></dt><dd>Introduced in Mac OS X v10.5.
+</dd>
+</dl>
+<h2>Typedefs</h2>
+<hr><!-- headerDoc=tdef;  uid=//apple_ref/c/tdef/ConstFSEventStreamRef;  name=ConstFSEventStreamRef -->
+<a name="//apple_ref/c/tdef/ConstFSEventStreamRef"></a>
+<table border="0"  cellpadding="2" cellspacing="2" width="300"><tr><td valign="top" height="12" colspan="5" scope="row"><h3><a name="ConstFSEventStreamRef">ConstFSEventStreamRef</a></h3>
+</td></tr></table><hr><p></p><pre><span class="keyword">typedef</span> <span class="keyword">const</span> <span class="keyword">struct</span> <!-- a --><span class="type">__FSEventStream</span><!-- /a --> <span class="type">*</span><span class="var">ConstFSEventStreamRef</span>;  </pre>
+<h5 class="tight"><font face="Lucida Grande,Helvetica,Arial">Discussion</font>
+</h5><p><!-- begin discussion -->This is the type of a reference to a constant FSEventStream.<!-- end discussion --></p>
+<p></p><hr><!-- headerDoc=tdef;  uid=//apple_ref/c/tdef/FSEventStreamCallback;  name=FSEventStreamCallback -->
+<a name="//apple_ref/c/tdef/FSEventStreamCallback"></a>
+<table border="0"  cellpadding="2" cellspacing="2" width="300"><tr><td valign="top" height="12" colspan="5" scope="row"><h3><a name="FSEventStreamCallback">FSEventStreamCallback</a></h3>
+</td></tr></table><hr><p></p><pre><span class="keyword">typedef</span> <a href="../../../../GraphicsImaging/Reference/ImageCaptureDeviceModulesReference/ICADevice/CompositePage.html#//apple_ref/c/tdef/void" target="_top" class="type"><span class="type">void</span></a> ( *<!-- a --><span class="function">FSEventStreamCallback</span><!-- /a -->)( 
+    <a href="CompositePage.html#//apple_ref/c/tdef/ConstFSEventStreamRef" class="type"><span class="type">ConstFSEventStreamRef</span></a> <span class="param">streamRef</span>, 
+    <a href="../../../../GraphicsImaging/Reference/ImageCaptureDeviceModulesReference/ICADevice/CompositePage.html#//apple_ref/c/tdef/void" target="_top" class="type"><span class="type">void</span></a> *<span class="param">clientCallBackInfo</span>, 
+    <!-- a --><span class="type">size_t</span><!-- /a --> <span class="param">numEvents</span>, 
+    <a href="../../../../GraphicsImaging/Reference/ImageCaptureDeviceModulesReference/ICADevice/CompositePage.html#//apple_ref/c/tdef/void" target="_top" class="type"><span class="type">void</span></a> *<span class="param">eventPaths</span>, 
+    <span class="keyword">const</span> <a href="CompositePage.html#//apple_ref/c/tdef/FSEventStreamEventFlags" class="type"><span class="type">FSEventStreamEventFlags</span></a> <!-- a --><span class="type">eventFlags</span><!-- /a -->[], 
+    <span class="keyword">const</span> <a href="CompositePage.html#//apple_ref/c/tdef/FSEventStreamEventId" class="type"><span class="type">FSEventStreamEventId</span></a> <!-- a --><span class="type">eventIds</span><!-- /a -->[]);  </pre>
+<h5 class="tight"><font face="Lucida Grande,Helvetica,Arial">Discussion</font>
+</h5><p><!-- begin discussion -->This is the type of the callback function supplied by the client when creating
+a new stream.  This callback is invoked by the service from the client's
+runloop(s) when events occur, per the parameters specified when the stream was created.<br>
+<!-- end discussion --></p>
+<p></p><hr><!-- headerDoc=tdef;  uid=//apple_ref/c/tdef/FSEventStreamContext;  name=FSEventStreamContext -->
+<a name="//apple_ref/c/tdef/FSEventStreamContext"></a>
+<table border="0"  cellpadding="2" cellspacing="2" width="300"><tr><td valign="top" height="12" colspan="5" scope="row"><h3><a name="FSEventStreamContext">FSEventStreamContext</a></h3>
+</td></tr></table><hr><p></p><pre><span class="keyword">typedef</span> <span class="keyword">struct</span> <a href="CompositePage.html#//apple_ref/c/tdef/FSEventStreamContext" class="type"><span class="type">FSEventStreamContext</span></a> { 
+    <a href="../../../../CoreFoundation/Reference/CFBaseUtils/Reference/reference.html#//apple_ref/c/tdef/CFIndex" target="_top" class="type"><span class="type">CFIndex</span></a> <span class="var">version</span>; 
+    <a href="../../../../GraphicsImaging/Reference/ImageCaptureDeviceModulesReference/ICADevice/CompositePage.html#//apple_ref/c/tdef/void" target="_top" class="type"><span class="type">void</span></a> *<span class="var">info</span>; 
+    <a href="../../../../CoreFoundation/Reference/CFAllocatorRef/Reference/reference.html#//apple_ref/c/tdef/CFAllocatorRetainCallBack" target="_top" class="type"><span class="type">CFAllocatorRetainCallBack</span></a> <span class="var">retain</span>; 
+    <a href="../../../../CoreFoundation/Reference/CFAllocatorRef/Reference/reference.html#//apple_ref/c/tdef/CFAllocatorReleaseCallBack" target="_top" class="type"><span class="type">CFAllocatorReleaseCallBack</span></a> <span class="var">release</span>; 
+    <a href="../../../../CoreFoundation/Reference/CFAllocatorRef/Reference/reference.html#//apple_ref/c/tdef/CFAllocatorCopyDescriptionCallBack" target="_top" class="type"><span class="type">CFAllocatorCopyDescriptionCallBack</span></a> <span class="var">copyDescription</span>; 
+} <span class="var">FSEventStreamContext</span>;  </pre>
+<h5 class="tight"><font face="Lucida Grande,Helvetica,Arial">Fields</font></h5>
+<blockquote>
+<dl><dt><code>version</code></dt><dd>Currently the only valid value is zero.</dd>
+<dt><code>info</code></dt><dd>An arbitrary client-defined value (for instance, a pointer) to be associated
+with the stream and passed to the callback when it is invoked.  If a
+non-NULL value is supplied for the retain callback the framework will
+use it to retain this value.  If a non-NULL value is supplied for the
+release callback then when the stream is deallocated it will be used to
+release this value.  This can be NULL.</dd>
+<dt><code>retain</code></dt><dd>The callback used retain the info pointer.  This can be NULL.</dd>
+<dt><code>release</code></dt><dd>The callback used release a retain on the info pointer.  This can be NULL.</dd>
+<dt><code>copyDescription</code></dt><dd>The callback used to create a descriptive string representation of
+the info pointer (or the data pointed to by the info pointer) for
+debugging purposes.  This can be NULL.</dd>
+</dl>
+</blockquote>
+<h5 class="tight"><font face="Lucida Grande,Helvetica,Arial">Discussion</font>
+</h5><p><!-- begin discussion -->Structure containing client-supplied data (and callbacks to manage it)
+that should be associated with a newly-created stream.<!-- end discussion --></p>
+<p></p><hr><!-- headerDoc=tdef;  uid=//apple_ref/c/tdef/FSEventStreamCreateFlags;  name=FSEventStreamCreateFlags -->
+<a name="//apple_ref/c/tdef/FSEventStreamCreateFlags"></a>
+<table border="0"  cellpadding="2" cellspacing="2" width="300"><tr><td valign="top" height="12" colspan="5" scope="row"><h3><a name="FSEventStreamCreateFlags">FSEventStreamCreateFlags</a></h3>
+</td></tr></table><hr><p></p><pre><span class="keyword">typedef</span> <!-- a --><span class="type">UInt32</span><!-- /a --> <span class="var">FSEventStreamCreateFlags</span>;  </pre>
+<h5 class="tight"><font face="Lucida Grande,Helvetica,Arial">Discussion</font>
+</h5><p><!-- begin discussion -->Flags that can be passed to the FSEventStreamCreate...() functions.<!-- end discussion --></p>
+<p></p><hr><!-- headerDoc=tdef;  uid=//apple_ref/c/tdef/FSEventStreamEventFlags;  name=FSEventStreamEventFlags -->
+<a name="//apple_ref/c/tdef/FSEventStreamEventFlags"></a>
+<table border="0"  cellpadding="2" cellspacing="2" width="300"><tr><td valign="top" height="12" colspan="5" scope="row"><h3><a name="FSEventStreamEventFlags">FSEventStreamEventFlags</a></h3>
+</td></tr></table><hr><p></p><pre><span class="keyword">typedef</span> <!-- a --><span class="type">UInt32</span><!-- /a --> <span class="var">FSEventStreamEventFlags</span>;  </pre>
+<h5 class="tight"><font face="Lucida Grande,Helvetica,Arial">Discussion</font>
+</h5><p><!-- begin discussion -->Flags that can be passed to FSEventStreamCallback().<!-- end discussion --></p>
+<p></p><hr><!-- headerDoc=tdef;  uid=//apple_ref/c/tdef/FSEventStreamEventId;  name=FSEventStreamEventId -->
+<a name="//apple_ref/c/tdef/FSEventStreamEventId"></a>
+<table border="0"  cellpadding="2" cellspacing="2" width="300"><tr><td valign="top" height="12" colspan="5" scope="row"><h3><a name="FSEventStreamEventId">FSEventStreamEventId</a></h3>
+</td></tr></table><hr><p></p><pre><span class="keyword">typedef</span> <!-- a --><span class="type">uint64_t</span><!-- /a --> <span class="var">FSEventStreamEventId</span>;  </pre>
+<h5 class="tight"><font face="Lucida Grande,Helvetica,Arial">Discussion</font>
+</h5><p><!-- begin discussion -->Event IDs that can be passed to the FSEventStreamCreate...() functions and FSEventStreamCallback().
+They are monotonically increasing per system, even across reboots and drives coming and going.
+They bear no relation to any particular clock or timebase.<!-- end discussion --></p>
+<p></p><hr><!-- headerDoc=tdef;  uid=//apple_ref/c/tdef/FSEventStreamRef;  name=FSEventStreamRef -->
+<a name="//apple_ref/c/tdef/FSEventStreamRef"></a>
+<table border="0"  cellpadding="2" cellspacing="2" width="300"><tr><td valign="top" height="12" colspan="5" scope="row"><h3><a name="FSEventStreamRef">FSEventStreamRef</a></h3>
+</td></tr></table><hr><p></p><pre><span class="keyword">typedef</span> <span class="keyword">struct</span> <!-- a --><span class="type">__FSEventStream</span><!-- /a --> <span class="type">*</span><span class="var">FSEventStreamRef</span>;  </pre>
+<h5 class="tight"><font face="Lucida Grande,Helvetica,Arial">Discussion</font>
+</h5><p><!-- begin discussion -->This is the type of a reference to an FSEventStream.<!-- end discussion --></p>
+<p></p><p><!-- start of footer -->
+
+	<table width="100%" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/documentation/Darwin/Reference/FSEvents_Ref/FSEvents/CompositePage.html%3Fid%3DTP40004723-2.1&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/documentation/Darwin/Reference/FSEvents_Ref/FSEvents/CompositePage.html%3Fid%3DTP40004723-2.1&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/documentation/Darwin/Reference/FSEvents_Ref/FSEvents/CompositePage.html%3Fid%3DTP40004723-2.1&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+
+
+
+<!-- end of footer -->
+Last Updated: 2008-03-11
+</p></body></html>

@@ -1,0 +1,852 @@
+<html><head><title></title></head>
+
+<body bgcolor="#ffffff">
+
+ 
+
+ 
+
+<h2><a name="//apple_ref/occ/cl/EOAdaptor">EOAdaptor</a>
+
+ <BR>
+
+</h2>
+
+<p><B>Inherits From:</B><BR>  
+
+NSObject
+
+
+
+<p><B>Conforms To:</B>
+
+NSObject (NSObject)
+
+
+
+<p><B>Declared in:</B>
+
+EOAccess/EOAdaptor.h<em> 
+
+</em>
+
+<p><h3>Class At a Glance:</h3>
+
+<p><dl><dt><h4>Purpose</h4>
+
+</dl>EOAdaptor is an abstract class that defines how an Enterprise Objects Framework application connects to a database server. Concrete subclasses of EOAdaptor override many of its methods in terms of the client libraries for a specific RDBMS. You typically don't interact with adaptor objects directly; rather, the Enterprise Objects Framework creates instances of a concrete adaptor subclass automatically and handles all the necessary interactions with those instances. If you're not writing a concrete adaptor subclass, there aren't very many methods you need to use, and you'll rarely invoke them directly.<p>
+
+<dl><dt><h4>Principle Attributes</h4>
+
+</dl><li>Dictionary of connection information	&#183;	Login panel
+
+
+
+
+
+<li>Array of adaptor contexts	&#183;	Expression class
+
+
+
+
+
+<dl><dt><h4>Creation</h4>
+
+Other Framework classes create them.<p>
+
+<dl><dt>Adaptor instances are generally created automatically.	
+
++ adaptorWithModel:<p>
+
+<dt>	Creates a new adaptor with the adaptor name in the 
+
+specified model.	
+
++ adaptorWithName:<p>
+
+<dt>	Creates a new adaptor with the specified name.
+
+</dl><dt><h4>Commonly Used Methods</h4>
+
+<a href="#//apple_ref/occ/instm/EOAdaptor/assertConnectionDictionaryIsValid">- assertConnectionDictionaryIsValid</a><p>
+
+<dl><dt>	Verifies that the adaptor can connect with its connection 
+
+information.
+
+<a href="#//apple_ref/occ/instm/EOAdaptor/runLoginPanel">- runLoginPanel</a><p>
+
+<dt>	Runs the login panel without affecting the connection 
+
+dictionary.
+
+<a href="#//apple_ref/occ/instm/EOAdaptor/runLoginPanelAndValidateConnectionDictionary">- runLoginPanelAndValidateConnectionDictionary</a><p>
+
+<dt>	Runs the login panel until the user enters valid connection 
+
+information or cancels the panel.
+
+<a href="#//apple_ref/occ/instm/EOAdaptor/setConnectionDictionary:">- setConnectionDictionary:</a><p>
+
+<dt>	Sets the connection dictionary.
+
+</dl></dl><p>
+
+<a name="659">
+
+<a name="description"></a>
+
+<h3>Class Description </h3>
+
+</a>EOAdaptor is an abstract class that provides concrete subclasses with a structure for connecting to a database. A concrete subclass of EOAdaptor provides database-specific method implementations and represents a single database server. You never interact with instances of the EOAdaptor class, but you use its class methods, <a href="#784"><B>adaptorWithName: </B></a> and <a href="#779"><B>adaptorWithModel: </B></a>, to create instances of a concrete subclass. The EOAdaptor class defines the methods that find and load the concrete adaptors from bundles. However, you rarely interact with a concrete adaptor either. Generally, adaptors are automatically created and used by other classes in the Enterprise Objects Framework.<p>
+
+The EOAdaptor, EOAdaptorContext, and EOAdaptorChannel classes form the <em>adaptor level</em> of the Enterprise Objects Framework. An EOAdaptor can manage several EOAdaptorContexts, each of which represents a transaction scope on the database server. An EOAdaptorContext can in turn manage several EOAdaptorChannels, each of which handles actual access to the data on the server. An adaptor for a particular database may support a limited number of contexts per adaptor or channels per context, but an adaptor is guaranteed at least one of each.<p>
+
+<img src="../EOAdaptor.gif"><p>
+
+<a name="663">
+
+<b>Figure 1 </b> The Adaptor Level
+
+
+
+</a>Typically an application uses higher level objects such as an EOEditingContext and an EODatabaseContext that drive the adaptor level objects (<a href="#666">Figure 2</a>). Consequently, you don't usually have to interact with them. Each of the adaptor level classes have counterparts in the <em>database level</em> that use the adaptor level to interact with the database. In turn, classes in the <em>control layer</em> use database level classes to perform their operations.<p>
+
+<img src="../EOAdaptor1.gif"><p>
+
+<a name="666">
+
+<b>Figure 2 </b> The Adaptor Level and Higher Level Classes
+
+
+
+</a>If your application includes an EOEditingContext as shown in <a href="#666">Figure 2</a>, the editing context creates its database level objects, and the database level objects create their own adaptor level objects. Once the network of objects is in place your code can interact with an object in the adaptor level, but it's rarely necessary. Most applications that explicitly message adaptor level objects do so to perform one of the following tasks:<p>
+
+<ul><li>Set or validate the adaptor's connection dictionary with the EOAdaptor methods <a href="#918"><B>runLoginPanelAndValidateConnectionDictionary </B></a>, <a href="#923"><B>setConnectionDictionary: </B></a>, and <a href="#830"><B>assertConnectionDictionaryIsValid </B></a>.<p><li>Fine-tune transaction management with the EOAdaptorContext methods <B>beginTransaction </B>, <B>commitTransaction </B>, and <B>rollbackTransaction </B>.<p><li>Execute stored procedures and raw SQL statements using the EOAdaptorChannel methods <B>executeStoredProcedure:withValues: </B> and <B>evaluateExpression: </B>.<p></ul><p>
+
+<a name="672">
+
+<h3> Accessing An Editing Context's Adaptor Level Objects</h3>
+
+</a>To access an EOEditingContext's adaptor level objects, get the editing context's EOObjectStoreCoordinator from the editing context, an EODatabaseContext from the object store coordinator, and the adaptor level objects from there. The following code demonstrates the process.<p>
+
+<blockquote><pre>EOEditingContext *editingContext;    // Assume this exists.
+
+</pre></blockquote><p>
+
+<blockquote><pre>NSString *myEntityName;              // Assume this exists.     
+
+</pre></blockquote><p>
+
+<blockquote><pre>EOFetchSpecification *fspec;    
+
+</pre></blockquote><p>
+
+<blockquote><pre>EOObjectStoreCoordinator *rootStore;
+
+</pre></blockquote><p>
+
+<blockquote><pre>EODatabaseContext *dbContext;
+
+</pre></blockquote><p>
+
+<blockquote><pre>EOAdaptor *adaptor;
+
+</pre></blockquote><p>
+
+<blockquote><pre>EOAdaptorContext *adContext;
+
+</pre></blockquote><p>
+
+<blockquote><pre>fspec = [EOFetchSpecification fetchSpecificationWithEntityName:myEntityName<br>    qualifier:nil<br>    sortOrderings:nil];
+
+</pre></blockquote><p>
+
+<blockquote><pre>rootStore = (EOCooperatingObjectStore *)[editingContext rootObjectStore];
+
+</pre></blockquote><p>
+
+<blockquote><pre>dbContext = [rootStore objectStoreForFetchSpecification:fspec];
+
+</pre></blockquote><p>
+
+<blockquote><pre>adaptor = [[dbContext database] adaptor];
+
+</pre></blockquote><p>
+
+<blockquote><pre>adContext = [dbContext adaptorContext];
+
+</pre></blockquote><p>
+
+This example first creates a fetch specification, providing just the entity name as an argument. Of course, you can use a fetch specification that has non-<code>nil</code> values for all of its arguments, but only the entity name is used by the EOObjectStore <code>objectStoreForFetchSpecification:</code> method. Next, the example gets the editing context's EOObjectStoreCoordinator using the EOEditingContext method <code>rootObjectStore</code>. <code>rootObjectStore</code> returns an EOObjectStore and not an EOObjectStoreCoordinator, because it's possible to substitute a custom object store in place of an object store coordinator. Similarly, the EOObjectStoreCoordinator method <code>objectStoreForFetchSpecification:</code> returns an EOCooperatingObjectStore instead of an EODatabaseContext because it's possible to substitute a custom cooperating object store in place of a database context. If your code performs any such substitutions, you should alter the above code example to match your custom object store's API. See the class specifications for EOObjectStore, EOObjectStoreCoordinator, and EOCooperatingObjectStore for more information.<p>
+
+An EOEditingContext's EOObjectStoreCoordinator can have more than one set of database and adaptor level objects. Consequently, to get a database context from the object store coordinator, you have to provide information that the coordinator can use to choose the correct database context. The code example above provides an EOFetchSpecification using the method <code>objectStoreForFetchSpecification:</code>, but you could specify different criteria by using one of the following EOObjectStoreCoordinator methods instead:<p>
+
+cooperatingObjectStores<p>
+
+<dl><dt>Returns an array of the EOObjectStoreCoordinator's cooperating object stores.
+
+objectStoreForGlobalID:<p>
+
+<dt>Returns the cooperating object store for the enterprise object identified by the provided EOGlobalID<em>.
+
+</em>objectStoreForObject:<p>
+
+<dt>Returns the cooperating object store for the provided enterprise object.
+
+</dl>After you have the database context, you can get the corresponding EOAdaptor and EOAdaptorContext as shown above.<p>
+
+<a name="680">
+
+<h3> Creating Adaptor Level Objects and Connecting Them To The Server</h3>
+
+</a>Not all applications require higher level objects to drive the adaptor level. For example, you might bypass the database level and control layer entirely if you're writing an application, such as a report writer, that is concerned only with raw data and not with the methods that an enterprise object couples to that data. At the adaptor level, each database row is returned as a dictionary. An application that bypasses higher level database level and control layer objects must create its own adaptor level objects.<p>
+
+You normally create an adaptor with the method <B>adaptorWithModel: </B>, specifying an existing EOModel object (see the EOModel class specification for information on loading a model file). The model contains the name of the adaptor bundle it needs, and also contains database connection information so that an application can connect immediately without requiring the user to type a password. The connection information consists of all the values, such as user name and password, needed to connect to the database server. It's stored in a dictionary whose keys identify the information the server expects, and whose values are the values that the adaptor will try when connecting. Each adaptor uses different keys; see your adaptor's documentation for keys it uses.<p>
+
+A newly created adaptor has no adaptor contexts; to create a new context send your adaptor a <a href="#848"><B>createAdaptorContext </B></a> message. An EOAdaptorContext retains its adaptor when created and an EOAdaptorChannel retains its context, so when you create a set of these objects, you need only retain the channel for all objects to remain valid.<p>
+
+You can create a connection dictionary and assign it to your adaptor with the <B><a href="#923">setConnectionDictionary:</a> </B> method, or you can have the adaptor run a login panel to get the information from the user. When you ask an adaptor to validate its connection dictionary with the <a href="#918"><B>runLoginPanelAndValidateConnectionDictionary </B></a> message, it briefly forms a connection to confirm that the server will accept the values entered by the user. An adaptor doesn't form a lasting connection to the database server until one of its channels receives an <a href="../EOAdaptorChannel/EOAdaptorChannel.html#" target="_top"><B>openChannel </B></a> message.<p>
+
+The following code excerpt shows one way to set up a suite of adaptor objects, given a model that's already loaded:<p>
+
+<blockquote><pre>EOModel *myModel;    /* Assume this exists. */
+
+</pre></blockquote><p>
+
+<blockquote><pre>EOAdaptor *myAdaptor;
+
+</pre></blockquote><p>
+
+<blockquote><pre>EOAdaptorContext *myContext;
+
+</pre></blockquote><p>
+
+<blockquote><pre>EOAdaptorChannel *myChannel;
+
+</pre></blockquote><p>
+
+<blockquote><pre>myAdaptor = [EOAdaptor adaptorWithModel:myModel];
+
+</pre></blockquote><p>
+
+<blockquote><pre>myContext = [myAdaptor createAdaptorContext];
+
+</pre></blockquote><p>
+
+<blockquote><pre>myChannel = [[myContext createAdaptorChannel] retain];
+
+</pre></blockquote><p>
+
+<blockquote><pre>NS_DURING
+
+</pre></blockquote><p>
+
+<blockquote><pre>[myAdaptor assertConnectionDictionaryIsValid];
+
+</pre></blockquote><p>
+
+<blockquote><pre>NS_HANDLER
+
+</pre></blockquote><p>
+
+<blockquote><pre>if ([myAdaptor runLoginPanelAndValidateConnectionDictionary] == NO) {
+
+</pre></blockquote><p>
+
+<blockquote><pre>/* Handle user canceling login panel... */
+
+</pre></blockquote><p>
+
+<blockquote><pre>}
+
+</pre></blockquote><p>
+
+<blockquote><pre>NS_ENDHANDLER
+
+</pre></blockquote><p>
+
+<blockquote><pre>[myChannel openChannel];
+
+</pre></blockquote><p>
+
+The <a href="#830"><B>assertConnectionDictionaryIsValid </B></a> invocation verifies that the adaptor has the information needed to log in to the server. This method raises an exception if it's unable to connect to the database server. Thus, it's invoked within an exception handling domain bracketed by NS_DURING and NS_HANDLER macros (see the NSException class specification for information on handling exceptions). If the connection dictionary contains invalid information (for example, it's common to leave the user name and password unspecified in the model file), <B>assertConnectionDictionaryIsValid </B> raises an exception. As a result, the local exception handler (bracketed by NS_HANDLER and NS_ENDHANDLER macros) invokes <a href="#918"><B>runLoginPanelAndValidateConnectionDictionary </B></a> to allow the user to enter the necessary connection information. The invocation of <a href="../EOAdaptorChannel/EOAdaptorChannel.html#//apple_ref/occ/instm/EOAdaptorChannel/openChannel" target="_top"><B>openChannel </B></a> at the end of the excerpt causes the application to form a connection to the database.<p>
+
+<a name="705">
+
+<h3> Creating an EOAdaptor Subclass</h3>
+
+</a>Enterprise Objects Framework provides concrete adaptors for three standard relational database management systems-Informix, Oracle, and Sybase-as well as a concrete adaptor for ODBC-compliant databases. You may want to create a subclass of one of these adaptors to extend its behavior, or you may want to create a concrete EOAdaptor subclass for a different database or persistent storage system. EOAdaptor provides many default method implementations that are sufficient for concrete subclasses:<p>
+
+<ul><li><a href="#795">+ assignExternalInfoForEntireModel:</a><br><li><a href="#839">- connectionDictionary</a><br><li><a href="#844">- contexts</a><br><li><a href="#853">- databaseEncoding</a><br><li><a href="#864">- delegate</a><br><li><a href="#895">- hasOpenChannels</a><br><li><a href="#908">- name</a><br></ul><p>The following methods establish structure and conventions that other Enterprise Objects Framework classes depend on and should be overridden with caution:<p>
+
+<ul><li><a href="#779">+ adaptorWithModel:</a><br><li><a href="#784">+ adaptorWithName:</a><br><li><a href="#818">+ setExpressionClassName:adaptorClassName:</a><br><li><a href="#825">+ sharedLoginPanelInstance</a><br><li><a href="#899">- initWithName:</a><br><li><a href="#868">- expressionClass</a><br><li><a href="#913">- runLoginPanel</a><br><li><a href="#918">- runLoginPanelAndValidateConnectionDictionary</a><br><li><a href="#923">- setConnectionDictionary:</a><br><li><a href="#928">- setDelegate:</a><br></ul><p>If you override any of the above methods, your implementations should incorporate the superclass's implementation through a message to <B>super </B>.<p>
+
+The remaining EOAdaptor methods must be overridden by concrete adaptor subclasses in terms of the persistent storage system with which it interacts:<p>
+
+<ul><li><a href="#791">+ assignExternalInfoForAttribute:</a><br><li><a href="#799">+ assignExternalInfoForEntity:</a><br><li><a href="#810">+ externalTypesWithModel:</a><br><li><a href="#814">+ internalTypeForExternalType:model:</a><br><li><a href="#830">- assertConnectionDictionaryIsValid</a><br><li><a href="#848">- createAdaptorContext</a><br><li><a href="#859">- defaultExpressionClass</a><br><li><a href="#873">- fetchedValueForDataValue:attribute:</a><br><li><a href="#877">- fetchedValueForDateValue:attribute:</a><br><li><a href="#881">- fetchedValueForNumberValue:attribute:</a><br><li><a href="#885">- fetchedValueForStringValue:attribute:</a><br><li><a href="#889">- fetchedValueForValue:attribute:</a><br><li><a href="#904">- isValidQualifierType:model:</a><br></ul><p><dl><dt>Creating an EOAdaptor
+
+<dl><dt><a href="#//apple_ref/occ/clm/EOAdaptor/adaptorWithName:">+ adaptorWithName:</a>
+
+<dt><a href="#//apple_ref/occ/clm/EOAdaptor/adaptorWithModel:">+ adaptorWithModel:</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOAdaptor/initWithName:">- initWithName:</a>
+
+</dl><dt>Getting an adaptor's name
+
+<dl><dt><a href="#//apple_ref/occ/instm/EOAdaptor/name">- name</a>
+
+</dl><dt>Getting the names of all available adaptors
+
+<dl><dt><a href="#//apple_ref/occ/clm/EOAdaptor/availableAdaptorNames">+ availableAdaptorNames</a>
+
+</dl><dt>Setting connection information
+
+<dl><dt><a href="#//apple_ref/occ/instm/EOAdaptor/assertConnectionDictionaryIsValid">- assertConnectionDictionaryIsValid</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOAdaptor/connectionDictionary">- connectionDictionary</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOAdaptor/setConnectionDictionary:">- setConnectionDictionary:</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOAdaptor/runLoginPanelAndValidateConnectionDictionary">- runLoginPanelAndValidateConnectionDictionary</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOAdaptor/runLoginPanel">- runLoginPanel</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOAdaptor/databaseEncoding">- databaseEncoding</a>
+
+</dl><dt>Performing database-specific transformations on values
+
+<dl><dt><a href="#//apple_ref/occ/instm/EOAdaptor/fetchedValueForValue:attribute:">- fetchedValueForValue:attribute:</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOAdaptor/fetchedValueForDataValue:attribute:">- fetchedValueForDataValue:attribute:</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOAdaptor/fetchedValueForDateValue:attribute:">- fetchedValueForDateValue:attribute:</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOAdaptor/fetchedValueForNumberValue:attribute:">- fetchedValueForNumberValue:attribute:</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOAdaptor/fetchedValueForStringValue:attribute:">- fetchedValueForStringValue:attribute:</a>
+
+</dl><dt>Servicing models
+
+<dl><dt><a href="#//apple_ref/occ/instm/EOAdaptor/canServiceModel:">- canServiceModel:</a>
+
+<dt><a href="#//apple_ref/occ/clm/EOAdaptor/internalTypeForExternalType:model:">+ internalTypeForExternalType:model:</a>
+
+<dt><a href="#//apple_ref/occ/clm/EOAdaptor/externalTypesWithModel:">+ externalTypesWithModel:</a>
+
+<dt><a href="#//apple_ref/occ/clm/EOAdaptor/assignExternalInfoForEntireModel:">+ assignExternalInfoForEntireModel:</a>
+
+<dt><a href="#//apple_ref/occ/clm/EOAdaptor/assignExternalInfoForEntity:">+ assignExternalInfoForEntity:</a>
+
+<dt><a href="#//apple_ref/occ/clm/EOAdaptor/assignExternalInfoForAttribute:">+ assignExternalInfoForAttribute:</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOAdaptor/isValidQualifierType:model:">- isValidQualifierType:model:</a>
+
+</dl><dt>Creating adaptor contexts
+
+<dl><dt><a href="#//apple_ref/occ/instm/EOAdaptor/createAdaptorContext">- createAdaptorContext</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOAdaptor/contexts">- contexts</a>
+
+</dl><dt>Checking connection status
+
+<dl><dt><a href="#//apple_ref/occ/instm/EOAdaptor/hasOpenChannels">- hasOpenChannels</a>
+
+</dl><dt>Setting a default expression class
+
+<dl><dt><a href="#//apple_ref/occ/clm/EOAdaptor/setExpressionClassName:adaptorClassName:">+ setExpressionClassName:adaptorClassName:</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOAdaptor/expressionClass">- expressionClass</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOAdaptor/defaultExpressionClass">- defaultExpressionClass</a>
+
+</dl><dt>Accessing an adaptor's login panel
+
+<dl><dt><a href="#//apple_ref/occ/clm/EOAdaptor/sharedLoginPanelInstance">+ sharedLoginPanelInstance</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOAdaptor/runLoginPanelAndValidateConnectionDictionary">- runLoginPanelAndValidateConnectionDictionary</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOAdaptor/runLoginPanel">- runLoginPanel</a>
+
+</dl><dt>Setting the delegate
+
+<dl><dt><a href="#//apple_ref/occ/instm/EOAdaptor/delegate">- delegate</a>
+
+<dt><a href="#//apple_ref/occ/instm/EOAdaptor/setDelegate:">- setDelegate:</a>
+
+</dl></dl><a name="778">
+
+<a name="clm"></a>
+
+<h3>Class Methods </h3>
+
+</a><a name="779">
+
+<h4> <a name="//apple_ref/occ/clm/EOAdaptor/adaptorWithModel:">adaptorWithModel:</a></h4>
+
+</a>+(id)<code>adaptorWithModel:</code>(EOModel *)<em>model</em> <p>
+
+Creates and returns a new adaptor by extracting the adaptor name from <em>model</em>, sending <B><a href="#784">adaptorWithName:</a> </B> to <B>self </B>, and assigning <em>model</em>'s connection dictionary to the new adaptor. Raises an NSInvalidArgumentException if <em>model</em> is <B>nil, </B> if <em>model</em>'s adaptor name is <B>nil </B>, or if the adaptor named in <em>model</em> can't be loaded.<p>
+
+A subclass of EOAdaptor doesn't need to override this method. A subclass that does override this method must incorporate the superclass's version through a message to <B>super </B>.<p>
+
+<B>See also: </B>  
+
+<B><a href="../EOModel/EOModel.html#//apple_ref/occ/instm/EOModel/adaptorName" target="_top">- adaptorName  </B>(EOModel)</a>, <a href="#//apple_ref/occ/instm/EOAdaptor/setConnectionDictionary:"><B>- setConnectionDictionary:</a>
+
+ </B><p><a name="784">
+
+<h4> <a name="//apple_ref/occ/clm/EOAdaptor/adaptorWithName:">adaptorWithName:</a></h4>
+
+</a>+ (id)<code>adaptorWithName:</code>(NSString *)<em>name</em> <p>
+
+Creates and returns a new adaptor, loading it from the framework named <em>name</em> if necessary and sending it an <B><a href="#899">initWithName:</a> </B> message. For example, this code excerpt creates an adaptor from a framework named <B>AcmeEOAdaptor.framework </B>:<p>
+
+<blockquote><pre>EOAdaptor *myAdaptor = [EOAdaptor adaptorWithName:@"Acme"];
+
+</pre></blockquote><p>
+
+This method searches the application's main bundle, <B>~/Library/Frameworks </B>, <B>LocalLibrary/Frameworks </B>, and <B>NextLibrary/Frameworks </B> for the first framework whose base filename (that is, the filename without the ".framework" extension) corresponds to <em>name</em>. However, note that dynamic loading isn't available on PDO platforms. Consequently, you must statically link your adaptor into applications for PDO: In this case, <a href="#784"><B>adaptorWithName: </B></a> simply looks in the runtime for an adaptor class corresponding with the specified name. Raises an NSInvalidArgumentException if <em>name</em> is <B>nil </B> or if an adaptor class corresponding with <em>name</em> can't be found.<p>
+
+Usually you'd use <a href="#779"><B>adaptorWithModel: </B></a> to create a new adaptor, but you can use this method when you don't have a model. In fact, this method is typically used when you're creating an adaptor for the purpose of creating a model from an existing database.<p>
+
+A subclass of EOAdaptor doesn't need to override this method. A subclass that does override this method must incorporate the superclass's version through a message to <B>super </B>.<p>
+
+<a name="791">
+
+<h4> <a name="//apple_ref/occ/clm/EOAdaptor/assignExternalInfoForAttribute:">assignExternalInfoForAttribute:</a></h4>
+
+</a>+ (void)<code>assignExternalInfoForAttribute:</code>(EOAttribute *)<em>attribute</em> <p>
+
+Overridden by adaptor subclasses to assign database-specific characteristics to <em>attribute</em>. EOAdaptor's implementation invokes <a href="#803"><B>assignExternalTypeForAttribute: </B></a> to assign an external type and then assigns a column name based on the attribute name. For example, <code>assignExternalInfoForAttribute:</code> assigns the column name "FIRST_NAME" to an attribute named "firstName". The method makes no changes to <em>attribute</em>'s column name if <em>attribute</em> is derived.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/clm/EOAdaptor/assignExternalInfoForEntireModel:">+ assignExternalInfoForEntireModel:</a>
+
+ </B><p><a name="795">
+
+<h4> <a name="//apple_ref/occ/clm/EOAdaptor/assignExternalInfoForEntireModel:">assignExternalInfoForEntireModel:</a></h4>
+
+</a>+ (void)<code>assignExternalInfoForEntireModel:</code>(EOModel *)<em>model</em> <p>
+
+Assigns database-specific characteristics to <em>model</em>. Used in EOModeler to switch a model's adaptor. This method examines each entity in <em>model</em>. If an entity's external name is not set and all of the entity's attribute's external names are not set, then this method uses <a href="#799"><B>assignExternalInfoForEntity: </B></a> and <a href="#791"><B>assignExternalInfoForAttribute: </B></a> to assign external names. If the entity's external name is set or if any of the entity's attributes' external names are set, then the method doesn't assign external names to the entity or any of its attributes. Regardless, this method invokes <a href="#803"><B>assignExternalTypeForAttribute: </B></a> for each attribute in the model to assign external types.<p>
+
+A subclass of EOAdaptor doesn't need to override this method.<p>
+
+<a name="799">
+
+<h4> <a name="//apple_ref/occ/clm/EOAdaptor/assignExternalInfoForEntity:">assignExternalInfoForEntity:</a></h4>
+
+</a>+ (void)<code>assignExternalInfoForEntity:</code>(EOEntity *)<em>entity</em> <p>
+
+Overridden by adaptor subclasses to assign database-specific characteristics to <em>entity</em>. EOAdaptor's implementation assigns an external name to <em>entity</em> based on <em>entity</em>'s name. For example, <code><a href="#799"></code><B>assignExternalInfoForEntity: </B><code></a></code> assigns the external name "MOVIE" to an entity named "Movie". An adaptor subclass should override this method to assign additional database-specific characteristics, if any.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/clm/EOAdaptor/assignExternalInfoForEntireModel:">+ assignExternalInfoForEntireModel:</a>
+
+ </B><p><a name="803">
+
+<h4> <a name="//apple_ref/occ/clm/EOAdaptor/assignExternalTypeForAttribute:">assignExternalTypeForAttribute:</a></h4>
+
+</a>+ (void)<B>assignExternalTypeForAttribute: </B>(EOAttribute *)<em>attribute</em><p>
+
+Overridden by adaptor subclasses to assign the external type to <em>attribute</em>. EOAdaptor's implementation does nothing. A subclass of EOAdaptor should override this method to assign an external type using <em>attribute</em>'s internal type, precision, and length information.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/clm/EOAdaptor/assignExternalInfoForEntireModel:">+ assignExternalInfoForEntireModel:</a>
+
+ </B><p><a name="807">
+
+<h4> <a name="//apple_ref/occ/clm/EOAdaptor/availableAdaptorNames">availableAdaptorNames</a></h4>
+
+</a>+ (NSArray *)<code>availableAdaptorNames</code><p>
+
+Returns an array containing the names of all available adaptors, as found by searching the paths returned by <B>NSStandardLibraryPaths() </B>. If no adaptors are found, this method returns an empty array.<p>
+
+<a name="810">
+
+<h4> <a name="//apple_ref/occ/clm/EOAdaptor/externalTypesWithModel:">externalTypesWithModel:</a></h4>
+
+</a>+ (NSArray *)<code>externalTypesWithModel:</code>(EOModel *)<em>model</em> <p>
+
+Implemented by subclasses to return the names of the database types (such as Sybase "varchar" or Oracle "NUMBER") for use with this adaptor. <em>model</em> is an optional argument that can be used to supplement the adaptor's set of database types with additional, user-defined database types. See your adaptor's documentation for information on if and how it uses <em>model</em>.<p>
+
+An adaptor subclass should override this method without invoking EOAdaptor's implementation.<p>
+
+<a name="814">
+
+<h4> <a name="//apple_ref/occ/clm/EOAdaptor/internalTypeForExternalType:model:">internalTypeForExternalType:model:</a></h4>
+
+</a>+ (NSString *)<code>internalTypeForExternalType:</code>(NSString *)<em>extType </em><code>model:</code>(EOModel *)<em>model</em> <p>
+
+Implemented by subclasses to return the name of the Objective-C class used to represent values stored in the database as <em>extType</em>. <em>model</em> is an optional argument that can be used to supplement the adaptor's set of type mappings with additional mappings for user-defined database types. See your adaptor's documentation for information on if and how it uses <em>model</em>. Returns <B>nil </B> if no mapping for <em>extType</em> is found.<p>
+
+An adaptor subclass should override this method without invoking EOAdaptor's implementation.<p>
+
+<a name="818">
+
+<h4> <a name="//apple_ref/occ/clm/EOAdaptor/setExpressionClassName:adaptorClassName:">setExpressionClassName:adaptorClassName:</a></h4>
+
+</a>+ (void)<code>setExpressionClassName:</code>(NSString *)<em>sqlExpressionClassName </em><code>adaptorClassName:</code>(NSString *)<em>adaptorClassName</em> <p>
+
+Sets the expression class for instances of the class named <em>adaptorClassName</em> to <em>sqlExpressionClassName</em>. If <em>sqlExpressionClassName</em> is <B>nil </B>, restores the expression class to the default. Raises an NSInvalidArgumentException if <em>adaptorClassName</em> is <B>nil </B> or the empty string.<p>
+
+Use this method to substitute a subclass of EOSQLExpression for the expression class provided by the adaptor. For example, the default expression class for the Oracle adaptor is OracleSQLExpression. The following statement substitutes the class named MySQLExpression:<p>
+
+<blockquote><pre>[EOAdaptor setExpressionClassName:@"MySQLExpression" adaptorClassName:@"Oracle"];
+
+</pre></blockquote><p>
+
+A subclass of EOAdaptor doesn't need to override this method. A subclass that does override this method must incorporate the superclass's version through a message to <B>super </B>.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOAdaptor/defaultExpressionClass">- defaultExpressionClass</a>
+
+ </B><p><a name="825">
+
+<h4> <a name="//apple_ref/occ/clm/EOAdaptor/sharedLoginPanelInstance">sharedLoginPanelInstance</a></h4>
+
+</a>+ (EOLoginPanel *)<code>sharedLoginPanelInstance</code> <p>
+
+Returns the receiver's login panel in applications that have a graphical user interface. Returns <B>nil </B> if the application doesn't have an NSApplication object. Otherwise, looks for the bundle named "LoginPanel" in the resources for the adaptor framework, loads the bundle, and returns an instance of the bundle's principal class (see the NSBundle class specification for information on loading bundles). The returned object is used to implement <B><a href="#918">runLoginPanelAndValidateConnectionDictionary</a> </B> and <B><a href="#913">runLoginPanel</a> </B>.<p>
+
+A subclass of EOAdaptor doesn't need to override this method. A subclass that does override this method must incorporate the superclass's version through a message to <B>super </B>.<p>
+
+<a name="829">
+
+<a name="instm"></a>
+
+<h3>Instance Methods </h3>
+
+</a><a name="830">
+
+<h4> <a name="//apple_ref/occ/instm/EOAdaptor/assertConnectionDictionaryIsValid">assertConnectionDictionaryIsValid</a></h4>
+
+</a>- (void)<code>assertConnectionDictionaryIsValid</code> <p>
+
+Implemented by subclasses to verify that the adaptor can connect to the database server with its connection dictionary. Briefly forms a connection to the server to validate the connection dictionary and then closes the connection. Raises an EOGeneralAdaptorException if the connection dictionary contains invalid information.<p>
+
+An adaptor subclass must override this method without invoking EOAdaptor's implementation.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOAdaptor/setConnectionDictionary:">- setConnectionDictionary:</a> </B>, <a href="#//apple_ref/occ/instm/EOAdaptor/runLoginPanel"><B>- runLoginPanel</a> </B>, 
+
+<B><a href="#//apple_ref/occ/instm/EOAdaptor/runLoginPanelAndValidateConnectionDictionary">- runLoginPanelAndValidateConnectionDictionary</a>
+
+ </B><p><a name="835">
+
+<h4> <a name="//apple_ref/occ/instm/EOAdaptor/canServiceModel:">canServiceModel:</a></h4>
+
+</a>- (BOOL)<code>canServiceModel:</code>(EOModel *)<em>model</em> <p>
+
+Returns YES if the receiver can service <em>model</em>, NO otherwise. EOAdaptor's implementation returns YES if the receiver's connection dictionary is equal to <em>model</em>'s connection dictionary as determined by NSDictionary's <B>isEqual: </B> method.<p>
+
+A subclass of EOAdaptor doesn't need to override this method.<p>
+
+<a name="839">
+
+<h4> <a name="//apple_ref/occ/instm/EOAdaptor/connectionDictionary">connectionDictionary</a></h4>
+
+</a>- (NSDictionary *)<code>connectionDictionary</code> <p>
+
+Returns the receiver's connection dictionary, or <B>nil </B> if the adaptor doesn't have one. The connection dictionary contains the values, such as user name and password, needed to connect to the database server. The dictionary's keys identify the information the server expects, and its values are the values that the adaptor will try when connecting. Each adaptor uses different keys; see your adaptor's documentation for keys it uses.<p>
+
+A subclass of EOAdaptor doesn't need to override this method.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOAdaptor/setConnectionDictionary:">- setConnectionDictionary:</a>
+
+ </B><p><a name="844">
+
+<h4> <a name="//apple_ref/occ/instm/EOAdaptor/contexts">contexts</a></h4>
+
+</a>- (NSArray *)<code>contexts</code> <p>
+
+Returns the adaptor contexts created by the receiver, or<B> nil </B> if no adaptor contexts have been created. A subclass of EOAdaptor doesn't need to override this method.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOAdaptor/createAdaptorContext">- createAdaptorContext</a>
+
+ </B><p><a name="848">
+
+<h4> <a name="//apple_ref/occ/instm/EOAdaptor/createAdaptorContext">createAdaptorContext</a></h4>
+
+</a>- (EOAdaptorContext *)<code>createAdaptorContext</code> <p>
+
+Implemented by subclasses to create and return a new EOAdaptorContext, or <B>nil </B> if a new context can't be created.The new context retains the receiver. A newly created EOAdaptor has no contexts.<p>
+
+An adaptor subclass must override this method without invoking EOAdaptor's implementation.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOAdaptor/contexts">- contexts</a> </B>, <B><a href="../EOAdaptorContext/EOAdaptorContext.html#//apple_ref/occ/instm/EOAdaptorContext/initWithAdaptor:" target="_top">- initWithAdaptor: </B> (EOAdaptorContext)</a>
+
+<p><a name="853">
+
+<h4> <a name="//apple_ref/occ/instm/EOAdaptor/databaseEncoding">databaseEncoding</a></h4>
+
+</a>- (NSStringEncoding)<code>databaseEncoding</code> <p>
+
+Returns the string encoding used to encode and decode database strings. An adaptor's database encoding is stored in the connection dictionary with the key "databaseEncoding". If the connection dictionary doesn't have an entry for the database encoding, the default C string encoding is used. This method raises an NSInvalidArgumentException if the receiver's database encoding isn't valid.<p>
+
+A database system stores strings in a particular character set. The Framework needs to know what character set the database system uses so it can encode and decode strings coming from and going to the database server. The string encoding returned from this method specifies the character set the Framework uses.<p>
+
+A subclass of EOAdaptor doesn't need to override this method.<p>
+
+<B>See also: </B>  
+
+<B>- availableStringEncodings </B> (NSString), <B>- defaultCStringEncoding </B> (NSString)
+
+<p><a name="859">
+
+<h4> <a name="//apple_ref/occ/instm/EOAdaptor/defaultExpressionClass">defaultExpressionClass</a></h4>
+
+</a>- (Class)<code>defaultExpressionClass</code> <p>
+
+Implemented by subclasses to return the subclass of EOSQLExpression used as the default expression class for the adaptor. You wouldn't ordinarily invoke this method directly. It's invoked automatically to determine which class should be used to represent query language expressions.<p>
+
+An adaptor subclass must override this method without invoking EOAdaptor's implementation.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/clm/EOAdaptor/setExpressionClassName:adaptorClassName:">+ setExpressionClassName:adaptorClassName:</a>
+
+ </B><p><a name="864">
+
+<h4> <a name="//apple_ref/occ/instm/EOAdaptor/delegate">delegate</a></h4>
+
+</a>- (id)<code>delegate</code> <p>
+
+Returns the receiver's delegate or <B>nil </B> if a delegate has not been assigned. A subclass of EOAdaptor doesn't need to override this method.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOAdaptor/setDelegate:">- setDelegate:</a>
+
+ </B><p><a name="868">
+
+<h4> <a name="//apple_ref/occ/instm/EOAdaptor/expressionClass">expressionClass</a></h4>
+
+</a>- (Class)<code>expressionClass</code> <p>
+
+Returns the subclass of EOSQLExpression used by the receiver for query language expressions. Returns the expression class assigned using the class method <B><a href="#818">setExpressionClassName:adaptorClassName:</a> </B>. If no class has been set for the receiver's class, this method determines the expression class by sending <B><a href="#859">defaultExpressionClass</a> </B> to <B>self </B>.<p>
+
+You wouldn't ordinarily invoke this method directly. It's invoked automatically to determine which class should be used to represent query language expressions.<p>
+
+A subclass of EOAdaptor doesn't need to override this method. A subclass that does override this method must incorporate the superclass's version through a message to <B>super </B>.<p>
+
+<a name="873">
+
+<h4> <a name="//apple_ref/occ/instm/EOAdaptor/fetchedValueForDataValue:attribute:">fetchedValueForDataValue:attribute:</a></h4>
+
+</a>- (NSData *)<B>fetchedValueForDataValue: </B>(NSData *)<em>value</em> <B>attribute: </B>(EOAttribute *)<em>attribute</em><p>
+
+Overridden by subclasses to return the value that the receiver's database server would ultimately store for <em>value</em> if it was inserted or updated in the column described by <em>attribute</em>. This method is invoked from <a href="#889"><B>fetchedValueForValue:attribute: </B></a> when the value argument is an NSData.<p>
+
+EOAdaptor's implementation returns <em>value</em> unchanged. An adaptor subclass should override this method if the adaptor's database performs transformations on binary types, such as BLOBs.<p>
+
+<a name="877">
+
+<h4> <a name="//apple_ref/occ/instm/EOAdaptor/fetchedValueForDateValue:attribute:">fetchedValueForDateValue:attribute:</a></h4>
+
+</a>- (NSCalendarDate *)<B>fetchedValueForDateValue: </B>(NSCalendarDate *)<em>value<br></em><B>attribute: </B>(EOAttribute *)<em>attribute</em><p>
+
+Overridden by subclasses to return the value that the receiver's database server would ultimately store for <em>value</em> if it was inserted or updated in the column described by <em>attribute</em>. This method is invoked from <a href="#889"><B>fetchedValueForValue:attribute: </B></a> when the value argument is a date.<p>
+
+EOAdaptor's implementation returns <em>value</em> unchanged. An adaptor subclass should override this method to convert or format date values. For example, a concrete adaptor subclass could set <em>value</em>'s millisecond value to 0.<p>
+
+<a name="881">
+
+<h4> <a name="//apple_ref/occ/instm/EOAdaptor/fetchedValueForNumberValue:attribute:">fetchedValueForNumberValue:attribute:</a></h4>
+
+</a>- (NSNumber *)<B>fetchedValueForNumberValue: </B>(NSNumber *)<em>value<br></em><B>attribute: </B>(EOAttribute *)<em>attribute</em><p>
+
+Overridden by subclasses to return the value that the receiver's database server would ultimately store for <em>value</em> if it was inserted or updated in the column described by <em>attribute</em>. This method is invoked from <a href="#889"><B>fetchedValueForValue:attribute: </B></a> when the value argument is a number.<p>
+
+EOAdaptor's implementation returns <em>value</em> unchanged. An adaptor subclass should override this method to convert or format numeric values. For example, a concrete adaptor subclass should probably round <em>value</em> according to the precision and scale <em>attribute</em>.<p>
+
+<a name="885">
+
+<h4> <a name="//apple_ref/occ/instm/EOAdaptor/fetchedValueForStringValue:attribute:">fetchedValueForStringValue:attribute:</a></h4>
+
+</a>- (NSString*)<B>fetchedValueForStringValue: </B>(NSString *)<em>value</em> <B>attribute: </B>(EOAttribute *)<em>attribute</em><p>
+
+Overridden by subclasses to return the value that the receiver's database server would ultimately store for <em>value</em> if it was inserted or updated in the column described by <em>attribute</em>. This method is invoked from <a href="#889"><B>fetchedValueForValue:attribute: </B></a> when the value argument is a string.<p>
+
+EOAdaptor's implementation trims trailing spaces and returns <B>nil </B> for zero-length strings. An adaptor subclass should override this method to perform any additional conversion or formatting on string values. For example, a concrete adaptor subclass could trim trailing spaces.<p>
+
+<a name="889">
+
+<h4> <a name="//apple_ref/occ/instm/EOAdaptor/fetchedValueForValue:attribute:">fetchedValueForValue:attribute:</a></h4>
+
+</a>- (id)<B>fetchedValueForValue: </B>(id)<em>value</em> <B>attribute: </B>(EOAttribute *)<em>attribute</em><p>
+
+Returns the value that the receiver's database server would ultimately store for <em>value</em> if it was inserted or updated in the column described by <em>attribute</em>. The Framework uses this method to keep enterprise object snapshots in sync with database values. For example, assume that a product's price is marked down 15%. If the product's original price is 5.25, the sale price is 5.25*.85, or 4.4625. When the Framework updates the product's price, the database server truncates the price to 4.46 (assuming the scale of the database's price column is 2). Before performing the update, the Framework sends the adaptor a<em> </em><B><a href="#889">fetchedValueForValue:attribute:</a> </B> message with the value 4.4625. The adaptor performs the database-specific transformation and returns 4.46. The Framework assigns the truncated value to the product object and to the product object's snapshot and then proceeds with the update.<p>
+
+An adaptor subclass can override this method or one of the data type-specific <B>fetchedValue... </B> methods. EOAdaptor's implementation of <B><a href="#889">fetchedValueForValue:attribute:</a> </B> invokes one of the data type-specific methods depending on <em>value</em>'s class. If <em>value</em> is not a string, number, date, or data object (that is, an instance of NSString, NSNumber, NSDate, NSData, or any of their subclasses),<em> </em><B><a href="#889">fetchedValueForValue:attribute:</a> </B> returns <em>value</em> unchanged.<p>
+
+This method invokes the delegate method <a href="#933"><B>adaptor:fetchedValueForValue:attribute: </B></a> which can override the adaptor's default behavior.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOAdaptor/fetchedValueForDataValue:attribute:">- fetchedValueForDataValue:attribute:</a> </B>, <a href="#//apple_ref/occ/instm/EOAdaptor/fetchedValueForDateValue:attribute:"><B>- fetchedValueForDateValue:attribute:</a> </B>, 
+
+<B><a href="#//apple_ref/occ/instm/EOAdaptor/fetchedValueForNumberValue:attribute:">- fetchedValueForNumberValue:attribute:</a> </B>, <a href="#//apple_ref/occ/instm/EOAdaptor/fetchedValueForStringValue:attribute:"><B>- fetchedValueForStringValue:attribute:</a> </B>, <B><a href="../EOAttribute/EOAttribute.html#//apple_ref/occ/instm/EOAttribute/valueFactoryMethod" target="_top"><br>
+
+- valueFactoryMethod </B><code></code> (EOAttribute</a>)
+
+<p><a name="895">
+
+<h4> <a name="//apple_ref/occ/instm/EOAdaptor/hasOpenChannels">hasOpenChannels</a></h4>
+
+</a>- (BOOL)<code>hasOpenChannels</code> <p>
+
+Returns YES if any of the receiver's contexts have open channels, NO otherwise. A subclass of EOAdaptor doesn't need to override this method.<p>
+
+<B>See also: </B>  
+
+<B><a href="../EOAdaptorContext/EOAdaptorContext.html#//apple_ref/occ/instm/EOAdaptorContext/hasOpenChannels" target="_top">- hasOpenChannels </B><code></code> (EOAdaptorContext)</a>
+
+<p><a name="899">
+
+<h4> <a name="//apple_ref/occ/instm/EOAdaptor/initWithName:">initWithName:</a></h4>
+
+</a>- (id)<code>initWithName:</code>(NSString *)<em>name</em><p>
+
+The designated initializer for the EOAdaptor class, this method is overridden by adaptor subclasses to initialize a newly allocated EOAdaptor subclass with <em>name</em>. <em>name</em> is usually derived from the base filename (that is, the filename without the ".framework" extension) of the framework from which the adaptor is loaded. For example, an adaptor named "Acme" is loaded from the framework <B>AcmeEOAdaptor.framework </B>. Returns <B>self </B>.<p>
+
+Never invoke this method directly. It is invoked automatically from <B><a href="#784">adaptorWithName:</a> </B> and <B><a href="#779">adaptorWithModel:</a> </B>-EOAdaptor class methods you use to create a new adaptor.<p>
+
+A subclass of EOAdaptor doesn't need to override this method, but may override it to perform additional initialization. A subclass that does override this method must incorporate the superclass's version through a message to <B>super </B>.<p>
+
+<a name="904">
+
+<h4> <a name="//apple_ref/occ/instm/EOAdaptor/isValidQualifierType:model:">isValidQualifierType:model:</a></h4>
+
+</a>- (BOOL)<code>isValidQualifierType:</code>(NSString *)<em>typeName </em><code>model:</code>(EOModel *)<em>model</em> <p>
+
+Implemented by subclasses to return YES if an attribute of type <em>typeName</em> can be used in a qualifier (a SQL WHERE clause) sent to the database server, or NO otherwise. <em>typeName</em> is the name of a type as required by the database server, such as Sybase "varchar" or Oracle "NUMBER". <em>model</em> is an optional argument that can be used to supplement the adaptor's set of type mappings with additional mappings for user-defined database types. See your adaptor's documentation for information on if and how it uses <em>model</em>. <p>
+
+An adaptor subclass must override this method without invoking EOAdaptor's implementation.<p>
+
+<a name="908">
+
+<h4> <a name="//apple_ref/occ/instm/EOAdaptor/name">name</a></h4>
+
+</a>- (NSString *)<code>name</code> <p>
+
+Returns the adaptor's name; this is usually the base filename of the framework from which the adaptor was loaded. For example, if an adaptor was loaded from a framework named <B>AcmeEOAdaptor.framework </B>, this method returns "Acme".<p>
+
+A subclass of EOAdaptor doesn't need to override this method.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/clm/EOAdaptor/adaptorWithName:">+ adaptorWithName:</a> </B>, <a href="#//apple_ref/occ/instm/EOAdaptor/initWithName:"><B>- initWithName:</a>
+
+ </B><p><a name="913">
+
+<h4> <a name="//apple_ref/occ/instm/EOAdaptor/runLoginPanel">runLoginPanel</a></h4>
+
+</a>- (NSDictionary *)<code>runLoginPanel</code> <p>
+
+Runs the adaptor's login panel by sending a <code>runPanelForAdaptor:validate:</code> message to the adaptor's login panel object with the validate flag NO. Returns connection information entered in the panel without affecting the adaptor's connection dictionary. The connection dictionary returned isn't validated by this method.<p>
+
+A subclass of EOAdaptor doesn't need to override this method. A subclass that does override this method must incorporate the superclass's version through a message to <B>super </B>.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOAdaptor/runLoginPanelAndValidateConnectionDictionary">- runLoginPanelAndValidateConnectionDictionary</a> </B>, <a href="#//apple_ref/occ/instm/EOAdaptor/setConnectionDictionary:"><B>- setConnectionDictionary:</a> </B>, 
+
+<B><a href="#//apple_ref/occ/instm/EOAdaptor/assertConnectionDictionaryIsValid">- assertConnectionDictionaryIsValid</a> </B>, <a href="#//apple_ref/occ/clm/EOAdaptor/sharedLoginPanelInstance"><B>+ sharedLoginPanelInstance</a>
+
+ </B><p><a name="918">
+
+<h4> <a name="//apple_ref/occ/instm/EOAdaptor/runLoginPanelAndValidateConnectionDictionary">runLoginPanelAndValidateConnectionDictionary</a></h4>
+
+</a>- (BOOL)<code>runLoginPanelAndValidateConnectionDictionary</code> <p>
+
+Runs the adaptor's login panel by sending a <code>runPanelForAdaptor:validate:</code> message to the adaptor's login panel object with the validate flag YES. Returns YES if the user enters valid connection information, or NO if the user cancels the panel.<p>
+
+A subclass of EOAdaptor doesn't need to override this method. A subclass that does override this method must incorporate the superclass's version through a message to <B>super </B>.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOAdaptor/runLoginPanel">- runLoginPanel</a> </B>, <a href="#//apple_ref/occ/instm/EOAdaptor/setConnectionDictionary:"><B>- setConnectionDictionary:</a> </B>, <a href="#//apple_ref/occ/instm/EOAdaptor/assertConnectionDictionaryIsValid"><B>- assertConnectionDictionaryIsValid</a> </B>, 
+
+<B><a href="#//apple_ref/occ/clm/EOAdaptor/sharedLoginPanelInstance">+ sharedLoginPanelInstance</a>
+
+ </B><p><a name="923">
+
+<h4> <a name="//apple_ref/occ/instm/EOAdaptor/setConnectionDictionary:">setConnectionDictionary:</a></h4>
+
+</a>- (void)<code>setConnectionDictionary:</code>(NSDictionary *)<em>dictionary</em> <p>
+
+Sets the adaptor's connection dictionary to <em>dictionary</em>, which must only contain NSString, NSData, NSDictionary, and NSArray objects. Raises an NSInvalidArgumentException if there are any open channels-you can't change connection information while the adaptor is connected.<p>
+
+A subclass of EOAdaptor doesn't need to override this method. A subclass that does override this method must incorporate the superclass's version through a message to <B>super </B>.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOAdaptor/connectionDictionary">- connectionDictionary</a> </B>, <a href="#//apple_ref/occ/instm/EOAdaptor/hasOpenChannels"><B>- hasOpenChannels</a> </B>, <a href="#//apple_ref/occ/instm/EOAdaptor/assertConnectionDictionaryIsValid"><B>- assertConnectionDictionaryIsValid</a> </B>, 
+
+<B><a href="#//apple_ref/occ/instm/EOAdaptor/runLoginPanelAndValidateConnectionDictionary">- runLoginPanelAndValidateConnectionDictionary</a> </B>, <B><a href="../EOLoginPanel/EOLoginPanel.html#//apple_ref/occ/instm/EOLoginPanel/runPanelForAdaptor:validate:" target="_top"><br>
+
+- runPanelForAdaptor:validate: </B><code></code> (EOLoginPanel</a>)
+
+<p><a name="928">
+
+<h4> <a name="//apple_ref/occ/instm/EOAdaptor/setDelegate:">setDelegate:</a></h4>
+
+</a>- (void)<code>setDelegate:</code>(id)<em>delegate</em> <p>
+
+Sets the receiver's delegate to <em>delegate</em>, or removes its delegate if <em>delegate</em> is <B>nil </B>. The receiver does not retain <em>delegate</em>. A subclass of EOAdaptor doesn't need to override this method. A subclass that does override this method must incorporate the superclass's version through a message to <B>super </B>.<p>
+
+<B>See also: </B>  
+
+<B><a href="#//apple_ref/occ/instm/EOAdaptor/delegate">- delegate</a>
+
+ </B><p><a name="932">
+
+<h3>Methods Implemented By the Delegate </h3>
+
+</a><a name="933">
+
+<h4> <a name="//apple_ref/occ/instm/NSObject/adaptor:fetchedValueForValue:attribute:">adaptor:fetchedValueForValue:attribute:</a></h4>
+
+</a>- (id)<B>adaptor: </B>(EOAdaptor *)<em>adaptor<br></em><B>fetchedValueForValue: </B>(id)<em>value<br></em><B>attribute: </B>(EOAttribute *)<em>attribute</em><p>
+
+Invoked from <a href="#889"><B>fetchedValueForValue:attribute: </B></a> to allow the delegate to perform a database-specific transformation on <em>value</em>. The delegate should return the value that the adaptor's database server would ultimately store for <em>value</em> if it was inserted or updated in the column described by <em>attribute.</em><p>
+
+Ordinarily, <B>fetchedValueForValue:attribute: </B> invokes one of the type-specific <B>fetchedValue... </B> methods depending on the type of <em>value</em>. If you implement this delegate method, <B>fetchedValueForValue:attribute: </B> does not invoke the other <B>fetchedValue... </B> methods. It simply invokes your delegate method and returns the value returned from it. Therefore, an implementation of <B>adaptor:fetchedValueForValue:attribute: </B> must handle values of all types.<p>
+
+
+
+ 
+
+ 
+
+
+
+
+
+<i>Copyright &#169; 1997, Apple Computer, Inc.   All rights
+
+reserved.</i>
+
+
+
+<!-- Last updated: 10/16/97 11:19:15 -->
+
+
+
+</body>
+
+</html>
+

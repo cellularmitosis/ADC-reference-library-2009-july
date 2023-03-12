@@ -1,0 +1,648 @@
+<html><head><title></title></head>
+
+<body bgcolor="#ffffff">
+
+ 
+
+ 
+
+<h1>
+
+<FONT COLOR="#000066">
+
+<a name="126">
+
+ <a name="//apple_ref/occ/cl/NSCoder">NSCoder</a>
+
+</a>
+
+</FONT>
+
+</h1>
+
+<p><B>Inherits From:</B><BR>  
+
+NSObject
+
+
+
+<p><B>Conforms To:</B><BR>
+
+NSObject (NSObject) 
+
+
+
+<p><B>Declared In:	</B><BR>
+
+Foundation/NSCoder.h<br>
+
+Foundation/NSGeometry.h<br>
+
+Foundation/NSCompatibility.h
+
+
+
+<p><a name="157"></a>
+
+<a name="description"></a>
+
+<H2>Class Description
+
+</H2>
+
+NSCoder is an abstract class that declares the interface used by subclasses to take data from memory and code them into and out of some other format. The NSCoder abstract class declares the interface used by concrete subclasses to transfer objects and other Objective-C data items between memory and some other format. This capability provides the basis for archiving (where objects and data items are stored on disk) and distribution (where objects and data items are copied between different processes or threads). The concrete subclasses provided by Foundation for these purposes are NSArchiver, NSUnarchiver, and NSPortCoder. Concrete subclasses of NSCoder are referred to in general as <strong>coder classes</strong>, and instances of these classes as<strong> coder objects</strong> (or simply <em>coders</em>). A coder object that can only encode values is referred to as an <strong>encoder object</strong>, and one that can only decode values as a <strong>decoder object</strong>.<p>
+
+NSCoder operates on <code>id</code>'s, scalars, C arrays, structures, and strings, and on pointers to these types. It does not handle types whose implementation varies across platforms, such as <code>union</code>, <code>void</code> *, function pointers, and long chains of pointers. It can also operate on user-defined structures as well as pointers to any of these data types. A coder object stores object type information along with the data, so an object decoded from a stream of bytes is normally of the same class as the object that was originally encoded into the stream. An object can change its class when encoded, however; this is described in the NSCoding protocol specification under "<a href="../../Protocols/NSCoding/NSCoding.html#95" target="_top">"Making Substitutions During Coding"</a>."<p>
+
+<h3>
+
+<a name="160">
+
+ Encoding and Decoding Objects and Data Items
+
+</a>
+
+</h3>
+
+To encode or decode an object or data item, you must first create a coder object, then send it a message defined by NSCoder or by a concrete subclass to actually encode or decode the item. NSCoder itself defines no particular method for creating a coder; this typically varies with the subclass. NSArchiver and NSUnarchiver, for example, use <code>initForWritingWithMutableData:</code> and <code>initForReadingWithData:</code>. NSPortCoders are created and used by NSConnection objects; you never create one of these yourself.<p>
+
+To encode an object or data item, use any of the <code>encode...</code> methods, such as <code>encodeRootObject:</code>, <code>encodeValueOfObjCType:at:</code>, and so on. This sample code fragment uses the NSArchiver concrete subclass of NSCoder to archive a custom object called <code>myMapView</code>:<p>
+
+<blockquote><pre>MapView *myMapView;   /* Assume this exists. */<br>NSMutableData *data<br>NSArchiver *archiver;<br>BOOL result;<br>    <br>data = [NSMutableData data];<br>archiver = [[NSArchiver alloc] initForWritingWithMutableData:data];<br>[archiver encodeRootObject:myMapView];<br>result = [data writeToFile:@"/tmp/MapArchive" atomically:YES];
+
+</pre></blockquote><p>NSArchiver also provides a convenience method for archiving directly to a file, rendering the example above as:<p>
+
+<blockquote><pre>result = [NSArchiver archiveRootObject:myMapView toFile:@"/tmp/MapArchive"];
+
+</pre></blockquote><p>To decode an object or data item, simply use the <code>decode...</code> method corresponding to the original <code>encode...</code> method (as given in the individual method descriptions). Matching these is important, as the method originally used determines the format of the encoded data. See the NSCoding protocol specification for an example.<p>
+
+NSCoder's interface is quite general. Concrete subclasses aren't required to properly implement all of NSCoder's methods, and may explicitly restrict themselves to certain types of operations. For example, NSArchiver doesn't implement the <code>decode...</code> methods, and NSUnarchiver doesn't implement the <code>encode...</code> methods.<p>
+
+<h3>
+
+<a name="168">
+
+ When to Retain a Decoded Object
+
+</a>
+
+</h3>
+
+You can decode an object value in two ways. The first is explicitly, using the <code>decodeObject</code> method (or any <code>decode...Object</code> method). When decoding an object explicitly you must follow the object ownership convention, and retain the object returned if you intend to keep it. Otherwise the object is owned by the coder and will be released when the coder is released.<p>
+
+The second means of decoding an object is implicitly, using the <code>decodeValueOfObjCType:at:</code> method or one of its variants, <code>decodeArrayOfObjCType:count:at:</code> and <code>decodeValuesOfObjCTypes:</code>. These methods fill a value already claimed by the invoker, so you are responsible for releasing decoded object values. This behavior can prove useful for optimizing large decoding operations, as it obviates the need for sending a <code>retain</code> message to each decoded object.<p>
+
+<h3>
+
+<a name="171">
+
+ Managing Object Graphs
+
+</a>
+
+</h3>
+
+Objects frequently contain pointers to other objects, which may in turn contain pointers to other objects. When analyzed, a group of objects may contain circular references or one object may be referred to by several other objects. In these cases, the objects form an object graph and require special encoding methods to preserve the graph structure. NSCoder declares the following methods to manage object graphs: <code>encodeRootObject:</code>, <code>encodeObject:</code>, and <code>encodeConditionalObject:</code>. <p>
+
+As implemented by a subclass,<code> encodeRootObject:</code> should encode the object and any objects to which it refers. It is the responsibility of the overriding <code>encodeRootObject:</code> method to keep track of multiple references to objects, thus preserving the structure of any object graphs.<p>
+
+The <code>encodeConditionalObject:</code> method allows an object to be excluded from the encoding process. Objects are encoded unconditionally by default, that is, the contents of the object are always encoded. Subclasses can implement <code>encodeConditionalObject:</code> to encode an object only if it was encoded previously by a call to a method other than <code>encodeConditionalObject:</code>.<p>
+
+NSCoder's implementations of <code>encodeRootObject:</code> and <code>encodeConditionalObject:</code> simply encode the object unconditionally, whether or not it's already been encoded. A concrete subclass that supports object graphs must override these two methods. See the NSArchiver class specification for more information on managing object graphs.<p>
+
+<h3>
+
+<a name="176">
+
+ Creating a Subclass of NSCoder
+
+</a>
+
+</h3>
+
+If you define a subclass of NSCoder, at a minimum your subclass must override the following methods:<p>
+
+<code>encodeValueOfObjCType:at:<br>decodeValueOfObjCType:at:<br>encodeDataObject:<br>decodeDataObject:<br>versionForClassName:</code><p>
+
+In addition, your subclass may override other methods to provide specialized handling for certain situations. In particular, you can implement any of the following methods:<p>
+
+(an initialization method)<br><code>encodeRootObject:<br>encodeConditionalObject:<br>encodeBycopyObject:<br>encodeByrefObject:<br>decodeObject<br>setObjectZone:<br>objectZone</code><p>
+
+See the individual method descriptions for more information. See also the NSArchiver class specification for an example of a concrete subclass.<p>
+
+Note that <code>encodeObject:</code> and <code>decodeObject</code> are not among the basic methods. They're defined abstractly to invoke <code>encodeValueOfObjCType:at:</code> or <code>decodeValueOfObjCType:at:</code> with an Objective-C type code of "@". Your implementations of the latter two methods must handle this case, invoking the object's <code>encodeWithCoder:</code> or <code>initWithCoder:</code> method and sending the proper substitution messages (as described in the NSCoding protocol specification) to the object before encoding it and after decoding it.<p>
+
+With objects, the object being coded is fully responsible for coding itself. However,a few classes hand this responsibility back to the coder object, either for performance reasons or because proper support depends on more information than the object itself has. The two notable classes in Foundation that do this are NSData and NSPort. NSData's low-level nature makes optimization important. For this reason, an NSData object always asks its coder to handle its contents directly using the <code>encodeDataObject:</code> and <code>decodeDataObject:</code> methods described in this class specification. Similarly, an NSPort object asks its coder to handle it using the <code>encodePortObject:</code> and <code>decodePortObject:</code> methods (which only NSPortCoder implements). This is because an NSPort represents information kept in the operating system itself, which requires special handling for transmission to another process.<p>
+
+These special cases don't affect users of coder objects, since the redirection is handled by the classes themselves in their NSCoding protocol methods. An implementor of a concrete coder subclass, however, must encode NSData and NSPort objects itself, and take care not to send an <code>encodeWithCoder:</code> or <code>initWithCoder:</code> message to the NSData or NSPort object. Failure to do so can result in an infinite loop.<p>
+
+<a name="185">
+
+<HR WIDTH=50% ALIGN=LEFT>
+
+<h2>Method Types
+
+</h2>
+
+</a><dl>
+
+<dt>Encoding data<dd><dl><dd><dl><dd><dl><dd><dl>
+
+<dt><a href="#//apple_ref/occ/instm/NSCoder/encodeArrayOfObjCType:count:at:">- encodeArrayOfObjCType:count:at:</a><dt><a href="#//apple_ref/occ/instm/NSCoder/encodeBycopyObject:">- encodeBycopyObject:</a><dt><a href="#//apple_ref/occ/instm/NSCoder/encodeByrefObject:">- encodeByrefObject:</a><dt><a href="#//apple_ref/occ/instm/NSCoder/encodeBytes:length:">- encodeBytes:length:</a><dt><a href="#//apple_ref/occ/instm/NSCoder/encodeConditionalObject:">- encodeConditionalObject:</a><dt><a href="#//apple_ref/occ/instm/NSCoder/encodeDataObject:">- encodeDataObject:</a><dt><a href="#//apple_ref/occ/instm/NSCoder/encodeNXObject:">- encodeNXObject:</a><dt><a href="#//apple_ref/occ/instm/NSCoder/encodeObject:">- encodeObject:</a><dt><a href="#//apple_ref/occ/instm/NSCoder/encodePropertyList:">- encodePropertyList:</a><dt><a href="#//apple_ref/occ/instm/NSCoder/encodePoint:">- encodePoint:</a><dt><a href="#//apple_ref/occ/instm/NSCoder/encodeRect:">- encodeRect:</a><dt><a href="#//apple_ref/occ/instm/NSCoder/encodeRootObject:">- encodeRootObject:</a><dt><a href="#//apple_ref/occ/instm/NSCoder/encodeSize:">- encodeSize:</a><dt><a href="#//apple_ref/occ/instm/NSCoder/encodeValueOfObjCType:at:">- encodeValueOfObjCType:at:</a><dt><a href="#//apple_ref/occ/instm/NSCoder/encodeValuesOfObjCTypes:">- encodeValuesOfObjCTypes:</a></dl></dd>
+
+</dl></dd></dl></dd></dl></dd><dt>Decoding data<dd><dl><dd><dl><dd><dl><dd><dl>
+
+<dt><a href="#//apple_ref/occ/instm/NSCoder/decodeArrayOfObjCType:count:at:">- decodeArrayOfObjCType:count:at:</a><dt><a href="#//apple_ref/occ/instm/NSCoder/decodeBytesWithReturnedLength:">- decodeBytesWithReturnedLength:</a><dt><a href="#//apple_ref/occ/instm/NSCoder/decodeDataObject">- decodeDataObject</a><dt><a href="#//apple_ref/occ/instm/NSCoder/decodeNXObject">- decodeNXObject</a><dt><a href="#//apple_ref/occ/instm/NSCoder/decodeObject">- decodeObject</a><dt><a href="#//apple_ref/occ/instm/NSCoder/decodePropertyList">- decodePropertyList</a><dt><a href="#//apple_ref/occ/instm/NSCoder/decodePoint">- decodePoint</a><dt><a href="#//apple_ref/occ/instm/NSCoder/decodeRect">- decodeRect</a><dt><a href="#//apple_ref/occ/instm/NSCoder/decodeSize">- decodeSize</a><dt><a href="#//apple_ref/occ/instm/NSCoder/decodeValueOfObjCType:at:">- decodeValueOfObjCType:at:</a><dt><a href="#//apple_ref/occ/instm/NSCoder/decodeValuesOfObjCTypes:">- decodeValuesOfObjCTypes:</a></dl></dd>
+
+</dl></dd></dl></dd></dl></dd><dt>Managing zones<dd><dl><dd><dl><dd><dl><dd><dl>
+
+<dt><a href="#//apple_ref/occ/instm/NSCoder/objectZone">- objectZone</a><dt><a href="#//apple_ref/occ/instm/NSCoder/setObjectZone:">- setObjectZone:</a></dl></dd>
+
+</dl></dd></dl></dd></dl></dd><dt>Getting version information<dd><dl><dd><dl><dd><dl><dd><dl>
+
+<dt><a href="#//apple_ref/occ/instm/NSCoder/systemVersion">- systemVersion</a><dt><a href="#//apple_ref/occ/instm/NSCoder/versionForClassName:">- versionForClassName:</a></dl></dd>
+
+</dl></dd></dl></dd></dl></dd></dl>
+
+<HR WIDTH=50% ALIGN=LEFT>
+
+<a name="instm"></a>
+
+<h2>Instance Methods</h2>  
+
+ 
+
+
+
+<a name="221"></a>
+
+<h3>
+
+ <a name="//apple_ref/occ/instm/NSCoder/decodeArrayOfObjCType:count:at:">decodeArrayOfObjCType:count:at:</a>
+
+</h3>
+
+- (void)<code>decodeArrayOfObjCType:</code>(const char *)<em>itemType<br></em><code>count:</code>(unsigned int)<em>count<br></em><code>at:</code>(void *)<em>address</em>
+
+<P>Decodes an array of <em>count</em> items, whose Objective-C type is given by <em>itemType</em>. The items are decoded into the buffer beginning at <em>address</em>, which must be large enough to contain them all.<em> itemType</em> must contain exactly one type code. NSCoder's implementation invokes <code>decodeValueOfObjCType:at:</code> to decode the entire array of items. If you use this method to decode an array of Objective-C objects, you are responsible for releasing each object.<p>
+
+This method matches an <code>encodeArrayOfObjCType:count:at:</code> message used during encoding.<p>
+
+For information on creating an Objective-C type code suitable for <em>itemType</em>, see the description of the <code>@encode()</code> compiler directive in <em>Object-Oriented Programming and the Objective-C Language</em>.<p>
+
+<B>See also: </B>  
+
+<code><a href="#//apple_ref/occ/instm/NSCoder/decodeValuesOfObjCTypes:">- decodeValuesOfObjCTypes:</a>
+
+</code><p><hr WIDTH=25% ALIGN=LEFT>
+
+<a name="227"></a>
+
+<h3> <a name="//apple_ref/occ/instm/NSCoder/decodeBytesWithReturnedLength:">decodeBytesWithReturnedLength:</a></h3>
+
+- (void *)<code>decodeBytesWithReturnedLength</code><code>:</code>(unsigned int *)<em>numBytes</em>
+
+<P>Decodes a buffer of data whose types are unspecified. NSCoder's implementation invokes <code>decodeValueOfObjCType:at:</code> to decode the data as a series of bytes, which this method then places into a buffer and returns. The buffer's length is returned by reference in <em>numBytes</em>. If you need the bytes beyond the scope of the current autorelease pool, you must copy them.<p>
+
+This method matches an <code>encodeBytes:length:</code> message used during encoding.<p>
+
+<B>See also: </B>  
+
+<code><a href="#//apple_ref/occ/instm/NSCoder/encodeArrayOfObjCType:count:at:">- encodeArrayOfObjCType:count:at:</a>
+
+</code><p><hr WIDTH=25% ALIGN=LEFT>
+
+<a name="232"></a>
+
+<h3> <a name="//apple_ref/occ/instm/NSCoder/decodeDataObject">decodeDataObject</a></h3>
+
+- (NSData *)<code>decodeDataObject</code>
+
+<P>Must be overridden by subclasses to decode and return an NSData object.<p>
+
+The implementation of your overriding method must match the implementation of your <code>encodeDataObject:</code> method. For example, a typical <code>encodeDataObject:</code> method encodes the number of bytes of data followed by the bytes themselves. Your override of this method must read the number of bytes, create an NSData object of the appropriate size, and decode the bytes into the new NSData object. Your overriding method should send an <code>autorelease</code> message to the new NSData object before returning it.<p>
+
+<hr WIDTH=25% ALIGN=LEFT>
+
+<a name="236"></a>
+
+<h3> <a name="//apple_ref/occ/instm/NSCoder/decodeNXObject">decodeNXObject</a></h3>
+
+- (Object *)<code>decodeNXObject</code>
+
+<P>Decodes and returns an object descended from the Object class of NEXTSTEP Release 3 or earlier. Clients do not need to retain the returned object.<p>
+
+This method matches an <code>encodeNXObject:</code> message used during encoding.<p>
+
+<hr WIDTH=25% ALIGN=LEFT>
+
+<a name="240"></a>
+
+<h3> <a name="//apple_ref/occ/instm/NSCoder/decodeObject">decodeObject</a></h3>
+
+- (id)<code>decodeObject</code>
+
+<P>Decodes an Objective-C object that was previously encoded with any of the <code>encode...Object:</code> methods. NSCoder's implementation invokes <code>decodeValueOfObjCType:</code> to decode the object data.<p>
+
+Subclasses may need to override this method if they override any of the corresponding <code>encode...Object:</code> methods. For example, if an object was encoded conditionally using the <code>encodeConditionalObject:</code> method, this method needs to check whether the object had actually been encoded. <p>
+
+<B>See also: </B>  
+
+<code><a href="#//apple_ref/occ/instm/NSCoder/encodeBycopyObject:">- encodeBycopyObject:</a>, <a href="#//apple_ref/occ/instm/NSCoder/encodeByrefObject:">- encodeByrefObject:</a>, <a href="#//apple_ref/occ/instm/NSCoder/encodeObject:">- encodeObject:</a>
+
+</code><p><hr WIDTH=25% ALIGN=LEFT>
+
+<a name="245"></a>
+
+<h3> <a name="//apple_ref/occ/instm/NSCoder/decodePoint">decodePoint</a></h3>
+
+- (NSPoint)<code>decodePoint</code>
+
+<P>Decodes and returns an <code>NSPoint</code> structure that was previously encoded with <code>encodePoint:</code>. Subclasses should not override this method.<p>
+
+<hr WIDTH=25% ALIGN=LEFT>
+
+<a name="248"></a>
+
+<h3> <a name="//apple_ref/occ/instm/NSCoder/decodePropertyList">decodePropertyList</a></h3>
+
+- (id)<code>decodePropertyList</code>
+
+<P>Decodes a property list that was previously encoded with <code>encodePropertyList:</code>. Subclasses should not override this method. See the NSPPL class specification for information on property lists. <p>
+
+<hr WIDTH=25% ALIGN=LEFT>
+
+<a name="251"></a>
+
+<h3> <a name="//apple_ref/occ/instm/NSCoder/decodeRect">decodeRect</a></h3>
+
+- (NSRect)<code>decodeRect</code>
+
+<P>Decodes and returns an <code>NSRect</code> structure that was previously encoded with <code>encodeRect:</code>. Subclasses should not override this method.<p>
+
+<hr WIDTH=25% ALIGN=LEFT>
+
+<a name="254"></a>
+
+<h3> <a name="//apple_ref/occ/instm/NSCoder/decodeSize">decodeSize</a></h3>
+
+- (NSSize)<code>decodeSize</code>
+
+<P>Decodes and returns an <code>NSSize</code> structure that was previously encoded with <code>encodeSize:</code>. Subclasses should not override this method.<p>
+
+<hr WIDTH=25% ALIGN=LEFT>
+
+<a name="257"></a>
+
+<h3> <a name="//apple_ref/occ/instm/NSCoder/decodeValueOfObjCType:at:">decodeValueOfObjCType:at:</a></h3>
+
+- (void)<code>decodeValueOfObjCType:</code>(const char *)<em>valueType </em><code>at:</code>(void *)<em>data</em>
+
+<P>Decodes a single value, whose Objective-C type is given by <em>valueType</em>. <em>valueType</em> must contain exactly one type code and the buffer specified by <em>data</em> must be large enough to hold the value corresponding to that type code. For information on creating an Objective-C type code suitable for <em>valueType</em>, see the description of the <code>@encode()</code> compiler directive in <em>Object-Oriented Programming and the Objective-C Language</em>.<p>
+
+Subclasses must override this method and provide an implementation to decode the value. In your overriding implementation, decode the value<em> </em>into the buffer beginning at <em>data</em>. If your overriding method is capable of decoding an Objective-C object, your method must also retain that object. Clients of this method are then responsible for releasing the object.<p>
+
+This method matches an <code>encodeValueOfObjCType:at:</code> message used during encoding.<p>
+
+<B>See also: </B>  
+
+<code><a href="#//apple_ref/occ/instm/NSCoder/decodeArrayOfObjCType:count:at:">- decodeArrayOfObjCType:count:at:</a></code>, <a href="#//apple_ref/occ/instm/NSCoder/decodeValuesOfObjCTypes:"><code>- decodeValuesOfObjCTypes:</a>, <a href="#//apple_ref/occ/instm/NSCoder/decodeObject">- decodeObject</a>
+
+</code><p><hr WIDTH=25% ALIGN=LEFT>
+
+<a name="263"></a>
+
+<h3> <a name="//apple_ref/occ/instm/NSCoder/decodeValuesOfObjCTypes:">decodeValuesOfObjCTypes:</a></h3>
+
+- (void)<code>decodeValuesOfObjCTypes:</code>(const char *)<em>valueTypes</em>, ...
+
+<P>Decodes a series of potentially different Objective-C types. <em>valueTypes</em> is a single string containing any number of type codes. The variable arguments to this method consist of one or more pointer arguments, each of which specifies the buffer in which to place a single decoded value. For each type code in <em>valueTypes</em>, you must specify a corresponding pointer argument whose buffer is large enough to hold the decoded value. If you use this method to decode Objective-C objects, you are responsible for releasing them.<p>
+
+This method matches an <code>enc</code><code>odeValuesOfObjCTypes</code><code>:</code> message used during encoding.<p>
+
+NSCoder's implementation invokes <code>decodeValueOfObjCType:at:</code> to decode individual types. Subclasses that implement the <code>decodeValueOfObjCType:at:</code> method do not need to override this method.<p>
+
+For information on creating Objective-C type codes suitable for <em>valueTypes</em>, see the description of the <code>@encode()</code> compiler directive in <em>Object-Oriented Programming and the Objective-C Language</em>.<p>
+
+<B>See also: </B>  
+
+<code><a href="#//apple_ref/occ/instm/NSCoder/decodeArrayOfObjCType:count:at:">- decodeArrayOfObjCType:count:at:</a>
+
+</code><p><hr WIDTH=25% ALIGN=LEFT>
+
+<a name="270"></a>
+
+<h3> <a name="//apple_ref/occ/instm/NSCoder/encodeArrayOfObjCType:count:at:">encodeArrayOfObjCType:count:at:</a></h3>
+
+- (void)<code>encodeArrayOfObjCType:</code>(const char *)<em>itemType<br></em><code>count:</code>(unsigned int)<em>count<br></em><code>at:</code>(const void *)<em>address</em>
+
+<P>Encodes an array of <em>count</em> items, whose Objective-C type is given by <em>itemType</em>. The values are encoded from the buffer beginning at <em>address</em>.<em> itemType</em> must contain exactly one type code. NSCoder's implementation invokes <code>encodeValueOfObjCType:at:</code> to encode the entire array of items. Subclasses that implement the <code>encodeValueOfObjCType:at:</code> method do not need to override this method.<p>
+
+This method must be matched by a subsequent <code>decodeArrayOfObjCType:count:at:</code> message.<p>
+
+For information on creating an Objective-C type code suitable for <em>itemType</em>, see the description of the <code>@encode()</code> compiler directive in <em>Object-Oriented Programming and the Objective-C Language</em>.<p>
+
+<B>See also: </B>  
+
+<code><a href="#//apple_ref/occ/instm/NSCoder/encodeValueOfObjCType:at:">- encodeValueOfObjCType:at:</a></code>, <a href="#//apple_ref/occ/instm/NSCoder/encodeValuesOfObjCTypes:"><code>- encodeValuesOfObjCTypes:</a></code>,<code> <a href="#//apple_ref/occ/instm/NSCoder/encodeBytes:length:">- encodeBytes:length:</a>
+
+</code><p><hr WIDTH=25% ALIGN=LEFT>
+
+<a name="276"></a>
+
+<h3> <a name="//apple_ref/occ/instm/NSCoder/encodeBycopyObject:">encodeBycopyObject:</a></h3>
+
+- (void)<code>encodeBycopyObject:</code>(id)<em>object</em>
+
+<P>Can be overridden by subclasses to encode <em>object</em> so that a copy rather than a proxy is created upon decoding. NSCoder's implementation simply invokes <code>encodeObject:</code>.<p>
+
+This method must be matched by a subsequent <code>decodeObject</code> message.<p>
+
+<B>See also: </B>  
+
+<code><a href="#//apple_ref/occ/instm/NSCoder/encodeRootObject:">- encodeRootObject:</a></code>, <a href="#//apple_ref/occ/instm/NSCoder/encodeConditionalObject:"><code>- encodeConditionalObject:</a></code>, <a href="#//apple_ref/occ/instm/NSCoder/encodeNXObject:"><code>- encodeNXObject:</a>, 
+
+<a href="#//apple_ref/occ/instm/NSCoder/encodeByrefObject:">- encodeByrefObject:</a>
+
+</code><p><hr WIDTH=25% ALIGN=LEFT>
+
+<a name="281"></a>
+
+<h3> <a name="//apple_ref/occ/instm/NSCoder/encodeByrefObject:">encodeByrefObject:</a></h3>
+
+- (void)<code>encodeByrefObject:</code>(id)<em>object</em>
+
+<P>Can be overridden by subclasses to encode <em>object</em> so that a proxy, rather than a copy, is created upon decoding. NSCoder's implementation simply invokes <code>encodeObject:</code>.<p> This method must be matched by a subsequent decodeObject message.<p>
+
+<B>See also: </B>  
+
+<code>
+
+<a href="#//apple_ref/occ/instm/NSCoder/encodeBycopyObject:"><code>- encodeBycopyObject:</code></a>,<a href="../NSObject/NSObject.html#//apple_ref/occ/instm/NSObject/replacementObjectForPortCoder:" target="_top"><code>- replacementObjectForPortCoder</code></a>:
+
+</code><p><hr WIDTH=25% ALIGN=LEFT>
+
+<a name="285"></a>
+
+<h3> <a name="//apple_ref/occ/instm/NSCoder/encodeBytes:length:">encodeBytes:length:</a></h3>
+
+- (void)<code>encodeBytes</code><code>:</code>(void *)<em>address </em><code>length:</code>(unsigned int)<em>numBytes</em>
+
+<P>Encodes a buffer of data whose types are unspecified. The buffer to be encoded begins at <em>address</em>, and its length in bytes is given by <em>numBytes</em>.<p>
+
+This method must be matched by a subsequent <code>decodeBytesWithReturnedLength:numBytes:</code> message.<p>
+
+<B>See also: </B>  
+
+<code><a href="#//apple_ref/occ/instm/NSCoder/encodeArrayOfObjCType:count:at:">- encodeArrayOfObjCType:count:at:</a>
+
+</code><p><hr WIDTH=25% ALIGN=LEFT>
+
+<a name="290"></a>
+
+<h3> <a name="//apple_ref/occ/instm/NSCoder/encodeConditionalObject:">encodeConditionalObject:</a></h3>
+
+- (void)<code>encodeConditionalObject:</code>(id)<em>object</em>
+
+<P>Can be overridden by subclasses to conditionally encode <em>object</em>, preserving common references to that object. In the overriding method, <em>object</em> should be encoded only if it's unconditionally encoded elsewhere (with any other <code>encode...Object:</code> method).<p>
+
+This method must be matched by a subsequent <code>decodeObject</code> message. Upon decoding, if <em>object</em> was never encoded unconditionally, <code>decodeObject</code> returns <code>nil</code> in place of <em>object</em>. However, if <em>object</em> was encoded unconditionally, all references to <em>object</em> must be resolved.<p>
+
+NSCoder's implementation simply invokes <code>encodeObject:</code>. <p>
+
+<B>See also: </B>  
+
+<code><a href="#//apple_ref/occ/instm/NSCoder/encodeRootObject:">- encodeRootObject:</a></code>, <a href="#//apple_ref/occ/instm/NSCoder/encodeObject:"><code>- encodeObject:</a></code>, <a href="#//apple_ref/occ/instm/NSCoder/encodeBycopyObject:"><code>- encodeBycopyObject:</a></code>, <a href="#//apple_ref/occ/instm/NSCoder/encodeNXObject:"><code>- encodeNXObject:</a></code>, 
+
+<code><a href="../NSArchiver/NSArchiver.html#//apple_ref/occ/instm/NSArchiver/encodeConditionalObject:" target="_top">- encodeConditionalObject:</code> (NSArchiver)</a>
+
+<p><hr WIDTH=25% ALIGN=LEFT>
+
+<a name="296"></a>
+
+<h3> <a name="//apple_ref/occ/instm/NSCoder/encodeDataObject:">encodeDataObject:</a></h3>
+
+- (void)<code>encodeDataObject:</code>(NSData *)<em>data</em>
+
+<P>Must be overridden by subclasses to encode the NSData object <em>data</em>. This method must be matched by a subsequent <code>decodeDataObject</code> message.<p>
+
+<B>See also: </B>  
+
+<code><a href="#//apple_ref/occ/instm/NSCoder/encodeObject:">- encodeObject:</a>
+
+</code><p><hr WIDTH=25% ALIGN=LEFT>
+
+<a name="300"></a>
+
+<h3> <a name="//apple_ref/occ/instm/NSCoder/encodeNXObject:">encodeNXObject:</a></h3>
+
+- (void)<code>encodeNXObject:</code>(Object *)<em>nxobject</em>
+
+<P>Encodes <em>nxobject</em>, an object descended from the Object class of NEXTSTEP Release 3 or earlier. This method must be matched by a subsequent <code>decodeNXObject</code> message.<p>
+
+Objects encoded more than once by successive invocations of this method are written in their entirety on each invocation. Applied to an object graph, the behavior of this method effectively flattens the graph structure, creating a new copy of the object in place of a reference to the original. This differs from the behavior of <code>encodeObject:</code>, which encodes an object once and replaces subsequent occurences of the object with a reference to the original.<p>
+
+<B>See also: </B>  
+
+<code><a href="#//apple_ref/occ/instm/NSCoder/encodeConditionalObject:">- encodeConditionalObject:</a></code>, <a href="#//apple_ref/occ/instm/NSCoder/encodeBycopyObject:"><code>- encodeBycopyObject:</a></code>, <a href="#//apple_ref/occ/instm/NSCoder/encodeRootObject:"><code>- encodeRootObject:</a>
+
+</code><p><hr WIDTH=25% ALIGN=LEFT>
+
+<a name="305"></a>
+
+<h3> <a name="//apple_ref/occ/instm/NSCoder/encodeObject:">encodeObject:</a></h3>
+
+- (void)<code>encodeObject:</code>(id)<em>object</em>
+
+<P>Encodes <em>object</em>. NSCoder's implementation simply invokes <code>encodeValueOfObjCType:at:</code> to encode the object. Subclasses can override this method to encode a reference to <em>object</em> instead of <em>object</em> itself. For example, NSArchiver detects duplicate objects and encodes a reference to the original object rather than encode the same object twice.<p>
+
+This method must be matched by a subsequent <code>decodeObject</code> message.<p>
+
+<B>See also: </B>  
+
+<code><a href="#//apple_ref/occ/instm/NSCoder/encodeRootObject:">- encodeRootObject:</a></code>, <a href="#//apple_ref/occ/instm/NSCoder/encodeConditionalObject:"><code>- encodeConditionalObject:</a></code>, <a href="#//apple_ref/occ/instm/NSCoder/encodeBycopyObject:"><code>- encodeBycopyObject:</a></code>, 
+
+<code><a href="#//apple_ref/occ/instm/NSCoder/encodeNXObject:">- encodeNXObject:</a>
+
+</code><p><hr WIDTH=25% ALIGN=LEFT>
+
+<a name="310"></a>
+
+<h3> <a name="//apple_ref/occ/instm/NSCoder/encodePoint:">encodePoint:</a></h3>
+
+- (void)<code>encodePoint:</code>(NSPoint)<em>point</em>
+
+<P>Encodes <em>point</em>. NSCoder's implementation invokes <code>encodeValueOfObjCType:at:</code> to encode <em>point</em>. Subclasses should not need to override this method.<p>
+
+This method must be matched by a subsequent <code>decodePoint</code> message.<p>
+
+<hr WIDTH=25% ALIGN=LEFT>
+
+<a name="314"></a>
+
+<h3> <a name="//apple_ref/occ/instm/NSCoder/encodePropertyList:">encodePropertyList:</a></h3>
+
+- (void)<code>encodePropertyList:</code>(id)<em>aPropertyList</em>
+
+<P>Encodes a property list. (See the NSPPL class specification for information on property lists.) NSCoder's implementation invokes <code>encodeValueOfObjCType:at:</code> to encode <em>aPropertyList</em>. Subclasses should not need to override this method. <p>
+
+This method must be matched by a subsequent <code>decodePropertyList</code> message.<p>
+
+<hr WIDTH=25% ALIGN=LEFT>
+
+<a name="318"></a>
+
+<h3> <a name="//apple_ref/occ/instm/NSCoder/encodeRect:">encodeRect:</a></h3>
+
+- (void)<code>encodeRect:</code>(NSRect)<em>rect</em>
+
+<P>Encodes <em>rect</em>. NSCoder's implementation invokes <code>encodeValueOfObjCType:at:</code> to encode <em>rect</em>. Subclasses should not need to override this method.<p>
+
+ This method must be matched by a subsequent <code>decodeRect</code> message.<p>
+
+<hr WIDTH=25% ALIGN=LEFT>
+
+<a name="322"></a>
+
+<h3> <a name="//apple_ref/occ/instm/NSCoder/encodeRootObject:">encodeRootObject:</a></h3>
+
+- (void)<code>encodeRootObject:</code>(id)<em>rootObject</em>
+
+<P>Can be overridden by subclasses to encode an interconnected group of Objective-C objects, starting with <em>rootObject</em>. NSCoder's implementation simply invokes <code>encodeObject:</code>.<p>
+
+This method must be matched by a subsequent <code>decodeObject</code> message.<p>
+
+<B>See also: </B>  
+
+<code><a href="#//apple_ref/occ/instm/NSCoder/encodeObject:">- encodeObject:</a></code>, <a href="#//apple_ref/occ/instm/NSCoder/encodeConditionalObject:"><code>- encodeConditionalObject:</a></code>, <a href="#//apple_ref/occ/instm/NSCoder/encodeBycopyObject:"><code>- encodeBycopyObject:</a></code>, <a href="#//apple_ref/occ/instm/NSCoder/encodeNXObject:"><code>- encodeNXObject:</a></code>, 
+
+<code><a href="../NSArchiver/NSArchiver.html#//apple_ref/occ/instm/NSArchiver/encodeRootObject:" target="_top">- encodeRootObject:</code> (NSArchiver)</a>
+
+<p><hr WIDTH=25% ALIGN=LEFT>
+
+<a name="327"></a>
+
+<h3> <a name="//apple_ref/occ/instm/NSCoder/encodeSize:">encodeSize:</a></h3>
+
+- (void)<code>encodeSize:</code>(NSSize)<em>size</em>
+
+<P>Encodes <em>size</em>. NSCoder's implementation invokes <code>encodeValueOfObjCType:at:</code> to encode <em>size</em>. Subclasses should not need to override this method.<p>
+
+This method must be matched by a subsequent <code>decodeSize</code> message.<p>
+
+<hr WIDTH=25% ALIGN=LEFT>
+
+<a name="331"></a>
+
+<h3> <a name="//apple_ref/occ/instm/NSCoder/encodeValueOfObjCType:at:">encodeValueOfObjCType:at:</a></h3>
+
+- (void)<code>encodeValueOfObjCType:</code>(const char *)<em>valueType </em><code>at:</code>(const void *)<em>address</em>
+
+<P>Must be overridden by subclasses to encode a single value residing at <em>address</em>, whose Objective-C type is given by <em>valueType</em>. <em>valueType</em> must contain exactly one type code.<p>
+
+This method must be matched by a subsequent <code>decodeValueOfObjCType</code><code>:</code><code>at:</code> message.<p>
+
+For information on creating an Objective-C type code suitable for <em>valueType</em>, see the description of the <code>@encode()</code> compiler directive in <em>Object-Oriented Programming and the Objective-C Language</em>.<p>
+
+<B>See also: </B>  
+
+<code><a href="#//apple_ref/occ/instm/NSCoder/encodeArrayOfObjCType:count:at:">- encodeArrayOfObjCType:count:at:</a></code>, <a href="#//apple_ref/occ/instm/NSCoder/encodeValuesOfObjCTypes:"><code>- encodeValuesOfObjCTypes:</a>
+
+</code><p><hr WIDTH=25% ALIGN=LEFT>
+
+<a name="337"></a>
+
+<h3> <a name="//apple_ref/occ/instm/NSCoder/encodeValuesOfObjCTypes:">encodeValuesOfObjCTypes:</a></h3>
+
+- (void)<code>encodeValuesOfObjCTypes:</code>(const char *)<em>valueTypes, ...</em>
+
+<P>Encodes a series of values of potentially differing Objective-C types. <em>valueTypes</em> is a single string containing any number of type codes. The variable arguments to this method consist of one or more pointer arguments, each of which specifies a buffer containing the value to be encoded. For each type code in <em>valueTypes</em>, you must specify a corresponding pointer argument.<p>
+
+This method must be matched by a subsequent <code>decodeValuesOfObjCTypes</code><code>:</code> message.<p>
+
+NSCoder's implementation invokes <code>encodeValueOfObjCType:at:</code> to encode individual types. Subclasses that implement the <code>encodeValueOfObjCType:at:</code> method do not need to override this method. However, subclasses that provide a more efficient approach for encoding a series of values may override this method to implement that approach.<p>
+
+For information on creating Objective-C type codes suitable for <em>valueType</em><em>s</em>, see the description of the <code>@encode()</code> compiler directive in <em>Object-Oriented Programming and the Objective-C Language</em>.<p>
+
+<B>See also: </B>  
+
+<code><a href="#//apple_ref/occ/instm/NSCoder/encodeArrayOfObjCType:count:at:">- encodeArrayOfObjCType:count:at:</a></code>, <a href="#//apple_ref/occ/instm/NSCoder/encodeValueOfObjCType:at:"><code>- encodeValueOfObjCType:at:</a>
+
+</code><p><hr WIDTH=25% ALIGN=LEFT>
+
+<a name="344"></a>
+
+<h3> <a name="//apple_ref/occ/instm/NSCoder/objectZone">objectZone</a></h3>
+
+- (NSZone *)<code>objectZone</code>
+
+<P>Returns the memory zone used to allocate decoded objects. NSCoder's implementation simply returns the default memory zone, as given by <code>NSDefaultMallocZone()</code>.<p>
+
+Subclasses must override this method and the <code>setObjectZone:</code> method to allow objects to be decoded into a zone other than the default zone. In its overriding implementation of this method, your subclass should return the current memory zone (if one has been set) or the default zone (if no other zone has been set).<p>
+
+<B>See also: </B>  
+
+ <a href="#//apple_ref/occ/instm/NSCoder/setObjectZone:"><code>- setObjectZone:</a>
+
+</code><p><hr WIDTH=25% ALIGN=LEFT>
+
+<a name="349"></a>
+
+<h3> <a name="//apple_ref/occ/instm/NSCoder/setObjectZone:">setObjectZone:</a></h3>
+
+- (void)<code>setObjectZone:</code>(NSZone *)<em>zone</em>
+
+<P>Can be overridden by subclasses to set the memory zone used to allocate decoded objects. NSCoder's implementation of this method does nothing.<p>
+
+Subclasses must override this method and the <code>objectZone</code> method to allow objects to be decoded into a zone other than the default zone. In its overriding implementation of this method, your subclass should store a reference to the current memory zone.<p>
+
+<B>See also: </B>  
+
+<code><a href="#//apple_ref/occ/instm/NSCoder/objectZone">- objectZone</a>
+
+</code><p><hr WIDTH=25% ALIGN=LEFT>
+
+<a name="354"></a>
+
+<h3> <a name="//apple_ref/occ/instm/NSCoder/systemVersion">systemVersion</a></h3>
+
+- (unsigned int)<code>systemVersion</code> 
+
+<P>During encoding, this method should return the system version currently in effect. During decoding, this method should return the version that was in effect when the data was encoded.<p>
+
+By default, this method returns the current system version, which is appropriate for encoding but not for decoding. Subclasses that implement decoding must override this method to return the system version of the data being decoded.<p>
+
+<hr WIDTH=25% ALIGN=LEFT>
+
+<a name="358"></a>
+
+<h3> <a name="//apple_ref/occ/instm/NSCoder/versionForClassName:">versionForClassName:</a></h3>
+
+- (unsigned int)<code>versionForClassName:</code>(NSString *)<em>className</em>
+
+<P>Must be overridden by subclasses to return the version in effect for the class named <em>className</em> when it was encoded. Returns NSNotFound if no class named <p>
+
+
+
+ 
+
+ 
+
+
+
+
+
+<i>Copyright &#169; 1997, Apple Computer, Inc.   All rights
+
+reserved.</i>
+
+
+
+<!-- Last updated: 06/17/97 16:46:39 -->
+
+
+
+</body>
+
+</html>
+

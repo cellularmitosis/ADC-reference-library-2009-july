@@ -1,0 +1,55 @@
+<BODY bgcolor=#FFFFFF>
+<P><A HREF="ManagingState.book.html"><IMG SRC="ArrowUp.gif" border=0>Table of Contents</A>
+<A HREF="PageAwake.html"><IMG SRC="ArrowLeft.gif" border=0>Previous Section</A>
+<!-- This file was created with the fm2html filter.
+The filter is copyright Norwegian Telecom Research and
+was programmed by Jon Stephenson von Tetzchner. -->
+
+
+<H1><A NAME="REF58489">pageWithName: and Page Caching</A></H1>
+<P>When the application object receives a <B>pageWithName:</B> message, it creates a new component. For example, in the HelloWorld example a user enters a name in the first page (the Main component), clicks Submit, and is presented with a personal greeting on the second page (the Hello component). Clicking the Submit button in the first page invokes the <B>sayHello</B> method in the Main component. As part of its implementation <B>sayHello</B> sends a <B>pageWithName:</B> message to the application object:
+<PRE>id visitorName;
+
+- sayHello {
+    id nextPage;
+    
+    // Create the next page.
+    nextPage = [[self application] pageWithName:@"Hello"];  
+    
+    // Set state in the Hello page
+    [nextPage setVisitorName:visitorName];
+    
+    // Return the 'Hello' page.
+    return nextPage;
+}</PRE>
+<P>Each time the <B>sayHello</B> method is invoked, a new Hello component is created. For example, if the user backtracks to the main page and clicks the Submit button again, another Hello page is created. It's unlikely this duplication of components will be a problem for the HelloWorld application, since users quickly tire of its charms. But, depending on design, some applications may benefit by modifying the operation of <B>pageWithName:</B> so that an existing component can be reused.
+<P>If you want to extend WebObjects' page caching mechanism to include pages returned by <B>pageWithName:</B>, you must implement your own solution. Fortunately, it's easy. One approach is to have the session maintain a dictionary that maps page names to page objects. Here's the code you would add to an application's <B>Session.wos</B> file:
+<PRE>id pageDictionary;
+
+- init {
+    [super init];
+    pageDictionary = [NSMutableDictionary dictionary];
+    return self;
+
+}
+
+- pageWithName:aName {
+    id aPage = [pageDictionary objectForKey:aName];
+      
+    if (!aPage) {
+        aPage = [[self application] pageWithName:aName];
+        [pageDictionary setObject:aPage forKey:aName];
+    }
+    return aPage; 
+}</PRE>
+<P>Note that we implement <B>pageWithName:</B> in the session object since we want to cache these pages on a per-session basis. (Overriding the method in the application object would cache pages on a per-application basis.) Since the <B>pageWithName:</B> method that we want to use now resides in the session object, one line in the <B>sayHello</B> method has to change (change in bold):
+<PRE>- sayHello {
+    id nextPage;
+    nextPage = [[self <B>session</B>] pageWithName:@"Hello"];  
+    [nextPage setVisitorName:visitorName];
+    return nextPage;
+}</PRE>
+
+<P><A HREF="ManagingState.book.html"><IMG SRC="ArrowUp.gif" border=0>Table of Contents</A>
+<A HREF="ClientCaching.html"><IMG SRC="ArrowRight.gif" border=0>Next Section</A>
+</BODY >

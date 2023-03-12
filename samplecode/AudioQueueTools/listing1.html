@@ -1,0 +1,366 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+   "http://www.w3.org/TR/1999/REC-html401-19991224/loose.dtd">
+<html>
+<head>
+
+	<!-- BEGIN META TAG INFO -->
+	<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+	<link rel="home" href="http://developer.apple.com/">
+	<link rel="find" href="http://developer.apple.com/search/">
+	<link rel="stylesheet" type="text/css" href="../../documentation/css/adcstyle.css" title="fonts">
+	<script language="JavaScript" src="../../documentation/js/adc.js" type="text/javascript"></script>
+	<!-- END META TAG INFO -->
+	
+	<!-- BEGIN TITLE -->
+	<title>AudioQueueTools - /aqplay.cpp</title>
+	<!-- END TITLE -->
+<script language="JavaScript">
+function JumpToNewPage() {
+	window.location=document.scpopupmenu.gotop.value;
+	return true;
+}
+</script>
+
+</head>
+
+<!-- BEGIN BODY OPEN -->
+<body>
+<!--END BODY OPEN -->
+
+<!-- START CENTER OPEN -->
+<center>
+<!-- END CENTER OPEN -->
+
+	<!-- BEGIN LOGO AND SEARCH -->
+	<!--#include virtual="/includes/adcnavbar"-->
+	<!-- END LOGO AND SEARCH -->
+		
+		
+	<!-- START BREADCRUMB -->
+	<div id="breadcrumb">
+	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td scope="row"><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+			<td><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+		</tr>
+		<tr valign="middle">
+			<td align="left" colspan="2">
+			<a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../samplecode/index.html">Sample Code</a> &gt; <a href="../../samplecode/MusicAudio/index.html">Audio</a> &gt; <a href="../../samplecode/MusicAudio/idxCoreAudio-date.html">Core Audio</a> &gt; <A HREF="javascript:location.replace('index.html');">AudioQueueTools</A> &gt; 
+			</td>
+		</tr>
+		<tr>
+			<td colspan="2" scope="row"><img width="680" height="35" src="images/1dot.gif" alt=""></td>
+		</tr>
+	</table>
+	</div>
+	<!-- END BREADCRUMB -->
+
+
+	<!-- START MAIN CONTENT -->
+	
+	<!-- START TITLE GRAPHIC AND INTRO-->
+	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr align="left" valign="top">
+			<td><h1><div id="pagehead">AudioQueueTools</div></h1></td>
+		</tr>
+	</table>
+	<!-- END TITLE GRAPHIC AND INTRO -->
+	<!-- START WIDE COLUMN -->
+	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr align="left" valign="top">
+			<td id="scdetails">
+				<h2>/aqplay.cpp</h2>
+				<form name="scpopupmenu" onSubmit="return false;" method=post>
+				<p><strong>View Source Code:</strong> 
+					<select name="gotop" onChange="JumpToNewPage();" style="width:340px"><option selected value="ingnore">Select File</option>
+<option value="listing1.html">/aqplay.cpp</option>
+<option value="listing2.html">/aqrecord.c</option></select>
+				</p>
+				</form>
+				<p><strong><a href="AudioQueueTools.zip">Download Sample</a></strong> (&#147;AudioQueueTools.zip&#148;, 30.5K)<BR>
+<strong><a href="AudioQueueTools.dmg">Download Sample</a></strong> (&#147;AudioQueueTools.dmg&#148;, 94.3K)</p>
+				<!--
+				<p><strong><a href="#">Download Sample</a></strong> (&#147;filename.sit&#148;, 500K)</p>
+				-->
+			</td>
+		</tr>
+		<tr>
+			<td scope="row"><img width="680" height="10" src="images/1dot.gif" alt=""><br>
+			<img height="1" width="680" src="images/1dot_919699.gif" alt=""><br>
+			<img width="680" height="20" src="images/1dot.gif" alt=""></td>
+		</tr>
+		<tr>
+			<td scope="row">
+	<!--googleon: index -->
+<pre class="sourcecodebox">//#include &lt;CoreServices/CoreServices.h&gt;
+#include &lt;AudioToolbox/AudioQueue.h&gt;
+#include &lt;AudioToolbox/AudioFile.h&gt;
+
+// helpers
+#include &quot;CAXException.h&quot;
+#include &quot;CAStreamBasicDescription.h&quot;
+
+static const int kNumberBuffers = 3;
+static UInt32 gIsRunning = 0;
+
+
+struct AQTestInfo {
+  AudioFileID            mAudioFile;
+  CAStreamBasicDescription    mDataFormat;
+  AudioQueueRef          mQueue;
+  AudioQueueBufferRef        mBuffers[kNumberBuffers];
+  SInt64              mCurrentPacket;
+  UInt32              mNumPacketsToRead;
+  AudioStreamPacketDescription *  mPacketDescs;
+  bool              mDone;
+};
+
+static void AQTestBufferCallback(void *          inUserData,
+                AudioQueueRef      inAQ,
+                AudioQueueBufferRef    inCompleteAQBuffer) 
+{
+  AQTestInfo * myInfo = (AQTestInfo *)inUserData;
+  if (myInfo-&gt;mDone) return;
+    
+  UInt32 numBytes;
+  UInt32 nPackets = myInfo-&gt;mNumPacketsToRead;
+
+  XThrowIfError (AudioFileReadPackets(myInfo-&gt;mAudioFile, false, &amp;numBytes, myInfo-&gt;mPacketDescs, myInfo-&gt;mCurrentPacket, &amp;nPackets, 
+                inCompleteAQBuffer-&gt;mAudioData), &quot;AudioFileReadPackets failed&quot;);
+    
+  if (nPackets &gt; 0) {
+    inCompleteAQBuffer-&gt;mAudioDataByteSize = numBytes;    
+
+    AudioQueueEnqueueBuffer(inAQ, inCompleteAQBuffer, (myInfo-&gt;mPacketDescs ? nPackets : 0), myInfo-&gt;mPacketDescs);
+    
+    myInfo-&gt;mCurrentPacket += nPackets;
+  } else {
+    XThrowIfError(AudioQueueStop(myInfo-&gt;mQueue, false), &quot;AudioQueueStop(false) failed&quot;);
+      // reading nPackets == 0 is our EOF condition
+    myInfo-&gt;mDone = true;
+  }
+}
+
+static void usage()
+{
+  fprintf(stderr,
+      &quot;Usage:\n&quot;
+      &quot;%s [option...] audio_file\n\n&quot;
+      &quot;Options: (may appear before or after arguments)\n&quot;
+      &quot;  {-v | --volume} VOLUME\n&quot;
+      &quot;    set the volume for playback of the file\n&quot;
+      &quot;  {-h | --help}\n&quot;
+      &quot;    print help\n&quot;
+      , &quot;aqplay&quot;);
+  exit(1);
+}
+
+void  MissingArgument()
+{
+  fprintf(stderr, &quot;Missing argument\n&quot;);
+  usage();
+}
+
+void  MyAudioQueuePropertyListenerProc (  void *              inUserData,
+                    AudioQueueRef           inAQ,
+                    AudioQueuePropertyID    inID)
+{
+  UInt32 size = sizeof(gIsRunning);
+  XThrowIfError (AudioQueueGetProperty (inAQ, kAudioQueueProperty_IsRunning, &amp;gIsRunning, &amp;size), &quot;is running&quot;);
+}
+
+  // we only use time here as a guideline
+  // we're really trying to get somewhere between 16K and 64K buffers, but not allocate too much if we don't need it
+void CalculateBytesForTime (CAStreamBasicDescription &amp; inDesc, UInt32 inMaxPacketSize, Float64 inSeconds, UInt32 *outBufferSize, UInt32 *outNumPackets)
+{
+  static const int maxBufferSize = 0x10000; // limit size to 64K
+  static const int minBufferSize = 0x4000; // limit size to 16K
+
+  if (inDesc.mFramesPerPacket) {
+    Float64 numPacketsForTime = inDesc.mSampleRate / inDesc.mFramesPerPacket * inSeconds;
+    *outBufferSize = numPacketsForTime * inMaxPacketSize;
+  } else {
+    // if frames per packet is zero, then the codec has no predictable packet == time
+    // so we can't tailor this (we don't know how many Packets represent a time period
+    // we'll just return a default buffer size
+    *outBufferSize = maxBufferSize &gt; inMaxPacketSize ? maxBufferSize : inMaxPacketSize;
+  }
+  
+    // we're going to limit our size to our default
+  if (*outBufferSize &gt; maxBufferSize &amp;&amp; *outBufferSize &gt; inMaxPacketSize)
+    *outBufferSize = maxBufferSize;
+  else {
+    // also make sure we're not too small - we don't want to go the disk for too small chunks
+    if (*outBufferSize &lt; minBufferSize)
+      *outBufferSize = minBufferSize;
+  }
+  *outNumPackets = *outBufferSize / inMaxPacketSize;
+}
+
+
+int main (int argc, const char * argv[]) 
+{
+  const char *fpath = NULL;
+  Float32 volume = 1;
+  
+  for (int i = 1; i &lt; argc; ++i) {
+    const char *arg = argv[i];
+    if (arg[0] != '-') {
+      if (fpath != NULL) {
+        fprintf(stderr, &quot;may only specify one file to play\n&quot;);
+        usage();
+      }
+      fpath = arg;
+    } else {
+      arg += 1;
+      if (arg[0] == 'v' || !strcmp(arg, &quot;-volume&quot;)) {
+        if (++i == argc)
+          MissingArgument();
+        arg = argv[i];
+        sscanf(arg, &quot;%f&quot;, &amp;volume);
+      } else if (arg[0] == 'h' || !strcmp(arg, &quot;-help&quot;)) {
+        usage();
+      } else {
+        fprintf(stderr, &quot;unknown argument: %s\n\n&quot;, arg - 1);
+        usage();
+      }
+    }
+  }
+
+  if (fpath == NULL)
+    usage();
+  
+  printf (&quot;Playing file: %s\n&quot;, fpath);
+  
+  try {
+    AQTestInfo myInfo;
+    
+    CFURLRef sndFile = CFURLCreateFromFileSystemRepresentation (NULL, (const UInt8 *)fpath, strlen(fpath), false);
+    if (!sndFile) XThrowIfError (!sndFile, &quot;can't parse file path&quot;);
+      
+    OSStatus result = AudioFileOpenURL (sndFile, 0x1/*fsRdPerm*/, 0/*inFileTypeHint*/, &amp;myInfo.mAudioFile);
+    CFRelease (sndFile);
+            
+    XThrowIfError(result, &quot;AudioFileOpen failed&quot;);
+      
+    UInt32 size = sizeof(myInfo.mDataFormat);
+    XThrowIfError(AudioFileGetProperty(myInfo.mAudioFile, 
+                  kAudioFilePropertyDataFormat, &amp;size, &amp;myInfo.mDataFormat), &quot;couldn't get file's data format&quot;);
+    
+    printf (&quot;File format: &quot;); myInfo.mDataFormat.Print();
+
+    XThrowIfError(AudioQueueNewOutput(&amp;myInfo.mDataFormat, AQTestBufferCallback, &amp;myInfo, 
+                  CFRunLoopGetCurrent(), kCFRunLoopCommonModes, 0, &amp;myInfo.mQueue), &quot;AudioQueueNew failed&quot;);
+
+    UInt32 bufferByteSize;
+    
+    // we need to calculate how many packets we read at a time, and how big a buffer we need
+    // we base this on the size of the packets in the file and an approximate duration for each buffer
+    {
+      bool isFormatVBR = (myInfo.mDataFormat.mBytesPerPacket == 0 || myInfo.mDataFormat.mFramesPerPacket == 0);
+      
+      // first check to see what the max size of a packet is - if it is bigger
+      // than our allocation default size, that needs to become larger
+      UInt32 maxPacketSize;
+      size = sizeof(maxPacketSize);
+      XThrowIfError(AudioFileGetProperty(myInfo.mAudioFile, 
+                  kAudioFilePropertyPacketSizeUpperBound, &amp;size, &amp;maxPacketSize), &quot;couldn't get file's max packet size&quot;);
+      
+      // adjust buffer size to represent about a half second of audio based on this format
+      CalculateBytesForTime (myInfo.mDataFormat, maxPacketSize, 0.5/*seconds*/, &amp;bufferByteSize, &amp;myInfo.mNumPacketsToRead);
+      
+      if (isFormatVBR)
+        myInfo.mPacketDescs = new AudioStreamPacketDescription [myInfo.mNumPacketsToRead];
+      else
+        myInfo.mPacketDescs = NULL; // we don't provide packet descriptions for constant bit rate formats (like linear PCM)
+        
+      printf (&quot;Buffer Byte Size: %d, Num Packets to Read: %d\n&quot;, (int)bufferByteSize, (int)myInfo.mNumPacketsToRead);
+    }
+
+    // (2) If the file has a cookie, we should get it and set it on the AQ
+    size = sizeof(UInt32);
+    result = AudioFileGetPropertyInfo (myInfo.mAudioFile, kAudioFilePropertyMagicCookieData, &amp;size, NULL);
+
+    if (!result &amp;&amp; size) {
+      char* cookie = new char [size];    
+      XThrowIfError (AudioFileGetProperty (myInfo.mAudioFile, kAudioFilePropertyMagicCookieData, &amp;size, cookie), &quot;get cookie from file&quot;);
+      XThrowIfError (AudioQueueSetProperty(myInfo.mQueue, kAudioQueueProperty_MagicCookie, cookie, size), &quot;set cookie on queue&quot;);
+      delete [] cookie;
+    }
+
+      // prime the queue with some data before starting
+    myInfo.mDone = false;
+    myInfo.mCurrentPacket = 0;
+    for (int i = 0; i &lt; kNumberBuffers; ++i) {
+      XThrowIfError(AudioQueueAllocateBuffer(myInfo.mQueue, bufferByteSize, &amp;myInfo.mBuffers[i]), &quot;AudioQueueAllocateBuffer failed&quot;);
+
+      AQTestBufferCallback (&amp;myInfo, myInfo.mQueue, myInfo.mBuffers[i]);
+      
+      if (myInfo.mDone) break;
+    }  
+      // set the volume of the queue
+    XThrowIfError (AudioQueueSetParameter(myInfo.mQueue, kAudioQueueParam_Volume, volume), &quot;set queue volume&quot;);
+    
+    XThrowIfError (AudioQueueAddPropertyListener (myInfo.mQueue, kAudioQueueProperty_IsRunning, MyAudioQueuePropertyListenerProc, NULL), &quot;add listener&quot;);
+    
+      // lets start playing now - stop is called in the AQTestBufferCallback when there's
+      // no more to read from the file
+    XThrowIfError(AudioQueueStart(myInfo.mQueue, NULL), &quot;AudioQueueStart failed&quot;);
+
+    do {
+      CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.25, false);
+    } while (!myInfo.mDone /*|| gIsRunning*/);
+      
+    CFRunLoopRunInMode(kCFRunLoopDefaultMode, 1, false);
+
+    XThrowIfError(AudioQueueDispose(myInfo.mQueue, true), &quot;AudioQueueDispose(true) failed&quot;);
+    XThrowIfError(AudioFileClose(myInfo.mAudioFile), &quot;AudioQueueDispose(false) failed&quot;);
+    delete [] myInfo.mPacketDescs;
+  }
+  catch (CAXException e) {
+    char buf[256];
+    fprintf(stderr, &quot;Error: %s (%s)\n&quot;, e.mOperation, e.FormatError(buf));
+  }
+  
+    return 0;
+}
+</pre>
+	<!--googleoff: index -->
+			</td>
+		</tr>
+	</table>
+	<!-- END WIDE COLUMN -->
+
+	<!-- END MAIN CONTENT -->
+		<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/samplecode/AudioQueueTools/listing1.html%3Fid%3DDTS10004380-1.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/samplecode/AudioQueueTools/listing1.html%3Fid%3DDTS10004380-1.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/samplecode/AudioQueueTools/listing1.html%3Fid%3DDTS10004380-1.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+
+	<!-- START BOTTOM APPLE NAVIGATION -->
+	<!--#include virtual="/includes/footer"-->
+	<!-- END BOTTOM APPLE NAVIGATION -->
+
+<!-- START CENTER CLOSE -->
+</center>
+<!-- END CENTER CLOSE -->
+
+</body>
+</html>

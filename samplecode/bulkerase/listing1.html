@@ -1,0 +1,423 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+   "http://www.w3.org/TR/1999/REC-html401-19991224/loose.dtd">
+<html>
+<head>
+
+	<!-- BEGIN META TAG INFO -->
+	<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+	<link rel="home" href="http://developer.apple.com/">
+	<link rel="find" href="http://developer.apple.com/search/">
+	<link rel="stylesheet" type="text/css" href="../../documentation/css/adcstyle.css" title="fonts">
+	<script language="JavaScript" src="../../documentation/js/adc.js" type="text/javascript"></script>
+	<!-- END META TAG INFO -->
+	
+	<!-- BEGIN TITLE -->
+	<title>bulkerase - /discrecutils/dru_burning.c</title>
+	<!-- END TITLE -->
+<script language="JavaScript">
+function JumpToNewPage() {
+	window.location=document.scpopupmenu.gotop.value;
+	return true;
+}
+</script>
+
+</head>
+
+<!-- BEGIN BODY OPEN -->
+<body>
+<!--END BODY OPEN -->
+
+<!-- START CENTER OPEN -->
+<center>
+<!-- END CENTER OPEN -->
+
+	<!-- BEGIN LOGO AND SEARCH -->
+	<!--#include virtual="/includes/adcnavbar"-->
+	<!-- END LOGO AND SEARCH -->
+		
+		
+	<!-- START BREADCRUMB -->
+	<div id="breadcrumb">
+	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td scope="row"><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+			<td><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+		</tr>
+		<tr valign="middle">
+			<td align="left" colspan="2">
+			<a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../samplecode/index.html">Sample Code</a> &gt; <a href="../../samplecode/Carbon/index.html">Carbon</a> &gt; <a href="../../samplecode/Carbon/idxFileManagement-date.html">File Management</a> &gt; <A HREF="javascript:location.replace('index.html');">bulkerase</A> &gt; 
+			</td>
+		</tr>
+		<tr>
+			<td colspan="2" scope="row"><img width="680" height="35" src="images/1dot.gif" alt=""></td>
+		</tr>
+	</table>
+	</div>
+	<!-- END BREADCRUMB -->
+
+	
+
+	<!-- START MAIN CONTENT -->
+	
+	<!-- START TITLE GRAPHIC AND INTRO-->
+	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr align="left" valign="top">
+			<td><h1><div id="pagehead">bulkerase</div></h1></td>
+		</tr>
+	</table>
+	<!-- END TITLE GRAPHIC AND INTRO -->
+	<!-- START WIDE COLUMN -->
+	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr align="left" valign="top">
+			<td id="scdetails">
+				<h2>/discrecutils/dru_burning.c</h2>
+				<form name="scpopupmenu" onSubmit="return false;" method=post>
+				<p><strong>View Source Code:</strong> 
+					<select name="gotop" onChange="JumpToNewPage();" style="width:340px"><option selected value="ingnore">Select File</option>
+<option value="listing1.html">/discrecutils/dru_burning.c</option>
+<option value="listing2.html">/discrecutils/dru_burning.h</option>
+<option value="listing3.html">/discrecutils/dru_devices.c</option>
+<option value="listing4.html">/discrecutils/dru_devices.h</option>
+<option value="listing5.html">/discrecutils/dru_progress.c</option>
+<option value="listing6.html">/discrecutils/dru_progress.h</option>
+<option value="listing7.html">/main.c</option></select>
+				</p>
+				</form>
+				<p><strong><a href="bulkerase.zip">Download Sample</a></strong> (&#147;bulkerase.zip&#148;, 15.4K)<BR>
+<strong><a href="bulkerase.dmg">Download Sample</a></strong> (&#147;bulkerase.dmg&#148;, 73.1K)</p>
+				<!--
+				<p><strong><a href="#">Download Sample</a></strong> (&#147;filename.sit&#148;, 500K)</p>
+				-->
+			</td>
+		</tr>
+		<tr>
+			<td scope="row"><img width="680" height="10" src="images/1dot.gif" alt=""><br>
+			<img height="1" width="680" src="images/1dot_919699.gif" alt=""><br>
+			<img width="680" height="20" src="images/1dot.gif" alt=""></td>
+		</tr>
+		<tr>
+			<td scope="row">
+	<!--googleon: index -->
+<pre class="sourcecodebox">/*
+  dru_burning.c
+  
+  Part of the Disc Recording Utility sources for command-line tools.  This
+  code provides an example of handling progress during a burn.
+*/
+#include &lt;DiscRecording/DiscRecording.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;unistd.h&gt;
+#include &lt;sys/ioctl.h&gt;
+#include &lt;sys/fcntl.h&gt;
+#include &lt;sys/ttycom.h&gt;
+#include &quot;dru_burning.h&quot;
+#include &quot;dru_progress.h&quot;
+
+
+typedef struct  druBurnStatus druBurnStatus;
+struct druBurnStatus
+{
+  int        success;
+  CFStringRef    lastState;
+  CFNumberRef    lastTrack;
+  CFDictionaryRef  completionStatus;
+  char      stage[80];
+  dru_progress_t  progressBar;
+};
+
+void druProgressCallback(DRNotificationCenterRef center,void *observer,CFStringRef name,DRTypeRef object,CFDictionaryRef info);
+
+
+#pragma mark -
+
+
+
+
+
+/*
+  druBurn
+  
+  Called to do a burn.  Burning is a long async process, so this function mostly
+  handles providing appropriate progress and completion information to the user.
+*/
+int
+druBurn(DRBurnRef burn, CFTypeRef layout)
+{
+  DRNotificationCenterRef    notificationCenter = NULL;
+  CFRunLoopSourceRef      source = NULL;
+  druBurnStatus        status = {0, NULL, NULL, NULL, {0}, 0};
+  
+  /* Create a progress bar. */
+  status.progressBar = druProgressBarCreate();
+  
+  /* Sign up for notifications from the burn object. */
+  notificationCenter = DRNotificationCenterCreate();
+  source = DRNotificationCenterCreateRunLoopSource(notificationCenter);
+  CFRunLoopAddSource(CFRunLoopGetCurrent(), source, kCFRunLoopCommonModes);
+  DRNotificationCenterAddObserver(notificationCenter,&amp;status,druProgressCallback, kDRBurnStatusChangedNotification, burn);
+  
+  /* Okay, kick off the burn. */
+  DRBurnWriteLayout(burn, layout);
+  
+  /* Enter a runloop until the burn finishes. */
+  CFRunLoopRun();
+  
+  /* Clean up memory and exit. */
+  CFRunLoopSourceInvalidate(source);
+  if (notificationCenter != NULL)  CFRelease(notificationCenter);
+  if (source != NULL)        CFRelease(source);
+  if (status.progressBar != NULL)  druProgressBarDispose(status.progressBar,status.success);
+  if (status.success)
+    printf(&quot;Burn completed.\n&quot;);
+  else
+    druPrintFailureMessage(&quot;Burn&quot;, status.completionStatus);
+  if (status.completionStatus != NULL)  CFRelease(status.completionStatus);
+  
+  return status.success;
+}
+
+
+
+
+
+/*
+  druErase
+  
+  Called to do a erase. Pass in the device and a flag to indicate a full or quick erase.
+*/
+int
+druErase(DRDeviceRef device, int fullErase)
+{
+  DREraseRef          erase = NULL;
+  DRNotificationCenterRef    notificationCenter = NULL;
+  CFRunLoopSourceRef      source = NULL;
+  druBurnStatus        status = {0, NULL, NULL, NULL, {0}, 0};
+  CFMutableDictionaryRef    properties;
+
+  erase = DREraseCreate(device);
+
+  if (erase != NULL)
+  {
+    /* Create a progress bar. */
+    status.progressBar = druProgressBarCreate();
+    
+    /* Sign up for notifications from the erase object. */
+    notificationCenter = DRNotificationCenterCreate();
+    source = DRNotificationCenterCreateRunLoopSource(notificationCenter);
+    CFRunLoopAddSource(CFRunLoopGetCurrent(), source, kCFRunLoopCommonModes);
+    DRNotificationCenterAddObserver(notificationCenter,&amp;status,druProgressCallback,kDREraseStatusChangedNotification, erase);
+    
+    /* setup erase properties for type of erase to be performed */
+    properties = CFDictionaryCreateMutable(NULL,0,&amp;kCFTypeDictionaryKeyCallBacks,&amp;kCFTypeDictionaryValueCallBacks);
+    if (fullErase)
+      CFDictionaryAddValue(properties,kDREraseTypeKey,kDREraseTypeComplete);
+    else
+      CFDictionaryAddValue(properties,kDREraseTypeKey,kDREraseTypeQuick);
+    DREraseSetProperties(erase, properties);
+    
+    /* Okay, start the erase. */
+    DREraseStart(erase);
+    
+    /* Enter a runloop until the burn finishes. */
+    CFRunLoopRun();
+    
+    /* Clean up memory and exit. */
+    CFRunLoopSourceInvalidate(source);
+    if (notificationCenter != NULL)  CFRelease(notificationCenter);
+    if (source != NULL)        CFRelease(source);
+    if (status.progressBar != NULL)  druProgressBarDispose(status.progressBar,status.success);
+    CFRelease(erase);
+  }
+  if (status.success)
+    printf(&quot;Erase completed.\n&quot;);
+  else
+    druPrintFailureMessage(&quot;Erase&quot;, status.completionStatus);
+  if (status.completionStatus != NULL)  CFRelease(status.completionStatus);
+  
+  return status.success;
+}
+
+
+#pragma mark -
+
+
+/*
+  druProgressCallback
+  
+  DRNotificationCallback to handle burn or erase progress.
+*/
+void
+druProgressCallback(DRNotificationCenterRef center,void *observer,CFStringRef name,DRTypeRef object,CFDictionaryRef taskStatus)
+{
+#pragma unused(center, name, object)
+  druBurnStatus  *status = (druBurnStatus*)observer;
+  CFStringRef    currentState = NULL;
+  CFNumberRef    progressRef = NULL;
+  CFNumberRef    currentTrackRef = NULL;
+  float      progress = 0.0;
+  int        currentTrack = 0;
+  char      buffer[sizeof(status-&gt;stage)];
+  
+  /* Get information from the status dictionary. */
+  currentState = CFDictionaryGetValue(taskStatus,kDRStatusStateKey);
+  progressRef = CFDictionaryGetValue(taskStatus,kDRStatusPercentCompleteKey);
+  currentTrackRef = CFDictionaryGetValue(taskStatus,kDRStatusCurrentTrackKey);
+  
+  /* Fetch values from CFNumbers. */
+  if (progressRef != NULL)
+    CFNumberGetValue(progressRef,kCFNumberFloatType,&amp;progress);
+  if (currentTrackRef != NULL)
+    CFNumberGetValue(currentTrackRef,kCFNumberIntType,&amp;currentTrack);
+  
+  /* Check to see if primary burn state has changed. (Preparing, Writing, Verifying, etc) */
+  if (status-&gt;lastState == NULL ||
+    !CFEqual(status-&gt;lastState,currentState) ||
+    ((currentTrackRef != NULL) &amp;&amp; !CFEqual(status-&gt;lastTrack,currentTrackRef)))
+  {
+    /* Yes - did we have a previous state? */
+    if (status-&gt;lastState != NULL)
+    {
+      /* Forget about the old state. */
+      if (status-&gt;lastState) CFRelease(status-&gt;lastState);
+      if (status-&gt;lastTrack) CFRelease(status-&gt;lastTrack);
+    }
+    
+    /* If the burn was successful, stop the runloop. */
+    if (CFEqual(currentState,kDRStatusStateDone))
+    {
+      status-&gt;completionStatus = (CFDictionaryRef)CFRetain(taskStatus);
+      status-&gt;success = 1;
+      CFRunLoopStop(CFRunLoopGetCurrent());
+      return;
+    }
+    
+    /* If the burn was unsuccessful, print a failure message (localized)
+      and stop the runloop. */
+    if (CFEqual(currentState,kDRStatusStateFailed))
+    {
+      status-&gt;completionStatus = (CFDictionaryRef)CFRetain(taskStatus);
+      status-&gt;success = 0;
+      CFRunLoopStop(CFRunLoopGetCurrent());
+      return;
+    }
+    
+    /* Remember the new state. */
+    status-&gt;lastState = CFStringCreateCopy(NULL,currentState);
+    if (currentTrackRef) status-&gt;lastTrack = CFRetain(currentTrackRef);
+    
+    /* Translate the stage into a user-visible string.
+      
+      We only display a few of the possible states - the others are
+      brief and the user doesn't really care about them.
+    */
+    buffer[0] = 0;
+    if (CFEqual(currentState,kDRStatusStatePreparing))
+    {
+      if (currentTrack == 0)
+        snprintf(buffer,sizeof(buffer),&quot;Preparing...&quot;);
+      else
+        snprintf(buffer,sizeof(buffer),&quot;Preparing track %d ...&quot;, currentTrack);
+    }
+    else if (CFEqual(currentState,kDRStatusStateTrackWrite))
+    {
+      if (currentTrack != 0)
+        snprintf(buffer,sizeof(buffer),&quot;Writing track %d ...&quot;, currentTrack);
+    }
+    else if (CFEqual(currentState,kDRStatusStateSessionClose) ||
+         CFEqual(currentState,kDRStatusStateTrackClose))
+    {
+      snprintf(buffer,sizeof(buffer),&quot;Closing...&quot;);
+    }
+    else if (CFEqual(currentState,kDRStatusStateVerifying))
+    {
+      if (currentTrack != 0)
+        snprintf(buffer,sizeof(buffer),&quot;Verifying...&quot;);
+    }
+    else if (CFEqual(currentState,kDRStatusStateErasing))
+    {
+      snprintf(buffer,sizeof(buffer),&quot;Erasing...&quot;);
+    }
+    
+    /* Change the stage string - the progress bar will catch this. */
+    if (buffer[0] != 0 &amp;&amp; strcmp(status-&gt;stage,buffer))
+      strncpy(status-&gt;stage, buffer, sizeof(status-&gt;stage));
+  }
+  
+  /* Update the progress bar. */
+  druProgressBarUpdate(status-&gt;progressBar,status-&gt;stage,progress);
+}
+
+
+
+
+
+/*
+  druPrintFailureMessage
+  
+  Prints out a localized burn failure message from the burn engine.
+*/
+void
+druPrintFailureMessage(const char *task, CFDictionaryRef status)
+{
+  CFDictionaryRef    errorStatus = CFDictionaryGetValue(status,kDRErrorStatusKey);
+  UInt8        message[256];
+  CFIndex        len = 0;
+  
+  strncpy(message,&quot;no error message available.&quot;,sizeof(message));
+  
+  if (errorStatus != NULL)
+  {
+    CFStringRef    errorString = CFDictionaryGetValue(errorStatus,kDRErrorStatusErrorStringKey);
+    if (errorString != NULL)
+    {
+      CFStringGetBytes(errorString, CFRangeMake(0,CFStringGetLength(errorString)), kCFStringEncodingASCII,
+            '.', false, (UInt8*)message, sizeof(message)-1, &amp;len);
+      message[len] = 0;
+    }
+  }
+  
+  printf(&quot;%s failed: %s\n&quot;, task, message);
+}
+
+
+
+</pre>
+	<!--googleoff: index -->
+			</td>
+		</tr>
+	</table>
+	<!-- END WIDE COLUMN -->
+
+	<!-- END MAIN CONTENT -->
+		<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/samplecode/bulkerase/listing1.html%3Fid%3DDTS10000463-1.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/samplecode/bulkerase/listing1.html%3Fid%3DDTS10000463-1.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/samplecode/bulkerase/listing1.html%3Fid%3DDTS10000463-1.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+
+	<!-- START BOTTOM APPLE NAVIGATION -->
+	<!--#include virtual="/includes/footer"-->
+	<!-- END BOTTOM APPLE NAVIGATION -->
+
+<!-- START CENTER CLOSE -->
+</center>
+<!-- END CENTER CLOSE -->
+
+</body>
+</html>

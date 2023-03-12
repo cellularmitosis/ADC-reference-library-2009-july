@@ -1,0 +1,375 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+   "http://www.w3.org/TR/1999/REC-html401-19991224/loose.dtd">
+<html>
+<head>
+
+	<!-- BEGIN META TAG INFO -->
+	<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+	<link rel="home" href="http://developer.apple.com/">
+	<link rel="find" href="http://developer.apple.com/search/">
+	<link rel="stylesheet" type="text/css" href="../../documentation/css/adcstyle.css" title="fonts">
+	<script language="JavaScript" src="../../documentation/js/adc.js" type="text/javascript"></script>
+	<!-- END META TAG INFO -->
+	
+	<!-- BEGIN TITLE -->
+	<title>SharedMemory - /SharedMemory.m</title>
+	<!-- END TITLE -->
+<script language="JavaScript">
+function JumpToNewPage() {
+	window.location=document.scpopupmenu.gotop.value;
+	return true;
+}
+</script>
+
+</head>
+
+<!-- BEGIN BODY OPEN -->
+<body>
+<!--END BODY OPEN -->
+
+<!-- START CENTER OPEN -->
+<center>
+<!-- END CENTER OPEN -->
+
+	<!-- BEGIN LOGO AND SEARCH -->
+	<!--#include virtual="/includes/adcnavbar"-->
+	<!-- END LOGO AND SEARCH -->
+		
+		
+	<!-- START BREADCRUMB -->
+	<div id="breadcrumb">
+	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td scope="row"><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+			<td><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+		</tr>
+		<tr valign="middle">
+			<td align="left" colspan="2">
+			<a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../samplecode/index.html">Sample Code</a> &gt; <a href="../../samplecode/Cocoa/index.html">Cocoa</a> &gt; <a href="../../samplecode/Cocoa/idxPerformance-date.html">Performance</a> &gt; <A HREF="javascript:location.replace('index.html');">SharedMemory</A> &gt; 
+			</td>
+		</tr>
+		<tr>
+			<td colspan="2" scope="row"><img width="680" height="35" src="images/1dot.gif" alt=""></td>
+		</tr>
+	</table>
+	</div>
+	<!-- END BREADCRUMB -->
+
+	
+
+	<!-- START MAIN CONTENT -->
+	
+	<!-- START TITLE GRAPHIC AND INTRO-->
+	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr align="left" valign="top">
+			<td><h1><div id="pagehead">SharedMemory</div></h1></td>
+		</tr>
+	</table>
+	<!-- END TITLE GRAPHIC AND INTRO -->
+	<!-- START WIDE COLUMN -->
+	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr align="left" valign="top">
+			<td id="scdetails">
+				<h2>/SharedMemory.m</h2>
+				<form name="scpopupmenu" onSubmit="return false;" method=post>
+				<p><strong>View Source Code:</strong> 
+					<select name="gotop" onChange="JumpToNewPage();" style="width:340px"><option selected value="ingnore">Select File</option>
+<option value="listing1.html">/main.m</option>
+<option value="listing2.html">/SharedMemory.h</option>
+<option value="listing3.html">/SharedMemory.m</option></select>
+				</p>
+				</form>
+				<p><strong><a href="SharedMemory.zip">Download Sample</a></strong> (&#147;SharedMemory.zip&#148;, 52.9K)<BR>
+<strong><a href="SharedMemory.dmg">Download Sample</a></strong> (&#147;SharedMemory.dmg&#148;, 113.1K)</p>
+				<!--
+				<p><strong><a href="#">Download Sample</a></strong> (&#147;filename.sit&#148;, 500K)</p>
+				-->
+			</td>
+		</tr>
+		<tr>
+			<td scope="row"><img width="680" height="10" src="images/1dot.gif" alt=""><br>
+			<img height="1" width="680" src="images/1dot_919699.gif" alt=""><br>
+			<img width="680" height="20" src="images/1dot.gif" alt=""></td>
+		</tr>
+		<tr>
+			<td scope="row">
+	<!--googleon: index -->
+<pre class="sourcecodebox">/*
+  File:    SharedMemory.m
+
+  Contains:  A sample to demonstrate Shared Memory using shmget()
+
+  Written by:   Karl Groethe
+
+  Copyright:  Copyright &copy; 2000 by Apple Computer, Inc., All Rights Reserved.
+
+      You may incorporate this Apple sample source code into your program(s) without
+      restriction. This Apple sample source code has been provided &quot;AS IS&quot; and the
+      responsibility for its operation is yours. You are not permitted to redistribute
+      this Apple sample source code as &quot;Apple sample source code&quot; after having made
+      changes. If you're going to re-distribute the source, we require that you make
+      it clear in the source that the code was descended from Apple sample source
+      code, but that you've made changes.
+
+  Change History (most recent first):
+                        8/16/00    Created
+*/
+#import &quot;SharedMemory.h&quot;
+
+#include &lt;sys/shm.h&gt;
+#include &lt;sys/errno.h&gt;
+
+//access permissions on our memory 0666=everyone can access
+#define GLOBAL_PERMISSIONS 0666
+
+//error strings
+#define EUNKNOWN_STR &quot;Unknown Error occured&quot;
+#define ENOSPC_STR &quot;All possible shared memory IDs are allocated&quot;
+#define ENOMEM_STR &quot;allocating requested size would exceed the limit on shared memory&quot;
+#define EACCES_STR &quot;You do not have access permission&quot;
+#define EINVAL_STR &quot;Invalid segment size specified&quot;
+#define EINVAL_STR2 &quot;Not a valid memory identifier&quot;
+#define EMFILE_STR &quot;The number of shared memory segments has reached it's limit&quot;
+
+@implementation SharedMemory
+
+-(id)init
+{
+    /*------------------------------------------------------
+      do initialization
+    --------------------------------------------------------*/
+    if(self=[super init])
+    {
+        SemaphoreID=NULL;
+        //catch thread terminations form our update thread
+        [[NSNotificationCenter defaultCenter] addObserver:self
+                                              selector:@selector(FinishedUpdate:)
+                                              name:NSThreadWillExitNotification 
+                                              object:nil];
+        
+    }
+    return self;
+}
+
+-(void)dealloc
+{
+    /*------------------------------------------------------
+        do cleanup
+    --------------------------------------------------------*/
+    if([[AttachDetach  title] compare:@&quot;Detach&quot;]==NSOrderedSame)//if we're attached
+        [self AttachDetach:self];  //make sure we've detached from our shared memory
+    sem_close(SemaphoreID);    //close our semaphore
+    [super dealloc];
+}
+-(void)FinishedUpdate :(id)anObject
+{
+    /*------------------------------------------------------
+       Notification that our thread has finished
+    --------------------------------------------------------*/
+    if([[AttachDetach  title] compare:@&quot;Detach&quot;]==NSOrderedSame)//if we're attached to shared memory
+        //spin off thread to display the stats
+        [NSThread detachNewThreadSelector:@selector(UpdateSharedMemoryDisplay) toTarget:self
+                                        withObject:self];
+}
+
+- (void)AttachDetach:(id)sender
+{
+    /*------------------------------------------------------
+        Create, attach, or detach from shared memory segment
+    --------------------------------------------------------*/
+    if([[AttachDetach  title] compare:@&quot;Create/Attach&quot;]==NSOrderedSame)//if we're attaching/creating
+    {
+        int key=[Key intValue];//Get the key from the key field
+        int size=[BlockSize intValue];//Get the size from the size field
+        //use shmget with our key, size and options, IPC_CREAT specified create if non-existant
+        SharedMemID=shmget(key,size,IPC_CREAT | GLOBAL_PERMISSIONS);
+        //check for errors
+        if(SharedMemID==-1){
+            char* errorStr=NULL;
+            switch(errno){
+                case ENOSPC: errorStr=ENOSPC_STR;break;
+                case ENOMEM: errorStr=ENOMEM_STR;break;
+                case EACCES: errorStr=EACCES_STR;break;
+                case EINVAL: errorStr=EINVAL_STR;break;
+                default:     errorStr=EUNKNOWN_STR;
+            }
+            NSRunAlertPanel(@&quot;An Error Occured with shmget()&quot;,
+                            @&quot;Unable to Get memory associated with key: %i\n %s\nError# %i&quot;,
+                            @&quot;OK&quot;,nil,nil,key,errorStr,errno);
+            return;
+        }
+        //Grab a pointer to our shared memory with shmat() using the ID returned from shmget()
+        SharedMemoryBlock=shmat(SharedMemID,0,GLOBAL_PERMISSIONS);
+        //test for errors
+        if(SharedMemoryBlock==NULL){
+            char* errorStr=NULL;
+            switch(errno){
+                case EACCES: errorStr=EACCES_STR;break;
+                case ENOMEM: errorStr=ENOMEM_STR;break;
+                case EINVAL: errorStr=EINVAL_STR2;break;
+                case EMFILE: errorStr=EMFILE_STR;break;
+                default:     errorStr=EUNKNOWN_STR;
+            }
+            NSRunAlertPanel(@&quot;An Error occured with shmat()&quot;,
+                            @&quot;Unable to Access memory associated with key: %i\n %s \nError# %i&quot;,
+                            @&quot;OK&quot;,nil,nil,key,errorStr,errno);
+            return;
+        }
+        //if our semaphore exists then close it.
+        if(SemaphoreID) sem_close(SemaphoreID);
+        
+        //create a named semaphore using a string version of our key to identify it.
+        SemaphoreID=sem_open([[NSString stringWithFormat:@&quot;%i&quot;,key] cString],
+                                O_CREAT,GLOBAL_PERMISSIONS,1);
+        //check for errors
+        if((int)SemaphoreID==SEM_FAILED){
+            NSRunAlertPanel(@&quot;An Error Occured with sem_open()&quot;,@&quot;&quot;,@&quot;OK&quot;,NULL,NULL);
+            shmdt(SharedMemoryBlock);
+            return;
+        }
+        //update our interface to show that we are attached to a shared memory segment
+        [AttachDetach setTitle:@&quot;Detach&quot;];
+        [Key setEditable:FALSE];
+        [BlockSize setEditable:FALSE];
+        [Data setEditable:FALSE];
+        [[Data window] makeFirstResponder:[Data window]];
+        [StartStopButton setEnabled:TRUE];
+        //spin off an update thread
+        [NSThread detachNewThreadSelector:@selector(UpdateSharedMemoryDisplay) toTarget:self
+                                        withObject:self];
+    }else{//we are attached so detach
+        struct shmid_ds SharedMemDS;
+        //If editing semaphore is set then stop editing
+        if([[StartStopButton title] compare:@&quot;Stop Editing&quot;]==NSOrderedSame)//
+            [self StartStopEditing:self];
+        //detach from our shared memory
+        shmdt(SharedMemoryBlock);
+        //get stats for shared memory segment
+        shmctl(SharedMemID,IPC_STAT,&amp;SharedMemDS);
+        if(SharedMemDS.shm_nattch==0)//if nobody is attached anymore
+            //remove the segment so the key  and memory can be reused
+            shmctl(SharedMemID,IPC_RMID,NULL);
+        //update interface
+        [StartStopButton setEnabled:FALSE];
+        [AttachDetach setTitle:@&quot;Create/Attach&quot;];
+        [Key setEditable:TRUE];
+        [Key setStringValue:@&quot;&quot;];
+        [BlockSize setEditable:TRUE];
+        [BlockSize setStringValue:@&quot;&quot;];
+    }
+}
+-(void)StartStopEditing:(id)sender
+{
+    /*------------------------------------------------------
+       make the shared memory field editable or not editable
+       and set the semaphore.
+    --------------------------------------------------------*/
+    //if the user clicked start editing
+    if([[StartStopButton title] compare:@&quot;Start Editing&quot;]==NSOrderedSame)//
+    {
+        if(sem_trywait(SemaphoreID)!=-1){//try to get a lock on our semaphore
+            //update interface to allow editing shared memory
+            [StartStopButton setTitle:@&quot;Stop Editing&quot;];
+            [Data setEditable:TRUE];
+            [[Data window] makeFirstResponder:Data];
+            [Data moveToBeginningOfDocument:self];
+        }else//semaphore already set so put up alert
+           NSRunAlertPanel(@&quot;Semaphore Already Set&quot;,
+                           @&quot;Cannot Edit memory until the semaphore is released&quot;,
+                           @&quot;OK&quot;,nil,nil);
+    }else{//stop editing was clicked
+        NSRange charRange={0,[BlockSize intValue]};
+        //update interface to not allow edting shared memory
+        [StartStopButton setTitle:@&quot;Start Editing&quot;];
+        [Data setEditable:FALSE];
+        [[Data window] makeFirstResponder:[Data window]];
+        //copy the string from our text field to the shared memory
+        [[Data string] getCharacters:(unichar*)SharedMemoryBlock range:charRange];
+        //release semaphore
+        sem_post(SemaphoreID);
+    }
+        
+}
+-(void)UpdateSharedMemoryDisplay
+{
+    /*------------------------------------------------------
+       Thread to update display of stats for shared memory
+       segment
+    --------------------------------------------------------*/
+    //since we're in a thread we need to allocate our own AutoreleasePool
+    NSAutoreleasePool *pool=[[NSAutoreleasePool alloc] init];
+    struct shmid_ds SharedMemDS;
+    //get shared memory stats
+    if(shmctl(SharedMemID,IPC_STAT,&amp;SharedMemDS)!=-1){
+        //update Size field
+        [BlockSize setIntValue:SharedMemDS.shm_segsz];
+        //update number of attaches field
+        [NumberOfAttaches setIntValue:SharedMemDS.shm_nattch];
+        //update Creator field
+        [Creator setIntValue:SharedMemDS.shm_cpid];
+        //update Last Operator feild
+        [Operator setIntValue:SharedMemDS.shm_lpid];  
+        //update Last Attach time field formatted as hour:min:sec    
+        [AttachTime setStringValue:[[NSDate dateWithTimeIntervalSince1970:
+                                    SharedMemDS.shm_atime] descriptionWithCalendarFormat:@&quot;%H:%M:%S&quot; 
+                                    timeZone:nil locale:nil]];
+        //update Last Change time field formatted as hour:min:sec                              
+        [ChangeTime setStringValue:[[NSDate dateWithTimeIntervalSince1970:
+                                    SharedMemDS.shm_ctime] descriptionWithCalendarFormat:@&quot;%H:%M:%S&quot; 
+                                    timeZone:nil locale:nil]];
+        //update Last Change time field formatted as hour:min:sec  
+        [DetachTime setStringValue:[[NSDate dateWithTimeIntervalSince1970:
+                                    SharedMemDS.shm_dtime] descriptionWithCalendarFormat:@&quot;%H:%M:%S&quot; 
+                                    timeZone:nil locale:nil]];
+        if((sem_trywait(SemaphoreID)!=-1)){//see if we can update shared memory string
+            [Data setString:[NSString stringWithCharacters:(const unichar*)SharedMemoryBlock
+                                                                length:[BlockSize intValue]-1]];
+            sem_post(SemaphoreID);//release semaphore
+        }
+                
+    }
+    [NSThread sleepUntilDate:[NSDate dateWithTimeIntervalSinceNow:1]];//sleep for a sec
+    [pool release];//free any temporary allocated objects
+}
+     
+@end
+</pre>
+	<!--googleoff: index -->
+			</td>
+		</tr>
+	</table>
+	<!-- END WIDE COLUMN -->
+
+	<!-- END MAIN CONTENT -->
+		<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/samplecode/SharedMemory/listing3.html%3Fid%3DDTS10000754-1.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/samplecode/SharedMemory/listing3.html%3Fid%3DDTS10000754-1.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/samplecode/SharedMemory/listing3.html%3Fid%3DDTS10000754-1.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+
+	<!-- START BOTTOM APPLE NAVIGATION -->
+	<!--#include virtual="/includes/footer"-->
+	<!-- END BOTTOM APPLE NAVIGATION -->
+
+<!-- START CENTER CLOSE -->
+</center>
+<!-- END CENTER CLOSE -->
+
+</body>
+</html>

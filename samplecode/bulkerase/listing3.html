@@ -1,0 +1,709 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+   "http://www.w3.org/TR/1999/REC-html401-19991224/loose.dtd">
+<html>
+<head>
+
+	<!-- BEGIN META TAG INFO -->
+	<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+	<link rel="home" href="http://developer.apple.com/">
+	<link rel="find" href="http://developer.apple.com/search/">
+	<link rel="stylesheet" type="text/css" href="../../documentation/css/adcstyle.css" title="fonts">
+	<script language="JavaScript" src="../../documentation/js/adc.js" type="text/javascript"></script>
+	<!-- END META TAG INFO -->
+	
+	<!-- BEGIN TITLE -->
+	<title>bulkerase - /discrecutils/dru_devices.c</title>
+	<!-- END TITLE -->
+<script language="JavaScript">
+function JumpToNewPage() {
+	window.location=document.scpopupmenu.gotop.value;
+	return true;
+}
+</script>
+
+</head>
+
+<!-- BEGIN BODY OPEN -->
+<body>
+<!--END BODY OPEN -->
+
+<!-- START CENTER OPEN -->
+<center>
+<!-- END CENTER OPEN -->
+
+	<!-- BEGIN LOGO AND SEARCH -->
+	<!--#include virtual="/includes/adcnavbar"-->
+	<!-- END LOGO AND SEARCH -->
+		
+		
+	<!-- START BREADCRUMB -->
+	<div id="breadcrumb">
+	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td scope="row"><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+			<td><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+		</tr>
+		<tr valign="middle">
+			<td align="left" colspan="2">
+			<a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../samplecode/index.html">Sample Code</a> &gt; <a href="../../samplecode/Carbon/index.html">Carbon</a> &gt; <a href="../../samplecode/Carbon/idxFileManagement-date.html">File Management</a> &gt; <A HREF="javascript:location.replace('index.html');">bulkerase</A> &gt; 
+			</td>
+		</tr>
+		<tr>
+			<td colspan="2" scope="row"><img width="680" height="35" src="images/1dot.gif" alt=""></td>
+		</tr>
+	</table>
+	</div>
+	<!-- END BREADCRUMB -->
+
+	
+
+	<!-- START MAIN CONTENT -->
+	
+	<!-- START TITLE GRAPHIC AND INTRO-->
+	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr align="left" valign="top">
+			<td><h1><div id="pagehead">bulkerase</div></h1></td>
+		</tr>
+	</table>
+	<!-- END TITLE GRAPHIC AND INTRO -->
+	<!-- START WIDE COLUMN -->
+	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr align="left" valign="top">
+			<td id="scdetails">
+				<h2>/discrecutils/dru_devices.c</h2>
+				<form name="scpopupmenu" onSubmit="return false;" method=post>
+				<p><strong>View Source Code:</strong> 
+					<select name="gotop" onChange="JumpToNewPage();" style="width:340px"><option selected value="ingnore">Select File</option>
+<option value="listing1.html">/discrecutils/dru_burning.c</option>
+<option value="listing2.html">/discrecutils/dru_burning.h</option>
+<option value="listing3.html">/discrecutils/dru_devices.c</option>
+<option value="listing4.html">/discrecutils/dru_devices.h</option>
+<option value="listing5.html">/discrecutils/dru_progress.c</option>
+<option value="listing6.html">/discrecutils/dru_progress.h</option>
+<option value="listing7.html">/main.c</option></select>
+				</p>
+				</form>
+				<p><strong><a href="bulkerase.zip">Download Sample</a></strong> (&#147;bulkerase.zip&#148;, 15.4K)<BR>
+<strong><a href="bulkerase.dmg">Download Sample</a></strong> (&#147;bulkerase.dmg&#148;, 73.1K)</p>
+				<!--
+				<p><strong><a href="#">Download Sample</a></strong> (&#147;filename.sit&#148;, 500K)</p>
+				-->
+			</td>
+		</tr>
+		<tr>
+			<td scope="row"><img width="680" height="10" src="images/1dot.gif" alt=""><br>
+			<img height="1" width="680" src="images/1dot_919699.gif" alt=""><br>
+			<img width="680" height="20" src="images/1dot.gif" alt=""></td>
+		</tr>
+		<tr>
+			<td scope="row">
+	<!--googleon: index -->
+<pre class="sourcecodebox">/*
+  dru_devices.c
+  
+  Part of the Disc Recording Utility sources for command-line tools.  This
+  code provides an example of prompting the user to select a device and/or
+  insert media, and how to create a textual description of a device.
+*/
+#include &lt;DiscRecording/DiscRecording.h&gt;
+#include &lt;stdlib.h&gt;
+#include &quot;dru_devices.h&quot;
+
+
+
+/* DRNotificationCallback to wait for blank media. */
+void druWaitForBlankMedia(DRNotificationCenterRef center,void *observer,CFStringRef name,DRTypeRef object,CFDictionaryRef info);
+
+/* DRNotificationCallback to wait for erasable media. */
+void druWaitForErasableMedia(DRNotificationCenterRef center,void *observer,CFStringRef name,DRTypeRef object,CFDictionaryRef info);
+
+/* Standard druDeviceFilterProcs. */
+int druFilter_AnyBurner(DRDeviceRef device);
+int druFilter_AnyEraser(DRDeviceRef device);
+int druFilter_CDBurners(DRDeviceRef device);
+int druFilter_DVDBurners(DRDeviceRef device);
+
+
+
+#pragma mark -
+
+
+
+
+/*
+  druPromptForDevice
+  
+  Interactively asks the user to select a device from the devices which are
+  currently attached.  If only one device is connected, the device is
+  automatically chosen and nothing is printed.
+  
+  The optional filter function is called to filter devices.  If you wish to
+  suppress a device, the filter function should return 0.
+  
+  The returned device is retained by this routine.
+*/
+DRDeviceRef
+druPromptForDevice(char *promptString, druDeviceFilterProc filter)
+{
+  CFArrayRef  deviceList = DRCopyDeviceArray();
+  CFIndex    deviceCount = CFArrayGetCount(deviceList);
+  DRDeviceRef  device;
+  CFIndex    selection;
+  char    userInput[10];
+  
+  /* Can't proceed without at least one drive. */
+  if (deviceCount == 0)
+  {
+    printf(&quot;Sorry, no CD/DVD drives were found.\n&quot;);
+    exit(1);
+  }
+  
+  /* Filter the list. */
+  if (filter != NULL)
+  {
+    CFMutableArrayRef  filteredList = CFArrayCreateMutableCopy(NULL,0,deviceList);
+    
+    for (selection=deviceCount-1; selection&gt;=0; --selection)
+      if ((*filter)((DRDeviceRef)CFArrayGetValueAtIndex(filteredList,selection)) == 0)
+        CFArrayRemoveValueAtIndex(filteredList,selection);
+    
+    CFRelease(deviceList);
+    deviceList = filteredList;
+    deviceCount = CFArrayGetCount(deviceList);
+  }
+  
+  /* Can't proceed without at least one drive. */
+  if (deviceCount == 0)
+  {
+    printf(&quot;Sorry, no eligible drives were found.\n&quot;);
+    exit(1);
+  }
+  
+  /* If there's only one device, which is actually true for many machines (those with
+    an internal CD burner and no external burners attached) then the choice
+    is obvious, and we don't need to display a menu. */
+  if (deviceCount == 1)
+  {
+    device = (DRDeviceRef)CFArrayGetValueAtIndex(deviceList,0);
+    CFRetain(device);
+    CFRelease(deviceList);
+    return device;
+  }
+  
+  /* Display a menu of devices. */
+  printf(&quot;Available devices:\n&quot;);
+  druDisplayDeviceList(deviceList);
+  
+  /* Display the prompt. */
+  if (promptString == NULL)
+    promptString = &quot;Please select a device:&quot;;
+  printf(&quot;%s &quot;, promptString);
+  fflush(stdout);
+  
+  /* Get user input. */
+  userInput[0] = 0;
+  selection = atoi(fgets(userInput,sizeof(userInput),stdin)) - 1;
+  if (selection &lt; 0 || selection &gt;= deviceCount)
+  {
+    printf(&quot;Aborted.\n&quot;);
+    exit(1);
+  }
+  
+  /* Return the selected device. */
+  device = (DRDeviceRef)CFArrayGetValueAtIndex(deviceList,selection);
+  CFRetain(device);
+  CFRelease(deviceList);
+  return device;
+}
+
+
+
+/*
+  druPromptForBlankMediaInDevice
+  
+  Interactively prompts for blank, writable media in a particular device.  The type of
+  media is not considered, so this is probably most useful for pure data discs.  In other
+  situations, the type of media may be important - for example, DVD media is not valid if
+  you're writing an audio CD.
+  
+  When the call completes, there is blank media in the drive and we will, if possible,
+  have a reservation on the media (so nobody else can burn to it or grab it out from
+  underneath us).
+*/
+void
+druPromptForBlankMediaInDevice(DRDeviceRef device)
+{
+  DRNotificationCenterRef  notificationCenter = NULL;
+  CFRunLoopSourceRef    source = NULL;
+    
+  /* If the device contains blank media right now, then we're done. */
+  if (druDeviceContainsBlankMedia(device))
+    return;
+  
+  /* Display a prompt. */
+  printf(&quot;Please insert blank media.\n&quot;);
+  
+  /* Open the tray (and eject existing media, if any). */
+  /* This call may or may not work - the media in the device may be busy
+    and can't be unmounted, or the device may not even have a tray (slot-load
+    drives are an example of this).  However, we don't really care; this is just
+    a convenience to the user and will do the right thing if the right thing
+    can be done. */
+  /* We also don't want to eject the media if it's still spinning up -
+    the user may have just inserted it, and it takes a good 5-10 seconds
+    on some drives for discs to be recognized. */
+  if (!druDeviceIsBecomingReady(device))
+    DRDeviceEjectMedia(device);
+  
+  /* Sign up for device status notifications, and enter a tiny runloop so that we can avoid polling. */
+  notificationCenter = DRNotificationCenterCreate();
+  source = DRNotificationCenterCreateRunLoopSource(notificationCenter);
+  CFRunLoopAddSource(CFRunLoopGetCurrent(), source, kCFRunLoopCommonModes);
+  DRNotificationCenterAddObserver(notificationCenter, NULL, druWaitForBlankMedia, NULL, device);
+  CFRunLoopRun();
+  CFRunLoopSourceInvalidate(source);
+  
+  /* Clean up memory and we're done. */
+  if (notificationCenter != NULL)  CFRelease(notificationCenter);
+  if (source != NULL)        CFRelease(source);
+}
+
+
+
+/*
+  druPromptForErasableMediaInDevice
+  
+  Interactively prompts for erasable media in a particular device.  The type of media 
+  is not considered.
+  
+  When the call completes, there is erasable media in the drive and we have a reservation
+  on the media (so nobody else can burn to it or grab it out from underneath us).
+*/
+void
+druPromptForErasableMediaInDevice(DRDeviceRef device)
+{
+  DRNotificationCenterRef  notificationCenter = NULL;
+  CFRunLoopSourceRef    source = NULL;
+    
+  /* If the device contains erasable media right now, then we're done. */
+  if (druDeviceContainsErasableMedia(device))
+    return;
+  
+  /* Display a prompt. */
+  printf(&quot;Please insert erasable media.\n&quot;);
+  
+  /* Open the tray (and eject existing media, if any). */
+  /* This call may or may not work - the media in the device may be busy
+    and can't be unmounted, or the device may not even have a tray (slot-load
+    drives are an example of this).  However, we don't really care; this is just
+    a convenience to the user and will do the right thing if the right thing
+    can be done. */
+  /* We also don't want to eject the media if it's still spinning up -
+    the user may have just inserted it, and it takes a good 5-10 seconds
+    on some drives for discs to be recognized. */
+  if (!druDeviceIsBecomingReady(device))
+    DRDeviceEjectMedia(device);
+  
+  /* Sign up for device status notifications, and enter a tiny runloop so that we can avoid polling. */
+  notificationCenter = DRNotificationCenterCreate();
+  source = DRNotificationCenterCreateRunLoopSource(notificationCenter);
+  CFRunLoopAddSource(CFRunLoopGetCurrent(), source, kCFRunLoopCommonModes);
+  DRNotificationCenterAddObserver(notificationCenter, NULL, druWaitForErasableMedia, NULL, device);
+  CFRunLoopRun();
+  CFRunLoopSourceInvalidate(source);
+  
+  /* Clean up memory and we're done. */
+  if (notificationCenter != NULL)  CFRelease(notificationCenter);
+  if (source != NULL)        CFRelease(source);
+}
+
+
+
+/*
+  druDeviceContainsBlankMedia
+  
+  Returns TRUE if the device contains blank media.
+*/
+int
+druDeviceContainsBlankMedia(DRDeviceRef device)
+{
+  CFDictionaryRef    deviceStatus = DRDeviceCopyStatus(device);
+  CFStringRef      mediaState = CFDictionaryGetValue(deviceStatus,kDRDeviceMediaStateKey);
+  int          result = 0;
+  
+  /* Check to see if there's media in the device */
+  if (mediaState != NULL &amp;&amp; CFEqual(mediaState,kDRDeviceMediaStateMediaPresent))
+  {
+    CFDictionaryRef  mediaInfo = CFDictionaryGetValue(deviceStatus,kDRDeviceMediaInfoKey);
+    CFBooleanRef  blank = CFDictionaryGetValue(mediaInfo,kDRDeviceMediaIsBlankKey);
+    CFBooleanRef  appendable = CFDictionaryGetValue(mediaInfo,kDRDeviceMediaIsAppendableKey);
+    
+    /* There's media, but is it blank and writable? */
+    if (blank != NULL &amp;&amp; CFBooleanGetValue(blank) &amp;&amp; appendable != NULL &amp;&amp; CFBooleanGetValue(appendable))
+      result = 1;
+  }
+  
+  CFRelease(deviceStatus);
+  return result;
+}
+
+
+
+/*
+  druDeviceContainsErasableMedia
+  
+  Returns TRUE if the device contains blank media.
+*/
+int
+druDeviceContainsErasableMedia(DRDeviceRef device)
+{
+  CFDictionaryRef    deviceStatus = DRDeviceCopyStatus(device);
+  CFStringRef      mediaState = CFDictionaryGetValue(deviceStatus,kDRDeviceMediaStateKey);
+  int          result = 0;
+  
+  /* Check to see if there's media in the device */
+  if (mediaState != NULL &amp;&amp; CFEqual(mediaState,kDRDeviceMediaStateMediaPresent))
+  {
+    CFDictionaryRef  mediaInfo = CFDictionaryGetValue(deviceStatus,kDRDeviceMediaInfoKey);
+    CFBooleanRef  erasable = CFDictionaryGetValue(mediaInfo,kDRDeviceMediaIsErasableKey);
+    
+    /* There's media, but is it blank and writable? */
+    if (erasable != NULL &amp;&amp; CFBooleanGetValue(erasable))
+      result = 1;
+  }
+  
+  CFRelease(deviceStatus);
+  return result;
+}
+
+
+
+/*
+  druDeviceIsBecomingReady
+  
+  Returns TRUE if the device is becoming ready (eg, spinning up).
+*/
+int
+druDeviceIsBecomingReady(DRDeviceRef device)
+{
+  CFDictionaryRef    deviceStatus = DRDeviceCopyStatus(device);
+  CFStringRef      mediaState = CFDictionaryGetValue(deviceStatus,kDRDeviceMediaStateKey);
+  int          result;
+  
+  result = (mediaState != NULL &amp;&amp; CFEqual(mediaState,kDRDeviceMediaStateInTransition)) ? 1:0;
+  
+  CFRelease(deviceStatus);
+  return result;
+}
+
+
+
+/*
+  druDisplayDeviceList
+  
+  Displays a list of devices, prefixed by their numeric index in the array.
+*/
+void
+druDisplayDeviceList(CFArrayRef deviceArray)
+{
+  CFIndex    i, deviceCount = CFArrayGetCount(deviceArray);
+  for (i=0;i&lt;deviceCount;++i)
+  {
+    DRDeviceRef    thisDevice = (DRDeviceRef)CFArrayGetValueAtIndex(deviceArray,i);
+    char      description[100];
+    printf(&quot;%2d) %s\n&quot;, (int)(i+1), druGetDeviceDescription(thisDevice,description,sizeof(description)));
+  }
+}
+
+
+
+
+/*
+  druGetDeviceDescription
+  
+  Fills a character buffer with a device's normal description: VENDOR PRODUCT via BUS.
+  The incoming buffer is returned as a convenience.
+*/
+char *
+druGetDeviceDescription(DRDeviceRef device, char *buffer, size_t bufSize)
+{
+  CFDictionaryRef  deviceInfo = DRDeviceCopyInfo(device);
+  CFStringRef    bus = CFDictionaryGetValue(deviceInfo,kDRDevicePhysicalInterconnectKey);
+  CFStringRef    desc;
+  CFIndex      len = 0;
+  
+  #if 1  /* for now, until the bus starts getting returned in ASCII */
+  if (CFEqual(bus,kDRDevicePhysicalInterconnectFireWire))    bus = CFSTR(&quot;FireWire&quot;);
+  else if (CFEqual(bus,kDRDevicePhysicalInterconnectUSB))    bus = CFSTR(&quot;USB&quot;);
+  else if (CFEqual(bus,kDRDevicePhysicalInterconnectATAPI))  bus = CFSTR(&quot;ATAPI&quot;);
+  else if (CFEqual(bus,kDRDevicePhysicalInterconnectSCSI))  bus = CFSTR(&quot;SCSI&quot;);
+  else                            bus = CFSTR(&quot;unknown interface&quot;);
+  #endif
+  
+  desc = CFStringCreateWithFormat(NULL,NULL,CFSTR(&quot;%@ %@ via %@&quot;),
+      CFDictionaryGetValue(deviceInfo,kDRDeviceVendorNameKey),
+      CFDictionaryGetValue(deviceInfo,kDRDeviceProductNameKey),
+      bus);
+  CFStringGetBytes(desc, CFRangeMake(0,CFStringGetLength(desc)), kCFStringEncodingASCII,
+          '.', false, (UInt8*)buffer, bufSize-1, &amp;len);
+  buffer[len] = 0;
+  
+  CFRelease(deviceInfo);
+  CFRelease(desc);
+  return buffer;
+}
+
+
+/*
+  druGetDeviceShortDescription
+  
+  Fills a character buffer with a device's short description: VENDOR PRODUCT.
+  The incoming buffer is returned as a convenience.
+*/
+char *
+druGetDeviceShortDescription(DRDeviceRef device, char *buffer, size_t bufSize)
+{
+  CFDictionaryRef  deviceInfo = DRDeviceCopyInfo(device);
+  CFStringRef    desc = CFStringCreateWithFormat(NULL,NULL,CFSTR(&quot;%@ %@&quot;),
+              CFDictionaryGetValue(deviceInfo,kDRDeviceVendorNameKey),
+              CFDictionaryGetValue(deviceInfo,kDRDeviceProductNameKey));
+  CFIndex      len = 0;
+  
+  CFStringGetBytes(desc, CFRangeMake(0,CFStringGetLength(desc)), kCFStringEncodingASCII,
+          '.', false, (UInt8*)buffer, bufSize-1, &amp;len);
+  buffer[len] = 0;
+  
+  CFRelease(deviceInfo);
+  CFRelease(desc);
+  return buffer;
+}
+
+
+/*
+  dru_getlongdevicedescription
+  
+  Fills a character buffer with a device's long description: VENDOR PRODUCT (FIRMWARE) via BUS.
+  The incoming buffer is returned as a convenience.
+*/
+char *
+druGetDeviceLongDescription(DRDeviceRef device, char *buffer, size_t bufSize)
+{
+  CFDictionaryRef  deviceInfo = DRDeviceCopyInfo(device);
+  CFStringRef    bus = CFDictionaryGetValue(deviceInfo,kDRDevicePhysicalInterconnectKey);
+  CFStringRef    desc;
+  CFIndex      len = 0;
+  
+  #if 1  /* for now, until the bus starts getting returned in ASCII */
+  if (CFEqual(bus,kDRDevicePhysicalInterconnectFireWire))    bus = CFSTR(&quot;FireWire&quot;);
+  else if (CFEqual(bus,kDRDevicePhysicalInterconnectUSB))    bus = CFSTR(&quot;USB&quot;);
+  else if (CFEqual(bus,kDRDevicePhysicalInterconnectATAPI))  bus = CFSTR(&quot;ATAPI&quot;);
+  else if (CFEqual(bus,kDRDevicePhysicalInterconnectSCSI))  bus = CFSTR(&quot;SCSI&quot;);
+  else                            bus = CFSTR(&quot;unknown interface&quot;);
+  #endif
+  
+  desc = CFStringCreateWithFormat(NULL,NULL,CFSTR(&quot;%@ %@ (%@) via %@&quot;),
+      CFDictionaryGetValue(deviceInfo,kDRDeviceVendorNameKey),
+      CFDictionaryGetValue(deviceInfo,kDRDeviceProductNameKey),
+      CFDictionaryGetValue(deviceInfo,kDRDeviceFirmwareRevisionKey),
+      bus);
+  CFStringGetBytes(desc, CFRangeMake(0,CFStringGetLength(desc)), kCFStringEncodingASCII,
+          '.', false, (UInt8*)buffer, bufSize-1, &amp;len);
+  buffer[len] = 0;
+  
+  CFRelease(deviceInfo);
+  CFRelease(desc);
+  return buffer;
+}
+
+
+
+
+
+#pragma mark -
+
+
+
+/*
+  druMediaIsReserved
+  
+  Returns TRUE if the device contains blank media.
+*/
+int
+druMediaIsReserved(DRDeviceRef device)
+{
+  CFDictionaryRef    deviceStatus = DRDeviceCopyStatus(device);
+  CFStringRef      mediaState = CFDictionaryGetValue(deviceStatus,kDRDeviceMediaStateKey);
+  int          result = 0;
+  
+  /* Check to see if there's media in the device */
+  if (mediaState != NULL &amp;&amp; CFEqual(mediaState,kDRDeviceMediaStateMediaPresent))
+  {
+    CFDictionaryRef  mediaInfo = CFDictionaryGetValue(deviceStatus,kDRDeviceMediaInfoKey);
+    CFBooleanRef  reserved = CFDictionaryGetValue(mediaInfo,kDRDeviceMediaIsReservedKey);
+    
+    /* There's media, but do we have the reservation? */
+    if (reserved != NULL &amp;&amp; CFBooleanGetValue(reserved))
+      result = 1;
+  }
+  
+  CFRelease(deviceStatus);
+  return result;
+}
+
+
+
+/*
+  druWaitForBlankMedia
+  
+  DRNotificationCallback to wait for blank media.
+*/
+void
+druWaitForBlankMedia(DRNotificationCenterRef center,void *observer,CFStringRef name,DRTypeRef object,CFDictionaryRef info)
+{
+#pragma unused(center, info, observer)
+  DRDeviceRef  device = (DRDeviceRef)object;
+  
+  /* The device may have been unplugged - check for that. */
+  if (CFEqual(name,kDRDeviceDisappearedNotification) || !DRDeviceIsValid(device))
+  {
+    printf(&quot;Aborted. (device disconnected)\n&quot;);
+    exit(1);
+  }
+  
+  /* If the device status changed, and there's blank media now.... */
+  if (CFEqual(name,kDRDeviceStatusChangedNotification) &amp;&amp; druDeviceContainsBlankMedia(device))
+  {
+    /* Then stop the runloop. */
+    CFRunLoopStop(CFRunLoopGetCurrent());
+  }
+}
+
+
+
+/*
+  druWaitForErasableMedia
+  
+  DRNotificationCallback to wait for blank media.
+*/
+void
+druWaitForErasableMedia(DRNotificationCenterRef center,void *observer,CFStringRef name,DRTypeRef object,CFDictionaryRef info)
+{
+#pragma unused(center, info, observer)
+  DRDeviceRef  device = (DRDeviceRef)object;
+  
+  /* The device may have been unplugged - check for that. */
+  if (CFEqual(name,kDRDeviceDisappearedNotification) || !DRDeviceIsValid(device))
+  {
+    printf(&quot;Aborted. (device disconnected)\n&quot;);
+    exit(1);
+  }
+  
+  /* If the device status changed, and there's blank media now.... */
+  if (CFEqual(name,kDRDeviceStatusChangedNotification) &amp;&amp; druDeviceContainsErasableMedia(device))
+  {
+    /* Then stop the runloop. */
+    CFRunLoopStop(CFRunLoopGetCurrent());
+  }
+}
+
+
+
+int
+druFilter_AnyBurner(DRDeviceRef device)
+{
+  CFDictionaryRef    info = DRDeviceCopyInfo(device);
+  CFDictionaryRef    capabilities = CFDictionaryGetValue(info,kDRDeviceWriteCapabilitiesKey);
+  
+  int  result = ((CFDictionaryGetValue(capabilities,kDRDeviceCanWriteCDRKey) == kCFBooleanTrue) ||
+          (CFDictionaryGetValue(capabilities,kDRDeviceCanWriteCDRWKey) == kCFBooleanTrue) ||
+          (CFDictionaryGetValue(capabilities,kDRDeviceCanWriteDVDRKey) == kCFBooleanTrue) ||
+          (CFDictionaryGetValue(capabilities,kDRDeviceCanWriteDVDRWKey) == kCFBooleanTrue));
+  
+  CFRelease(info);
+  return result;
+}
+
+
+int
+druFilter_AnyEraser(DRDeviceRef device)
+{
+  CFDictionaryRef    info = DRDeviceCopyInfo(device);
+  CFDictionaryRef    capabilities = CFDictionaryGetValue(info,kDRDeviceWriteCapabilitiesKey);
+  
+  int  result = ((CFDictionaryGetValue(capabilities,kDRDeviceCanWriteCDRWKey) == kCFBooleanTrue) ||
+          (CFDictionaryGetValue(capabilities,kDRDeviceCanWriteDVDRWKey) == kCFBooleanTrue));
+  
+  CFRelease(info);
+  return result;
+}
+
+
+
+int
+druFilter_CDBurners(DRDeviceRef device)
+{
+  CFDictionaryRef    info = DRDeviceCopyInfo(device);
+  CFDictionaryRef    capabilities = CFDictionaryGetValue(info,kDRDeviceWriteCapabilitiesKey);
+  
+  int  result = ((CFDictionaryGetValue(capabilities,kDRDeviceCanWriteCDRKey) == kCFBooleanTrue) ||
+          (CFDictionaryGetValue(capabilities,kDRDeviceCanWriteCDRWKey) == kCFBooleanTrue));
+  
+  CFRelease(info);
+  return result;
+}
+
+
+
+int
+druFilter_DVDBurners(DRDeviceRef device)
+{
+  CFDictionaryRef    info = DRDeviceCopyInfo(device);
+  CFDictionaryRef    capabilities = CFDictionaryGetValue(info,kDRDeviceWriteCapabilitiesKey);
+  
+  int  result = ((CFDictionaryGetValue(capabilities,kDRDeviceCanWriteDVDRKey) == kCFBooleanTrue) ||
+          (CFDictionaryGetValue(capabilities,kDRDeviceCanWriteDVDRWKey) == kCFBooleanTrue));
+  
+  CFRelease(info);
+  return result;
+}
+
+</pre>
+	<!--googleoff: index -->
+			</td>
+		</tr>
+	</table>
+	<!-- END WIDE COLUMN -->
+
+	<!-- END MAIN CONTENT -->
+		<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/samplecode/bulkerase/listing3.html%3Fid%3DDTS10000463-1.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/samplecode/bulkerase/listing3.html%3Fid%3DDTS10000463-1.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/samplecode/bulkerase/listing3.html%3Fid%3DDTS10000463-1.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+
+	<!-- START BOTTOM APPLE NAVIGATION -->
+	<!--#include virtual="/includes/footer"-->
+	<!-- END BOTTOM APPLE NAVIGATION -->
+
+<!-- START CENTER CLOSE -->
+</center>
+<!-- END CENTER CLOSE -->
+
+</body>
+</html>

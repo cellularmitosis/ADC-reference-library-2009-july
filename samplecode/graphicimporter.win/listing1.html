@@ -1,0 +1,677 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+   "http://www.w3.org/TR/1999/REC-html401-19991224/loose.dtd">
+<html>
+<head>
+
+	<!-- BEGIN META TAG INFO -->
+	<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+	<link rel="home" href="http://developer.apple.com/">
+	<link rel="find" href="http://developer.apple.com/search/">
+	<link rel="stylesheet" type="text/css" href="../../documentation/css/adcstyle.css" title="fonts">
+	<script language="JavaScript" src="../../documentation/js/adc.js" type="text/javascript"></script>
+	<!-- END META TAG INFO -->
+	
+	<!-- BEGIN TITLE -->
+	<title>graphicimporter.win - /GraphicImporter.c</title>
+	<!-- END TITLE -->
+<script language="JavaScript">
+function JumpToNewPage() {
+	window.location=document.scpopupmenu.gotop.value;
+	return true;
+}
+</script>
+
+</head>
+
+<!-- BEGIN BODY OPEN -->
+<body>
+<!--END BODY OPEN -->
+
+<!-- START CENTER OPEN -->
+<center>
+<!-- END CENTER OPEN -->
+
+	<!-- BEGIN LOGO AND SEARCH -->
+	<!--#include virtual="/includes/adcnavbar"-->
+	<!-- END LOGO AND SEARCH -->
+		
+		
+	<!-- START BREADCRUMB -->
+	<div id="breadcrumb">
+	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td scope="row"><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+			<td><img width="340" height="10" src="images/1dot.gif" alt=""></td>
+		</tr>
+		<tr valign="middle">
+			<td align="left" colspan="2">
+			<a href="http://developer.apple.com/">ADC Home</a> &gt; <a href="../../referencelibrary/index.html">Reference Library</a> &gt; <a href="../../samplecode/index.html">Sample Code</a> &gt; <a href="../../samplecode/QuickTime/index.html">QuickTime</a> &gt; <a href="../../samplecode/QuickTime/idxImportExport-date.html">Import & Export</a> &gt; <A HREF="javascript:location.replace('index.html');">graphicimporter.win</A> &gt; 
+			</td>
+		</tr>
+		<tr>
+			<td colspan="2" scope="row"><img width="680" height="35" src="images/1dot.gif" alt=""></td>
+		</tr>
+	</table>
+	</div>
+	<!-- END BREADCRUMB -->
+
+	
+
+	<!-- START MAIN CONTENT -->
+	
+	<!-- START TITLE GRAPHIC AND INTRO-->
+	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr align="left" valign="top">
+			<td><h1><div id="pagehead">graphicimporter.win</div></h1></td>
+		</tr>
+	</table>
+	<!-- END TITLE GRAPHIC AND INTRO -->
+	<!-- START WIDE COLUMN -->
+	<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr align="left" valign="top">
+			<td id="scdetails">
+				<h2>/GraphicImporter.c</h2>
+				<form name="scpopupmenu" onSubmit="return false;" method=post>
+				<p><strong>View Source Code:</strong> 
+					<select name="gotop" onChange="JumpToNewPage();" style="width:340px"><option selected value="ingnore">Select File</option>
+<option value="listing1.html">/GraphicImporter.c</option>
+<option value="listing2.html">/README.txt</option>
+<option value="listing3.html">/resource.h</option>
+<option value="listing4.html">/STDWIN.C</option>
+<option value="listing5.html">/STDWIN.H</option></select>
+				</p>
+				</form>
+				<p><strong><a href="graphicimporter.win.zip">Download Sample</a></strong> (&#147;graphicimporter.win.zip&#148;, 49.4K)<BR>
+<strong><a href="graphicimporter.win.dmg">Download Sample</a></strong> (&#147;graphicimporter.win.dmg&#148;, 112.5K)</p>
+				<!--
+				<p><strong><a href="#">Download Sample</a></strong> (&#147;filename.sit&#148;, 500K)</p>
+				-->
+			</td>
+		</tr>
+		<tr>
+			<td scope="row"><img width="680" height="10" src="images/1dot.gif" alt=""><br>
+			<img height="1" width="680" src="images/1dot_919699.gif" alt=""><br>
+			<img width="680" height="20" src="images/1dot.gif" alt=""></td>
+		</tr>
+		<tr>
+			<td scope="row">
+	<!--googleon: index -->
+<pre class="sourcecodebox"> /*
+  File:    GraphicImporter.c
+
+  Written by: Keith Gurganus
+
+  GraphicImporter.exe is a MDI application that demonstates QuickTime graphic import 
+  functions. This is a part of the QuickTime sample source code and is provided as is.
+
+    Copyright:  &copy; 1997 by Apple Computer, Inc., all rights reserved.
+*/
+
+#include &quot;QTML.h&quot;
+#include &quot;Movies.h&quot;
+#include &quot;MacWindows.h&quot;
+#include &quot;Resources.h&quot;
+#include &quot;ImageCompression.h&quot;
+#include &quot;stdwin.h&quot;
+#include &quot;resource.h&quot;
+#include &quot;TextUtils.h&quot;
+
+// Globals
+HINSTANCE  ghModule;
+HWND    ghwndMain   = NULL;
+HWND    ghwndClient = NULL;
+HMENU    hMenu,      hMenuWindow;
+HMENU    hChildMenu, hChildMenuWindow; 
+int      gMDICount=1;
+
+
+// Instance data for each MDI child window
+typedef struct _PerWndInfo {
+    HWND          hParent;
+  HWND          hwndChildWindow;
+    RECT          rcClient;
+  FSSpec          spec;
+  OPENFILENAME      ofn;
+  GraphicsImportComponent  gi;
+  Rect          imageRect;
+} INFO, *PINFO;
+
+// Defines
+#define USEEXPLORERSTYLE (LOBYTE(LOWORD(GetVersion()))&gt;=4)
+
+// Prototypes
+LRESULT CALLBACK MainWndProc     (HWND, UINT, WPARAM, LPARAM);
+LRESULT CALLBACK MDIWndProc      (HWND, UINT, WPARAM, LPARAM);
+BOOL  CALLBACK About           (HWND, UINT, WPARAM, LPARAM);
+BOOL  InitializeApp(void);
+BOOL  DoOpen(PINFO pInfo);
+BOOL  DoGraphicsImport(PINFO pInfo);
+static  UINT APIENTRY GenericHook(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
+void  ParseCmdLinePriv(LPSTR cmdLine);
+BOOL  DoFileOpen(char* fullPathName);
+
+/*
+  WinMain
+*/
+int CALLBACK WinMain ( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd)
+{
+    MSG    msg;
+    HANDLE hAccel;
+
+  // Store our module handle
+    ghModule = GetModuleHandle(NULL);
+
+  // Initialize QuickTime Media Layer
+  InitializeQTML(0);
+
+  // Initialize QuickTime
+  EnterMovies();
+
+  // Initialize the app
+    if (!InitializeApp()) 
+    {
+        MessageBox(ghwndMain, &quot;MDI: InitializeApp failure!&quot;, &quot;Error&quot;, MB_OK);
+        return 0;
+    }
+
+  // Load our accelerator keys
+    if (!(hAccel = LoadAccelerators (ghModule, MAKEINTRESOURCE(ACCEL_ID))))
+        MessageBox(ghwndMain, &quot;MDI: Load Accel failure!&quot;, &quot;Error&quot;, MB_OK);
+
+  // Parse the command line for drag and drop
+  ParseCmdLinePriv(NULL);
+
+  // Loop for messages
+    while (GetMessage(&amp;msg, NULL, 0, 0)) {
+        if (!TranslateAccelerator( ghwndMain, hAccel, &amp;msg) &amp;&amp;
+            !TranslateMDISysAccel(  ghwndClient, &amp;msg)          ) {
+            TranslateMessage(&amp;msg);
+            DispatchMessage(&amp;msg);
+        }
+    }
+
+  // Deinitialize QuickTime
+  ExitMovies();
+
+  // Deinitialize QTML
+  TerminateQTML();
+
+    return TRUE;
+}
+
+
+/*
+  InitializeApp
+*/
+BOOL InitializeApp(void)
+{
+
+    WNDCLASS wc;
+  RECT  rcDesktop;
+
+    wc.style            = CS_OWNDC;
+    wc.lpfnWndProc      = (WNDPROC) MainWndProc;
+    wc.cbClsExtra       = 0;
+    wc.cbWndExtra       = sizeof(LONG);
+    wc.hInstance        = ghModule;
+    wc.hIcon            = LoadIcon(NULL, MAKEINTRESOURCE(IDI_APP));
+    wc.hCursor          = LoadCursor(NULL, IDC_ARROW);
+    wc.hbrBackground    = (HBRUSH)(COLOR_APPWORKSPACE);
+    wc.lpszMenuName     = MAKEINTRESOURCE(IDR_MAINMENU);
+    wc.lpszClassName    = &quot;MDIDemoClass&quot;;
+
+    if (!RegisterClass(&amp;wc))
+        return FALSE;
+
+    wc.lpfnWndProc      = (WNDPROC) MDIWndProc;
+    wc.hIcon            = LoadIcon(NULL, MAKEINTRESOURCE(IDI_APP));
+    wc.lpszMenuName     = NULL;
+    wc.lpszClassName    = &quot;MDIClass&quot;;
+
+    if (!RegisterClass(&amp;wc))
+        return FALSE;
+
+
+    hMenu       = LoadMenu(ghModule, MAKEINTRESOURCE(IDR_MAINMENU));
+    hChildMenu  = LoadMenu(ghModule, MAKEINTRESOURCE(IDR_CHILDMENU));
+    hMenuWindow      = GetSubMenu(hMenu, 1);
+    hChildMenuWindow = GetSubMenu(hChildMenu, 2);
+
+  // Get the size for our window
+  GetWindowRect(GetDesktopWindow(), &amp;rcDesktop);
+    ghwndMain = CreateWindowEx(0L, &quot;MDIDemoClass&quot;, &quot;Graphic Importer&quot;,
+            WS_OVERLAPPED   | WS_CAPTION     | WS_BORDER       |
+            WS_THICKFRAME   | WS_MAXIMIZEBOX | WS_MINIMIZEBOX  |
+            WS_CLIPCHILDREN | WS_VISIBLE     | WS_SYSMENU,
+            0, 0, rcDesktop.right - rcDesktop.left, rcDesktop.bottom - rcDesktop.top,
+            NULL, hMenu, ghModule, NULL);
+
+    if (ghwndMain == NULL)
+        return FALSE;
+
+  // Store our data
+    SetWindowLong(ghwndMain, GWL_USERDATA, 0L);
+
+  // Set initial focus 
+    SetFocus(ghwndMain);
+
+    return TRUE;
+}
+
+/*
+  MainWndProc
+*/
+LRESULT CALLBACK MainWndProc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
+{
+
+    CLIENTCREATESTRUCT  clientcreate;
+  DWORD        dwStyle;  
+
+    switch (message) 
+    {
+
+      case WM_CREATE:
+        SetWindowLong(hwnd, 0, (LONG)NULL);
+        clientcreate.hWindowMenu  = hMenuWindow;
+        clientcreate.idFirstChild = 1;
+  
+    dwStyle = WS_CHILD | WS_CLIPCHILDREN | WS_VISIBLE;      
+
+    // Create our child window
+    ghwndClient = CreateWindow(&quot;MDICLIENT&quot;, NULL,
+                    dwStyle,
+                    0,0,0,0,
+                    hwnd, NULL, ghModule, (LPVOID)&amp;clientcreate);
+
+        return 0L;
+
+      case WM_DESTROY: 
+    PostQuitMessage(0);
+        return 0L;
+
+      case WM_SYSCOMMAND:
+    if ( LOWORD(wParam) == MM_ABOUT)   {
+      SendMessage(hwnd,WM_COMMAND,MM_ABOUT,0);
+      return 0;
+    } else
+              return DefWindowProc (hwnd, message, wParam, lParam);
+    break;
+
+      case WM_COMMAND:
+
+        switch (LOWORD(wParam)) 
+        {
+            
+      // File Menu
+      case ID_FILE_OPEN: 
+        if(DoFileOpen(NULL))
+          return 0L;
+        break;
+      
+      case ID_FILE_CLOSE:
+        DestroyWindow((HWND)SendMessage(ghwndClient, WM_MDIGETACTIVE, 0L, FALSE));
+        break;
+
+      case ID_FILE_EXIT:
+              PostMessage(hwnd, WM_SYSCOMMAND, SC_CLOSE, 0L);
+              break;
+      
+      // Window Menu
+            case IDM_TILE:
+                SendMessage(ghwndClient, WM_MDITILE, 0L, 0L);
+                return 0L;
+            
+      case IDM_CASCADE:
+                SendMessage(ghwndClient, WM_MDICASCADE, 0L, 0L);
+                return 0L;
+            
+      case IDM_ARRANGE:
+                SendMessage(ghwndClient, WM_MDIICONARRANGE, 0L, 0L);
+                return 0L;
+
+            case ID_WINDOW_ABOUT:
+                if (DialogBox(ghModule, &quot;AboutBox&quot;, ghwndMain, (DLGPROC)About) == -1){
+          MessageBox(ghwndMain, &quot;About Dialog Creation Error!&quot;, &quot;Error&quot;, MB_OK);
+        }
+        return 0L;
+
+            default:
+                return DefFrameProc(hwnd,  ghwndClient, message, wParam, lParam);
+        }
+
+    default:
+
+        return DefFrameProc(hwnd,  ghwndClient, message, wParam, lParam);
+    }
+}
+
+/*
+  MDIWndProc
+*/
+LRESULT CALLBACK MDIWndProc( HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
+{
+    HANDLE      hInfo;
+  PINFO       pInfo;
+  MSG      msg;
+  EventRecord  macEvent;
+  LONG    thePoints = GetMessagePos();
+  PAINTSTRUCT  ps;
+
+  msg.hwnd = hwnd;
+  msg.message = message;
+  msg.wParam = wParam;
+  msg.lParam = lParam;
+  msg.time = GetMessageTime();
+  msg.pt.x = LOWORD(thePoints);
+  msg.pt.y = HIWORD(thePoints);
+  WinEventToMacEvent(&amp;msg, &amp;macEvent);           
+
+    switch (message) 
+    {
+    case WM_CREATE:
+    case WM_MDICREATE:
+      break;
+    case WM_DESTROY:
+      hInfo = (HANDLE)GetWindowLong(hwnd, GWL_USERDATA);
+            if (hInfo) 
+            {
+                if ((pInfo = (PINFO)LocalLock(hInfo)) != NULL){
+          if (pInfo-&gt;gi) 
+            // close the graphic import component
+            CloseComponent(pInfo-&gt;gi);
+
+            // Destroy our port association
+            DestroyPortAssociation((CGrafPort *)GetHWNDPort(pInfo-&gt;hwndChildWindow));
+        }
+                LocalUnlock(hInfo);
+      }
+      break;
+
+    // Draw our graphic
+    case WM_PAINT:
+      BeginPaint(hwnd, &amp;ps); 
+      hInfo = (HANDLE)GetWindowLong(hwnd, GWL_USERDATA);
+            if (hInfo) 
+            {
+                if ((pInfo = (PINFO)LocalLock(hInfo)) != NULL)
+          GraphicsImportDraw(pInfo-&gt;gi);
+      
+                LocalUnlock(hInfo);
+      }
+      EndPaint(hwnd, &amp;ps);
+      break;
+
+        default:
+            return DefMDIChildProc(hwnd, message, wParam, lParam);
+
+    }
+    return DefMDIChildProc(hwnd, message, wParam, lParam);
+}
+
+/*
+  About
+*/
+BOOL CALLBACK About (HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
+{
+    switch (message) 
+    {
+    case WM_INITDIALOG:
+        return TRUE;
+
+    case WM_COMMAND:
+        if (wParam == IDOK)
+            EndDialog(hDlg, wParam);
+        break;
+    }
+
+    return FALSE;
+}
+
+/*
+  DoGraphicsImport
+*/
+BOOL DoGraphicsImport(PINFO pInfo)
+{
+  long  err;
+
+  // Get the graphics importer component
+  c2pstr(pInfo-&gt;spec.name);
+  err = GetGraphicsImporterForFile(&amp;pInfo-&gt;spec, &amp;pInfo-&gt;gi);
+  
+  if (err) 
+    goto bail;
+
+  // Get the pixel bounds of this image
+  err = GraphicsImportGetNaturalBounds(pInfo-&gt;gi, &amp;pInfo-&gt;imageRect);
+
+bail:
+  if (err)
+    return FALSE;
+  else
+    return TRUE;
+}
+
+/*
+  DoOpen
+*/
+BOOL DoOpen(PINFO pInfo)
+{
+    pInfo-&gt;ofn.lStructSize = sizeof(OPENFILENAME);
+  pInfo-&gt;ofn.lpstrTitle = &quot;Select an Image File&quot;;
+  pInfo-&gt;ofn.lpstrFile = pInfo-&gt;spec.name;
+  pInfo-&gt;ofn.nMaxFile = 256;
+    pInfo-&gt;ofn.lpstrFilter = &quot;All Files (*.*) \0 *.*\0&quot;;
+  if(USEEXPLORERSTYLE)
+    pInfo-&gt;ofn.Flags |= OFN_ENABLEHOOK | OFN_EXPLORER;
+  else
+    pInfo-&gt;ofn.Flags |= OFN_ENABLEHOOK;
+  pInfo-&gt;ofn.lpfnHook = GenericHook;
+
+  // Open the file...
+  return GetOpenFileName(&amp;pInfo-&gt;ofn);
+}
+
+/*
+  GenericHook
+*/
+static UINT APIENTRY GenericHook(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
+{
+  switch (uMsg)
+  {
+    case WM_INITDIALOG:    // Center window
+    {
+      Point  ptTopLeft;
+      RECT  rcWindow;
+      BOOL  retValue;
+      HWND  theWnd = hWnd;
+      RECT  rcDesktopWindow;
+      long  width;
+      long  height;
+
+      // if we are using 95 or NT 4.0 use the new explorer style
+      if(USEEXPLORERSTYLE)
+        theWnd = GetParent(hWnd);
+
+      GetWindowRect(theWnd, &amp;rcWindow);
+
+      width = rcWindow.right - rcWindow.left;
+      height = rcWindow.bottom - rcWindow.top;
+      GetWindowRect(GetDesktopWindow(), &amp;rcDesktopWindow);
+      ptTopLeft.h = (short)((rcDesktopWindow.right + rcDesktopWindow.left)/2 - width/2);
+      ptTopLeft.v = (short)((rcDesktopWindow.top + rcDesktopWindow.bottom)/3 - height/3);
+    
+      retValue = SetWindowPos(theWnd, 0, ptTopLeft.h, ptTopLeft.v, 0, 0, SWP_NOZORDER|SWP_NOSIZE);
+  
+      return true;
+    }
+  }
+  return 0;
+}
+
+/*
+  DoFileOpen
+*/
+BOOL DoFileOpen(char* fullPathName)
+{
+  HANDLE      hInfo;
+    PINFO      pInfo;
+    MDICREATESTRUCT mdicreate;
+  CGrafPtr    port;
+  GDHandle    gd;
+
+  // Allocate memory for INFO to be associated with the
+  hInfo = LocalAlloc(LHND, (WORD) sizeof(INFO));
+  if (hInfo) 
+  {
+    if ((pInfo = (PINFO)LocalLock(hInfo)) == NULL)
+      MessageBox(ghwndMain, &quot;Failed in LocalLock&quot;, &quot;Error&quot;, MB_OK);
+
+    // if we do not have a fullPathName, display an open dialog
+    if(fullPathName == NULL) {
+      // Display an open dialog
+      if(  !DoOpen(pInfo)){
+        LocalFree(hInfo);
+        return FALSE;
+      }
+    } else {
+      // Else we open the file
+      pInfo-&gt;ofn.lpstrFile = fullPathName;
+      strcpy(pInfo-&gt;spec.name, fullPathName);
+      pInfo-&gt;ofn.nMaxFile = 256;
+    }
+
+    // Can we import this file?
+    if(!DoGraphicsImport(pInfo)){
+      LocalFree(hInfo);
+      return FALSE;
+    } else
+      gMDICount++;
+
+    pInfo-&gt;hParent    = ghwndClient;
+    mdicreate.szClass = &quot;MDIClass&quot;;
+    mdicreate.szTitle = (LPTSTR)((*pInfo).ofn).lpstrFile;
+    mdicreate.hOwner  = ghModule;
+    mdicreate.x       = CW_USEDEFAULT;
+    mdicreate.y       = CW_USEDEFAULT;
+    mdicreate.cx      = pInfo-&gt;imageRect.right - pInfo-&gt;imageRect.left;
+    mdicreate.cy      = pInfo-&gt;imageRect.bottom - pInfo-&gt;imageRect.top + GetSystemMetrics(SM_CYCAPTION);
+    mdicreate.style   = 0L;
+    // pass the handle of the per MDI child INFO to the child MDI window for storage
+    mdicreate.lParam  = (LONG) hInfo;
+
+    // Create Child Window
+    pInfo-&gt;hwndChildWindow =
+              (HANDLE) SendMessage(ghwndClient, WM_MDICREATE,
+              0L,
+              (LONG)(LPMDICREATESTRUCT)&amp;mdicreate);
+
+    if (pInfo-&gt;hwndChildWindow == NULL) 
+    {
+      MessageBox(ghwndMain, &quot;Failed in Creating Child Window&quot;, &quot;Error&quot;, MB_OK);
+      return FALSE;
+    }
+
+    // Create our port association &amp;&amp; set the port
+    MacSetPort(CreatePortAssociation(pInfo-&gt;hwndChildWindow, NULL, 0));
+  
+    // These lines required to get the image to draw within the window
+    GetGWorld(&amp;port, &amp;gd);
+    GraphicsImportSetGWorld(pInfo-&gt;gi, port, gd);
+    
+    // Store our private data
+    SetWindowLong(pInfo-&gt;hwndChildWindow, GWL_USERDATA, (LONG)hInfo);
+
+    return TRUE;
+    } else 
+    MessageBox(ghwndMain, &quot;Failed to Allocate INFO data!&quot;, &quot;Error&quot;, MB_OK);
+
+  return FALSE;
+}
+
+/*
+  ParseCmdLinePriv
+
+  Parse the command line when the applcation first starts.
+*/
+void ParseCmdLinePriv(LPSTR cmdLine)
+{
+  LPSTR lpCmdLine, lpT;
+
+  if(cmdLine == NULL)
+    lpCmdLine = GetCommandLine();
+  else
+    lpCmdLine = cmdLine;
+
+  if (*lpCmdLine) {
+    lpT = strchr(lpCmdLine, ' ');   // skip self name
+    if (lpT) {
+      lpCmdLine = lpT;
+      while (*lpCmdLine == ' ') {
+        lpCmdLine++;            // skip spaces to end or first cmd
+      }
+
+      while (*lpCmdLine != '\0'){
+        char buff[255];
+        int i;
+        for (i = 0; (*lpCmdLine != ' ') &amp;&amp; (*lpCmdLine != '\0'); i++, lpCmdLine++) {
+          buff[i] = *lpCmdLine;
+        }
+
+        // Null terminate
+        if(*lpCmdLine != '\0')
+          lpCmdLine++;
+        
+        buff[i] = '\0';
+
+        // Open the file
+        DoFileOpen(buff);  
+      }
+
+    } else
+      lpCmdLine += strlen(lpCmdLine);   // point to NULL
+    
+  }
+}  
+
+
+
+</pre>
+	<!--googleoff: index -->
+			</td>
+		</tr>
+	</table>
+	<!-- END WIDE COLUMN -->
+
+	<!-- END MAIN CONTENT -->
+		<table width="680" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td><div style="width: 100%; height: 1px; background-color: #919699; margin-top: 5px; margin-bottom: 15px"></div></td>
+		</tr>
+		<tr>
+			<td align="center"><br/>
+				<table border="0" cellpadding="0" cellspacing="0" class="graybox">
+					<tr>
+						<th>Did this document help you?</th>
+					</tr>
+					<tr>
+						<td>
+						    <div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=1&url=/samplecode/graphicimporter.win/listing1.html%3Fid%3DDTS10000890-1.0&media=dvd" target=_new>Yes</a>:  Tell us what works for you.</div>
+							<div style="margin-bottom: 8px"><a href="http://developer.apple.com/feedback/?v=2&url=/samplecode/graphicimporter.win/listing1.html%3Fid%3DDTS10000890-1.0&media=dvd" target=_new>It&#8217;s good, but:</a> Report typos, inaccuracies, and so forth.</div>
+							<div><a href="http://developer.apple.com/feedback/?v=3&url=/samplecode/graphicimporter.win/listing1.html%3Fid%3DDTS10000890-1.0&media=dvd" target=_new>It wasn&#8217;t helpful</a>: Tell us what would have helped.</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+
+	<!-- START BOTTOM APPLE NAVIGATION -->
+	<!--#include virtual="/includes/footer"-->
+	<!-- END BOTTOM APPLE NAVIGATION -->
+
+<!-- START CENTER CLOSE -->
+</center>
+<!-- END CENTER CLOSE -->
+
+</body>
+</html>

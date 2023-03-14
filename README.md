@@ -710,3 +710,13 @@ All of the sample code zip files have been expanded for online browsing:
 - [XML_Transport](samplecode/XML_Transport)
 - [YASTControl](samplecode/YASTControl)
 - [ZoomRecter](samplecode/ZoomRecter)
+
+
+# About
+
+This was taken from the July 2009 Apple Developer Connection DVD.
+- https://www.macintoshrepository.org/software_search.php?s=apple+developer+connection&sid=&p=1
+- https://archive.org/details/Apple_Developer_Discs_1989-2009
+
+Apple previously published all of of this online, but time has moved on.
+- https://web.archive.org/web/20080509104309/http://developer.apple.com/samplecode/index-date.html

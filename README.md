@@ -5,7 +5,7 @@ This is a copy of Apple's ADC Reference Library for OS X Leopard
 
 Viewable online at http://leopard-adc.pepas.com.
 
-[![](.media/screenshot.png)](http://leopard-adc.pepas.com)
+[![](media/screenshot.png)](http://leopard-adc.pepas.com)
 
 Note: two files have been compressed using xz because they exceed github's 50MB filesize limit:
 - documentation/GraphicsImaging/Reference/CoreImageFilterReference/CoreImageFilterReference.pdf
